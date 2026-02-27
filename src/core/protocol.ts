@@ -13,6 +13,9 @@ export const MSG_SNAPSHOT = 0;
 export const MSG_FRAME = 1;
 export const MSG_METADATA = 2;
 
+const HAS_BOND_ORDERS = 0x01;
+const HAS_BOX = 0x02;
+
 export function decodeHeader(buffer: ArrayBuffer): {
   msgType: number;
   flags: number;
@@ -32,6 +35,7 @@ export function decodeHeader(buffer: ArrayBuffer): {
 
 export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
   const view = new DataView(buffer);
+  const flags = view.getUint8(5);
   let offset = 8; // skip header
 
   const nAtoms = view.getUint32(offset, true);
@@ -50,8 +54,24 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
 
   // Bonds: Uint32Array[nBonds * 2]
   const bonds = new Uint32Array(buffer, offset, nBonds * 2);
+  offset += nBonds * 2 * 4;
 
-  return { nAtoms, nBonds, positions, elements, bonds };
+  // Bond orders (optional, if HAS_BOND_ORDERS flag)
+  let bondOrders: Uint8Array | null = null;
+  if (flags & HAS_BOND_ORDERS) {
+    bondOrders = new Uint8Array(buffer, offset, nBonds);
+    offset += nBonds;
+    offset += (4 - (offset % 4)) % 4; // alignment padding
+  }
+
+  // Box (optional, if HAS_BOX flag)
+  let box: Float32Array | null = null;
+  if (flags & HAS_BOX) {
+    box = new Float32Array(buffer, offset, 9);
+    offset += 9 * 4;
+  }
+
+  return { nAtoms, nBonds, positions, elements, bonds, bondOrders, box };
 }
 
 export function decodeFrame(buffer: ArrayBuffer): Frame {

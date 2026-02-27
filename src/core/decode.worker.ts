@@ -47,6 +47,12 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
         snapshot.elements.buffer as ArrayBuffer,
         snapshot.bonds.buffer as ArrayBuffer,
       ];
+      if (snapshot.bondOrders) {
+        transfers.push(snapshot.bondOrders.buffer as ArrayBuffer);
+      }
+      if (snapshot.box) {
+        transfers.push(snapshot.box.buffer as ArrayBuffer);
+      }
       ctx.postMessage(
         {
           id,
@@ -57,6 +63,8 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
             positions: snapshot.positions,
             elements: snapshot.elements,
             bonds: snapshot.bonds,
+            bondOrders: snapshot.bondOrders,
+            box: snapshot.box,
           },
         } satisfies WorkerResponse,
         transfers,

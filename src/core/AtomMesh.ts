@@ -22,9 +22,10 @@ export class AtomMesh {
   constructor(maxAtoms: number = 1_000_000) {
     const segments = this.selectLOD(maxAtoms);
     const geometry = new THREE.SphereGeometry(1, segments, segments);
-    const material = new THREE.MeshStandardMaterial({
-      roughness: 0.4,
-      metalness: 0.1,
+    const material = new THREE.MeshPhysicalMaterial({
+      roughness: 0.35,
+      metalness: 0.05,
+      clearcoat: 0.1,
     });
 
     this.mesh = new THREE.InstancedMesh(geometry, material, maxAtoms);

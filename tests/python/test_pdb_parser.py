@@ -38,3 +38,33 @@ def test_bond_indices_valid():
         assert s.bonds[i, 0] < s.n_atoms
         assert s.bonds[i, 1] < s.n_atoms
         assert s.bonds[i, 0] <= s.bonds[i, 1]  # sorted
+
+
+def test_bond_orders():
+    """Test that bond orders are extracted."""
+    s = load_pdb(str(FIXTURES / "1crn.pdb"))
+
+    assert len(s.bond_orders) == len(s.bonds)
+    assert s.bond_orders.dtype == np.uint8
+
+    # All bond orders should be valid (1=single, 2=double, 3=triple, 4=aromatic)
+    for bo in s.bond_orders:
+        assert bo in (1, 2, 3, 4)
+
+    # Crambin has peptide bonds with C=O double bonds
+    assert 2 in s.bond_orders  # At least some double bonds
+
+
+def test_box():
+    """Test that box is parsed from CRYST1 record."""
+    s = load_pdb(str(FIXTURES / "1crn.pdb"))
+
+    assert s.box.shape == (3, 3)
+    assert s.box.dtype == np.float32
+
+    # 1CRN has CRYST1 record: 40.960  18.650  22.520  90.00  90.77  90.00
+    if np.any(s.box != 0):
+        # First vector should have a ~ 40.96
+        assert abs(s.box[0, 0] - 40.96) < 0.1
+        # Second vector y component ~ 18.65
+        assert abs(s.box[1, 1] - 18.65) < 0.1

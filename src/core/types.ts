@@ -7,6 +7,8 @@ export interface Snapshot {
   positions: Float32Array; // length = nAtoms * 3
   elements: Uint8Array; // length = nAtoms (atomic numbers)
   bonds: Uint32Array; // length = nBonds * 2
+  bondOrders: Uint8Array | null; // length = nBonds (1=single,2=double,3=triple,4=aromatic)
+  box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
 }
 
 /** Decoded trajectory frame. */

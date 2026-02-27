@@ -52,6 +52,20 @@ export const BALL_STICK_ATOM_SCALE = 0.3;
 /** Ball-and-stick bond radius in Angstroms. */
 export const BOND_RADIUS = 0.15;
 
+/** Bond order constants (matches Python encoding). */
+export const BOND_SINGLE = 1;
+export const BOND_DOUBLE = 2;
+export const BOND_TRIPLE = 3;
+export const BOND_AROMATIC = 4;
+
+/** Bond order rendering parameters. */
+export const DOUBLE_BOND_OFFSET = 0.18;
+export const DOUBLE_BOND_RADIUS = 0.10;
+export const TRIPLE_BOND_OFFSET = 0.20;
+export const TRIPLE_BOND_RADIUS = 0.08;
+export const AROMATIC_BOND_RADIUS = 0.10;
+export const AROMATIC_DASH_RADIUS = 0.06;
+
 export function getColor(atomicNum: number): [number, number, number] {
   return ELEMENT_COLORS[atomicNum] ?? DEFAULT_COLOR;
 }

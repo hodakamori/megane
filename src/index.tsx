@@ -6,8 +6,16 @@
 import { StrictMode, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
+import { UploadArea } from "./components/UploadArea";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import "./styles/megane.css";
+
+async function uploadFiles(pdb: File, xtc?: File): Promise<void> {
+  const form = new FormData();
+  form.append("pdb", pdb);
+  if (xtc) form.append("xtc", xtc);
+  await fetch("/api/upload", { method: "POST", body: form });
+}
 
 function App() {
   const wsUrl = `ws://${window.location.host}/ws`;
@@ -55,6 +63,10 @@ function App() {
     setFps(newFps);
   }, []);
 
+  const handleUpload = useCallback((pdb: File, xtc?: File) => {
+    uploadFiles(pdb, xtc);
+  }, []);
+
   return (
     <>
       <MeganeViewer
@@ -67,7 +79,9 @@ function App() {
         onSeek={handleSeek}
         onPlayPause={handlePlayPause}
         onFpsChange={handleFpsChange}
+        onUpload={handleUpload}
       />
+      {!snapshot && connected && <UploadArea onUpload={handleUpload} />}
       <div
         className={`megane-status ${connected ? "megane-status--connected" : "megane-status--disconnected"}`}
       >

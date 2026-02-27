@@ -3,7 +3,7 @@
  * Combines Viewport, Toolbar, and Timeline.
  */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Toolbar } from "./Toolbar";
 import { Timeline } from "./Timeline";
@@ -20,6 +20,7 @@ interface MeganeViewerProps {
   onSeek?: (frame: number) => void;
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
+  onUpload?: (pdb: File, xtc?: File) => void;
   width?: string | number;
   height?: string | number;
 }
@@ -34,10 +35,12 @@ export function MeganeViewer({
   onSeek,
   onPlayPause,
   onFpsChange,
+  onUpload,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
+  const [cellVisible, setCellVisible] = useState(true);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -46,6 +49,18 @@ export function MeganeViewer({
   const handleResetView = useCallback(() => {
     rendererRef.current?.resetView();
   }, []);
+
+  const handleToggleCell = useCallback(() => {
+    setCellVisible((prev) => {
+      const next = !prev;
+      rendererRef.current?.setCellVisible(next);
+      return next;
+    });
+  }, []);
+
+  // Check if snapshot has a non-zero box
+  const hasCell =
+    snapshot?.box != null && snapshot.box.some((v) => v !== 0);
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden" }}>
@@ -58,6 +73,10 @@ export function MeganeViewer({
         atomCount={snapshot?.nAtoms ?? 0}
         bondCount={snapshot?.nBonds ?? 0}
         onResetView={handleResetView}
+        onUpload={onUpload}
+        hasCell={hasCell}
+        cellVisible={cellVisible}
+        onToggleCell={handleToggleCell}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

@@ -4,17 +4,23 @@
  * Imperative API - framework agnostic.
  *
  * Automatically selects rendering strategy based on atom count:
- *   ≤5,000 atoms  → InstancedMesh (sphere/cylinder geometry)
- *   >5,000 atoms  → Billboard impostors (2-triangle quads + shader)
+ *   <=5,000 atoms  -> InstancedMesh (sphere/cylinder geometry) with SSAO
+ *   >5,000 atoms   -> Billboard impostors (2-triangle quads + shader)
  */
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Snapshot, Frame, AtomRenderer, BondRenderer } from "./types";
 import { AtomMesh } from "./AtomMesh";
 import { BondMesh } from "./BondMesh";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
+import { CellRenderer } from "./CellRenderer";
 
 /** Threshold above which we use impostor rendering. */
 const IMPOSTOR_THRESHOLD = 5_000;
@@ -27,9 +33,15 @@ export class MoleculeRenderer {
   private controls!: OrbitControls;
   private atomRenderer: AtomRenderer | null = null;
   private bondRenderer: BondRenderer | null = null;
+  private cellRenderer: CellRenderer | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
+
+  // Post-processing (SSAO only for InstancedMesh path)
+  private composer: EffectComposer | null = null;
+  private ssaoPass: SSAOPass | null = null;
+  private useSSAO = false;
 
   /** Mount the viewer into a DOM element. */
   mount(container: HTMLElement): void {
@@ -51,12 +63,21 @@ export class MoleculeRenderer {
     // Scene
     this.scene = new THREE.Scene();
 
+    // Environment map for PBR materials
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    pmrem.compileEquirectangularShader();
+    this.scene.environment = pmrem.fromScene(
+      new RoomEnvironment(),
+      0.04,
+    ).texture;
+    pmrem.dispose();
+
     // Camera
     this.camera = new THREE.PerspectiveCamera(
       50,
       container.clientWidth / container.clientHeight,
       0.1,
-      10000
+      10000,
     );
     this.camera.position.set(0, 0, 50);
 
@@ -67,9 +88,9 @@ export class MoleculeRenderer {
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
 
-    // Lighting - 3-point setup (used by InstancedMesh path)
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambient);
+    // Lighting - hemisphere + 3-point
+    const hemi = new THREE.HemisphereLight(0xddeeff, 0x997744, 0.6);
+    this.scene.add(hemi);
 
     const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
     keyLight.position.set(50, 50, 50);
@@ -83,6 +104,9 @@ export class MoleculeRenderer {
     rimLight.position.set(0, -30, -50);
     this.scene.add(rimLight);
 
+    // Post-processing pipeline (will be enabled for InstancedMesh path)
+    this.setupPostProcessing();
+
     // Resize observer
     const resizeObserver = new ResizeObserver(() => this.onResize());
     resizeObserver.observe(container);
@@ -91,12 +115,39 @@ export class MoleculeRenderer {
     this.animate();
   }
 
+  private setupPostProcessing(): void {
+    this.composer = new EffectComposer(this.renderer);
+
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+
+    this.ssaoPass = new SSAOPass(
+      this.scene,
+      this.camera,
+      this.container!.clientWidth,
+      this.container!.clientHeight,
+    );
+    this.ssaoPass.kernelRadius = 8;
+    this.ssaoPass.minDistance = 0.005;
+    this.ssaoPass.maxDistance = 0.1;
+    this.composer.addPass(this.ssaoPass);
+
+    const outputPass = new OutputPass();
+    this.composer.addPass(outputPass);
+  }
+
   /** Load a molecular snapshot (topology + positions). */
   loadSnapshot(snapshot: Snapshot): void {
     this.snapshot = snapshot;
 
     // Pick rendering strategy based on atom count
     const shouldUseImpostor = snapshot.nAtoms > IMPOSTOR_THRESHOLD;
+
+    // Enable SSAO only for InstancedMesh path
+    this.useSSAO = !shouldUseImpostor;
+    if (this.ssaoPass) {
+      this.ssaoPass.enabled = this.useSSAO;
+    }
 
     // Rebuild renderers if strategy changed or first load
     if (
@@ -108,6 +159,19 @@ export class MoleculeRenderer {
 
     this.atomRenderer!.loadSnapshot(snapshot);
     this.bondRenderer!.loadSnapshot(snapshot);
+
+    // Update simulation cell
+    if (snapshot.box) {
+      const hasNonZero = snapshot.box.some((v) => v !== 0);
+      if (hasNonZero) {
+        if (!this.cellRenderer) {
+          this.cellRenderer = new CellRenderer();
+          this.scene.add(this.cellRenderer.mesh);
+        }
+        this.cellRenderer.loadBox(snapshot.box);
+      }
+    }
+
     this.fitToView(snapshot);
   }
 
@@ -118,8 +182,20 @@ export class MoleculeRenderer {
     this.bondRenderer.updatePositions(
       frame.positions,
       this.snapshot.bonds,
-      this.snapshot.nBonds
+      this.snapshot.nBonds,
     );
+  }
+
+  /** Toggle simulation cell visibility. */
+  setCellVisible(visible: boolean): void {
+    if (this.cellRenderer) {
+      this.cellRenderer.setVisible(visible);
+    }
+  }
+
+  /** Check if cell data exists. */
+  hasCell(): boolean {
+    return this.cellRenderer !== null && this.cellRenderer.mesh.visible;
   }
 
   /** Swap between InstancedMesh and Impostor renderers. */
@@ -204,12 +280,20 @@ export class MoleculeRenderer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    if (this.composer) {
+      this.composer.setSize(w, h);
+    }
   }
 
   private animate = (): void => {
     this.animationId = requestAnimationFrame(this.animate);
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+
+    if (this.useSSAO && this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   };
 
   /** Clean up all resources. */
@@ -219,6 +303,8 @@ export class MoleculeRenderer {
     }
     if (this.atomRenderer) this.atomRenderer.dispose();
     if (this.bondRenderer) this.bondRenderer.dispose();
+    if (this.cellRenderer) this.cellRenderer.dispose();
+    if (this.composer) this.composer.dispose();
     this.controls.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {

@@ -2,9 +2,9 @@
  * GLSL 3.0 ES shaders for billboard impostor rendering.
  *
  * Atom shader: screen-aligned quad + ray-sphere intersection in fragment
- *              → pixel-perfect spheres with correct depth.
+ *              -> pixel-perfect spheres with correct depth.
  * Bond shader: screen-aligned quad between two endpoints
- *              → cylinder-like shading.
+ *              -> cylinder-like shading with dashed bond support.
  *
  * RawShaderMaterial requires explicit uniform/attribute declarations.
  */
@@ -69,16 +69,33 @@ export const atomFragmentShader = /* glsl */ `#version 300 es
     float ndcDepth = clipPos.z / clipPos.w;
     gl_FragDepth = ndcDepth * 0.5 + 0.5;
 
-    // Blinn-Phong
-    vec3 lightDir = normalize(vec3(0.5, 0.5, 1.0));
-    float diffuse = max(dot(normal, lightDir), 0.0);
-    float ambient = 0.35;
+    // Hemisphere ambient: sky blue on top, warm brown on bottom
+    vec3 skyColor = vec3(0.87, 0.92, 1.0);
+    vec3 groundColor = vec3(0.6, 0.47, 0.27);
+    float hemiMix = normal.y * 0.5 + 0.5;
+    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.4;
 
+    // Dual-light diffuse
+    vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
+    vec3 lightDir2 = normalize(vec3(-0.3, 0.3, 0.8));
+    float diffuse1 = max(dot(normal, lightDir1), 0.0);
+    float diffuse2 = max(dot(normal, lightDir2), 0.0);
+    float diffuse = diffuse1 * 0.55 + diffuse2 * 0.2;
+
+    // Specular (Blinn-Phong)
     vec3 viewDir = vec3(0.0, 0.0, 1.0);
-    vec3 halfDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 40.0);
+    vec3 halfDir = normalize(lightDir1 + viewDir);
+    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
-    vec3 color = vColor * (ambient + diffuse * 0.65) + vec3(1.0) * spec * 0.3;
+    // Fresnel rim
+    float fresnel = pow(1.0 - z, 3.0) * 0.25;
+
+    // Edge darkening
+    float edgeFactor = mix(0.85, 1.0, z);
+
+    vec3 color = vColor * (ambient + diffuse) * edgeFactor
+               + vec3(1.0) * spec * 0.3
+               + vec3(0.15) * fresnel;
     fragColor = vec4(color, 1.0);
   }
 `;
@@ -96,13 +113,16 @@ export const bondVertexShader = /* glsl */ `#version 300 es
   in vec3 instanceEnd;
   in vec3 instanceColor;
   in float instanceRadius;
+  in float instanceDashed;
 
   out vec3 vColor;
   out vec2 vCylUv;
+  out float vDashed;
 
   void main() {
     vColor = instanceColor;
     vCylUv = uv;
+    vDashed = instanceDashed;
 
     vec4 viewStart = modelViewMatrix * vec4(instanceStart, 1.0);
     vec4 viewEnd = modelViewMatrix * vec4(instanceEnd, 1.0);
@@ -127,23 +147,44 @@ export const bondFragmentShader = /* glsl */ `#version 300 es
 
   in vec3 vColor;
   in vec2 vCylUv;
+  in float vDashed;
 
   out vec4 fragColor;
 
   void main() {
+    // Dashed bond: discard alternate segments along bond length
+    if (vDashed > 0.5) {
+      if (sin(vCylUv.y * 30.0) < 0.0) discard;
+    }
+
     float nx = vCylUv.x;
     float nz = sqrt(max(0.0, 1.0 - nx * nx));
     vec3 normal = vec3(nx, 0.0, nz);
 
-    vec3 lightDir = normalize(vec3(0.5, 0.5, 1.0));
-    float diffuse = max(dot(normal, lightDir), 0.0);
-    float ambient = 0.35;
+    // Hemisphere ambient
+    vec3 skyColor = vec3(0.87, 0.92, 1.0);
+    vec3 groundColor = vec3(0.6, 0.47, 0.27);
+    float hemiMix = normal.y * 0.5 + 0.5;
+    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.4;
 
+    // Dual-light diffuse
+    vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
+    vec3 lightDir2 = normalize(vec3(-0.3, 0.3, 0.8));
+    float diffuse1 = max(dot(normal, lightDir1), 0.0);
+    float diffuse2 = max(dot(normal, lightDir2), 0.0);
+    float diffuse = diffuse1 * 0.55 + diffuse2 * 0.2;
+
+    // Specular
     vec3 viewDir = vec3(0.0, 0.0, 1.0);
-    vec3 halfDir = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 40.0);
+    vec3 halfDir = normalize(lightDir1 + viewDir);
+    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
-    vec3 color = vColor * (ambient + diffuse * 0.65) + vec3(1.0) * spec * 0.2;
+    // Fresnel rim
+    float fresnel = pow(1.0 - nz, 3.0) * 0.15;
+
+    vec3 color = vColor * (ambient + diffuse)
+               + vec3(1.0) * spec * 0.2
+               + vec3(0.1) * fresnel;
     fragColor = vec4(color, 1.0);
   }
 `;

@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from megane.parsers.pdb import Structure, load_pdb
@@ -18,6 +19,9 @@ from megane.protocol import encode_frame, encode_metadata, encode_snapshot
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="megane")
+
+# Track connected WebSocket clients for broadcasting
+_clients: set[WebSocket] = set()
 
 
 @dataclass
@@ -62,10 +66,55 @@ def configure(pdb_path: str, xtc_path: str | None = None) -> None:
     )
 
 
+async def _broadcast_snapshot() -> None:
+    """Send snapshot (and metadata if trajectory) to all connected clients."""
+    for ws in list(_clients):
+        try:
+            await ws.send_bytes(_state.snapshot_bytes)
+            traj = _state.trajectory
+            if traj is not None:
+                meta_bytes = encode_metadata(
+                    traj.n_frames, traj.timestep_ps, traj.n_atoms
+                )
+                await ws.send_bytes(meta_bytes)
+        except Exception:
+            _clients.discard(ws)
+
+
+@app.post("/api/upload")
+async def upload_file(
+    pdb: UploadFile,
+    xtc: UploadFile | None = None,
+) -> dict:
+    """Upload a PDB file (and optional XTC) to load in the viewer."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Save PDB
+        pdb_path = Path(tmpdir) / (pdb.filename or "upload.pdb")
+        pdb_path.write_bytes(await pdb.read())
+
+        # Save XTC if provided
+        xtc_path = None
+        if xtc is not None:
+            xtc_path_obj = Path(tmpdir) / (xtc.filename or "upload.xtc")
+            xtc_path_obj.write_bytes(await xtc.read())
+            xtc_path = str(xtc_path_obj)
+
+        configure(str(pdb_path), xtc_path)
+
+    # Broadcast to all connected clients
+    await _broadcast_snapshot()
+
+    return {
+        "nAtoms": _state.structure.n_atoms,
+        "nBonds": len(_state.structure.bonds),
+    }
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for streaming molecular data."""
     await websocket.accept()
+    _clients.add(websocket)
     try:
         # Send snapshot immediately on connection
         if _state.structure is not None:
@@ -74,7 +123,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         # Send trajectory metadata if available
         traj = _state.trajectory
         if traj is not None:
-            meta_bytes = encode_metadata(traj.n_frames, traj.timestep_ps, traj.n_atoms)
+            meta_bytes = encode_metadata(
+                traj.n_frames, traj.timestep_ps, traj.n_atoms
+            )
             await websocket.send_bytes(meta_bytes)
 
         # Handle client commands
@@ -87,7 +138,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 frame_idx = msg["frame"]
                 if 0 <= frame_idx < traj.n_frames:
                     positions = traj.get_frame(frame_idx)
-                    await websocket.send_bytes(encode_frame(frame_idx, positions))
+                    await websocket.send_bytes(
+                        encode_frame(frame_idx, positions)
+                    )
 
             elif cmd == "stream" and traj is not None:
                 start = msg.get("start", 0)
@@ -106,9 +159,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")
+    finally:
+        _clients.discard(websocket)
 
 
 # Try to serve static files for the built web app
 _static_dir = Path(__file__).parent / "static" / "app"
 if _static_dir.exists():
-    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="app")
+    app.mount(
+        "/", StaticFiles(directory=str(_static_dir), html=True), name="app"
+    )

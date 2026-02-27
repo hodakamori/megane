@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 import webbrowser
 from threading import Timer
 
@@ -15,13 +14,22 @@ def main() -> None:
         description="megane - A fast, beautiful molecular viewer",
     )
     parser.add_argument("command", choices=["serve"], help="Command to run")
-    parser.add_argument("pdb", help="Path to PDB file")
+    parser.add_argument(
+        "pdb",
+        nargs="?",
+        default=None,
+        help="Path to PDB file (optional; can upload from browser)",
+    )
     parser.add_argument("--xtc", help="Path to XTC trajectory file")
     parser.add_argument("--port", type=int, default=8765, help="Server port")
     parser.add_argument(
         "--no-browser", action="store_true", help="Don't open browser"
     )
-    parser.add_argument("--dev", action="store_true", help="Development mode (use Vite dev server)")
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Development mode (use Vite dev server)",
+    )
 
     args = parser.parse_args()
 
@@ -30,16 +38,25 @@ def main() -> None:
     if args.command == "serve":
         from megane.server import app, configure
 
-        configure(args.pdb, args.xtc)
+        if args.pdb:
+            configure(args.pdb, args.xtc)
+        else:
+            logging.info(
+                "No PDB file specified. Waiting for file upload from browser..."
+            )
 
         if not args.no_browser and not args.dev:
             url = f"http://localhost:{args.port}"
             Timer(1.5, lambda: webbrowser.open(url)).start()
 
         if args.dev:
-            logging.info("Dev mode: connect Vite dev server to ws://localhost:%d/ws", args.port)
+            logging.info(
+                "Dev mode: connect Vite dev server to ws://localhost:%d/ws",
+                args.port,
+            )
 
         import uvicorn
+
         uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="info")
 
 

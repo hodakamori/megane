@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from megane.parsers.pdb import cell_params_to_matrix
+
 
 @dataclass
 class Trajectory:
@@ -15,6 +17,7 @@ class Trajectory:
     n_frames: int
     n_atoms: int
     timestep_ps: float
+    box: np.ndarray  # (3, 3) float32 - cell vectors as rows
 
     def get_frame(self, index: int) -> np.ndarray:
         """Get positions for a specific frame.
@@ -27,6 +30,17 @@ class Trajectory:
         universe: mda.Universe = self._universe  # type: ignore
         universe.trajectory[index]
         return universe.atoms.positions.astype(np.float32)
+
+
+def _box_from_dimensions(dimensions: np.ndarray | None) -> np.ndarray:
+    """Convert MDAnalysis dimensions [a, b, c, alpha, beta, gamma] to 3x3 matrix."""
+    if dimensions is None:
+        return np.zeros((3, 3), dtype=np.float32)
+    a, b, c, alpha, beta, gamma = dimensions
+    if a == 0 and b == 0 and c == 0:
+        return np.zeros((3, 3), dtype=np.float32)
+    return cell_params_to_matrix(float(a), float(b), float(c),
+                                 float(alpha), float(beta), float(gamma))
 
 
 def load_trajectory(pdb_path: str, xtc_path: str) -> Trajectory:
@@ -45,10 +59,12 @@ def load_trajectory(pdb_path: str, xtc_path: str) -> Trajectory:
     n_frames = len(universe.trajectory)
     n_atoms = len(universe.atoms)
     timestep_ps = universe.trajectory.dt
+    box = _box_from_dimensions(universe.dimensions)
 
     return Trajectory(
         _universe=universe,
         n_frames=n_frames,
         n_atoms=n_atoms,
         timestep_ps=timestep_ps,
+        box=box,
     )
