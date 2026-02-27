@@ -7,3 +7,4 @@ __pycache__/
 .venv/
 .vite/
 *.whl
+tests/fixtures/.*.npz
