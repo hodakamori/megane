@@ -1,0 +1,9 @@
+node_modules/
+dist/
+python/megane/static/
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.vite/
+*.whl
