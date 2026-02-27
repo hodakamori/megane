@@ -69,3 +69,10 @@ def encode_frame(frame_id: int, positions: np.ndarray) -> bytes:
     pos_bytes = positions.astype(np.float32).tobytes()
 
     return header + frame_header + pos_bytes
+
+
+def encode_metadata(n_frames: int, timestep_ps: float, n_atoms: int) -> bytes:
+    """Encode trajectory metadata message."""
+    header = MAGIC + struct.pack("<BBH", MSG_METADATA, 0, 0)
+    payload = struct.pack("<IfI", n_frames, timestep_ps, n_atoms)
+    return header + payload

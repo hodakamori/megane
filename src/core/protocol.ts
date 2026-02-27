@@ -5,12 +5,13 @@
  * Header: "MEGN" (4 bytes) + msg_type (u8) + flags (u8) + reserved (u16)
  */
 
-import type { Snapshot, Frame } from "./types";
+import type { Snapshot, Frame, TrajectoryMeta } from "./types";
 
 const MAGIC = 0x4e47454d; // "MEGN" in little-endian
 
 export const MSG_SNAPSHOT = 0;
 export const MSG_FRAME = 1;
+export const MSG_METADATA = 2;
 
 export function decodeHeader(buffer: ArrayBuffer): {
   msgType: number;
@@ -67,14 +68,13 @@ export function decodeFrame(buffer: ArrayBuffer): Frame {
   return { frameId, nAtoms, positions };
 }
 
-export function decode(buffer: ArrayBuffer): Snapshot | Frame {
-  const { msgType } = decodeHeader(buffer);
-  switch (msgType) {
-    case MSG_SNAPSHOT:
-      return decodeSnapshot(buffer);
-    case MSG_FRAME:
-      return decodeFrame(buffer);
-    default:
-      throw new Error(`Unknown message type: ${msgType}`);
-  }
+export function decodeMetadata(buffer: ArrayBuffer): TrajectoryMeta {
+  const view = new DataView(buffer);
+  const offset = 8; // skip header
+
+  const nFrames = view.getUint32(offset, true);
+  const timestepPs = view.getFloat32(offset + 4, true);
+  const nAtoms = view.getUint32(offset + 8, true);
+
+  return { nFrames, timestepPs, nAtoms };
 }

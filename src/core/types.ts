@@ -13,3 +13,10 @@ export interface Frame {
   nAtoms: number;
   positions: Float32Array;
 }
+
+/** Trajectory metadata. */
+export interface TrajectoryMeta {
+  nFrames: number;
+  timestepPs: number;
+  nAtoms: number;
+}

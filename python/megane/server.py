@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from megane.parsers.pdb import load_pdb
-from megane.protocol import encode_snapshot
+from megane.protocol import encode_frame, encode_metadata, encode_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,21 @@ def configure(pdb_path: str, xtc_path: str | None = None) -> None:
     structure = load_pdb(pdb_path)
     _state["structure"] = structure
     _state["snapshot_bytes"] = encode_snapshot(structure)
+    _state["pdb_path"] = pdb_path
     _state["xtc_path"] = xtc_path
+    _state["trajectory"] = None
+
+    if xtc_path:
+        from megane.parsers.xtc import load_trajectory
+
+        traj = load_trajectory(pdb_path, xtc_path)
+        _state["trajectory"] = traj
+        logger.info(
+            "Loaded trajectory: %d frames, %d atoms",
+            traj.n_frames,
+            traj.n_atoms,
+        )
+
     logger.info(
         "Loaded %s: %d atoms, %d bonds",
         pdb_path,
@@ -43,11 +58,38 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         if "snapshot_bytes" in _state:
             await websocket.send_bytes(_state["snapshot_bytes"])
 
-        # Keep connection alive, handle future commands
+        # Send trajectory metadata if available
+        traj = _state.get("trajectory")
+        if traj is not None:
+            meta_bytes = encode_metadata(traj.n_frames, traj.timestep_ps, traj.n_atoms)
+            await websocket.send_bytes(meta_bytes)
+
+        # Handle client commands
         while True:
             data = await websocket.receive_text()
-            # Phase 2: handle frame requests, streaming commands
-            logger.debug("Received: %s", data)
+            msg = json.loads(data)
+            cmd = msg.get("type")
+
+            if cmd == "request_frame" and traj is not None:
+                frame_idx = msg["frame"]
+                if 0 <= frame_idx < traj.n_frames:
+                    positions = traj.get_frame(frame_idx)
+                    await websocket.send_bytes(encode_frame(frame_idx, positions))
+
+            elif cmd == "stream" and traj is not None:
+                start = msg.get("start", 0)
+                end = msg.get("end", traj.n_frames)
+                stride = msg.get("stride", 1)
+                fps = msg.get("fps", 30)
+                delay = 1.0 / fps
+
+                for i in range(start, end, stride):
+                    positions = traj.get_frame(i)
+                    await websocket.send_bytes(encode_frame(i, positions))
+                    await asyncio.sleep(delay)
+
+            elif cmd == "stop":
+                pass  # Stream cancellation handled by new commands
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")

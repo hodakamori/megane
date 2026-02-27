@@ -3,7 +3,7 @@
  * Combines Viewport, Toolbar, and Timeline.
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { Viewport } from "./Viewport";
 import { Toolbar } from "./Toolbar";
 import { Timeline } from "./Timeline";
@@ -13,6 +13,13 @@ import type { Snapshot, Frame } from "../core/types";
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
   frame?: Frame | null;
+  currentFrame?: number;
+  totalFrames?: number;
+  playing?: boolean;
+  fps?: number;
+  onSeek?: (frame: number) => void;
+  onPlayPause?: () => void;
+  onFpsChange?: (fps: number) => void;
   width?: string | number;
   height?: string | number;
 }
@@ -20,6 +27,13 @@ interface MeganeViewerProps {
 export function MeganeViewer({
   snapshot,
   frame = null,
+  currentFrame = 0,
+  totalFrames = 0,
+  playing = false,
+  fps = 30,
+  onSeek,
+  onPlayPause,
+  onFpsChange,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
@@ -45,7 +59,17 @@ export function MeganeViewer({
         bondCount={snapshot?.nBonds ?? 0}
         onResetView={handleResetView}
       />
-      <Timeline />
+      {onSeek && onPlayPause && onFpsChange && (
+        <Timeline
+          currentFrame={currentFrame}
+          totalFrames={totalFrames}
+          playing={playing}
+          fps={fps}
+          onSeek={onSeek}
+          onPlayPause={onPlayPause}
+          onFpsChange={onFpsChange}
+        />
+      )}
     </div>
   );
 }
