@@ -12,14 +12,14 @@
 ### 前提
 
 - Python 3.10+
+- [uv](https://docs.astral.sh/uv/)
 - Node.js 18+
 
 ### インストール
 
 ```bash
 # Python
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,trajectory]"
+uv sync --extra dev --extra trajectory
 
 # Node.js
 npm install
@@ -31,9 +31,9 @@ npm run build
 ### CLI（スタンドアロン）
 
 ```bash
-megane serve protein.pdb
-megane serve protein.pdb --xtc trajectory.xtc
-megane serve protein.pdb --port 9000
+uv run megane serve protein.pdb
+uv run megane serve protein.pdb --xtc trajectory.xtc
+uv run megane serve protein.pdb --port 9000
 ```
 
 ### 開発モード
@@ -43,7 +43,7 @@ megane serve protein.pdb --port 9000
 npm run dev
 
 # ターミナル2: Python backend
-megane serve protein.pdb --dev --no-browser
+uv run megane serve protein.pdb --dev --no-browser
 ```
 
 `http://localhost:5173` でアクセス。
@@ -65,7 +65,7 @@ viewer.frame_index = 50
 ## テスト
 
 ```bash
-pytest                  # Python テスト
+uv run pytest           # Python テスト
 npm run build           # TypeScript ビルド
 ```
 
