@@ -12,6 +12,9 @@ export { Timeline } from "./components/Timeline";
 // Core renderer (framework-agnostic)
 export { MoleculeRenderer } from "./core/MoleculeRenderer";
 
+// Worker pool for off-main-thread decoding
+export { WorkerPool } from "./core/WorkerPool";
+
 // Protocol
 export {
   decodeSnapshot,

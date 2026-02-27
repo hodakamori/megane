@@ -2,6 +2,10 @@
  * Main molecular viewer class.
  * Owns the Three.js scene, camera, renderer, and controls.
  * Imperative API - framework agnostic.
+ *
+ * Automatically selects rendering strategy based on atom count:
+ *   ≤5,000 atoms  → InstancedMesh (sphere/cylinder geometry)
+ *   >5,000 atoms  → Billboard impostors (2-triangle quads + shader)
  */
 
 import * as THREE from "three";
@@ -9,6 +13,25 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Snapshot, Frame } from "./types";
 import { AtomMesh } from "./AtomMesh";
 import { BondMesh } from "./BondMesh";
+import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
+import { ImpostorBondMesh } from "./ImpostorBondMesh";
+
+/** Threshold above which we use impostor rendering. */
+const IMPOSTOR_THRESHOLD = 5_000;
+
+interface AtomRenderer {
+  readonly mesh: THREE.Object3D;
+  loadSnapshot(snapshot: Snapshot): void;
+  updatePositions(positions: Float32Array): void;
+  dispose(): void;
+}
+
+interface BondRenderer {
+  readonly mesh: THREE.Object3D;
+  loadSnapshot(snapshot: Snapshot): void;
+  updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void;
+  dispose(): void;
+}
 
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
@@ -16,8 +39,9 @@ export class MoleculeRenderer {
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private controls!: OrbitControls;
-  private atomMesh!: AtomMesh;
-  private bondMesh!: BondMesh;
+  private atomRenderer: AtomRenderer | null = null;
+  private bondRenderer: BondRenderer | null = null;
+  private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
 
@@ -57,7 +81,7 @@ export class MoleculeRenderer {
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
 
-    // Lighting - 3-point setup
+    // Lighting - 3-point setup (used by InstancedMesh path)
     const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambient);
 
@@ -73,13 +97,6 @@ export class MoleculeRenderer {
     rimLight.position.set(0, -30, -50);
     this.scene.add(rimLight);
 
-    // Meshes
-    this.atomMesh = new AtomMesh();
-    this.scene.add(this.atomMesh.mesh);
-
-    this.bondMesh = new BondMesh();
-    this.scene.add(this.bondMesh.mesh);
-
     // Resize observer
     const resizeObserver = new ResizeObserver(() => this.onResize());
     resizeObserver.observe(container);
@@ -91,20 +108,62 @@ export class MoleculeRenderer {
   /** Load a molecular snapshot (topology + positions). */
   loadSnapshot(snapshot: Snapshot): void {
     this.snapshot = snapshot;
-    this.atomMesh.loadSnapshot(snapshot);
-    this.bondMesh.loadSnapshot(snapshot);
+
+    // Pick rendering strategy based on atom count
+    const shouldUseImpostor = snapshot.nAtoms > IMPOSTOR_THRESHOLD;
+
+    // Rebuild renderers if strategy changed or first load
+    if (
+      this.atomRenderer === null ||
+      shouldUseImpostor !== this.useImpostor
+    ) {
+      this.swapRenderers(shouldUseImpostor);
+    }
+
+    this.atomRenderer!.loadSnapshot(snapshot);
+    this.bondRenderer!.loadSnapshot(snapshot);
     this.fitToView(snapshot);
   }
 
   /** Update positions from a trajectory frame. */
   updateFrame(frame: Frame): void {
-    if (!this.snapshot) return;
-    this.atomMesh.updatePositions(frame.positions);
-    this.bondMesh.updatePositions(
+    if (!this.snapshot || !this.atomRenderer || !this.bondRenderer) return;
+    this.atomRenderer.updatePositions(frame.positions);
+    this.bondRenderer.updatePositions(
       frame.positions,
       this.snapshot.bonds,
       this.snapshot.nBonds
     );
+  }
+
+  /** Swap between InstancedMesh and Impostor renderers. */
+  private swapRenderers(impostor: boolean): void {
+    // Remove old renderers
+    if (this.atomRenderer) {
+      this.scene.remove(this.atomRenderer.mesh);
+      this.atomRenderer.dispose();
+    }
+    if (this.bondRenderer) {
+      this.scene.remove(this.bondRenderer.mesh);
+      this.bondRenderer.dispose();
+    }
+
+    this.useImpostor = impostor;
+
+    if (impostor) {
+      const atoms = new ImpostorAtomMesh();
+      const bonds = new ImpostorBondMesh();
+      this.atomRenderer = atoms;
+      this.bondRenderer = bonds;
+    } else {
+      const atoms = new AtomMesh();
+      const bonds = new BondMesh();
+      this.atomRenderer = atoms;
+      this.bondRenderer = bonds;
+    }
+
+    this.scene.add(this.atomRenderer.mesh);
+    this.scene.add(this.bondRenderer.mesh);
   }
 
   /** Fit camera to show all atoms. */
@@ -172,8 +231,8 @@ export class MoleculeRenderer {
     if (this.animationId !== null) {
       cancelAnimationFrame(this.animationId);
     }
-    this.atomMesh.dispose();
-    this.bondMesh.dispose();
+    if (this.atomRenderer) this.atomRenderer.dispose();
+    if (this.bondRenderer) this.bondRenderer.dispose();
     this.controls.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {
