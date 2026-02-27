@@ -1,21 +1,21 @@
 # megane
 
-高速・シンプルな分子ビューアー。PDB構造とXTCトラジェクトリをブラウザ上でリアルタイム描画する。
+A fast, simple molecular viewer. Renders PDB structures and XTC trajectories in real time in the browser.
 
-- Three.js InstancedMesh + Billboard Impostor で100万原子に対応
-- 5,000原子以下は高品質InstancedMesh、以上は自動でImpostorに切替
-- FastAPI WebSocketでPython→ブラウザへバイナリストリーミング
-- anywidget対応のJupyterウィジェット
+- Scales to 1M atoms with Three.js InstancedMesh + Billboard Impostor
+- High-quality InstancedMesh for <=5,000 atoms; auto-switches to Impostor above that
+- Binary streaming from Python to browser via FastAPI WebSocket
+- Jupyter widget powered by anywidget
 
-## セットアップ
+## Setup
 
-### 前提
+### Prerequisites
 
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/)
 - Node.js 18+
 
-### インストール
+### Installation
 
 ```bash
 # Python
@@ -26,9 +26,9 @@ npm install
 npm run build
 ```
 
-## 使い方
+## Usage
 
-### CLI（スタンドアロン）
+### CLI (Standalone)
 
 ```bash
 uv run megane serve protein.pdb
@@ -36,17 +36,17 @@ uv run megane serve protein.pdb --xtc trajectory.xtc
 uv run megane serve protein.pdb --port 9000
 ```
 
-### 開発モード
+### Development Mode
 
 ```bash
-# ターミナル1: Vite dev server
+# Terminal 1: Vite dev server
 npm run dev
 
-# ターミナル2: Python backend
+# Terminal 2: Python backend
 uv run megane serve protein.pdb --dev --no-browser
 ```
 
-`http://localhost:5173` でアクセス。
+Open `http://localhost:5173` in your browser.
 
 ### Jupyter
 
@@ -55,33 +55,33 @@ import megane
 
 viewer = megane.MolecularViewer()
 viewer.load("protein.pdb")
-viewer  # セルに表示
+viewer  # display in cell
 
-# トラジェクトリ付き
+# With trajectory
 viewer.load("protein.pdb", xtc="trajectory.xtc")
 viewer.frame_index = 50
 ```
 
-## テスト
+## Tests
 
 ```bash
-uv run pytest           # Python テスト
-npm run build           # TypeScript ビルド
+uv run pytest           # Python tests
+npm run build           # TypeScript build
 ```
 
-## プロジェクト構造
+## Project Structure
 
 ```
-src/                     TypeScript フロントエンド
-  core/                  Three.js レンダラー・プロトコル・シェーダー
-  components/            React UIコンポーネント
-  hooks/                 カスタムReact hooks
-  stream/                WebSocketクライアント
-python/megane/           Python バックエンド
-  parsers/               PDB / XTC パーサー
-  protocol.py            バイナリプロトコル エンコーダー
-  server.py              FastAPI WebSocketサーバー
-  widget.py              anywidget Jupyterウィジェット
-scripts/                 ベンチマーク・ヘッドレスレンダリング
-tests/                   テスト
+src/                     TypeScript frontend
+  core/                  Three.js renderer, protocol, shaders
+  components/            React UI components
+  hooks/                 Custom React hooks
+  stream/                WebSocket client
+python/megane/           Python backend
+  parsers/               PDB / XTC parsers
+  protocol.py            Binary protocol encoder
+  server.py              FastAPI WebSocket server
+  widget.py              anywidget Jupyter widget
+scripts/                 Benchmarks, headless rendering
+tests/                   Tests
 ```
