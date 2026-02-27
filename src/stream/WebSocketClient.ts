@@ -3,20 +3,31 @@
  */
 
 export type OnMessageCallback = (data: ArrayBuffer) => void;
+export type OnStatusCallback = (connected: boolean) => void;
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private onMessage: OnMessageCallback;
+  private onStatus: OnStatusCallback | null;
   private url: string;
 
-  constructor(url: string, onMessage: OnMessageCallback) {
+  constructor(
+    url: string,
+    onMessage: OnMessageCallback,
+    onStatus?: OnStatusCallback,
+  ) {
     this.url = url;
     this.onMessage = onMessage;
+    this.onStatus = onStatus ?? null;
   }
 
   connect(): void {
     this.ws = new WebSocket(this.url);
     this.ws.binaryType = "arraybuffer";
+
+    this.ws.onopen = () => {
+      this.onStatus?.(true);
+    };
 
     this.ws.onmessage = (event: MessageEvent) => {
       if (event.data instanceof ArrayBuffer) {
@@ -24,8 +35,13 @@ export class WebSocketClient {
       }
     };
 
+    this.ws.onerror = (event: Event) => {
+      console.error("[megane] WebSocket error:", event);
+    };
+
     this.ws.onclose = () => {
       this.ws = null;
+      this.onStatus?.(false);
     };
   }
 

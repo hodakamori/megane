@@ -5,36 +5,49 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-from megane.parsers.pdb import load_pdb
+from megane.parsers.pdb import Structure, load_pdb
 from megane.protocol import encode_frame, encode_metadata, encode_snapshot
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="megane")
 
-# Global state for the currently loaded structure
-_state: dict = {}
+
+@dataclass
+class ServerState:
+    """Typed state for the currently loaded structure."""
+
+    structure: Optional[Structure] = None
+    snapshot_bytes: bytes = b""
+    pdb_path: str = ""
+    xtc_path: Optional[str] = None
+    trajectory: object = None  # Optional[Trajectory] - lazy import
+
+
+_state = ServerState()
 
 
 def configure(pdb_path: str, xtc_path: str | None = None) -> None:
     """Configure the server with a molecular structure to serve."""
     structure = load_pdb(pdb_path)
-    _state["structure"] = structure
-    _state["snapshot_bytes"] = encode_snapshot(structure)
-    _state["pdb_path"] = pdb_path
-    _state["xtc_path"] = xtc_path
-    _state["trajectory"] = None
+    _state.structure = structure
+    _state.snapshot_bytes = encode_snapshot(structure)
+    _state.pdb_path = pdb_path
+    _state.xtc_path = xtc_path
+    _state.trajectory = None
 
     if xtc_path:
         from megane.parsers.xtc import load_trajectory
 
         traj = load_trajectory(pdb_path, xtc_path)
-        _state["trajectory"] = traj
+        _state.trajectory = traj
         logger.info(
             "Loaded trajectory: %d frames, %d atoms",
             traj.n_frames,
@@ -55,11 +68,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         # Send snapshot immediately on connection
-        if "snapshot_bytes" in _state:
-            await websocket.send_bytes(_state["snapshot_bytes"])
+        if _state.structure is not None:
+            await websocket.send_bytes(_state.snapshot_bytes)
 
         # Send trajectory metadata if available
-        traj = _state.get("trajectory")
+        traj = _state.trajectory
         if traj is not None:
             meta_bytes = encode_metadata(traj.n_frames, traj.timestep_ps, traj.n_atoms)
             await websocket.send_bytes(meta_bytes)

@@ -7,6 +7,14 @@ import * as THREE from "three";
 import type { Snapshot } from "./types";
 import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "./constants";
 
+// Reusable temp objects to avoid per-atom GC pressure (matches BondMesh pattern)
+const _matrix = new THREE.Matrix4();
+const _tmpMatrix = new THREE.Matrix4();
+const _pos = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+const _scale = new THREE.Vector3();
+const _color = new THREE.Color();
+
 export class AtomMesh {
   readonly mesh: THREE.InstancedMesh;
   private nAtoms = 0;
@@ -48,22 +56,19 @@ export class AtomMesh {
 
     this.mesh.count = nAtoms;
 
-    const matrix = new THREE.Matrix4();
-    const color = new THREE.Color();
-
     for (let i = 0; i < nAtoms; i++) {
       const x = positions[i * 3];
       const y = positions[i * 3 + 1];
       const z = positions[i * 3 + 2];
       const r = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
 
-      matrix.makeScale(r, r, r);
-      matrix.setPosition(x, y, z);
-      this.mesh.setMatrixAt(i, matrix);
+      _matrix.makeScale(r, r, r);
+      _matrix.setPosition(x, y, z);
+      this.mesh.setMatrixAt(i, _matrix);
 
       const [cr, cg, cb] = getColor(elements[i]);
-      color.setRGB(cr, cg, cb);
-      this.mesh.setColorAt(i, color);
+      _color.setRGB(cr, cg, cb);
+      this.mesh.setColorAt(i, _color);
     }
 
     this.mesh.instanceMatrix.needsUpdate = true;
@@ -74,22 +79,18 @@ export class AtomMesh {
 
   /** Update only positions (for trajectory frames). */
   updatePositions(positions: Float32Array): void {
-    const matrix = new THREE.Matrix4();
-    const tmpMatrix = new THREE.Matrix4();
-
     for (let i = 0; i < this.nAtoms; i++) {
       const x = positions[i * 3];
       const y = positions[i * 3 + 1];
       const z = positions[i * 3 + 2];
 
       // Get existing matrix to preserve scale
-      this.mesh.getMatrixAt(i, tmpMatrix);
-      const sx = new THREE.Vector3();
-      tmpMatrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), sx);
+      this.mesh.getMatrixAt(i, _tmpMatrix);
+      _tmpMatrix.decompose(_pos, _quat, _scale);
 
-      matrix.makeScale(sx.x, sx.y, sx.z);
-      matrix.setPosition(x, y, z);
-      this.mesh.setMatrixAt(i, matrix);
+      _matrix.makeScale(_scale.x, _scale.y, _scale.z);
+      _matrix.setPosition(x, y, z);
+      this.mesh.setMatrixAt(i, _matrix);
     }
 
     this.mesh.instanceMatrix.needsUpdate = true;

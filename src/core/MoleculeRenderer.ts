@@ -10,7 +10,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { Snapshot, Frame } from "./types";
+import type { Snapshot, Frame, AtomRenderer, BondRenderer } from "./types";
 import { AtomMesh } from "./AtomMesh";
 import { BondMesh } from "./BondMesh";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
@@ -18,20 +18,6 @@ import { ImpostorBondMesh } from "./ImpostorBondMesh";
 
 /** Threshold above which we use impostor rendering. */
 const IMPOSTOR_THRESHOLD = 5_000;
-
-interface AtomRenderer {
-  readonly mesh: THREE.Object3D;
-  loadSnapshot(snapshot: Snapshot): void;
-  updatePositions(positions: Float32Array): void;
-  dispose(): void;
-}
-
-interface BondRenderer {
-  readonly mesh: THREE.Object3D;
-  loadSnapshot(snapshot: Snapshot): void;
-  updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void;
-  dispose(): void;
-}
 
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;

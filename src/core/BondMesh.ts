@@ -15,6 +15,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _quat = new THREE.Quaternion();
 const _matrix = new THREE.Matrix4();
 const _color = new THREE.Color();
+const _scale = new THREE.Vector3();
 
 export class BondMesh {
   readonly mesh: THREE.InstancedMesh;
@@ -90,11 +91,8 @@ export class BondMesh {
     // Quaternion that rotates Y-axis to bond direction
     _quat.setFromUnitVectors(_up, _dir);
 
-    _matrix.compose(
-      _mid,
-      _quat,
-      new THREE.Vector3(BOND_RADIUS, length, BOND_RADIUS)
-    );
+    _scale.set(BOND_RADIUS, length, BOND_RADIUS);
+    _matrix.compose(_mid, _quat, _scale);
 
     this.mesh.setMatrixAt(instanceIdx, _matrix);
   }

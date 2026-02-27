@@ -11,8 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "playwright": "^1.58.2",
-    "playwright-core": "^1.58.2",
+    "gl": "^8.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.172.0"

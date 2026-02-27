@@ -27,4 +27,10 @@ export {
 } from "./core/protocol";
 
 // Types
-export type { Snapshot, Frame, TrajectoryMeta } from "./core/types";
+export type {
+  Snapshot,
+  Frame,
+  TrajectoryMeta,
+  AtomRenderer,
+  BondRenderer,
+} from "./core/types";

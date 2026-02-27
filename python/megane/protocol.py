@@ -24,10 +24,9 @@ Protocol format:
 from __future__ import annotations
 
 import struct
+from typing import Protocol, runtime_checkable
 
 import numpy as np
-
-from megane.parsers.pdb import Structure
 
 MAGIC = b"MEGN"
 MSG_SNAPSHOT = 0
@@ -35,7 +34,17 @@ MSG_FRAME = 1
 MSG_METADATA = 2
 
 
-def encode_snapshot(structure: Structure) -> bytes:
+@runtime_checkable
+class StructureLike(Protocol):
+    """Structural contract for objects that can be encoded as snapshots."""
+
+    n_atoms: int
+    positions: np.ndarray  # (N, 3) float32
+    elements: np.ndarray  # (N,) uint8
+    bonds: np.ndarray  # (M, 2) uint32
+
+
+def encode_snapshot(structure: StructureLike) -> bytes:
     """Encode a molecular structure as a binary snapshot message."""
     n_atoms = structure.n_atoms
     n_bonds = len(structure.bonds)

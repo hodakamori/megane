@@ -1,3 +1,5 @@
+import type * as THREE from "three";
+
 /** Decoded molecular snapshot data. */
 export interface Snapshot {
   nAtoms: number;
@@ -19,4 +21,24 @@ export interface TrajectoryMeta {
   nFrames: number;
   timestepPs: number;
   nAtoms: number;
+}
+
+/** Interface for atom rendering backends. */
+export interface AtomRenderer {
+  readonly mesh: THREE.Object3D;
+  loadSnapshot(snapshot: Snapshot): void;
+  updatePositions(positions: Float32Array): void;
+  dispose(): void;
+}
+
+/** Interface for bond rendering backends. */
+export interface BondRenderer {
+  readonly mesh: THREE.Object3D;
+  loadSnapshot(snapshot: Snapshot): void;
+  updatePositions(
+    positions: Float32Array,
+    bonds: Uint32Array,
+    nBonds: number,
+  ): void;
+  dispose(): void;
 }

@@ -3,7 +3,7 @@
  * Manages the lifecycle of MoleculeRenderer.
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { MoleculeRenderer } from "../core/MoleculeRenderer";
 import type { Snapshot, Frame } from "../core/types";
 
@@ -42,10 +42,6 @@ export function Viewport({ snapshot, frame, onRendererReady }: ViewportProps) {
       rendererRef.current.updateFrame(frame);
     }
   }, [frame]);
-
-  const handleResetView = useCallback(() => {
-    rendererRef.current?.resetView();
-  }, []);
 
   return (
     <div
