@@ -18,7 +18,8 @@ async function uploadFiles(pdb: File, xtc?: File): Promise<void> {
 }
 
 function App() {
-  const wsUrl = `ws://${window.location.host}/ws`;
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
   const {
     snapshot,
     frame,

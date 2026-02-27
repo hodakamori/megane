@@ -1,0 +1,19 @@
+version: 1.0
+runtime: image
+image:
+  port: "8080"
+  start-command: "megane serve /data/1crn.pdb --port 8080 --no-browser"
+instance:
+  cpu: 1
+  memory: 2
+auto-scaling:
+  max-concurrency: 50
+  min-size: 1
+  max-size: 2
+health-check:
+  path: "/"
+  protocol: HTTP
+  interval: 10
+  timeout: 5
+  healthy-threshold: 1
+  unhealthy-threshold: 3

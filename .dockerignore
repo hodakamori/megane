@@ -1,0 +1,7 @@
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.git/
+python/megane/static/app/
+python/megane/static/widget.js
