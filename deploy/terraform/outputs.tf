@@ -17,3 +17,8 @@ output "ecs_service_name" {
   description = "ECS service name"
   value       = aws_ecs_service.app.name
 }
+
+output "service_url" {
+  description = "Public URL of the application"
+  value       = "http://${aws_lb.app.dns_name}"
+}

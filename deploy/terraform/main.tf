@@ -19,6 +19,17 @@ provider "aws" {
 }
 
 # ---------------------------------------------------------------------------
+# Locals
+# ---------------------------------------------------------------------------
+locals {
+  common_tags = {
+    App       = var.app_name
+    ManagedBy = "terraform"
+  }
+  subnet_cidrs = [for i in range(2) : cidrsubnet(var.vpc_cidr, 8, i)]
+}
+
+# ---------------------------------------------------------------------------
 # Network (dedicated VPC)
 # ---------------------------------------------------------------------------
 data "aws_availability_zones" "available" {
@@ -26,32 +37,32 @@ data "aws_availability_zones" "available" {
 }
 
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.app_name}-vpc"
-  }
+  })
 }
 
 resource "aws_subnet" "public" {
   count             = 2
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.${count.index}.0/24"
+  cidr_block        = local.subnet_cidrs[count.index]
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.app_name}-public-${count.index}"
-  }
+  })
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.app_name}-igw"
-  }
+  })
 }
 
 resource "aws_route_table" "public" {
@@ -62,9 +73,9 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.app_name}-public-rt"
-  }
+  })
 }
 
 resource "aws_route_table_association" "public" {
@@ -96,9 +107,9 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.app_name}-alb-sg"
-  }
+  })
 }
 
 resource "aws_security_group" "ecs" {
@@ -108,8 +119,8 @@ resource "aws_security_group" "ecs" {
 
   ingress {
     description     = "App port from ALB"
-    from_port       = 8080
-    to_port         = 8080
+    from_port       = var.container_port
+    to_port         = var.container_port
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -121,9 +132,9 @@ resource "aws_security_group" "ecs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
+  tags = merge(local.common_tags, {
     Name = "${var.app_name}-ecs-sg"
-  }
+  })
 }
 
 # ---------------------------------------------------------------------------
@@ -138,9 +149,9 @@ resource "aws_ecr_repository" "app" {
     scan_on_push = false
   }
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-ecr"
+  })
 }
 
 resource "aws_ecr_lifecycle_policy" "app" {
@@ -175,14 +186,14 @@ resource "aws_lb" "app" {
   subnets            = aws_subnet.public[*].id
   idle_timeout       = 4000
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-alb"
+  })
 }
 
 resource "aws_lb_target_group" "app" {
   name        = "${var.app_name}-tg"
-  port        = 8080
+  port        = var.container_port
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
@@ -198,9 +209,9 @@ resource "aws_lb_target_group" "app" {
     matcher             = "200"
   }
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-tg"
+  })
 }
 
 resource "aws_lb_listener" "http" {
@@ -233,9 +244,9 @@ resource "aws_iam_role" "ecs_execution" {
     ]
   })
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-ecs-execution-role"
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_execution" {
@@ -250,9 +261,9 @@ resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/${var.app_name}"
   retention_in_days = 14
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-logs"
+  })
 }
 
 # ---------------------------------------------------------------------------
@@ -261,9 +272,9 @@ resource "aws_cloudwatch_log_group" "app" {
 resource "aws_ecs_cluster" "app" {
   name = "${var.app_name}-cluster"
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-cluster"
+  })
 }
 
 # ---------------------------------------------------------------------------
@@ -285,7 +296,7 @@ resource "aws_ecs_task_definition" "app" {
 
       portMappings = [
         {
-          containerPort = 8080
+          containerPort = var.container_port
           protocol      = "tcp"
         }
       ]
@@ -301,9 +312,9 @@ resource "aws_ecs_task_definition" "app" {
     }
   ])
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-task"
+  })
 }
 
 # ---------------------------------------------------------------------------
@@ -325,14 +336,14 @@ resource "aws_ecs_service" "app" {
   load_balancer {
     target_group_arn = aws_lb_target_group.app.arn
     container_name   = var.app_name
-    container_port   = 8080
+    container_port   = var.container_port
   }
 
   lifecycle {
     ignore_changes = [task_definition]
   }
 
-  tags = {
-    App = var.app_name
-  }
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-service"
+  })
 }

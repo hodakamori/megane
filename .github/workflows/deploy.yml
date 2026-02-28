@@ -2,11 +2,12 @@ name: Deploy to AWS ECS
 
 on:
   push:
-    branches: [main, claude/molecular-viewer-sL9Us]
+    branches: [main]
 
 env:
   TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
   AWS_REGION: ${{ secrets.AWS_REGION }}
+  APP_NAME: megane
 
 jobs:
   infra:
@@ -16,6 +17,7 @@ jobs:
       ecr_url: ${{ steps.tf-output.outputs.ecr_url }}
       ecs_cluster: ${{ steps.tf-output.outputs.ecs_cluster }}
       ecs_service: ${{ steps.tf-output.outputs.ecs_service }}
+      service_url: ${{ steps.tf-output.outputs.service_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,8 +33,9 @@ jobs:
 
       - name: Ensure S3 state bucket exists
         run: |
-          aws s3api head-bucket --bucket megane-terraform-state 2>/dev/null || \
-            aws s3 mb s3://megane-terraform-state --region "$AWS_REGION" || \
+          set -euo pipefail
+          aws s3api head-bucket --bucket ${{ env.APP_NAME }}-terraform-state 2>/dev/null || \
+            aws s3 mb s3://${{ env.APP_NAME }}-terraform-state --region "$AWS_REGION" || \
             echo "Bucket may already exist, continuing..."
 
       - name: Terraform init
@@ -47,14 +50,15 @@ jobs:
         id: tf-output
         working-directory: deploy/terraform
         run: |
+          set -euo pipefail
           echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
           echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
           echo "ecs_service=$(terraform output -raw ecs_service_name)" >> "$GITHUB_OUTPUT"
+          echo "service_url=$(terraform output -raw service_url)" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: Build and deploy
     needs: infra
-    if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,88 +73,58 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Get ECR repository URL
-        id: ecr-url
-        run: |
-          if [ -n "${{ needs.infra.outputs.ecr_url }}" ]; then
-            echo "url=${{ needs.infra.outputs.ecr_url }}" >> "$GITHUB_OUTPUT"
-          else
-            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo "url=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/megane" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build and push Docker image
         run: |
-          ECR_URL="${{ steps.ecr-url.outputs.url }}"
+          set -euo pipefail
+          ECR_URL="${{ needs.infra.outputs.ecr_url }}"
           docker build -t "${ECR_URL}:${GITHUB_SHA}" -t "${ECR_URL}:latest" .
           docker push "${ECR_URL}:${GITHUB_SHA}"
           docker push "${ECR_URL}:latest"
 
-      - name: Get ECS details
-        id: ecs-details
-        run: |
-          if [ -n "${{ needs.infra.outputs.ecs_cluster }}" ]; then
-            echo "cluster=${{ needs.infra.outputs.ecs_cluster }}" >> "$GITHUB_OUTPUT"
-            echo "service=${{ needs.infra.outputs.ecs_service }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "cluster=megane-cluster" >> "$GITHUB_OUTPUT"
-            echo "service=megane-service" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Update ECS task definition
         id: task-def
         run: |
-          ECR_URL="${{ steps.ecr-url.outputs.url }}"
-          CLUSTER="${{ steps.ecs-details.outputs.cluster }}"
+          set -euo pipefail
+          ECR_URL="${{ needs.infra.outputs.ecr_url }}"
+          CLUSTER="${{ needs.infra.outputs.ecs_cluster }}"
+          SERVICE="${{ needs.infra.outputs.ecs_service }}"
 
           TASK_DEF=$(aws ecs describe-services \
             --cluster "$CLUSTER" \
-            --services "${{ steps.ecs-details.outputs.service }}" \
+            --services "$SERVICE" \
             --query 'services[0].taskDefinition' --output text)
 
-          aws ecs describe-task-definition --task-definition "$TASK_DEF" \
+          NEW_ARN=$(aws ecs describe-task-definition --task-definition "$TASK_DEF" \
             --query 'taskDefinition' | \
             jq --arg IMAGE "${ECR_URL}:${GITHUB_SHA}" \
-            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = $IMAGE' \
-            > /tmp/task-def.json
-
-          NEW_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file:///tmp/task-def.json \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
+            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = $IMAGE' | \
+            aws ecs register-task-definition \
+              --cli-input-json file:///dev/stdin \
+              --query 'taskDefinition.taskDefinitionArn' --output text)
 
           echo "task_def_arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to ECS
         run: |
-          CLUSTER="${{ steps.ecs-details.outputs.cluster }}"
-          SERVICE="${{ steps.ecs-details.outputs.service }}"
-
+          set -euo pipefail
           aws ecs update-service \
-            --cluster "$CLUSTER" \
-            --service "$SERVICE" \
+            --cluster "${{ needs.infra.outputs.ecs_cluster }}" \
+            --service "${{ needs.infra.outputs.ecs_service }}" \
             --task-definition "${{ steps.task-def.outputs.task_def_arn }}" \
             --force-new-deployment \
             --no-cli-pager
 
       - name: Wait for service stability
         run: |
-          CLUSTER="${{ steps.ecs-details.outputs.cluster }}"
-          SERVICE="${{ steps.ecs-details.outputs.service }}"
-
+          set -euo pipefail
           aws ecs wait services-stable \
-            --cluster "$CLUSTER" \
-            --services "$SERVICE"
+            --cluster "${{ needs.infra.outputs.ecs_cluster }}" \
+            --services "${{ needs.infra.outputs.ecs_service }}"
 
       - name: Print service URL
         run: |
-          ALB_DNS=$(aws elbv2 describe-load-balancers \
-            --names megane-alb \
-            --query 'LoadBalancers[0].DNSName' --output text 2>/dev/null || echo "")
-
-          if [ -n "$ALB_DNS" ]; then
-            echo "::notice::Deployed to http://${ALB_DNS}"
-            echo "## Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
-            echo "URL: http://${ALB_DNS}" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::notice::Deployment complete (ALB DNS not available)"
-          fi
+          set -euo pipefail
+          SERVICE_URL="${{ needs.infra.outputs.service_url }}"
+          echo "::notice::Deployed to ${SERVICE_URL}"
+          echo "## Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: ${SERVICE_URL}" >> "$GITHUB_STEP_SUMMARY"
