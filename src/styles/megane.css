@@ -13,7 +13,7 @@ body,
   height: 100%;
   overflow: hidden;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: #f8f9fa;
+  background: #ffffff;
   color: #212529;
 }
 
@@ -24,7 +24,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(248, 249, 250, 0.9);
+  background: rgba(255, 255, 255, 0.9);
   z-index: 20;
   font-size: 14px;
   color: #6c757d;

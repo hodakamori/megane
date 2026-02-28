@@ -20,7 +20,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   container.style.width = "100%";
   container.style.height = "500px";
   container.style.position = "relative";
-  container.style.background = "linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)";
+  container.style.background = "#ffffff";
   container.style.borderRadius = "8px";
   container.style.overflow = "hidden";
   el.appendChild(container);
