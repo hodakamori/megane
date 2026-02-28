@@ -15,13 +15,14 @@ const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
 const _color = new THREE.Color();
 
+const SPHERE_SEGMENTS = 32;
+
 export class AtomMesh {
   readonly mesh: THREE.InstancedMesh;
   private nAtoms = 0;
 
-  constructor(maxAtoms: number = 1_000_000) {
-    const segments = this.selectLOD(maxAtoms);
-    const geometry = new THREE.SphereGeometry(1, segments, segments);
+  constructor(maxAtoms: number = 5_000) {
+    const geometry = new THREE.SphereGeometry(1, SPHERE_SEGMENTS, SPHERE_SEGMENTS);
     const material = new THREE.MeshPhysicalMaterial({
       roughness: 0.35,
       metalness: 0.05,
@@ -33,28 +34,10 @@ export class AtomMesh {
     this.mesh.frustumCulled = false;
   }
 
-  /** Select sphere segment count based on atom count (LOD). */
-  private selectLOD(nAtoms: number): number {
-    if (nAtoms > 500_000) return 4;
-    if (nAtoms > 100_000) return 8;
-    return 16;
-  }
-
   /** Update atom positions and colors from a snapshot. */
   loadSnapshot(snapshot: Snapshot): void {
     const { nAtoms, positions, elements } = snapshot;
     this.nAtoms = nAtoms;
-
-    // Rebuild if LOD should change
-    if (this.mesh.count > 0) {
-      const oldLOD = this.selectLOD(this.mesh.count);
-      const newLOD = this.selectLOD(nAtoms);
-      if (oldLOD !== newLOD) {
-        this.mesh.geometry.dispose();
-        this.mesh.geometry = new THREE.SphereGeometry(1, newLOD, newLOD);
-      }
-    }
-
     this.mesh.count = nAtoms;
 
     for (let i = 0; i < nAtoms; i++) {
