@@ -10,14 +10,9 @@ env:
   APP_NAME: megane
 
 jobs:
-  infra:
-    name: Provision infrastructure
+  deploy:
+    name: Provision and deploy
     runs-on: ubuntu-latest
-    outputs:
-      ecr_url: ${{ steps.tf-output.outputs.ecr_url }}
-      ecs_cluster: ${{ steps.tf-output.outputs.ecs_cluster }}
-      ecs_service: ${{ steps.tf-output.outputs.ecs_service }}
-      service_url: ${{ steps.tf-output.outputs.service_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +41,7 @@ jobs:
         working-directory: deploy/terraform
         run: terraform apply -auto-approve
 
-      - name: Export outputs
+      - name: Export Terraform outputs
         id: tf-output
         working-directory: deploy/terraform
         run: |
@@ -56,57 +51,13 @@ jobs:
           echo "ecs_service=$(terraform output -raw ecs_service_name)" >> "$GITHUB_OUTPUT"
           echo "service_url=$(terraform output -raw service_url)" >> "$GITHUB_OUTPUT"
 
-  deploy:
-    name: Build and deploy
-    needs: infra
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: Login to Amazon ECR
-        id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Resolve deploy parameters
-        id: params
-        run: |
-          set -euo pipefail
-          ECR_URL="${{ needs.infra.outputs.ecr_url }}"
-          CLUSTER="${{ needs.infra.outputs.ecs_cluster }}"
-          SERVICE="${{ needs.infra.outputs.ecs_service }}"
-          SERVICE_URL="${{ needs.infra.outputs.service_url }}"
-
-          # Fallback: fetch from AWS directly if job outputs are empty
-          if [ -z "$ECR_URL" ]; then
-            echo "::warning::ecr_url job output was empty, fetching from AWS"
-            ECR_URL=$(aws ecr describe-repositories --repository-names "${{ env.APP_NAME }}" --query 'repositories[0].repositoryUri' --output text)
-          fi
-          if [ -z "$CLUSTER" ]; then
-            CLUSTER="${{ env.APP_NAME }}-cluster"
-          fi
-          if [ -z "$SERVICE" ]; then
-            SERVICE="${{ env.APP_NAME }}-service"
-          fi
-          if [ -z "$SERVICE_URL" ]; then
-            ALB_DNS=$(aws elbv2 describe-load-balancers --names "${{ env.APP_NAME }}-alb" --query 'LoadBalancers[0].DNSName' --output text 2>/dev/null || echo "")
-            SERVICE_URL="http://${ALB_DNS}"
-          fi
-
-          echo "ecr_url=${ECR_URL}" >> "$GITHUB_OUTPUT"
-          echo "cluster=${CLUSTER}" >> "$GITHUB_OUTPUT"
-          echo "service=${SERVICE}" >> "$GITHUB_OUTPUT"
-          echo "service_url=${SERVICE_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         run: |
           set -euo pipefail
-          ECR_URL="${{ steps.params.outputs.ecr_url }}"
+          ECR_URL="${{ steps.tf-output.outputs.ecr_url }}"
           docker build -t "${ECR_URL}:${GITHUB_SHA}" -t "${ECR_URL}:latest" .
           docker push "${ECR_URL}:${GITHUB_SHA}"
           docker push "${ECR_URL}:latest"
@@ -115,9 +66,9 @@ jobs:
         id: task-def
         run: |
           set -euo pipefail
-          ECR_URL="${{ steps.params.outputs.ecr_url }}"
-          CLUSTER="${{ steps.params.outputs.cluster }}"
-          SERVICE="${{ steps.params.outputs.service }}"
+          ECR_URL="${{ steps.tf-output.outputs.ecr_url }}"
+          CLUSTER="${{ steps.tf-output.outputs.ecs_cluster }}"
+          SERVICE="${{ steps.tf-output.outputs.ecs_service }}"
 
           TASK_DEF=$(aws ecs describe-services \
             --cluster "$CLUSTER" \
@@ -138,8 +89,8 @@ jobs:
         run: |
           set -euo pipefail
           aws ecs update-service \
-            --cluster "${{ steps.params.outputs.cluster }}" \
-            --service "${{ steps.params.outputs.service }}" \
+            --cluster "${{ steps.tf-output.outputs.ecs_cluster }}" \
+            --service "${{ steps.tf-output.outputs.ecs_service }}" \
             --task-definition "${{ steps.task-def.outputs.task_def_arn }}" \
             --force-new-deployment \
             --no-cli-pager
@@ -148,13 +99,13 @@ jobs:
         run: |
           set -euo pipefail
           aws ecs wait services-stable \
-            --cluster "${{ steps.params.outputs.cluster }}" \
-            --services "${{ steps.params.outputs.service }}"
+            --cluster "${{ steps.tf-output.outputs.ecs_cluster }}" \
+            --services "${{ steps.tf-output.outputs.ecs_service }}"
 
       - name: Print service URL
         run: |
           set -euo pipefail
-          SERVICE_URL="${{ steps.params.outputs.service_url }}"
+          SERVICE_URL="${{ steps.tf-output.outputs.service_url }}"
           echo "::notice::Deployed to ${SERVICE_URL}"
           echo "## Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
           echo "URL: ${SERVICE_URL}" >> "$GITHUB_STEP_SUMMARY"
