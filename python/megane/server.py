@@ -81,6 +81,12 @@ async def _broadcast_snapshot() -> None:
             _clients.discard(ws)
 
 
+@app.get("/health")
+async def health() -> dict:
+    """Health check endpoint for load balancers and container orchestrators."""
+    return {"status": "ok"}
+
+
 @app.post("/api/upload")
 async def upload_file(
     pdb: UploadFile,
