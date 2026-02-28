@@ -65,55 +65,59 @@ export function UploadArea({ onUpload }: UploadAreaProps) {
         gap: 16,
         zIndex: 20,
         background: dragging
-          ? "rgba(66, 133, 244, 0.08)"
-          : "transparent",
+          ? "rgba(59, 130, 246, 0.06)"
+          : "radial-gradient(ellipse at 50% 30%, rgba(59,130,246,0.04) 0%, transparent 70%)",
         transition: "background 0.15s",
       }}
     >
       <div
         style={{
-          background: "rgba(255, 255, 255, 0.9)",
-          backdropFilter: "blur(12px)",
-          borderRadius: 16,
-          padding: "40px 48px",
+          background: "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderRadius: 20,
+          padding: "48px 56px",
           textAlign: "center",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
           border: dragging
-            ? "2px dashed #4285f4"
-            : "2px dashed #dee2e6",
-          transition: "border-color 0.15s",
+            ? "2px dashed #3b82f6"
+            : "2px dashed #e2e8f0",
+          transition: "border-color 0.15s, box-shadow 0.15s",
         }}
       >
         <div
           style={{
-            fontSize: 36,
-            marginBottom: 12,
-            opacity: 0.5,
+            fontSize: 28,
+            fontWeight: 700,
+            color: "#1e293b",
+            letterSpacing: "-0.02em",
+            marginBottom: 8,
           }}
         >
-          {"\u{1F9EC}"}
+          megane
         </div>
         <div
           style={{
-            fontSize: 16,
-            fontFamily: "system-ui, -apple-system, sans-serif",
-            color: "#495057",
-            marginBottom: 16,
+            fontSize: 15,
+            color: "#64748b",
+            marginBottom: 20,
           }}
         >
-          Drop a PDB file here
+          Drop a structure file to visualize
         </div>
         <button
           onClick={() => inputRef.current?.click()}
           style={{
-            background: "#495057",
+            background: "#3b82f6",
             color: "white",
             border: "none",
-            borderRadius: 6,
-            padding: "8px 20px",
+            borderRadius: 8,
+            padding: "10px 24px",
             fontSize: 14,
+            fontWeight: 500,
             cursor: "pointer",
-            fontFamily: "system-ui, -apple-system, sans-serif",
+            boxShadow: "0 1px 3px rgba(59,130,246,0.3)",
+            transition: "background 0.15s",
           }}
         >
           Browse Files

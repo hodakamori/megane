@@ -30,17 +30,18 @@ export function Timeline({
         bottom: 0,
         left: 0,
         right: 0,
-        padding: "8px 16px 12px",
-        background: "rgba(255, 255, 255, 0.85)",
-        backdropFilter: "blur(8px)",
-        borderTop: "1px solid rgba(0,0,0,0.06)",
+        padding: "10px 20px 14px",
+        background: "rgba(255, 255, 255, 0.88)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        borderTop: "1px solid rgba(226,232,240,0.6)",
+        boxShadow: "0 -1px 8px rgba(0,0,0,0.04)",
         display: "flex",
         alignItems: "center",
         gap: 12,
         zIndex: 10,
-        fontFamily: "system-ui, -apple-system, sans-serif",
         fontSize: 13,
-        color: "#495057",
+        color: "#64748b",
       }}
     >
       {/* Play/Pause button */}
@@ -48,8 +49,8 @@ export function Timeline({
         onClick={onPlayPause}
         style={{
           background: "none",
-          border: "1px solid #dee2e6",
-          borderRadius: 6,
+          border: "1px solid #e2e8f0",
+          borderRadius: 8,
           width: 32,
           height: 32,
           cursor: "pointer",
@@ -57,8 +58,10 @@ export function Timeline({
           alignItems: "center",
           justifyContent: "center",
           fontSize: 14,
-          color: "#495057",
+          fontWeight: 500,
+          color: "#64748b",
           flexShrink: 0,
+          transition: "all 0.15s",
         }}
         title={playing ? "Pause" : "Play"}
       >
@@ -71,6 +74,8 @@ export function Timeline({
           minWidth: 80,
           textAlign: "center",
           fontVariantNumeric: "tabular-nums",
+          fontWeight: 500,
+          color: "#64748b",
           flexShrink: 0,
         }}
       >
@@ -88,7 +93,7 @@ export function Timeline({
           flex: 1,
           height: 4,
           cursor: "pointer",
-          accentColor: "#495057",
+          accentColor: "#3b82f6",
         }}
       />
 
@@ -97,12 +102,13 @@ export function Timeline({
         value={fps}
         onChange={(e) => onFpsChange(parseInt(e.target.value, 10))}
         style={{
-          background: "white",
-          border: "1px solid #dee2e6",
-          borderRadius: 4,
+          background: "rgba(255,255,255,0.8)",
+          border: "1px solid #e2e8f0",
+          borderRadius: 6,
           padding: "2px 6px",
           fontSize: 12,
-          color: "#495057",
+          fontWeight: 500,
+          color: "#64748b",
           cursor: "pointer",
           flexShrink: 0,
         }}

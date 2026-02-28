@@ -73,7 +73,7 @@ export const atomFragmentShader = /* glsl */ `#version 300 es
     vec3 skyColor = vec3(0.87, 0.92, 1.0);
     vec3 groundColor = vec3(0.6, 0.47, 0.27);
     float hemiMix = normal.y * 0.5 + 0.5;
-    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.4;
+    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.35;
 
     // Dual-light diffuse
     vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
@@ -88,10 +88,10 @@ export const atomFragmentShader = /* glsl */ `#version 300 es
     float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
     // Fresnel rim
-    float fresnel = pow(1.0 - z, 3.0) * 0.25;
+    float fresnel = pow(1.0 - z, 3.0) * 0.15;
 
-    // Edge darkening
-    float edgeFactor = mix(0.85, 1.0, z);
+    // Edge darkening (stronger for Speck-like depth)
+    float edgeFactor = mix(0.7, 1.0, z);
 
     vec3 color = vColor * (ambient + diffuse) * edgeFactor
                + vec3(1.0) * spec * 0.3
@@ -165,7 +165,7 @@ export const bondFragmentShader = /* glsl */ `#version 300 es
     vec3 skyColor = vec3(0.87, 0.92, 1.0);
     vec3 groundColor = vec3(0.6, 0.47, 0.27);
     float hemiMix = normal.y * 0.5 + 0.5;
-    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.4;
+    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.35;
 
     // Dual-light diffuse
     vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
@@ -180,7 +180,7 @@ export const bondFragmentShader = /* glsl */ `#version 300 es
     float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
     // Fresnel rim
-    float fresnel = pow(1.0 - nz, 3.0) * 0.15;
+    float fresnel = pow(1.0 - nz, 3.0) * 0.1;
 
     vec3 color = vColor * (ambient + diffuse)
                + vec3(1.0) * spec * 0.2

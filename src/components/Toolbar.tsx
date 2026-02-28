@@ -18,18 +18,21 @@ interface ToolbarProps {
 
 const buttonStyle: React.CSSProperties = {
   background: "none",
-  border: "1px solid #dee2e6",
-  borderRadius: 4,
-  padding: "2px 10px",
+  border: "1px solid #e2e8f0",
+  borderRadius: 6,
+  padding: "3px 12px",
   cursor: "pointer",
   fontSize: 12,
-  color: "#495057",
+  fontWeight: 500,
+  color: "#64748b",
+  transition: "all 0.15s",
 };
 
 const activeButtonStyle: React.CSSProperties = {
   ...buttonStyle,
-  background: "#e9ecef",
-  borderColor: "#adb5bd",
+  background: "rgba(59, 130, 246, 0.08)",
+  borderColor: "rgba(59, 130, 246, 0.25)",
+  color: "#3b82f6",
 };
 
 export function Toolbar({
@@ -73,39 +76,42 @@ export function Toolbar({
     >
       <div
         style={{
-          background: "rgba(255, 255, 255, 0.85)",
-          backdropFilter: "blur(8px)",
-          borderRadius: 8,
-          padding: "6px 14px",
+          background: "rgba(255, 255, 255, 0.88)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderRadius: 10,
+          padding: "8px 16px",
           fontSize: 13,
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          color: "#495057",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          color: "#64748b",
+          boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+          border: "1px solid rgba(226,232,240,0.6)",
           display: "flex",
           gap: 16,
           alignItems: "center",
         }}
       >
-        <span style={{ fontWeight: 600, color: "#212529" }}>megane</span>
+        <span style={{ fontWeight: 700, color: "#1e293b", letterSpacing: "-0.02em" }}>megane</span>
         {onToggleMode && mode && (
           <div
             style={{
               display: "flex",
-              borderRadius: 4,
+              borderRadius: 6,
               overflow: "hidden",
-              border: "1px solid #dee2e6",
+              border: "1px solid #e2e8f0",
             }}
           >
             <button
               onClick={mode === "local" ? undefined : onToggleMode}
               style={{
-                background: mode === "local" ? "#e9ecef" : "none",
+                background: mode === "local" ? "rgba(59,130,246,0.08)" : "none",
                 border: "none",
-                borderRight: "1px solid #dee2e6",
+                borderRight: "1px solid #e2e8f0",
                 padding: "2px 8px",
                 cursor: mode === "local" ? "default" : "pointer",
                 fontSize: 12,
-                color: "#495057",
+                fontWeight: 500,
+                color: mode === "local" ? "#3b82f6" : "#94a3b8",
+                transition: "all 0.15s",
               }}
               title="In-memory mode (no server)"
             >
@@ -114,12 +120,14 @@ export function Toolbar({
             <button
               onClick={mode === "streaming" ? undefined : onToggleMode}
               style={{
-                background: mode === "streaming" ? "#e9ecef" : "none",
+                background: mode === "streaming" ? "rgba(59,130,246,0.08)" : "none",
                 border: "none",
                 padding: "2px 8px",
                 cursor: mode === "streaming" ? "default" : "pointer",
                 fontSize: 12,
-                color: "#495057",
+                fontWeight: 500,
+                color: mode === "streaming" ? "#3b82f6" : "#94a3b8",
+                transition: "all 0.15s",
               }}
               title="WebSocket streaming mode"
             >
