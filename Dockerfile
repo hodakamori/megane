@@ -13,6 +13,7 @@ RUN npm ci
 COPY --from=wasm /app/wasm/pkg/ wasm/pkg/
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index.html ./
 COPY src/ src/
+COPY public/ public/
 RUN npx tsc && npx vite build && npx vite build --config vite.widget.config.ts
 
 # Stage 2: Python runtime

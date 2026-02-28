@@ -86,6 +86,7 @@ export class MoleculeRenderer {
 
     // Scene
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xffffff);
 
     // Environment map for PBR materials
     const pmrem = new THREE.PMREMGenerator(this.renderer);
