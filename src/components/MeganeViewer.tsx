@@ -29,6 +29,8 @@ interface MeganeViewerProps {
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
   onUpload?: (pdb: File, xtc?: File) => void;
+  mode?: "streaming" | "local";
+  onToggleMode?: () => void;
   width?: string | number;
   height?: string | number;
 }
@@ -44,6 +46,8 @@ export function MeganeViewer({
   onPlayPause,
   onFpsChange,
   onUpload,
+  mode,
+  onToggleMode,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
@@ -110,6 +114,8 @@ export function MeganeViewer({
         hasCell={hasCell}
         cellVisible={cellVisible}
         onToggleCell={handleToggleCell}
+        mode={mode}
+        onToggleMode={onToggleMode}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

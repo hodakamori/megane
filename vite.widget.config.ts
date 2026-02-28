@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
+import wasm from "vite-plugin-wasm";
 import path from "path";
 
 export default defineConfig({
+  plugins: [wasm()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),

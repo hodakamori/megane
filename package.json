@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && vite build --config vite.widget.config.ts",
-    "build:app": "tsc && vite build",
+    "build:wasm": "cd wasm && wasm-pack build --target web --release",
+    "build": "npm run build:wasm && tsc && vite build && vite build --config vite.widget.config.ts",
+    "build:app": "npm run build:wasm && tsc && vite build",
     "build:widget": "vite build --config vite.widget.config.ts",
     "preview": "vite preview"
   },
@@ -21,6 +22,7 @@
     "@types/three": "^0.172.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.7.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vite-plugin-wasm": "^3.5.0"
   }
 }

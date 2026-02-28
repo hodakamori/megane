@@ -1,11 +1,19 @@
+# Stage 0: Build WASM PDB parser
+FROM rust:1.93-slim AS wasm
+RUN rustup target add wasm32-unknown-unknown && cargo install wasm-pack
+WORKDIR /app
+COPY wasm/ wasm/
+RUN cd wasm && wasm-pack build --target web --release
+
 # Stage 1: Build frontend
 FROM node:20-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
+COPY --from=wasm /app/wasm/pkg/ wasm/pkg/
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index.html ./
 COPY src/ src/
-RUN npm run build
+RUN npx tsc && npx vite build && npx vite build --config vite.widget.config.ts
 
 # Stage 2: Python runtime
 FROM python:3.11-slim AS runtime
