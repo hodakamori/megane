@@ -35,7 +35,7 @@ const _scale = new THREE.Vector3();
 const _offset = new THREE.Vector3();
 
 /** Per-visual-bond info for trajectory updates. */
-interface VisualBond {
+export interface VisualBond {
   ai: number;
   bi: number;
   radius: number;
@@ -45,7 +45,7 @@ interface VisualBond {
 
 export class BondMesh {
   readonly mesh: THREE.InstancedMesh;
-  private visualBonds: VisualBond[] = [];
+  readonly visualBonds: VisualBond[] = [];
 
   constructor(maxInstances: number = 3_000_000) {
     const geometry = new THREE.CylinderGeometry(1, 1, 1, 6, 1);
@@ -53,6 +53,7 @@ export class BondMesh {
       roughness: 0.35,
       metalness: 0.05,
       clearcoat: 0.1,
+      envMapIntensity: 0.4,
     });
 
     this.mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
@@ -63,7 +64,7 @@ export class BondMesh {
   /** Build bond instances from snapshot data. */
   loadSnapshot(snapshot: Snapshot): void {
     const { nBonds, positions, elements, bonds, bondOrders } = snapshot;
-    this.visualBonds = [];
+    this.visualBonds.length = 0;
 
     let instanceIdx = 0;
 

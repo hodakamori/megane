@@ -33,4 +33,9 @@ export type {
   TrajectoryMeta,
   AtomRenderer,
   BondRenderer,
+  HoverInfo,
+  AtomHoverInfo,
+  BondHoverInfo,
+  SelectionState,
+  Measurement,
 } from "./core/types";

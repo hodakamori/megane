@@ -44,3 +44,40 @@ export interface BondRenderer {
   ): void;
   dispose(): void;
 }
+
+/** Hover info for atoms. */
+export interface AtomHoverInfo {
+  kind: "atom";
+  atomIndex: number;
+  elementSymbol: string;
+  atomicNumber: number;
+  position: [number, number, number];
+  screenX: number;
+  screenY: number;
+}
+
+/** Hover info for bonds. */
+export interface BondHoverInfo {
+  kind: "bond";
+  atomA: number;
+  atomB: number;
+  bondOrder: number;
+  bondLength: number;
+  screenX: number;
+  screenY: number;
+}
+
+export type HoverInfo = AtomHoverInfo | BondHoverInfo | null;
+
+/** Atom selection state. */
+export interface SelectionState {
+  atoms: number[];
+}
+
+/** Geometric measurement result. */
+export interface Measurement {
+  atoms: number[];
+  type: "distance" | "angle" | "dihedral";
+  value: number;
+  label: string;
+}

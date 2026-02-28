@@ -27,6 +27,7 @@ export class AtomMesh {
       roughness: 0.35,
       metalness: 0.05,
       clearcoat: 0.1,
+      envMapIntensity: 0.4,
     });
 
     this.mesh = new THREE.InstancedMesh(geometry, material, maxAtoms);

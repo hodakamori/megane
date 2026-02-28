@@ -25,7 +25,8 @@ RUN pip install --no-cache-dir .
 
 # Copy demo data
 COPY tests/fixtures/1crn.pdb /data/1crn.pdb
+COPY tests/fixtures/1crn_vibration.xtc /data/1crn_vibration.xtc
 
 EXPOSE 8080
 
-CMD ["megane", "serve", "/data/1crn.pdb", "--port", "8080", "--no-browser"]
+CMD ["megane", "serve", "/data/1crn.pdb", "--xtc", "/data/1crn_vibration.xtc", "--port", "8080", "--no-browser"]
