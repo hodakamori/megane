@@ -19,10 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python deps
 COPY pyproject.toml ./
 COPY python/ python/
-RUN pip install --no-cache-dir .
-
-# Copy built frontend (app + widget)
 COPY --from=frontend /app/python/megane/static/ python/megane/static/
+RUN pip install --no-cache-dir .
 
 # Copy demo data
 COPY tests/fixtures/1crn.pdb /data/1crn.pdb
