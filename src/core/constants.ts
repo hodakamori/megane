@@ -3,23 +3,31 @@
  * Indexed by atomic number.
  */
 
-// CPK colors as [r, g, b] in 0-1 range
+// Molstar element-symbol color scheme as [r, g, b] in 0-1 range
 export const ELEMENT_COLORS: Record<number, [number, number, number]> = {
   1: [1.0, 1.0, 1.0], // H  - white
-  6: [0.33, 0.33, 0.33], // C  - dark gray
-  7: [0.2, 0.3, 0.9], // N  - blue
-  8: [0.9, 0.15, 0.15], // O  - red
-  9: [0.56, 0.88, 0.31], // F  - green
-  11: [0.67, 0.36, 0.95], // Na - purple
-  12: [0.54, 1.0, 0.0], // Mg - green
-  15: [1.0, 0.5, 0.0], // P  - orange
-  16: [1.0, 0.78, 0.17], // S  - yellow
-  17: [0.12, 0.94, 0.12], // Cl - green
-  19: [0.56, 0.25, 0.83], // K  - purple
-  20: [0.24, 1.0, 0.0], // Ca - green
-  26: [0.88, 0.4, 0.2], // Fe - orange
-  29: [0.78, 0.5, 0.2], // Cu - copper
-  30: [0.49, 0.5, 0.69], // Zn - slate
+  2: [0.851, 1.0, 1.0], // He - light cyan
+  5: [1.0, 0.710, 0.710], // B  - pink
+  6: [0.565, 0.565, 0.565], // C  - gray
+  7: [0.188, 0.314, 0.973], // N  - blue
+  8: [1.0, 0.051, 0.051], // O  - red
+  9: [0.565, 0.878, 0.314], // F  - green
+  11: [0.671, 0.361, 0.949], // Na - purple
+  12: [0.541, 1.0, 0.0], // Mg - green
+  13: [0.749, 0.651, 0.651], // Al - gray-pink
+  14: [0.941, 0.784, 0.627], // Si - tan
+  15: [1.0, 0.502, 0.0], // P  - orange
+  16: [1.0, 1.0, 0.188], // S  - yellow
+  17: [0.122, 0.941, 0.122], // Cl - green
+  18: [0.502, 0.820, 0.890], // Ar - light blue
+  19: [0.561, 0.251, 0.831], // K  - purple
+  20: [0.239, 1.0, 0.0], // Ca - green
+  26: [0.878, 0.400, 0.200], // Fe - orange
+  29: [0.784, 0.502, 0.200], // Cu - copper
+  30: [0.490, 0.502, 0.690], // Zn - slate
+  34: [1.0, 0.631, 0.0], // Se - orange
+  35: [0.651, 0.161, 0.161], // Br - dark red
+  53: [0.580, 0.0, 0.580], // I  - purple
 };
 
 // Default color for unknown elements
