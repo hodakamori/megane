@@ -1,4 +1,4 @@
-name: Deploy to AWS Lightsail
+name: Deploy to AWS ECS
 
 on:
   push:
@@ -6,18 +6,16 @@ on:
 
 env:
   TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-  TF_VAR_domain: ${{ secrets.DOMAIN }}
-  TF_VAR_certbot_email: ${{ secrets.CERTBOT_EMAIL }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
 
 jobs:
   infra:
     name: Provision infrastructure
     runs-on: ubuntu-latest
     outputs:
-      static_ip: ${{ steps.tf-output.outputs.static_ip }}
+      ecr_url: ${{ steps.tf-output.outputs.ecr_url }}
+      ecs_cluster: ${{ steps.tf-output.outputs.ecs_cluster }}
+      ecs_service: ${{ steps.tf-output.outputs.ecs_service }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,10 +23,16 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Ensure S3 state bucket exists
         run: |
           aws s3api head-bucket --bucket megane-terraform-state 2>/dev/null || \
-            aws s3 mb s3://megane-terraform-state --region "$AWS_DEFAULT_REGION"
+            aws s3 mb s3://megane-terraform-state --region "$AWS_REGION"
 
       - name: Terraform init
         working-directory: deploy/terraform
@@ -42,71 +46,110 @@ jobs:
         id: tf-output
         working-directory: deploy/terraform
         run: |
-          echo "static_ip=$(terraform output -raw static_ip)" >> "$GITHUB_OUTPUT"
-
-      - name: Save SSH key
-        working-directory: deploy/terraform
-        run: |
-          terraform output -raw ssh_private_key > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-
-      - name: Upload SSH key as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: deploy-key
-          path: /tmp/deploy_key
-          retention-days: 1
+          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
+          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> "$GITHUB_OUTPUT"
 
   deploy:
-    name: Deploy application
+    name: Build and deploy
     needs: infra
+    if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
-      - name: Download SSH key
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: deploy-key
-          path: /tmp
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Set key permissions
-        run: chmod 600 /tmp/deploy_key
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Wait for instance to be ready
+      - name: Get ECR repository URL
+        id: ecr-url
         run: |
-          HOST="${{ needs.infra.outputs.static_ip }}"
-          for i in $(seq 1 30); do
-            ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-              "ubuntu@${HOST}" 'test -f /var/log/megane-setup.log && echo ready' 2>/dev/null && break
-            echo "Waiting for instance... (attempt $i/30)"
-            sleep 10
-          done
+          if [ -n "${{ needs.infra.outputs.ecr_url }}" ]; then
+            echo "url=${{ needs.infra.outputs.ecr_url }}" >> "$GITHUB_OUTPUT"
+          else
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "url=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/megane" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Deploy latest code
+      - name: Build and push Docker image
         run: |
-          HOST="${{ needs.infra.outputs.static_ip }}"
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no "ubuntu@${HOST}" bash -s <<'REMOTE'
-          set -euo pipefail
-          cd ~/megane
+          ECR_URL="${{ steps.ecr-url.outputs.url }}"
+          docker build -t "${ECR_URL}:${GITHUB_SHA}" -t "${ECR_URL}:latest" .
+          docker push "${ECR_URL}:${GITHUB_SHA}"
+          docker push "${ECR_URL}:latest"
 
-          echo "==> Pulling latest code..."
-          git pull --ff-only origin main
+      - name: Get ECS details
+        id: ecs-details
+        run: |
+          if [ -n "${{ needs.infra.outputs.ecs_cluster }}" ]; then
+            echo "cluster=${{ needs.infra.outputs.ecs_cluster }}" >> "$GITHUB_OUTPUT"
+            echo "service=${{ needs.infra.outputs.ecs_service }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "cluster=megane-cluster" >> "$GITHUB_OUTPUT"
+            echo "service=megane-service" >> "$GITHUB_OUTPUT"
+          fi
 
-          echo "==> Rebuilding and restarting..."
-          cd deploy/lightsail
-          docker compose build
-          docker compose up -d
+      - name: Update ECS task definition
+        id: task-def
+        run: |
+          ECR_URL="${{ steps.ecr-url.outputs.url }}"
+          CLUSTER="${{ steps.ecs-details.outputs.cluster }}"
 
-          echo "==> Checking health..."
-          sleep 5
-          curl -sf http://localhost:8080/health && echo " OK" || echo " Waiting..."
-          REMOTE
+          TASK_DEF=$(aws ecs describe-services \
+            --cluster "$CLUSTER" \
+            --services "${{ steps.ecs-details.outputs.service }}" \
+            --query 'services[0].taskDefinition' --output text)
+
+          aws ecs describe-task-definition --task-definition "$TASK_DEF" \
+            --query 'taskDefinition' | \
+            jq --arg IMAGE "${ECR_URL}:${GITHUB_SHA}" \
+            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = $IMAGE' \
+            > /tmp/task-def.json
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          echo "task_def_arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to ECS
+        run: |
+          CLUSTER="${{ steps.ecs-details.outputs.cluster }}"
+          SERVICE="${{ steps.ecs-details.outputs.service }}"
+
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "${{ steps.task-def.outputs.task_def_arn }}" \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Wait for service stability
+        run: |
+          CLUSTER="${{ steps.ecs-details.outputs.cluster }}"
+          SERVICE="${{ steps.ecs-details.outputs.service }}"
+
+          aws ecs wait services-stable \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE"
 
       - name: Print service URL
         run: |
-          DOMAIN="${{ secrets.DOMAIN }}"
-          IP="${{ needs.infra.outputs.static_ip }}"
-          if [ -n "$DOMAIN" ]; then
-            echo "::notice::Deployed to https://${DOMAIN}"
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names megane-alb \
+            --query 'LoadBalancers[0].DNSName' --output text 2>/dev/null || echo "")
+
+          if [ -n "$ALB_DNS" ]; then
+            echo "::notice::Deployed to http://${ALB_DNS}"
+            echo "## Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
+            echo "URL: http://${ALB_DNS}" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "::notice::Deployed to http://${IP}"
+            echo "::notice::Deployment complete (ALB DNS not available)"
           fi

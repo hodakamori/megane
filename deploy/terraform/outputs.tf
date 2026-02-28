@@ -1,20 +1,19 @@
-output "instance_name" {
-  description = "Lightsail instance name"
-  value       = aws_lightsail_instance.app.name
+output "alb_dns_name" {
+  description = "DNS name of the ALB"
+  value       = aws_lb.app.dns_name
 }
 
-output "static_ip" {
-  description = "Static IP address of the Lightsail instance"
-  value       = aws_lightsail_static_ip.app.ip_address
+output "ecr_repository_url" {
+  description = "ECR repository URL"
+  value       = aws_ecr_repository.app.repository_url
 }
 
-output "ssh_private_key" {
-  description = "SSH private key for instance access (auto-generated)"
-  value       = tls_private_key.deploy.private_key_pem
-  sensitive   = true
+output "ecs_cluster_name" {
+  description = "ECS cluster name"
+  value       = aws_ecs_cluster.app.name
 }
 
-output "service_url" {
-  description = "Public URL of the megane demo"
-  value       = var.domain != "" ? "https://${var.domain}" : "http://${aws_lightsail_static_ip.app.ip_address}"
+output "ecs_service_name" {
+  description = "ECS service name"
+  value       = aws_ecs_service.app.name
 }
