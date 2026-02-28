@@ -1,14 +1,22 @@
 /**
  * Main megane viewer React component.
- * Combines Viewport, Toolbar, and Timeline.
+ * Combines Viewport, Toolbar, Timeline, Tooltip, and MeasurementPanel.
  */
 
 import { useCallback, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Toolbar } from "./Toolbar";
 import { Timeline } from "./Timeline";
+import { Tooltip } from "./Tooltip";
+import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../core/MoleculeRenderer";
-import type { Snapshot, Frame } from "../core/types";
+import type {
+  Snapshot,
+  Frame,
+  HoverInfo,
+  SelectionState,
+  Measurement,
+} from "../core/types";
 
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
@@ -41,6 +49,9 @@ export function MeganeViewer({
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [cellVisible, setCellVisible] = useState(true);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
+  const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
+  const [measurement, setMeasurement] = useState<Measurement | null>(null);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -58,6 +69,25 @@ export function MeganeViewer({
     });
   }, []);
 
+  const handleAtomRightClick = useCallback((atomIndex: number) => {
+    if (!rendererRef.current) return;
+    const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
+    setSelection(newSelection);
+    setMeasurement(rendererRef.current.getMeasurement());
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    rendererRef.current?.clearSelection();
+    setSelection({ atoms: [] });
+    setMeasurement(null);
+  }, []);
+
+  const handleFrameUpdated = useCallback(() => {
+    if (!rendererRef.current) return;
+    const m = rendererRef.current.getMeasurement();
+    if (m) setMeasurement(m);
+  }, []);
+
   // Check if snapshot has a non-zero box
   const hasCell =
     snapshot?.box != null && snapshot.box.some((v) => v !== 0);
@@ -68,6 +98,9 @@ export function MeganeViewer({
         snapshot={snapshot}
         frame={frame}
         onRendererReady={handleRendererReady}
+        onHover={setHoverInfo}
+        onAtomRightClick={handleAtomRightClick}
+        onFrameUpdated={handleFrameUpdated}
       />
       <Toolbar
         atomCount={snapshot?.nAtoms ?? 0}
@@ -89,6 +122,13 @@ export function MeganeViewer({
           onFpsChange={onFpsChange}
         />
       )}
+      <Tooltip info={hoverInfo} />
+      <MeasurementPanel
+        selection={selection}
+        measurement={measurement}
+        elements={snapshot?.elements ?? null}
+        onClear={handleClearSelection}
+      />
     </div>
   );
 }

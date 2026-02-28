@@ -66,10 +66,26 @@ export const TRIPLE_BOND_RADIUS = 0.08;
 export const AROMATIC_BOND_RADIUS = 0.10;
 export const AROMATIC_DASH_RADIUS = 0.06;
 
+// Element symbols indexed by atomic number
+export const ELEMENT_SYMBOLS: Record<number, string> = {
+  1: "H", 6: "C", 7: "N", 8: "O", 9: "F",
+  11: "Na", 12: "Mg", 15: "P", 16: "S", 17: "Cl",
+  19: "K", 20: "Ca", 26: "Fe", 29: "Cu", 30: "Zn",
+};
+
+// Bond order display names
+export const BOND_ORDER_NAMES: Record<number, string> = {
+  1: "Single", 2: "Double", 3: "Triple", 4: "Aromatic",
+};
+
 export function getColor(atomicNum: number): [number, number, number] {
   return ELEMENT_COLORS[atomicNum] ?? DEFAULT_COLOR;
 }
 
 export function getRadius(atomicNum: number): number {
   return VDW_RADII[atomicNum] ?? DEFAULT_RADIUS;
+}
+
+export function getElementSymbol(atomicNum: number): string {
+  return ELEMENT_SYMBOLS[atomicNum] ?? `#${atomicNum}`;
 }
