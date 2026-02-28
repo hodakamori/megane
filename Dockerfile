@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index.html ./
 COPY src/ src/
-RUN npm run build:app
+RUN npm run build
 
 # Stage 2: Python runtime
 FROM python:3.11-slim AS runtime
@@ -21,8 +21,8 @@ COPY pyproject.toml ./
 COPY python/ python/
 RUN pip install --no-cache-dir .
 
-# Copy built frontend
-COPY --from=frontend /app/python/megane/static/app/ python/megane/static/app/
+# Copy built frontend (app + widget)
+COPY --from=frontend /app/python/megane/static/ python/megane/static/
 
 # Copy demo data
 COPY tests/fixtures/1crn.pdb /data/1crn.pdb
