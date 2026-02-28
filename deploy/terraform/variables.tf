@@ -16,26 +16,24 @@ variable "github_repo" {
   default     = "hodakamori/megane"
 }
 
-variable "create_oidc_provider" {
-  description = "Set to false if GitHub OIDC provider already exists in your AWS account"
-  type        = bool
-  default     = true
+variable "lightsail_bundle" {
+  description = "Lightsail instance bundle (nano_3_0=$3.50/mo, micro_3_0=$5/mo, small_3_0=$10/mo)"
+  type        = string
+  default     = "small_3_0"
 }
 
-variable "container_port" {
-  description = "Port the container listens on"
-  type        = number
-  default     = 8080
+variable "ssh_public_key" {
+  description = "SSH public key for Lightsail instance access"
+  type        = string
 }
 
-variable "cpu" {
-  description = "App Runner CPU (1024 = 1 vCPU)"
-  type        = number
-  default     = 1024
+variable "domain" {
+  description = "Domain name for TLS certificate (leave empty to skip DNS setup)"
+  type        = string
+  default     = ""
 }
 
-variable "memory" {
-  description = "App Runner memory in MB"
-  type        = number
-  default     = 2048
+variable "certbot_email" {
+  description = "Email for Let's Encrypt certificate registration"
+  type        = string
 }

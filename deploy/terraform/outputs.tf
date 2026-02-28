@@ -1,22 +1,29 @@
-output "ecr_repository_url" {
-  description = "ECR repository URL for Docker push"
-  value       = aws_ecr_repository.app.repository_url
+output "instance_name" {
+  description = "Lightsail instance name"
+  value       = aws_lightsail_instance.app.name
 }
 
-output "github_actions_role_arn" {
-  description = "IAM Role ARN to set as GitHub secret AWS_ROLE_ARN"
-  value       = aws_iam_role.github_actions.arn
+output "static_ip" {
+  description = "Static IP address of the Lightsail instance"
+  value       = aws_lightsail_static_ip.app.ip_address
 }
 
-output "apprunner_service_url" {
-  description = "Public URL of the App Runner demo site"
-  value       = "https://${aws_apprunner_service.app.service_url}"
+output "ssh_command" {
+  description = "SSH command to connect to the instance"
+  value       = "ssh ubuntu@${aws_lightsail_static_ip.app.ip_address}"
 }
 
-output "github_secrets_summary" {
-  description = "Values to set in GitHub repository secrets"
-  value = {
-    AWS_ROLE_ARN = aws_iam_role.github_actions.arn
-    AWS_REGION   = var.aws_region
-  }
+output "service_url" {
+  description = "Public URL of the megane demo"
+  value       = var.domain != "" ? "https://${var.domain}" : "http://${aws_lightsail_static_ip.app.ip_address}"
+}
+
+output "deploy_command" {
+  description = "Command to redeploy after code changes"
+  value       = "./deploy/lightsail/deploy-lightsail.sh ubuntu@${aws_lightsail_static_ip.app.ip_address}"
+}
+
+output "setup_log" {
+  description = "Check cloud-init setup progress"
+  value       = "ssh ubuntu@${aws_lightsail_static_ip.app.ip_address} 'tail -f /var/log/megane-setup.log'"
 }

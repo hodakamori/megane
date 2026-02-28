@@ -1,0 +1,43 @@
+#!/bin/bash
+# Lightsail instance bootstrap for megane molecular viewer.
+# This script runs once on first boot via cloud-init.
+
+set -euo pipefail
+exec > /var/log/megane-setup.log 2>&1
+
+echo "==> Installing Docker..."
+apt-get update
+apt-get install -y ca-certificates curl gnupg
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+systemctl enable docker
+usermod -aG docker ubuntu
+
+echo "==> Cloning repository..."
+cd /home/ubuntu
+sudo -u ubuntu git clone "https://github.com/${github_repo}.git" megane
+cd megane/deploy/lightsail
+
+echo "==> Creating .env..."
+cat > .env <<'ENVEOF'
+DOMAIN=${domain}
+CERTBOT_EMAIL=${email}
+ENVEOF
+chown ubuntu:ubuntu .env
+
+echo "==> Building Docker image..."
+docker compose build
+
+echo "==> Running Let's Encrypt setup..."
+if [ -n "${domain}" ]; then
+  bash init-letsencrypt.sh
+fi
+
+echo "==> Starting all services..."
+docker compose up -d
+
+echo "==> Setup complete!"

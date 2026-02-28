@@ -1,2 +1,7 @@
-aws_region  = "ap-northeast-1"
-github_repo = "hodakamori/megane"
+aws_region     = "ap-northeast-1"
+github_repo    = "hodakamori/megane"
+ssh_public_key = "ssh-rsa AAAA... your-key"
+domain         = "megane.example.com"
+certbot_email  = "you@example.com"
+
+# lightsail_bundle = "small_3_0"  # $10/mo, 2GB RAM, 1 vCPU
