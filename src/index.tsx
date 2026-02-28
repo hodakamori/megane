@@ -11,6 +11,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { UploadArea } from "./components/UploadArea";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
+import defaultPDB from "../tests/fixtures/1crn.pdb?raw";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";
@@ -35,12 +36,9 @@ function App() {
   // Local data source
   const local = useMeganeLocal();
 
-  // Load default PDB on first mount
+  // Load bundled demo PDB on first mount
   useEffect(() => {
-    fetch("/1crn.pdb")
-      .then((r) => (r.ok ? r.text() : Promise.reject()))
-      .then((text) => local.loadText(text))
-      .catch(() => {});
+    local.loadText(defaultPDB).catch(() => {});
   }, []);
 
   // Select active data source based on mode
