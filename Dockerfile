@@ -21,7 +21,7 @@ COPY pyproject.toml ./
 COPY python/ python/
 COPY --from=frontend /app/python/megane/static/ python/megane/static/
 RUN test -f python/megane/static/app/index.html || (echo "ERROR: Frontend build missing app/index.html" && exit 1)
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[trajectory]"
 
 # Copy demo data
 COPY tests/fixtures/1crn.pdb /data/1crn.pdb
