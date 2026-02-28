@@ -2,7 +2,7 @@
 FROM node:20-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=optional
+RUN npm ci
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index.html ./
 COPY src/ src/
 RUN npm run build:app

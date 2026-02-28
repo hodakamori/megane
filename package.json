@@ -15,9 +15,6 @@
     "react-dom": "^19.0.0",
     "three": "^0.172.0"
   },
-  "optionalDependencies": {
-    "gl": "^8.1.6"
-  },
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
