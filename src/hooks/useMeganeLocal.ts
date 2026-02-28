@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-import { parsePDBFile } from "../core/parsers/pdb";
+import { parsePDBFile, parsePDBText } from "../core/parsers/pdb";
 import type { Snapshot, Frame, TrajectoryMeta } from "../core/types";
 
 export interface MeganeLocalState {
@@ -15,6 +15,7 @@ export interface MeganeLocalState {
   currentFrame: number;
   currentFrameRef: React.MutableRefObject<number>;
   loadFile: (pdb: File) => Promise<void>;
+  loadText: (text: string) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
 }
 
@@ -28,17 +29,26 @@ export function useMeganeLocal(): MeganeLocalState {
   const framesRef = useRef<Frame[]>([]);
   const snapshotRef = useRef<Snapshot | null>(null);
 
-  const loadFile = useCallback(async (pdb: File) => {
-    const result = await parsePDBFile(pdb);
-    snapshotRef.current = result.snapshot;
-    framesRef.current = result.frames;
+  const applyResult = useCallback(
+    (result: { snapshot: Snapshot; frames: Frame[]; meta: TrajectoryMeta | null }) => {
+      snapshotRef.current = result.snapshot;
+      framesRef.current = result.frames;
+      setSnapshot(result.snapshot);
+      setMeta(result.meta);
+      setFrame(null);
+      setCurrentFrame(0);
+      currentFrameRef.current = 0;
+    },
+    [],
+  );
 
-    setSnapshot(result.snapshot);
-    setMeta(result.meta);
-    setFrame(null);
-    setCurrentFrame(0);
-    currentFrameRef.current = 0;
-  }, []);
+  const loadFile = useCallback(async (pdb: File) => {
+    applyResult(await parsePDBFile(pdb));
+  }, [applyResult]);
+
+  const loadText = useCallback(async (text: string) => {
+    applyResult(await parsePDBText(text));
+  }, [applyResult]);
 
   const seekFrame = useCallback((frameIdx: number) => {
     if (frameIdx === 0) {
@@ -67,6 +77,7 @@ export function useMeganeLocal(): MeganeLocalState {
     currentFrame,
     currentFrameRef,
     loadFile,
+    loadText,
     seekFrame,
   };
 }

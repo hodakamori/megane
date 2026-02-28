@@ -35,6 +35,14 @@ function App() {
   // Local data source
   const local = useMeganeLocal();
 
+  // Load default PDB on first mount
+  useEffect(() => {
+    fetch("/1crn.pdb")
+      .then((r) => (r.ok ? r.text() : Promise.reject()))
+      .then((text) => local.loadText(text))
+      .catch(() => {});
+  }, []);
+
   // Select active data source based on mode
   const snapshot = mode === "streaming" ? ws.snapshot : local.snapshot;
   const frame = mode === "streaming" ? ws.frame : local.frame;
