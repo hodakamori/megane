@@ -79,7 +79,7 @@ export class MoleculeRenderer {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.setClearColor(0xffffff, 1);
+    this.renderer.setClearColor(0xf0f2f5, 1);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
     container.appendChild(this.renderer.domElement);
@@ -154,9 +154,9 @@ export class MoleculeRenderer {
       this.container!.clientWidth,
       this.container!.clientHeight,
     );
-    this.ssaoPass.kernelRadius = 8;
-    this.ssaoPass.minDistance = 0.005;
-    this.ssaoPass.maxDistance = 0.1;
+    this.ssaoPass.kernelRadius = 16;
+    this.ssaoPass.minDistance = 0.001;
+    this.ssaoPass.maxDistance = 0.15;
     this.composer.addPass(this.ssaoPass);
 
     const outputPass = new OutputPass();
@@ -204,10 +204,10 @@ export class MoleculeRenderer {
 
     // Scale SSAO parameters to molecule size
     if (this.ssaoPass && this.useSSAO) {
-      const scaledRadius = Math.max(0.2, Math.min(2.0, this.lastExtent * 0.02));
+      const scaledRadius = Math.max(0.5, Math.min(4.0, this.lastExtent * 0.04));
       this.ssaoPass.kernelRadius = scaledRadius;
       this.ssaoPass.minDistance = 0.001;
-      this.ssaoPass.maxDistance = 0.02;
+      this.ssaoPass.maxDistance = 0.05;
     }
   }
 

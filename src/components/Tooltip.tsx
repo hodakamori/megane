@@ -16,16 +16,18 @@ export function Tooltip({ info }: TooltipProps) {
     position: "fixed",
     left: info.screenX + 14,
     top: info.screenY - 14,
-    background: "rgba(33, 37, 41, 0.92)",
+    background: "rgba(15, 23, 42, 0.92)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
     color: "#fff",
-    padding: "6px 10px",
-    borderRadius: 6,
+    padding: "8px 12px",
+    borderRadius: 8,
     fontSize: 12,
     fontFamily: "system-ui, -apple-system, monospace",
     pointerEvents: "none",
     zIndex: 100,
     whiteSpace: "nowrap",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
   };
 
   if (info.kind === "atom") {
