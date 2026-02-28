@@ -110,7 +110,7 @@ export function Viewport({
         width: "100%",
         height: "100%",
         position: "relative",
-        background: "#f0f2f5",
+        background: "#ffffff",
       }}
     />
   );

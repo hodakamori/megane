@@ -41,6 +41,14 @@ async function ensureInit(): Promise<void> {
 }
 
 /**
+ * Parse PDB text directly using the WASM parser.
+ */
+export async function parsePDBText(text: string): Promise<PDBParseResult> {
+  await ensureInit();
+  return parsePDBFromText(text);
+}
+
+/**
  * Parse a PDB File object using the WASM parser.
  * Returns a Snapshot (first model) and optional trajectory Frames.
  */
@@ -48,6 +56,10 @@ export async function parsePDBFile(file: File): Promise<PDBParseResult> {
   await ensureInit();
 
   const text = await file.text();
+  return parsePDBFromText(text);
+}
+
+function parsePDBFromText(text: string): PDBParseResult {
   const result = wasmParsePdb!(text) as WasmParseResult;
 
   const snapshot: Snapshot = {
