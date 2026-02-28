@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 COPY python/ python/
 COPY --from=frontend /app/python/megane/static/ python/megane/static/
+RUN test -f python/megane/static/app/index.html || (echo "ERROR: Frontend build missing app/index.html" && exit 1)
 RUN pip install --no-cache-dir .
 
 # Copy demo data

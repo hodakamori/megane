@@ -9,6 +9,7 @@ export default defineConfig({
   },
   build: {
     outDir: "python/megane/static",
+    emptyOutDir: false,
     lib: {
       entry: path.resolve(__dirname, "src/widget.ts"),
       formats: ["es"],

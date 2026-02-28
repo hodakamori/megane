@@ -175,3 +175,10 @@ if _static_dir.exists():
     app.mount(
         "/", StaticFiles(directory=str(_static_dir), html=True), name="app"
     )
+else:
+    logger.warning(
+        "Static app directory not found at %s. "
+        "The web UI will not be available. "
+        "Build the frontend with 'npm run build' first.",
+        _static_dir,
+    )

@@ -25,9 +25,11 @@ dev = ["pytest>=7.0", "httpx>=0.24"]
 [project.scripts]
 megane = "megane.cli:main"
 
+[tool.hatch.build]
+artifacts = ["python/megane/static/**"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["python/megane"]
-artifacts = ["python/megane/static/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
