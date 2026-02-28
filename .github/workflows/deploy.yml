@@ -1,32 +1,112 @@
-name: Deploy to AWS App Runner
+name: Deploy to AWS Lightsail
 
 on:
   push:
     branches: [main]
 
+env:
+  TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+  TF_VAR_domain: ${{ secrets.DOMAIN }}
+  TF_VAR_certbot_email: ${{ secrets.CERTBOT_EMAIL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
 jobs:
-  deploy:
+  infra:
+    name: Provision infrastructure
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
+    outputs:
+      static_ip: ${{ steps.tf-output.outputs.static_ip }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: hashicorp/setup-terraform@v3
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          terraform_wrapper: false
 
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      - name: Ensure S3 state bucket exists
         run: |
-          docker build -t megane .
-          docker tag megane:latest $ECR_REGISTRY/megane:latest
-          docker push $ECR_REGISTRY/megane:latest
+          aws s3api head-bucket --bucket megane-terraform-state 2>/dev/null || \
+            aws s3 mb s3://megane-terraform-state --region "$AWS_DEFAULT_REGION"
+
+      - name: Terraform init
+        working-directory: deploy/terraform
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: deploy/terraform
+        run: terraform apply -auto-approve
+
+      - name: Export outputs
+        id: tf-output
+        working-directory: deploy/terraform
+        run: |
+          echo "static_ip=$(terraform output -raw static_ip)" >> "$GITHUB_OUTPUT"
+
+      - name: Save SSH key
+        working-directory: deploy/terraform
+        run: |
+          terraform output -raw ssh_private_key > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Upload SSH key as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-key
+          path: /tmp/deploy_key
+          retention-days: 1
+
+  deploy:
+    name: Deploy application
+    needs: infra
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SSH key
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-key
+          path: /tmp
+
+      - name: Set key permissions
+        run: chmod 600 /tmp/deploy_key
+
+      - name: Wait for instance to be ready
+        run: |
+          HOST="${{ needs.infra.outputs.static_ip }}"
+          for i in $(seq 1 30); do
+            ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+              "ubuntu@${HOST}" 'test -f /var/log/megane-setup.log && echo ready' 2>/dev/null && break
+            echo "Waiting for instance... (attempt $i/30)"
+            sleep 10
+          done
+
+      - name: Deploy latest code
+        run: |
+          HOST="${{ needs.infra.outputs.static_ip }}"
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no "ubuntu@${HOST}" bash -s <<'REMOTE'
+          set -euo pipefail
+          cd ~/megane
+
+          echo "==> Pulling latest code..."
+          git pull --ff-only origin main
+
+          echo "==> Rebuilding and restarting..."
+          cd deploy/lightsail
+          docker compose build
+          docker compose up -d
+
+          echo "==> Checking health..."
+          sleep 5
+          curl -sf http://localhost:8080/health && echo " OK" || echo " Waiting..."
+          REMOTE
+
+      - name: Print service URL
+        run: |
+          DOMAIN="${{ secrets.DOMAIN }}"
+          IP="${{ needs.infra.outputs.static_ip }}"
+          if [ -n "$DOMAIN" ]; then
+            echo "::notice::Deployed to https://${DOMAIN}"
+          else
+            echo "::notice::Deployed to http://${IP}"
+          fi

@@ -5,6 +5,16 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+  }
+
+  backend "s3" {
+    bucket = "megane-terraform-state"
+    key    = "lightsail/terraform.tfstate"
+    region = "ap-northeast-1"
   }
 }
 
@@ -13,11 +23,16 @@ provider "aws" {
 }
 
 # ---------------------------------------------------------------------------
-# SSH Key Pair
+# SSH Key Pair (auto-generated)
 # ---------------------------------------------------------------------------
+resource "tls_private_key" "deploy" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
 resource "aws_lightsail_key_pair" "deploy" {
   name       = "${var.app_name}-deploy"
-  public_key = var.ssh_public_key
+  public_key = tls_private_key.deploy.public_key_openssh
 }
 
 # ---------------------------------------------------------------------------

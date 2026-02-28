@@ -8,22 +8,13 @@ output "static_ip" {
   value       = aws_lightsail_static_ip.app.ip_address
 }
 
-output "ssh_command" {
-  description = "SSH command to connect to the instance"
-  value       = "ssh ubuntu@${aws_lightsail_static_ip.app.ip_address}"
+output "ssh_private_key" {
+  description = "SSH private key for instance access (auto-generated)"
+  value       = tls_private_key.deploy.private_key_pem
+  sensitive   = true
 }
 
 output "service_url" {
   description = "Public URL of the megane demo"
   value       = var.domain != "" ? "https://${var.domain}" : "http://${aws_lightsail_static_ip.app.ip_address}"
-}
-
-output "deploy_command" {
-  description = "Command to redeploy after code changes"
-  value       = "./deploy/lightsail/deploy-lightsail.sh ubuntu@${aws_lightsail_static_ip.app.ip_address}"
-}
-
-output "setup_log" {
-  description = "Check cloud-init setup progress"
-  value       = "ssh ubuntu@${aws_lightsail_static_ip.app.ip_address} 'tail -f /var/log/megane-setup.log'"
 }

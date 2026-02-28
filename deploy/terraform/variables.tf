@@ -22,13 +22,8 @@ variable "lightsail_bundle" {
   default     = "small_3_0"
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key for Lightsail instance access"
-  type        = string
-}
-
 variable "domain" {
-  description = "Domain name for TLS certificate (leave empty to skip DNS setup)"
+  description = "Domain name for TLS certificate (leave empty to skip DNS/TLS setup)"
   type        = string
   default     = ""
 }
@@ -36,4 +31,5 @@ variable "domain" {
 variable "certbot_email" {
   description = "Email for Let's Encrypt certificate registration"
   type        = string
+  default     = ""
 }
