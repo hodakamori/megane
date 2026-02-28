@@ -79,7 +79,7 @@ export class MoleculeRenderer {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.setClearColor(0xf8f9fa, 1);
+    this.renderer.setClearColor(0xffffff, 1);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
     container.appendChild(this.renderer.domElement);

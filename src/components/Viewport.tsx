@@ -110,7 +110,7 @@ export function Viewport({
         width: "100%",
         height: "100%",
         position: "relative",
-        background: "linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)",
+        background: "#ffffff",
       }}
     />
   );
