@@ -11,7 +11,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { UploadArea } from "./components/UploadArea";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
-import defaultPDB from "../tests/fixtures/1crn.pdb?raw";
+import defaultPDB from "./assets/1crn.pdb?raw";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";
