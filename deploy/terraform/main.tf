@@ -88,9 +88,10 @@ resource "aws_route_table_association" "public" {
 # Security Groups
 # ---------------------------------------------------------------------------
 resource "aws_security_group" "alb" {
-  name        = "${var.app_name}-alb-sg"
-  description = "Allow HTTP/HTTPS traffic to ALB"
-  vpc_id      = aws_vpc.main.id
+  name                   = "${var.app_name}-alb-sg"
+  description            = "Allow HTTP/HTTPS traffic to ALB"
+  vpc_id                 = aws_vpc.main.id
+  revoke_rules_on_delete = true
 
   ingress {
     description = "HTTP"
@@ -121,9 +122,10 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group" "ecs" {
-  name        = "${var.app_name}-ecs-sg"
-  description = "Allow traffic from ALB to ECS tasks"
-  vpc_id      = aws_vpc.main.id
+  name                   = "${var.app_name}-ecs-sg"
+  description            = "Allow traffic from ALB to ECS tasks"
+  vpc_id                 = aws_vpc.main.id
+  revoke_rules_on_delete = true
 
   ingress {
     description     = "App port from ALB"
