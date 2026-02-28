@@ -2,7 +2,7 @@ name: Deploy to AWS Lightsail
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/molecular-viewer-sL9Us]
 
 env:
   TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
