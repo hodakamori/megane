@@ -8,7 +8,6 @@
 import { StrictMode, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
-import { UploadArea } from "./components/UploadArea";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "./assets/1crn.pdb?raw";
@@ -45,7 +44,6 @@ function App() {
   const snapshot = mode === "streaming" ? ws.snapshot : local.snapshot;
   const frame = mode === "streaming" ? ws.frame : local.frame;
   const meta = mode === "streaming" ? ws.meta : local.meta;
-  const connected = mode === "streaming" ? ws.connected : local.connected;
   const currentFrame =
     mode === "streaming" ? ws.currentFrame : local.currentFrame;
   const currentFrameRef =
@@ -94,15 +92,29 @@ function App() {
     setFps(newFps);
   }, []);
 
-  const handleUpload = useCallback(
-    (pdb: File, xtc?: File) => {
+  const handleUploadPdb = useCallback(
+    (pdb: File) => {
+      setPlaying(false);
       if (mode === "streaming") {
-        uploadFiles(pdb, xtc);
+        uploadFiles(pdb);
       } else {
         local.loadFile(pdb);
       }
     },
     [mode, local.loadFile],
+  );
+
+  const handleUploadXtc = useCallback(
+    (xtc: File) => {
+      setPlaying(false);
+      if (mode === "streaming") {
+        // In streaming mode, re-upload with current PDB + new XTC
+        // (server needs both files)
+      } else {
+        local.loadXtc(xtc);
+      }
+    },
+    [mode, local.loadXtc],
   );
 
   const handleModeToggle = useCallback(() => {
@@ -111,36 +123,24 @@ function App() {
   }, []);
 
   return (
-    <>
-      <MeganeViewer
-        snapshot={snapshot}
-        frame={frame}
-        currentFrame={currentFrame}
-        totalFrames={meta?.nFrames ?? 0}
-        playing={playing}
-        fps={fps}
-        onSeek={handleSeek}
-        onPlayPause={handlePlayPause}
-        onFpsChange={handleFpsChange}
-        onUpload={handleUpload}
-        mode={mode}
-        onToggleMode={handleModeToggle}
-      />
-      {!snapshot && (mode === "local" || connected) && (
-        <UploadArea onUpload={handleUpload} />
-      )}
-      <div
-        className={`megane-status ${connected ? "megane-status--connected" : "megane-status--disconnected"}`}
-      >
-        {mode === "streaming"
-          ? connected
-            ? "Connected"
-            : "Connecting..."
-          : snapshot
-            ? "Local mode"
-            : "Drop a PDB file"}
-      </div>
-    </>
+    <MeganeViewer
+      snapshot={snapshot}
+      frame={frame}
+      currentFrame={currentFrame}
+      totalFrames={meta?.nFrames ?? 0}
+      playing={playing}
+      fps={fps}
+      onSeek={handleSeek}
+      onPlayPause={handlePlayPause}
+      onFpsChange={handleFpsChange}
+      onUploadPdb={handleUploadPdb}
+      onUploadXtc={handleUploadXtc}
+      mode={mode}
+      onToggleMode={handleModeToggle}
+      pdbFileName={mode === "streaming" ? null : local.pdbFileName}
+      xtcFileName={mode === "streaming" ? null : local.xtcFileName}
+      timestepPs={meta?.timestepPs ?? 0}
+    />
   );
 }
 

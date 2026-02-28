@@ -1,10 +1,12 @@
 /**
  * Local (in-memory) data source hook.
  * Parses PDB files in the browser via WASM — no server communication needed.
+ * Supports XTC trajectory loading as a separate step.
  */
 
 import { useState, useRef, useCallback } from "react";
 import { parsePDBFile, parsePDBText } from "../core/parsers/pdb";
+import { parseXTCFile } from "../core/parsers/xtc";
 import type { Snapshot, Frame, TrajectoryMeta } from "../core/types";
 
 export interface MeganeLocalState {
@@ -14,8 +16,11 @@ export interface MeganeLocalState {
   connected: boolean;
   currentFrame: number;
   currentFrameRef: React.MutableRefObject<number>;
+  pdbFileName: string | null;
+  xtcFileName: string | null;
   loadFile: (pdb: File) => Promise<void>;
   loadText: (text: string) => Promise<void>;
+  loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
 }
 
@@ -24,6 +29,8 @@ export function useMeganeLocal(): MeganeLocalState {
   const [frame, setFrame] = useState<Frame | null>(null);
   const [meta, setMeta] = useState<TrajectoryMeta | null>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
+  const [pdbFileName, setPdbFileName] = useState<string | null>(null);
+  const [xtcFileName, setXtcFileName] = useState<string | null>(null);
 
   const currentFrameRef = useRef(0);
   const framesRef = useRef<Frame[]>([]);
@@ -44,11 +51,31 @@ export function useMeganeLocal(): MeganeLocalState {
 
   const loadFile = useCallback(async (pdb: File) => {
     applyResult(await parsePDBFile(pdb));
+    setPdbFileName(pdb.name);
+    setXtcFileName(null);
   }, [applyResult]);
 
   const loadText = useCallback(async (text: string) => {
     applyResult(await parsePDBText(text));
+    setPdbFileName("1crn.pdb");
+    setXtcFileName(null);
   }, [applyResult]);
+
+  const loadXtc = useCallback(async (xtc: File) => {
+    if (!snapshotRef.current) {
+      throw new Error("Load a PDB structure before loading a trajectory");
+    }
+    const { frames, meta: xtcMeta } = await parseXTCFile(
+      xtc,
+      snapshotRef.current.nAtoms,
+    );
+    framesRef.current = frames;
+    setMeta(xtcMeta);
+    setFrame(null);
+    setCurrentFrame(0);
+    currentFrameRef.current = 0;
+    setXtcFileName(xtc.name);
+  }, []);
 
   const seekFrame = useCallback((frameIdx: number) => {
     if (frameIdx === 0) {
@@ -76,8 +103,11 @@ export function useMeganeLocal(): MeganeLocalState {
     connected: true,
     currentFrame,
     currentFrameRef,
+    pdbFileName,
+    xtcFileName,
     loadFile,
     loadText,
+    loadXtc,
     seekFrame,
   };
 }

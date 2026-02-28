@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 
 mod bonds;
 mod parser;
+mod xtc;
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
@@ -71,6 +72,75 @@ impl ParseResult {
     pub fn frame_data(&self) -> Float32Array {
         Float32Array::from(&self.frame_data[..])
     }
+}
+
+/// Result of parsing an XTC trajectory file.
+#[wasm_bindgen]
+pub struct XtcParseResult {
+    n_atoms: u32,
+    n_frames: u32,
+    timestep_ps: f32,
+    has_box: bool,
+    box_matrix: Vec<f32>,
+    frame_data: Vec<f32>,
+}
+
+#[wasm_bindgen]
+impl XtcParseResult {
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn timestep_ps(&self) -> f32 {
+        self.timestep_ps
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn has_box(&self) -> bool {
+        self.has_box
+    }
+
+    pub fn box_matrix(&self) -> Float32Array {
+        Float32Array::from(&self.box_matrix[..])
+    }
+
+    /// All frame positions concatenated (n_frames * n_atoms * 3 floats).
+    pub fn frame_data(&self) -> Float32Array {
+        Float32Array::from(&self.frame_data[..])
+    }
+}
+
+/// Parse an XTC trajectory binary and return frame data.
+#[wasm_bindgen]
+pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
+    let xtc_data = xtc::parse_xtc(data).map_err(|e| JsError::new(&e))?;
+
+    let has_box = xtc_data.box_matrix.is_some();
+    let box_matrix = match xtc_data.box_matrix {
+        Some(m) => m.to_vec(),
+        None => Vec::new(),
+    };
+
+    let mut frame_data: Vec<f32> = Vec::new();
+    for frame in &xtc_data.frame_positions {
+        frame_data.extend_from_slice(frame);
+    }
+
+    Ok(XtcParseResult {
+        n_atoms: xtc_data.n_atoms as u32,
+        n_frames: xtc_data.n_frames as u32,
+        timestep_ps: xtc_data.timestep_ps,
+        has_box,
+        box_matrix,
+        frame_data,
+    })
 }
 
 /// Parse a PDB file text and return structured data for the molecular viewer.
