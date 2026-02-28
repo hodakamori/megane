@@ -27,7 +27,7 @@ megane = "megane.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["python/megane"]
-artifacts = ["python/megane/static/*"]
+artifacts = ["python/megane/static/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
