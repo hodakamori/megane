@@ -27,7 +27,7 @@ export interface MeganeWebSocketState {
   clientRef: React.MutableRefObject<WebSocketClient | null>;
 }
 
-export function useMeganeWebSocket(url: string): MeganeWebSocketState {
+export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [frame, setFrame] = useState<Frame | null>(null);
   const [meta, setMeta] = useState<TrajectoryMeta | null>(null);
@@ -38,6 +38,8 @@ export function useMeganeWebSocket(url: string): MeganeWebSocketState {
   const currentFrameRef = useRef(0);
 
   useEffect(() => {
+    if (!url) return;
+
     const client = new WebSocketClient(
       url,
       (data: ArrayBuffer) => {

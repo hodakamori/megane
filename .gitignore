@@ -9,3 +9,5 @@ __pycache__/
 *.whl
 tests/fixtures/.*.npz
 *.ppm
+wasm/target/
+wasm/pkg/

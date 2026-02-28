@@ -12,6 +12,8 @@ interface ToolbarProps {
   hasCell?: boolean;
   cellVisible?: boolean;
   onToggleCell?: () => void;
+  mode?: "streaming" | "local";
+  onToggleMode?: () => void;
 }
 
 const buttonStyle: React.CSSProperties = {
@@ -38,6 +40,8 @@ export function Toolbar({
   hasCell = false,
   cellVisible = true,
   onToggleCell,
+  mode,
+  onToggleMode,
 }: ToolbarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +87,46 @@ export function Toolbar({
         }}
       >
         <span style={{ fontWeight: 600, color: "#212529" }}>megane</span>
+        {onToggleMode && mode && (
+          <div
+            style={{
+              display: "flex",
+              borderRadius: 4,
+              overflow: "hidden",
+              border: "1px solid #dee2e6",
+            }}
+          >
+            <button
+              onClick={mode === "local" ? undefined : onToggleMode}
+              style={{
+                background: mode === "local" ? "#e9ecef" : "none",
+                border: "none",
+                borderRight: "1px solid #dee2e6",
+                padding: "2px 8px",
+                cursor: mode === "local" ? "default" : "pointer",
+                fontSize: 12,
+                color: "#495057",
+              }}
+              title="In-memory mode (no server)"
+            >
+              Local
+            </button>
+            <button
+              onClick={mode === "streaming" ? undefined : onToggleMode}
+              style={{
+                background: mode === "streaming" ? "#e9ecef" : "none",
+                border: "none",
+                padding: "2px 8px",
+                cursor: mode === "streaming" ? "default" : "pointer",
+                fontSize: 12,
+                color: "#495057",
+              }}
+              title="WebSocket streaming mode"
+            >
+              Stream
+            </button>
+          </div>
+        )}
         {atomCount > 0 && (
           <span>
             {atomCount.toLocaleString()} atoms / {bondCount.toLocaleString()}{" "}

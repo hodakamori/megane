@@ -20,5 +20,5 @@ output "ecs_service_name" {
 
 output "service_url" {
   description = "Public URL of the application"
-  value       = "http://${aws_lb.app.dns_name}"
+  value       = "https://${var.domain_name}"
 }
