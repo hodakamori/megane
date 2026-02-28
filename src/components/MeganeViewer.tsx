@@ -1,11 +1,11 @@
 /**
  * Main megane viewer React component.
- * Combines Viewport, Toolbar, Timeline, Tooltip, and MeasurementPanel.
+ * Combines Viewport, Sidebar, Timeline, Tooltip, and MeasurementPanel.
  */
 
 import { useCallback, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
-import { Toolbar } from "./Toolbar";
+import { Sidebar } from "./Sidebar";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
@@ -28,9 +28,13 @@ interface MeganeViewerProps {
   onSeek?: (frame: number) => void;
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
-  onUpload?: (pdb: File, xtc?: File) => void;
-  mode?: "streaming" | "local";
-  onToggleMode?: () => void;
+  onUploadPdb: (pdb: File) => void;
+  onUploadXtc: (xtc: File) => void;
+  mode: "streaming" | "local";
+  onToggleMode: () => void;
+  pdbFileName: string | null;
+  xtcFileName: string | null;
+  timestepPs?: number;
   width?: string | number;
   height?: string | number;
 }
@@ -45,9 +49,13 @@ export function MeganeViewer({
   onSeek,
   onPlayPause,
   onFpsChange,
-  onUpload,
+  onUploadPdb,
+  onUploadXtc,
   mode,
   onToggleMode,
+  pdbFileName,
+  xtcFileName,
+  timestepPs = 0,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
@@ -56,6 +64,7 @@ export function MeganeViewer({
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -92,6 +101,10 @@ export function MeganeViewer({
     if (m) setMeasurement(m);
   }, []);
 
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => !prev);
+  }, []);
+
   // Check if snapshot has a non-zero box
   const hasCell =
     snapshot?.box != null && snapshot.box.some((v) => v !== 0);
@@ -106,16 +119,23 @@ export function MeganeViewer({
         onAtomRightClick={handleAtomRightClick}
         onFrameUpdated={handleFrameUpdated}
       />
-      <Toolbar
+      <Sidebar
+        mode={mode}
+        onToggleMode={onToggleMode}
         atomCount={snapshot?.nAtoms ?? 0}
         bondCount={snapshot?.nBonds ?? 0}
+        pdbFileName={pdbFileName}
+        xtcFileName={xtcFileName}
+        totalFrames={totalFrames}
+        timestepPs={timestepPs}
+        onUploadPdb={onUploadPdb}
+        onUploadXtc={onUploadXtc}
         onResetView={handleResetView}
-        onUpload={onUpload}
         hasCell={hasCell}
         cellVisible={cellVisible}
         onToggleCell={handleToggleCell}
-        mode={mode}
-        onToggleMode={onToggleMode}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

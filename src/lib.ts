@@ -6,7 +6,7 @@
 // React components
 export { MeganeViewer } from "./components/MeganeViewer";
 export { Viewport } from "./components/Viewport";
-export { Toolbar } from "./components/Toolbar";
+export { Sidebar } from "./components/Sidebar";
 export { Timeline } from "./components/Timeline";
 
 // Core renderer (framework-agnostic)
