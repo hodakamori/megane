@@ -32,7 +32,8 @@ jobs:
       - name: Ensure S3 state bucket exists
         run: |
           aws s3api head-bucket --bucket megane-terraform-state 2>/dev/null || \
-            aws s3 mb s3://megane-terraform-state --region "$AWS_REGION"
+            aws s3 mb s3://megane-terraform-state --region "$AWS_REGION" || \
+            echo "Bucket may already exist, continuing..."
 
       - name: Terraform init
         working-directory: deploy/terraform
