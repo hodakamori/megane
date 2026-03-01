@@ -5,6 +5,7 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react(), wasm()],
+  assetsInclude: ["**/*.xtc"],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),

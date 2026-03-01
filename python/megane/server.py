@@ -142,6 +142,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             data = await websocket.receive_text()
             msg = json.loads(data)
             cmd = msg.get("type")
+            traj = _state.trajectory
 
             if cmd == "request_frame" and traj is not None:
                 frame_idx = msg["frame"]

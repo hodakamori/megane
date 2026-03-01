@@ -11,6 +11,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "./assets/1crn.pdb?raw";
+import demoXtcUrl from "./assets/1crn_vibration.xtc?url";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";
@@ -35,9 +36,15 @@ function App() {
   // Local data source
   const local = useMeganeLocal();
 
-  // Load bundled demo PDB on first mount
+  // Load bundled demo PDB and XTC on first mount
   useEffect(() => {
-    local.loadText(defaultPDB).catch(() => {});
+    (async () => {
+      await local.loadText(defaultPDB);
+      const resp = await fetch(demoXtcUrl);
+      const buffer = await resp.arrayBuffer();
+      const file = new File([buffer], "1crn_vibration.xtc");
+      await local.loadXtc(file);
+    })().catch(() => {});
   }, []);
 
   // Select active data source based on mode
