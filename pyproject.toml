@@ -11,7 +11,7 @@ dependencies = [
     "anywidget>=0.9.0",
     "traitlets>=5.0",
     "numpy>=1.24",
-    "rdkit",
+    "megane-python",
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
     "websockets>=12.0",

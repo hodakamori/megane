@@ -1,13 +1,7 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-mod bonds;
-mod gro;
-mod mol;
-mod parser;
-mod top;
-mod xtc;
-mod xyz;
+use megane_core::{bonds, gro, mol, parser, top, xtc, xyz};
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
