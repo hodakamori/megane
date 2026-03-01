@@ -23,7 +23,7 @@ pub struct PdbData {
 }
 
 /// Element symbol → atomic number lookup.
-fn symbol_to_atomic_num(sym: &str) -> u8 {
+pub fn symbol_to_atomic_num(sym: &str) -> u8 {
     match sym {
         "H" => 1, "He" => 2,
         "Li" => 3, "Be" => 4, "B" => 5, "C" => 6, "N" => 7, "O" => 8, "F" => 9, "Ne" => 10,

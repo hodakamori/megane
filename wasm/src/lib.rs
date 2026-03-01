@@ -2,8 +2,11 @@ use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 mod bonds;
+mod gro;
+mod mol;
 mod parser;
 mod xtc;
+mod xyz;
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
@@ -186,5 +189,97 @@ pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {
         bond_orders,
         box_matrix,
         frame_data,
+    })
+}
+
+/// Parse a GRO file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_gro(text: &str) -> Result<ParseResult, JsError> {
+    let data = gro::parse(text).map_err(|e| JsError::new(&e))?;
+
+    let n_bonds = data.bonds.len() as u32;
+    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
+    for (a, b) in &data.bonds {
+        bonds_flat.push(*a);
+        bonds_flat.push(*b);
+    }
+    let bond_orders = vec![1u8; data.bonds.len()];
+
+    let has_box = data.box_matrix.is_some();
+    let box_matrix = match data.box_matrix {
+        Some(m) => m.to_vec(),
+        None => Vec::new(),
+    };
+
+    Ok(ParseResult {
+        n_atoms: data.n_atoms as u32,
+        n_bonds,
+        n_frames: 0,
+        has_box,
+        positions: data.positions,
+        elements: data.elements,
+        bonds: bonds_flat,
+        bond_orders,
+        box_matrix,
+        frame_data: Vec::new(),
+    })
+}
+
+/// Parse an XYZ file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
+    let data = xyz::parse(text).map_err(|e| JsError::new(&e))?;
+
+    let n_bonds = data.bonds.len() as u32;
+    let n_frames = data.frame_positions.len() as u32;
+    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
+    for (a, b) in &data.bonds {
+        bonds_flat.push(*a);
+        bonds_flat.push(*b);
+    }
+    let bond_orders = vec![1u8; data.bonds.len()];
+
+    let mut frame_data: Vec<f32> = Vec::new();
+    for frame in &data.frame_positions {
+        frame_data.extend_from_slice(frame);
+    }
+
+    Ok(ParseResult {
+        n_atoms: data.n_atoms as u32,
+        n_bonds,
+        n_frames,
+        has_box: false,
+        positions: data.positions,
+        elements: data.elements,
+        bonds: bonds_flat,
+        bond_orders,
+        box_matrix: Vec::new(),
+        frame_data,
+    })
+}
+
+/// Parse an MDL Molfile (V2000) text and return structured data.
+#[wasm_bindgen]
+pub fn parse_mol(text: &str) -> Result<ParseResult, JsError> {
+    let data = mol::parse(text).map_err(|e| JsError::new(&e))?;
+
+    let n_bonds = data.bonds.len() as u32;
+    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
+    for (a, b) in &data.bonds {
+        bonds_flat.push(*a);
+        bonds_flat.push(*b);
+    }
+
+    Ok(ParseResult {
+        n_atoms: data.n_atoms as u32,
+        n_bonds,
+        n_frames: 0,
+        has_box: false,
+        positions: data.positions,
+        elements: data.elements,
+        bonds: bonds_flat,
+        bond_orders: data.bond_orders,
+        box_matrix: Vec::new(),
+        frame_data: Vec::new(),
     })
 }

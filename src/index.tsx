@@ -49,6 +49,10 @@ function App() {
   const currentFrameRef =
     mode === "streaming" ? ws.currentFrameRef : local.currentFrameRef;
 
+  // Streaming mode file name tracking (client-side only)
+  const [streamPdbFileName, setStreamPdbFileName] = useState<string | null>(null);
+  const [streamXtcFileName, setStreamXtcFileName] = useState<string | null>(null);
+
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
   const playingRef = useRef(false);
@@ -97,6 +101,8 @@ function App() {
       setPlaying(false);
       if (mode === "streaming") {
         uploadFiles(pdb);
+        setStreamPdbFileName(pdb.name);
+        setStreamXtcFileName(null);
       } else {
         local.loadFile(pdb);
       }
@@ -108,8 +114,8 @@ function App() {
     (xtc: File) => {
       setPlaying(false);
       if (mode === "streaming") {
-        // In streaming mode, re-upload with current PDB + new XTC
-        // (server needs both files)
+        uploadFiles(undefined as unknown as File, xtc);
+        setStreamXtcFileName(xtc.name);
       } else {
         local.loadXtc(xtc);
       }
@@ -137,8 +143,8 @@ function App() {
       onUploadXtc={handleUploadXtc}
       mode={mode}
       onToggleMode={handleModeToggle}
-      pdbFileName={mode === "streaming" ? null : local.pdbFileName}
-      xtcFileName={mode === "streaming" ? null : local.xtcFileName}
+      pdbFileName={mode === "streaming" ? streamPdbFileName : local.pdbFileName}
+      xtcFileName={mode === "streaming" ? streamXtcFileName : local.xtcFileName}
       timestepPs={meta?.timestepPs ?? 0}
     />
   );

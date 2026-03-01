@@ -1,6 +1,7 @@
 /**
- * WASM-based PDB parser wrapper.
+ * WASM-based structure parser wrapper.
  * Loads the Rust WASM module and converts results to megane Snapshot/Frame types.
+ * Supports PDB, GRO, XYZ, and MOL/SDF formats.
  */
 
 import type { Snapshot, Frame, TrajectoryMeta } from "../types";
@@ -12,7 +13,7 @@ export interface PDBParseResult {
 }
 
 let initPromise: Promise<void> | null = null;
-let wasmParsePdb: ((text: string) => WasmParseResult) | null = null;
+let wasmModule: WasmModule | null = null;
 
 interface WasmParseResult {
   n_atoms: number;
@@ -28,16 +29,45 @@ interface WasmParseResult {
   free(): void;
 }
 
+type ParseFn = (text: string) => WasmParseResult;
+
+interface WasmModule {
+  parse_pdb: ParseFn;
+  parse_gro: ParseFn;
+  parse_xyz: ParseFn;
+  parse_mol: ParseFn;
+}
+
 async function ensureInit(): Promise<void> {
-  if (wasmParsePdb) return;
+  if (wasmModule) return;
   if (!initPromise) {
     initPromise = (async () => {
       const wasm = await import("../../../wasm/pkg");
       await wasm.default();
-      wasmParsePdb = wasm.parse_pdb;
+      wasmModule = {
+        parse_pdb: wasm.parse_pdb,
+        parse_gro: wasm.parse_gro,
+        parse_xyz: wasm.parse_xyz,
+        parse_mol: wasm.parse_mol,
+      };
     })();
   }
   await initPromise;
+}
+
+/** Choose the appropriate WASM parser based on file extension. */
+function getParserForExtension(ext: string): ParseFn {
+  switch (ext) {
+    case ".gro":
+      return wasmModule!.parse_gro;
+    case ".xyz":
+      return wasmModule!.parse_xyz;
+    case ".mol":
+    case ".sdf":
+      return wasmModule!.parse_mol;
+    default:
+      return wasmModule!.parse_pdb;
+  }
 }
 
 /**
@@ -45,22 +75,25 @@ async function ensureInit(): Promise<void> {
  */
 export async function parsePDBText(text: string): Promise<PDBParseResult> {
   await ensureInit();
-  return parsePDBFromText(text);
+  return parseWithFn(wasmModule!.parse_pdb, text);
 }
 
 /**
- * Parse a PDB File object using the WASM parser.
+ * Parse a structure File object using the WASM parser.
+ * Auto-detects format from file extension (.pdb, .gro, .xyz, .mol, .sdf).
  * Returns a Snapshot (first model) and optional trajectory Frames.
  */
 export async function parsePDBFile(file: File): Promise<PDBParseResult> {
   await ensureInit();
 
   const text = await file.text();
-  return parsePDBFromText(text);
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb";
+  const parseFn = getParserForExtension(ext);
+  return parseWithFn(parseFn, text);
 }
 
-function parsePDBFromText(text: string): PDBParseResult {
-  const result = wasmParsePdb!(text) as WasmParseResult;
+function parseWithFn(parseFn: ParseFn, text: string): PDBParseResult {
+  const result = parseFn(text) as WasmParseResult;
 
   const snapshot: Snapshot = {
     nAtoms: result.n_atoms,
