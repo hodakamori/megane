@@ -1,32 +1,44 @@
 [
   {
     "nAtoms": 100,
-    "rustParse": 0.20537499995043618,
-    "protocolEncode": 0.007941000035316392,
-    "serverTotal": 0.21331599998575257
+    "rustParse": 0.2830219999623296,
+    "protocolEncode": 0.0080249999427906,
+    "serverTotal": 0.2910469999051202
   },
   {
     "nAtoms": 500,
-    "rustParse": 0.43348500003048684,
-    "protocolEncode": 0.00858399994285719,
-    "serverTotal": 0.44206899997334403
+    "rustParse": 0.47847799999090057,
+    "protocolEncode": 0.012353999977676722,
+    "serverTotal": 0.4908319999685773
   },
   {
     "nAtoms": 1000,
-    "rustParse": 0.9332519999816213,
-    "protocolEncode": 0.011142999937874265,
-    "serverTotal": 0.9443949999194956
+    "rustParse": 0.7938710000416904,
+    "protocolEncode": 0.010548999966886186,
+    "serverTotal": 0.8044200000085766
   },
   {
     "nAtoms": 5000,
-    "rustParse": 4.04129000003195,
-    "protocolEncode": 0.02691399993182131,
-    "serverTotal": 4.068203999963771
+    "rustParse": 4.2029530000036175,
+    "protocolEncode": 0.02704999997149571,
+    "serverTotal": 4.230002999975113
   },
   {
     "nAtoms": 10000,
-    "rustParse": 8.49115499988784,
-    "protocolEncode": 0.05541500001982058,
-    "serverTotal": 8.54656999990766
+    "rustParse": 7.686724999985017,
+    "protocolEncode": 0.058102000025428424,
+    "serverTotal": 7.744827000010446
+  },
+  {
+    "nAtoms": 50000,
+    "rustParse": 42.15696200003549,
+    "protocolEncode": 0.5484380000098099,
+    "serverTotal": 42.7054000000453
+  },
+  {
+    "nAtoms": 100000,
+    "rustParse": 85.03188800000316,
+    "protocolEncode": 1.271683000027224,
+    "serverTotal": 86.30357100003039
   }
 ]

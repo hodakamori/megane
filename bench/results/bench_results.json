@@ -1,71 +1,79 @@
 [
   {
     "nAtoms": 100,
-    "pdbParse": 0.5227980000000088,
-    "bondInference": 0.07128099999999904,
-    "nBonds": 205,
-    "streamingDecode": 0.0030280000000004748,
-    "rustParse": 0.20537499995043618,
-    "protocolEncode": 0.007941000035316392,
-    "serverTotal": 0.21331599998575257,
-    "streamingEndToEnd": 0.21634399998575304
+    "pdbParse": 0.5390560000000022,
+    "bondInference": 0.07764000000000237,
+    "nBonds": 196,
+    "streamingDecode": 0.002392999999997869,
+    "rustParse": 0.2830219999623296,
+    "protocolEncode": 0.0080249999427906,
+    "serverTotal": 0.2910469999051202,
+    "streamingEndToEnd": 0.29343999990511804
   },
   {
     "nAtoms": 500,
-    "pdbParse": 1.3098959999999948,
-    "bondInference": 0.23733099999999752,
-    "nBonds": 1123,
-    "streamingDecode": 0.00406700000000626,
-    "rustParse": 0.43348500003048684,
-    "protocolEncode": 0.00858399994285719,
-    "serverTotal": 0.44206899997334403,
-    "streamingEndToEnd": 0.4461359999733503
+    "pdbParse": 1.0880900000000082,
+    "bondInference": 0.2456770000000006,
+    "nBonds": 1112,
+    "streamingDecode": 0.003971000000007052,
+    "rustParse": 0.47847799999090057,
+    "protocolEncode": 0.012353999977676722,
+    "serverTotal": 0.4908319999685773,
+    "streamingEndToEnd": 0.49480299996858434
   },
   {
     "nAtoms": 1000,
-    "pdbParse": 1.2828269999999975,
-    "bondInference": 0.37585099999999727,
-    "nBonds": 2270,
-    "streamingDecode": 0.0004970000000099617,
-    "rustParse": 0.9332519999816213,
-    "protocolEncode": 0.011142999937874265,
-    "serverTotal": 0.9443949999194956,
-    "streamingEndToEnd": 0.9448919999195056
+    "pdbParse": 1.2749370000000084,
+    "bondInference": 0.370348000000007,
+    "nBonds": 2303,
+    "streamingDecode": 0.0005250000000103228,
+    "rustParse": 0.7938710000416904,
+    "protocolEncode": 0.010548999966886186,
+    "serverTotal": 0.8044200000085766,
+    "streamingEndToEnd": 0.8049450000085869
   },
   {
     "nAtoms": 5000,
-    "pdbParse": 6.189522000000011,
-    "bondInference": 2.237684999999999,
-    "nBonds": 12027,
-    "streamingDecode": 0.0005120000000147229,
-    "rustParse": 4.04129000003195,
-    "protocolEncode": 0.02691399993182131,
-    "serverTotal": 4.068203999963771,
-    "streamingEndToEnd": 4.068715999963786
+    "pdbParse": 6.003149000000008,
+    "bondInference": 2.2243249999999932,
+    "nBonds": 11912,
+    "streamingDecode": 0.0004890000000159489,
+    "rustParse": 4.2029530000036175,
+    "protocolEncode": 0.02704999997149571,
+    "serverTotal": 4.230002999975113,
+    "streamingEndToEnd": 4.230491999975129
   },
   {
     "nAtoms": 10000,
-    "pdbParse": 12.970732000000055,
-    "bondInference": 4.682536000000027,
-    "nBonds": 24228,
-    "streamingDecode": 0.000527000000033695,
-    "rustParse": 8.49115499988784,
-    "protocolEncode": 0.05541500001982058,
-    "serverTotal": 8.54656999990766,
-    "streamingEndToEnd": 8.547096999907694
+    "pdbParse": 12.319209,
+    "bondInference": 4.573853999999983,
+    "nBonds": 24238,
+    "streamingDecode": 0.0005240000000412692,
+    "rustParse": 7.686724999985017,
+    "protocolEncode": 0.058102000025428424,
+    "serverTotal": 7.744827000010446,
+    "streamingEndToEnd": 7.745351000010487
   },
   {
     "nAtoms": 50000,
-    "pdbParse": 59.669768999999974,
-    "bondInference": 24.007697000000007,
-    "nBonds": 124088,
-    "streamingDecode": 0.000657000000046537
+    "pdbParse": 57.94121299999995,
+    "bondInference": 23.860110000000077,
+    "nBonds": 123941,
+    "streamingDecode": 0.0005400000000008731,
+    "rustParse": 42.15696200003549,
+    "protocolEncode": 0.5484380000098099,
+    "serverTotal": 42.7054000000453,
+    "streamingEndToEnd": 42.7059400000453
   },
   {
     "nAtoms": 100000,
-    "pdbParse": 120.71127200000001,
-    "bondInference": 46.040783000000374,
-    "nBonds": 248906,
-    "streamingDecode": 0.0005360000000109721
+    "pdbParse": 121.84826299999986,
+    "bondInference": 46.5689440000001,
+    "nBonds": 248959,
+    "streamingDecode": 0.0005439999999907741,
+    "rustParse": 85.03188800000316,
+    "protocolEncode": 1.271683000027224,
+    "serverTotal": 86.30357100003039,
+    "streamingEndToEnd": 86.30411500003038
   }
 ]
