@@ -1,0 +1,51 @@
+[
+  {
+    "nAtoms": 100,
+    "pdbParse": 0.4363969999999995,
+    "bondInference": 0.06972199999999873,
+    "nBonds": 202,
+    "streamingDecode": 0.0019570000000044274
+  },
+  {
+    "nAtoms": 500,
+    "pdbParse": 1.0736830000000026,
+    "bondInference": 0.33690500000000156,
+    "nBonds": 1086,
+    "streamingDecode": 0.0010370000000108348
+  },
+  {
+    "nAtoms": 1000,
+    "pdbParse": 1.2401469999999932,
+    "bondInference": 0.32692199999999616,
+    "nBonds": 2319,
+    "streamingDecode": 0.0004100000000022419
+  },
+  {
+    "nAtoms": 5000,
+    "pdbParse": 5.291258999999997,
+    "bondInference": 1.9314200000000028,
+    "nBonds": 11968,
+    "streamingDecode": 0.0004619999999988522
+  },
+  {
+    "nAtoms": 10000,
+    "pdbParse": 10.56580600000001,
+    "bondInference": 4.214371999999969,
+    "nBonds": 24240,
+    "streamingDecode": 0.0005419999999958236
+  },
+  {
+    "nAtoms": 50000,
+    "pdbParse": 52.943895,
+    "bondInference": 20.41105600000003,
+    "nBonds": 123782,
+    "streamingDecode": 0.0009280000000444488
+  },
+  {
+    "nAtoms": 100000,
+    "pdbParse": 107.32125300000007,
+    "bondInference": 43.91462100000035,
+    "nBonds": 249150,
+    "streamingDecode": 0.00038700000004610047
+  }
+]
