@@ -8,11 +8,14 @@ COPY wasm/ wasm/
 RUN cd wasm && wasm-pack build --target web --release
 
 # Stage 1: Build Python native extension (megane-parser)
-FROM rust:1.93-slim AS pyext
+# Use python:3.11 as base to match the runtime stage Python version
+FROM python:3.11-slim AS pyext
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-dev python3-pip && \
+    curl build-essential && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install --break-system-packages maturin
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    pip install --no-cache-dir maturin
+ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /app
 COPY Cargo.toml ./
 COPY crates/ crates/
