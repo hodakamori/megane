@@ -50,15 +50,17 @@ export function useMeganeLocal(): MeganeLocalState {
   );
 
   const loadFile = useCallback(async (pdb: File) => {
-    applyResult(await parsePDBFile(pdb));
+    const result = await parsePDBFile(pdb);
+    applyResult(result);
     setPdbFileName(pdb.name);
-    setXtcFileName(null);
+    setXtcFileName(result.meta ? `PDB models` : null);
   }, [applyResult]);
 
   const loadText = useCallback(async (text: string) => {
-    applyResult(await parsePDBText(text));
+    const result = await parsePDBText(text);
+    applyResult(result);
     setPdbFileName("1crn.pdb");
-    setXtcFileName(null);
+    setXtcFileName(result.meta ? `PDB models` : null);
   }, [applyResult]);
 
   const loadXtc = useCallback(async (xtc: File) => {

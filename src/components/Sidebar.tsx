@@ -70,13 +70,23 @@ const placeholderStyle: React.CSSProperties = {
   fontStyle: "italic",
 };
 
+const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf";
+const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf"];
+
+function matchesAccept(name: string, exts: string[]): boolean {
+  const lower = name.toLowerCase();
+  return exts.some((ext) => lower.endsWith(ext));
+}
+
 function DropZone({
   accept,
+  exts,
   onFile,
   label,
   children,
 }: {
   accept: string;
+  exts: string[];
   onFile: (file: File) => void;
   label: string;
   children: React.ReactNode;
@@ -88,12 +98,10 @@ function DropZone({
       e.preventDefault();
       e.stopPropagation();
       const files = Array.from(e.dataTransfer.files);
-      const match = files.find((f) =>
-        f.name.toLowerCase().endsWith(accept),
-      );
+      const match = files.find((f) => matchesAccept(f.name, exts));
       if (match) onFile(match);
     },
-    [accept, onFile],
+    [exts, onFile],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -105,13 +113,11 @@ function DropZone({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files) return;
-      const match = Array.from(files).find((f) =>
-        f.name.toLowerCase().endsWith(accept),
-      );
+      const match = Array.from(files).find((f) => matchesAccept(f.name, exts));
       if (match) onFile(match);
       e.target.value = "";
     },
-    [accept, onFile],
+    [exts, onFile],
   );
 
   return (
@@ -316,7 +322,7 @@ export function Sidebar({
         {/* Structure Section */}
         <div>
           <div style={sectionLabelStyle}>Structure</div>
-          <DropZone accept=".pdb" onFile={onUploadPdb} label="Change...">
+          <DropZone accept={STRUCTURE_ACCEPT} exts={STRUCTURE_EXTS} onFile={onUploadPdb} label="Change...">
             {pdbFileName ? (
               <>
                 <div style={fileNameStyle}>{pdbFileName}</div>
@@ -336,7 +342,7 @@ export function Sidebar({
         {/* Trajectory Section */}
         <div>
           <div style={sectionLabelStyle}>Trajectory</div>
-          <DropZone accept=".xtc" onFile={onUploadXtc} label="Load XTC...">
+          <DropZone accept=".xtc" exts={[".xtc"]} onFile={onUploadXtc} label="Load XTC...">
             {xtcFileName ? (
               <>
                 <div style={fileNameStyle}>{xtcFileName}</div>
