@@ -1,51 +1,71 @@
 [
   {
     "nAtoms": 100,
-    "pdbParse": 0.47704400000000646,
-    "bondInference": 0.07262600000001385,
-    "nBonds": 197,
-    "streamingDecode": 0.0029220000000123036
+    "pdbParse": 0.5227980000000088,
+    "bondInference": 0.07128099999999904,
+    "nBonds": 205,
+    "streamingDecode": 0.0030280000000004748,
+    "rustParse": 0.20537499995043618,
+    "protocolEncode": 0.007941000035316392,
+    "serverTotal": 0.21331599998575257,
+    "streamingEndToEnd": 0.21634399998575304
   },
   {
     "nAtoms": 500,
-    "pdbParse": 1.1446129999999926,
-    "bondInference": 0.3359140000000025,
-    "nBonds": 1106,
-    "streamingDecode": 0.0012540000000171858
+    "pdbParse": 1.3098959999999948,
+    "bondInference": 0.23733099999999752,
+    "nBonds": 1123,
+    "streamingDecode": 0.00406700000000626,
+    "rustParse": 0.43348500003048684,
+    "protocolEncode": 0.00858399994285719,
+    "serverTotal": 0.44206899997334403,
+    "streamingEndToEnd": 0.4461359999733503
   },
   {
     "nAtoms": 1000,
-    "pdbParse": 2.2805449999999894,
-    "bondInference": 0.4546630000000107,
-    "nBonds": 2295,
-    "streamingDecode": 0.000618000000002894
+    "pdbParse": 1.2828269999999975,
+    "bondInference": 0.37585099999999727,
+    "nBonds": 2270,
+    "streamingDecode": 0.0004970000000099617,
+    "rustParse": 0.9332519999816213,
+    "protocolEncode": 0.011142999937874265,
+    "serverTotal": 0.9443949999194956,
+    "streamingEndToEnd": 0.9448919999195056
   },
   {
     "nAtoms": 5000,
-    "pdbParse": 6.304604999999981,
-    "bondInference": 2.3574839999999995,
-    "nBonds": 11978,
-    "streamingDecode": 0.00043499999998175554
+    "pdbParse": 6.189522000000011,
+    "bondInference": 2.237684999999999,
+    "nBonds": 12027,
+    "streamingDecode": 0.0005120000000147229,
+    "rustParse": 4.04129000003195,
+    "protocolEncode": 0.02691399993182131,
+    "serverTotal": 4.068203999963771,
+    "streamingEndToEnd": 4.068715999963786
   },
   {
     "nAtoms": 10000,
-    "pdbParse": 12.253465000000006,
-    "bondInference": 5.375211000000036,
-    "nBonds": 24258,
-    "streamingDecode": 0.0005509999999731008
+    "pdbParse": 12.970732000000055,
+    "bondInference": 4.682536000000027,
+    "nBonds": 24228,
+    "streamingDecode": 0.000527000000033695,
+    "rustParse": 8.49115499988784,
+    "protocolEncode": 0.05541500001982058,
+    "serverTotal": 8.54656999990766,
+    "streamingEndToEnd": 8.547096999907694
   },
   {
     "nAtoms": 50000,
-    "pdbParse": 62.306768000000034,
-    "bondInference": 25.98385600000006,
-    "nBonds": 123911,
-    "streamingDecode": 0.0006140000000414148
+    "pdbParse": 59.669768999999974,
+    "bondInference": 24.007697000000007,
+    "nBonds": 124088,
+    "streamingDecode": 0.000657000000046537
   },
   {
     "nAtoms": 100000,
-    "pdbParse": 133.3277109999999,
-    "bondInference": 54.73874500000011,
-    "nBonds": 249246,
-    "streamingDecode": 0.000551999999970576
+    "pdbParse": 120.71127200000001,
+    "bondInference": 46.040783000000374,
+    "nBonds": 248906,
+    "streamingDecode": 0.0005360000000109721
   }
 ]

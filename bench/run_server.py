@@ -80,7 +80,7 @@ def benchmark(fn, runs, warmup):
 
 
 def main():
-    print("=== megane Server-Side Benchmark (RDKit + Protocol) ===\n")
+    print("=== megane Server-Side Benchmark (Rust + Protocol) ===\n")
     print(f"Atom counts: {', '.join(f'{n:,}' for n in ATOM_COUNTS)}\n")
 
     results = []
@@ -95,7 +95,7 @@ def main():
 
         entry = {
             "nAtoms": n_atoms,
-            "rdkitParse": None,
+            "rustParse": None,
             "protocolEncode": None,
             "serverTotal": None,
         }
@@ -114,7 +114,7 @@ def main():
                 nonlocal structure
                 structure = load_pdb(tmp_path)
 
-            entry["rdkitParse"] = benchmark(do_parse, runs, warmup)
+            entry["rustParse"] = benchmark(do_parse, runs, warmup)
 
             # 2. Binary Protocol Encode (very fast, use same structure)
             def do_encode():
@@ -123,7 +123,7 @@ def main():
             entry["protocolEncode"] = benchmark(do_encode, runs, warmup)
 
             # 3. Server total = parse + encode (summed, avoid extra slow runs)
-            entry["serverTotal"] = entry["rdkitParse"] + entry["protocolEncode"]
+            entry["serverTotal"] = entry["rustParse"] + entry["protocolEncode"]
 
         finally:
             os.unlink(tmp_path)
@@ -138,7 +138,7 @@ def main():
             return f"{ms / 1000:.2f} s"
 
         print(
-            f"parse={fmt(entry['rdkitParse'])}  "
+            f"parse={fmt(entry['rustParse'])}  "
             f"encode={fmt(entry['protocolEncode'])}  "
             f"total={fmt(entry['serverTotal'])}"
         )

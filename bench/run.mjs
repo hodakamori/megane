@@ -170,11 +170,14 @@ function main() {
     console.log(`parse=${fmt(entry.pdbParse)}  bonds=${fmt(entry.bondInference)} (${entry.nBonds})  decode=${fmt(entry.streamingDecode)}`);
   }
 
-  // Run Python server-side benchmark (RDKit parse + protocol encode)
-  console.log("\n--- Running server-side benchmark (Python/RDKit) ---\n");
+  // Run Python server-side benchmark (Rust parse + protocol encode)
+  console.log("\n--- Running server-side benchmark (Rust + Protocol) ---\n");
   try {
     const pyScript = join(__dirname, "run_server.py");
-    execSync(`python3 ${pyScript}`, { stdio: "inherit" });
+    const projectRoot = join(__dirname, "..");
+    const venvPython = join(projectRoot, ".venv", "bin", "python3");
+    const python = existsSync(venvPython) ? venvPython : "python3";
+    execSync(`${python} ${pyScript}`, { stdio: "inherit" });
   } catch (e) {
     console.error("Python server benchmark failed:", e.message);
   }
@@ -188,7 +191,7 @@ function main() {
     for (const entry of results) {
       const server = serverMap.get(entry.nAtoms);
       if (server) {
-        entry.rdkitParse = server.rdkitParse;
+        entry.rustParse = server.rustParse;
         entry.protocolEncode = server.protocolEncode;
         entry.serverTotal = server.serverTotal;
         // End-to-end streaming = server parse + encode + client decode

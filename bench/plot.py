@@ -57,20 +57,22 @@ def main():
               label="Bond Inference (VDW)")
 
     if has_server:
-        streaming_e2e = [d["streamingEndToEnd"] for d in data]
-        rdkit_parse = [d["rdkitParse"] for d in data]
-        protocol_encode = [d["protocolEncode"] for d in data]
+        server_data = [d for d in data if d.get("streamingEndToEnd") is not None]
+        server_atoms = [d["nAtoms"] for d in server_data]
+        streaming_e2e = [d["streamingEndToEnd"] for d in server_data]
+        rust_parse = [d["rustParse"] for d in server_data]
+        protocol_encode = [d["protocolEncode"] for d in server_data]
 
         # Streaming end-to-end: server parse + encode + client decode
-        ax.loglog(atoms, streaming_e2e, "D-", color="#ef4444", linewidth=2, markersize=6,
+        ax.loglog(server_atoms, streaming_e2e, "D-", color="#ef4444", linewidth=2, markersize=6,
                   label="Streaming: End-to-End (server parse + encode + decode)")
 
-        # Breakdown: RDKit parse only
-        ax.loglog(atoms, rdkit_parse, "^--", color="#8b5cf6", linewidth=1.5, markersize=5,
-                  alpha=0.7, label="  \u2514 Server: RDKit Parse")
+        # Breakdown: Rust parse only
+        ax.loglog(server_atoms, rust_parse, "^--", color="#8b5cf6", linewidth=1.5, markersize=5,
+                  alpha=0.7, label="  \u2514 Server: Rust Parse")
 
         # Breakdown: Protocol encode only
-        ax.loglog(atoms, protocol_encode, "v--", color="#06b6d4", linewidth=1.5, markersize=5,
+        ax.loglog(server_atoms, protocol_encode, "v--", color="#06b6d4", linewidth=1.5, markersize=5,
                   alpha=0.7, label="  \u2514 Server: Protocol Encode")
 
     ax.set_xlabel("Number of Atoms", fontsize=12)

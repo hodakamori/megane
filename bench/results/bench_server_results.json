@@ -1,0 +1,32 @@
+[
+  {
+    "nAtoms": 100,
+    "rustParse": 0.20537499995043618,
+    "protocolEncode": 0.007941000035316392,
+    "serverTotal": 0.21331599998575257
+  },
+  {
+    "nAtoms": 500,
+    "rustParse": 0.43348500003048684,
+    "protocolEncode": 0.00858399994285719,
+    "serverTotal": 0.44206899997334403
+  },
+  {
+    "nAtoms": 1000,
+    "rustParse": 0.9332519999816213,
+    "protocolEncode": 0.011142999937874265,
+    "serverTotal": 0.9443949999194956
+  },
+  {
+    "nAtoms": 5000,
+    "rustParse": 4.04129000003195,
+    "protocolEncode": 0.02691399993182131,
+    "serverTotal": 4.068203999963771
+  },
+  {
+    "nAtoms": 10000,
+    "rustParse": 8.49115499988784,
+    "protocolEncode": 0.05541500001982058,
+    "serverTotal": 8.54656999990766
+  }
+]
