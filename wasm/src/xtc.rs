@@ -98,21 +98,33 @@ impl BitReader {
         }
     }
 
+    /// Read one byte from the buffer, returning 0 past the end.
+    /// The C reference allocates a much larger buffer than the compressed data,
+    /// so reads past the actual data hit zero-filled padding. We emulate that.
+    fn read_byte(&mut self) -> u32 {
+        if self.cnt < self.buf.len() {
+            let b = self.buf[self.cnt] as u32;
+            self.cnt += 1;
+            b
+        } else {
+            self.cnt += 1;
+            0
+        }
+    }
+
     fn decode_bits(&mut self, mut num_of_bits: u32) -> u32 {
         let mask = (1u32 << num_of_bits) - 1;
         let mut num: u32 = 0;
 
         while num_of_bits >= 8 {
-            self.lastbyte = (self.lastbyte << 8) | self.buf[self.cnt] as u32;
-            self.cnt += 1;
+            self.lastbyte = (self.lastbyte << 8) | self.read_byte();
             num |= (self.lastbyte >> self.lastbits) << (num_of_bits - 8);
             num_of_bits -= 8;
         }
         if num_of_bits > 0 {
             if self.lastbits < num_of_bits {
                 self.lastbits += 8;
-                self.lastbyte = (self.lastbyte << 8) | self.buf[self.cnt] as u32;
-                self.cnt += 1;
+                self.lastbyte = (self.lastbyte << 8) | self.read_byte();
             }
             self.lastbits -= num_of_bits;
             num |= (self.lastbyte >> self.lastbits) & ((1u32 << num_of_bits) - 1);
@@ -270,8 +282,10 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
 
     let mut bits = BitReader::new(bitstream_data);
 
-    // Decompress
-    let mut coords = vec![0i32; size3];
+    // Decompress.
+    // The run-length inner loop can advance `i` past natoms (up to +10 atoms).
+    // The C reference allocates a much larger buffer; we add padding here.
+    let mut coords = vec![0i32; size3 + 36];
     let mut output = Vec::with_capacity(size3);
     let mut prevcoord = [0i32; 3];
 
@@ -373,6 +387,9 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
         }
     }
 
+    // Truncate output to exactly natoms*3 (run-length can overshoot)
+    output.truncate(size3);
+
     // GROMACS XTC stores coordinates in nanometers; convert to Angstroms
     for v in &mut output {
         *v *= 10.0;
@@ -453,4 +470,23 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
         box_matrix: last_box,
         frame_positions,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_parse_demo_xtc() {
+        let data = std::fs::read("../src/assets/1crn_vibration.xtc").expect("read XTC");
+        println!("XTC file size: {} bytes", data.len());
+        match parse_xtc(&data) {
+            Ok(result) => {
+                println!("SUCCESS: n_atoms={}, n_frames={}", result.n_atoms, result.n_frames);
+            }
+            Err(e) => {
+                panic!("XTC parse error: {}", e);
+            }
+        }
+    }
 }
