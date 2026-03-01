@@ -168,6 +168,13 @@ export class MoleculeRenderer {
     }
   }
 
+  /** Toggle bond visibility. */
+  setBondsVisible(visible: boolean): void {
+    if (this.bondRenderer) {
+      this.bondRenderer.mesh.visible = visible;
+    }
+  }
+
   /** Toggle simulation cell visibility. */
   setCellVisible(visible: boolean): void {
     if (this.cellRenderer) {

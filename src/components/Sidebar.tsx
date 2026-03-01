@@ -234,8 +234,6 @@ export function Sidebar({
   hasStructureFrames,
   hasFileFrames,
 }: SidebarProps) {
-  const isLocal = mode === "local";
-
   if (collapsed) {
     return (
       <div
@@ -412,57 +410,56 @@ export function Sidebar({
           </DropZone>
         </div>
 
-        {/* Bonds Section (local mode only) */}
-        {isLocal && (
-          <div>
-            <div style={sectionLabelStyle}>Bonds</div>
-            <TabSelector<BondSource>
-              options={[
-                { value: "structure", label: "Structure" },
-                { value: "file", label: "File" },
-                { value: "distance", label: "Distance" },
-              ]}
-              value={bondSource}
-              onChange={onBondSourceChange}
-            />
-            {bondSource === "file" && (
-              <DropZone
-                accept={BOND_FILE_ACCEPT}
-                exts={BOND_FILE_EXTS}
-                onFile={onUploadBondFile}
-                label="Load PDB/TOP..."
-              >
-                {bondFileName && (
-                  <div style={fileNameStyle}>{bondFileName}</div>
-                )}
-              </DropZone>
-            )}
+        {/* Bonds Section */}
+        <div>
+          <div style={sectionLabelStyle}>Bonds</div>
+          <TabSelector<BondSource>
+            options={[
+              { value: "none", label: "None" },
+              { value: "structure", label: "Structure" },
+              { value: "file", label: "File" },
+              { value: "distance", label: "Distance" },
+            ]}
+            value={bondSource}
+            onChange={onBondSourceChange}
+          />
+          {bondSource === "file" && (
+            <DropZone
+              accept={BOND_FILE_ACCEPT}
+              exts={BOND_FILE_EXTS}
+              onFile={onUploadBondFile}
+              label="Load PDB/TOP..."
+            >
+              {bondFileName && (
+                <div style={fileNameStyle}>{bondFileName}</div>
+              )}
+            </DropZone>
+          )}
+          {bondSource !== "none" && (
             <div style={statsStyle}>
               {bondCount.toLocaleString()} bonds
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Trajectory Section */}
         <div>
           <div style={sectionLabelStyle}>Trajectory</div>
-          {isLocal && (
-            <TabSelector<TrajectorySource>
-              options={[
-                { value: "structure", label: "Structure" },
-                { value: "file", label: "File" },
-              ]}
-              value={trajectorySource}
-              onChange={onTrajectorySourceChange}
-              disabledOptions={
-                new Set<TrajectorySource>([
-                  ...(!hasStructureFrames ? ["structure" as TrajectorySource] : []),
-                  ...(!hasFileFrames ? ["file" as TrajectorySource] : []),
-                ])
-              }
-            />
-          )}
-          {isLocal && trajectorySource === "file" && (
+          <TabSelector<TrajectorySource>
+            options={[
+              { value: "structure", label: "Structure" },
+              { value: "file", label: "File" },
+            ]}
+            value={trajectorySource}
+            onChange={onTrajectorySourceChange}
+            disabledOptions={
+              new Set<TrajectorySource>([
+                ...(!hasStructureFrames ? ["structure" as TrajectorySource] : []),
+                ...(!hasFileFrames ? ["file" as TrajectorySource] : []),
+              ])
+            }
+          />
+          {trajectorySource === "file" && (
             <DropZone accept=".xtc" exts={[".xtc"]} onFile={onUploadXtc} label="Load XTC...">
               {xtcFileName ? (
                 <>
@@ -478,7 +475,7 @@ export function Sidebar({
               )}
             </DropZone>
           )}
-          {isLocal && trajectorySource === "structure" && (
+          {trajectorySource === "structure" && (
             xtcFileName ? (
               <>
                 <div style={fileNameStyle}>{xtcFileName}</div>
@@ -489,22 +486,6 @@ export function Sidebar({
             ) : (
               <div style={placeholderStyle}>No multi-model data</div>
             )
-          )}
-          {!isLocal && (
-            <DropZone accept=".xtc" exts={[".xtc"]} onFile={onUploadXtc} label="Load XTC...">
-              {xtcFileName ? (
-                <>
-                  <div style={fileNameStyle}>{xtcFileName}</div>
-                  <div style={statsStyle}>
-                    {totalFrames.toLocaleString()} frames
-                    {timestepPs > 0 &&
-                      ` · ${timestepPs.toFixed(1)} ps/frame`}
-                  </div>
-                </>
-              ) : (
-                <div style={placeholderStyle}>No trajectory loaded</div>
-              )}
-            </DropZone>
           )}
         </div>
       </div>
