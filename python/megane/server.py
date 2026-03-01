@@ -66,17 +66,27 @@ def configure(pdb_path: str, xtc_path: str | None = None) -> None:
     )
 
 
+def _build_metadata_bytes() -> bytes:
+    """Build metadata message bytes including file names."""
+    traj = _state.trajectory
+    pdb_name = Path(_state.pdb_path).name if _state.pdb_path else ""
+    xtc_name = Path(_state.xtc_path).name if _state.xtc_path else ""
+    return encode_metadata(
+        n_frames=traj.n_frames if traj else 0,
+        timestep_ps=traj.timestep_ps if traj else 0.0,
+        n_atoms=traj.n_atoms if traj else (_state.structure.n_atoms if _state.structure else 0),
+        pdb_name=pdb_name,
+        xtc_name=xtc_name,
+    )
+
+
 async def _broadcast_snapshot() -> None:
-    """Send snapshot (and metadata if trajectory) to all connected clients."""
+    """Send snapshot and metadata to all connected clients."""
+    meta_bytes = _build_metadata_bytes()
     for ws in list(_clients):
         try:
             await ws.send_bytes(_state.snapshot_bytes)
-            traj = _state.trajectory
-            if traj is not None:
-                meta_bytes = encode_metadata(
-                    traj.n_frames, traj.timestep_ps, traj.n_atoms
-                )
-                await ws.send_bytes(meta_bytes)
+            await ws.send_bytes(meta_bytes)
         except Exception:
             _clients.discard(ws)
 
@@ -122,17 +132,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.accept()
     _clients.add(websocket)
     try:
-        # Send snapshot immediately on connection
+        # Send snapshot and metadata immediately on connection
         if _state.structure is not None:
             await websocket.send_bytes(_state.snapshot_bytes)
-
-        # Send trajectory metadata if available
-        traj = _state.trajectory
-        if traj is not None:
-            meta_bytes = encode_metadata(
-                traj.n_frames, traj.timestep_ps, traj.n_atoms
-            )
-            await websocket.send_bytes(meta_bytes)
+            await websocket.send_bytes(_build_metadata_bytes())
 
         # Handle client commands
         while True:

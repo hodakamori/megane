@@ -96,5 +96,25 @@ export function decodeMetadata(buffer: ArrayBuffer): TrajectoryMeta {
   const timestepPs = view.getFloat32(offset + 4, true);
   const nAtoms = view.getUint32(offset + 8, true);
 
-  return { nFrames, timestepPs, nAtoms };
+  let pdbName: string | undefined;
+  let xtcName: string | undefined;
+
+  // Parse file names if buffer has extended data (backward compatible)
+  if (buffer.byteLength > 20) {
+    const decoder = new TextDecoder();
+    let pos = 20;
+    const pdbLen = view.getUint16(pos, true);
+    pos += 2;
+    if (pdbLen > 0) {
+      pdbName = decoder.decode(new Uint8Array(buffer, pos, pdbLen));
+    }
+    pos += pdbLen;
+    const xtcLen = view.getUint16(pos, true);
+    pos += 2;
+    if (xtcLen > 0) {
+      xtcName = decoder.decode(new Uint8Array(buffer, pos, xtcLen));
+    }
+  }
+
+  return { nFrames, timestepPs, nAtoms, pdbName, xtcName };
 }
