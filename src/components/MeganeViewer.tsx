@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Sidebar } from "./Sidebar";
+import type { BondConfig, TrajectoryConfig } from "./Sidebar";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
@@ -17,7 +18,6 @@ import type {
   SelectionState,
   Measurement,
   BondSource,
-  TrajectorySource,
 } from "../core/types";
 
 interface MeganeViewerProps {
@@ -30,24 +30,14 @@ interface MeganeViewerProps {
   onSeek?: (frame: number) => void;
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
-  onUploadPdb: (pdb: File) => void;
-  onUploadXtc: (xtc: File) => void;
+  onUploadStructure: (file: File) => void;
   mode: "streaming" | "local";
   onToggleMode: () => void;
   pdbFileName: string | null;
-  xtcFileName: string | null;
-  timestepPs?: number;
+  bonds: BondConfig;
+  trajectory: TrajectoryConfig;
   width?: string | number;
   height?: string | number;
-  bondSource?: BondSource;
-  onBondSourceChange?: (source: BondSource) => void;
-  onUploadBondFile?: (file: File) => void;
-  bondFileName?: string | null;
-  hasStructureBonds?: boolean;
-  trajectorySource?: TrajectorySource;
-  onTrajectorySourceChange?: (source: TrajectorySource) => void;
-  hasStructureFrames?: boolean;
-  hasFileFrames?: boolean;
 }
 
 export function MeganeViewer({
@@ -60,24 +50,14 @@ export function MeganeViewer({
   onSeek,
   onPlayPause,
   onFpsChange,
-  onUploadPdb,
-  onUploadXtc,
+  onUploadStructure,
   mode,
   onToggleMode,
   pdbFileName,
-  xtcFileName,
-  timestepPs = 0,
+  bonds,
+  trajectory,
   width = "100%",
   height = "100%",
-  bondSource = "structure",
-  onBondSourceChange,
-  onUploadBondFile,
-  bondFileName = null,
-  hasStructureBonds = false,
-  trajectorySource = "structure",
-  onTrajectorySourceChange,
-  hasStructureFrames = false,
-  hasFileFrames = false,
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [cellVisible, setCellVisible] = useState(true);
@@ -127,8 +107,8 @@ export function MeganeViewer({
 
   // Toggle bond visibility when bondSource changes to/from "none"
   useEffect(() => {
-    rendererRef.current?.setBondsVisible(bondSource !== "none");
-  }, [bondSource]);
+    rendererRef.current?.setBondsVisible(bonds.source !== "none");
+  }, [bonds.source]);
 
   // Check if snapshot has a non-zero box
   const hasCell =
@@ -147,29 +127,19 @@ export function MeganeViewer({
       <Sidebar
         mode={mode}
         onToggleMode={onToggleMode}
-        atomCount={snapshot?.nAtoms ?? 0}
-        bondCount={snapshot?.nBonds ?? 0}
-        pdbFileName={pdbFileName}
-        xtcFileName={xtcFileName}
-        totalFrames={totalFrames}
-        timestepPs={timestepPs}
-        onUploadPdb={onUploadPdb}
-        onUploadXtc={onUploadXtc}
+        structure={{
+          atomCount: snapshot?.nAtoms ?? 0,
+          fileName: pdbFileName,
+        }}
+        bonds={bonds}
+        trajectory={trajectory}
+        onUploadStructure={onUploadStructure}
         onResetView={handleResetView}
         hasCell={hasCell}
         cellVisible={cellVisible}
         onToggleCell={handleToggleCell}
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
-        bondSource={bondSource}
-        onBondSourceChange={onBondSourceChange ?? (() => {})}
-        onUploadBondFile={onUploadBondFile ?? (() => {})}
-        bondFileName={bondFileName}
-        hasStructureBonds={hasStructureBonds}
-        trajectorySource={trajectorySource}
-        onTrajectorySourceChange={onTrajectorySourceChange ?? (() => {})}
-        hasStructureFrames={hasStructureFrames}
-        hasFileFrames={hasFileFrames}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

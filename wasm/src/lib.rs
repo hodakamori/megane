@@ -84,6 +84,36 @@ impl ParseResult {
     }
 }
 
+impl ParseResult {
+    fn from_parsed(data: parser::ParsedStructure) -> Self {
+        let n_bonds = data.bonds.len() as u32;
+        let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
+        for (a, b) in &data.bonds {
+            bonds_flat.push(*a);
+            bonds_flat.push(*b);
+        }
+        let bond_orders = data.bond_orders.unwrap_or_else(|| vec![1u8; data.bonds.len()]);
+        let has_box = data.box_matrix.is_some();
+        let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        let n_frames = data.frame_positions.len() as u32;
+        let frame_data: Vec<f32> = data.frame_positions.into_iter().flat_map(|f| f.into_iter()).collect();
+
+        Self {
+            n_atoms: data.n_atoms as u32,
+            n_bonds,
+            n_file_bonds: data.n_file_bonds as u32,
+            n_frames,
+            has_box,
+            positions: data.positions,
+            elements: data.elements,
+            bonds: bonds_flat,
+            bond_orders,
+            box_matrix,
+            frame_data,
+        }
+    }
+}
+
 /// Result of parsing an XTC trajectory file.
 #[wasm_bindgen]
 pub struct XtcParseResult {
@@ -157,143 +187,28 @@ pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {
     let data = parser::parse(text).map_err(|e| JsError::new(&e))?;
-
-    let n_atoms = data.n_atoms as u32;
-    let n_bonds = data.bonds.len() as u32;
-    let n_file_bonds = data.n_file_bonds as u32;
-    let n_frames = data.frame_positions.len() as u32;
-
-    // Flatten bonds to [a0, b0, a1, b1, ...]
-    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
-    for (a, b) in &data.bonds {
-        bonds_flat.push(*a);
-        bonds_flat.push(*b);
-    }
-
-    // Bond orders: all single (1) for PDB
-    let bond_orders = vec![1u8; data.bonds.len()];
-
-    // Box matrix
-    let has_box = data.box_matrix.is_some();
-    let box_matrix = match data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => Vec::new(),
-    };
-
-    // Concatenate frame positions
-    let mut frame_data: Vec<f32> = Vec::new();
-    for frame in &data.frame_positions {
-        frame_data.extend_from_slice(frame);
-    }
-
-    Ok(ParseResult {
-        n_atoms,
-        n_bonds,
-        n_file_bonds,
-        n_frames,
-        has_box,
-        positions: data.positions,
-        elements: data.elements,
-        bonds: bonds_flat,
-        bond_orders,
-        box_matrix,
-        frame_data,
-    })
+    Ok(ParseResult::from_parsed(data))
 }
 
 /// Parse a GRO file text and return structured data.
 #[wasm_bindgen]
 pub fn parse_gro(text: &str) -> Result<ParseResult, JsError> {
     let data = gro::parse(text).map_err(|e| JsError::new(&e))?;
-
-    let n_bonds = data.bonds.len() as u32;
-    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
-    for (a, b) in &data.bonds {
-        bonds_flat.push(*a);
-        bonds_flat.push(*b);
-    }
-    let bond_orders = vec![1u8; data.bonds.len()];
-
-    let has_box = data.box_matrix.is_some();
-    let box_matrix = match data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => Vec::new(),
-    };
-
-    Ok(ParseResult {
-        n_atoms: data.n_atoms as u32,
-        n_bonds,
-        n_file_bonds: 0,
-        n_frames: 0,
-        has_box,
-        positions: data.positions,
-        elements: data.elements,
-        bonds: bonds_flat,
-        bond_orders,
-        box_matrix,
-        frame_data: Vec::new(),
-    })
+    Ok(ParseResult::from_parsed(data))
 }
 
 /// Parse an XYZ file text and return structured data.
 #[wasm_bindgen]
 pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
     let data = xyz::parse(text).map_err(|e| JsError::new(&e))?;
-
-    let n_bonds = data.bonds.len() as u32;
-    let n_frames = data.frame_positions.len() as u32;
-    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
-    for (a, b) in &data.bonds {
-        bonds_flat.push(*a);
-        bonds_flat.push(*b);
-    }
-    let bond_orders = vec![1u8; data.bonds.len()];
-
-    let mut frame_data: Vec<f32> = Vec::new();
-    for frame in &data.frame_positions {
-        frame_data.extend_from_slice(frame);
-    }
-
-    Ok(ParseResult {
-        n_atoms: data.n_atoms as u32,
-        n_bonds,
-        n_file_bonds: 0,
-        n_frames,
-        has_box: false,
-        positions: data.positions,
-        elements: data.elements,
-        bonds: bonds_flat,
-        bond_orders,
-        box_matrix: Vec::new(),
-        frame_data,
-    })
+    Ok(ParseResult::from_parsed(data))
 }
 
 /// Parse an MDL Molfile (V2000) text and return structured data.
 #[wasm_bindgen]
 pub fn parse_mol(text: &str) -> Result<ParseResult, JsError> {
     let data = mol::parse(text).map_err(|e| JsError::new(&e))?;
-
-    let n_bonds = data.bonds.len() as u32;
-    let mut bonds_flat: Vec<u32> = Vec::with_capacity(data.bonds.len() * 2);
-    for (a, b) in &data.bonds {
-        bonds_flat.push(*a);
-        bonds_flat.push(*b);
-    }
-
-    Ok(ParseResult {
-        n_atoms: data.n_atoms as u32,
-        n_bonds,
-        n_file_bonds: n_bonds,
-        n_frames: 0,
-        has_box: false,
-        positions: data.positions,
-        elements: data.elements,
-        bonds: bonds_flat,
-        bond_orders: data.bond_orders,
-        box_matrix: Vec::new(),
-        frame_data: Vec::new(),
-    })
+    Ok(ParseResult::from_parsed(data))
 }
 
 /// Infer bonds using VDW radii (threshold = vdw_sum * 0.6).

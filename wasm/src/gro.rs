@@ -17,14 +17,6 @@ use std::collections::HashSet;
 use crate::bonds;
 use crate::parser::symbol_to_atomic_num;
 
-pub struct GroData {
-    pub n_atoms: usize,
-    pub positions: Vec<f32>,
-    pub elements: Vec<u8>,
-    pub bonds: Vec<(u32, u32)>,
-    pub box_matrix: Option<[f32; 9]>,
-}
-
 /// Guess atomic number from GRO atom name (e.g. "CA", "OW", "HW1").
 fn element_from_atom_name(name: &str) -> u8 {
     let name = name.trim();
@@ -56,7 +48,7 @@ fn element_from_atom_name(name: &str) -> u8 {
     symbol_to_atomic_num(&one)
 }
 
-pub fn parse(text: &str) -> Result<GroData, String> {
+pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
     if lines.len() < 3 {
         return Err("GRO file too short".into());
@@ -116,12 +108,15 @@ pub fn parse(text: &str) -> Result<GroData, String> {
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
 
-    Ok(GroData {
+    Ok(crate::parser::ParsedStructure {
         n_atoms,
         positions,
         elements,
         bonds,
+        n_file_bonds: 0,
+        bond_orders: None,
         box_matrix,
+        frame_positions: Vec::new(),
     })
 }
 

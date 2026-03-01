@@ -9,15 +9,7 @@
 
 use crate::parser::symbol_to_atomic_num;
 
-pub struct MolData {
-    pub n_atoms: usize,
-    pub positions: Vec<f32>,
-    pub elements: Vec<u8>,
-    pub bonds: Vec<(u32, u32)>,
-    pub bond_orders: Vec<u8>,
-}
-
-pub fn parse(text: &str) -> Result<MolData, String> {
+pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
     if lines.len() < 5 {
         return Err("MOL file too short".into());
@@ -59,7 +51,7 @@ pub fn parse(text: &str) -> Result<MolData, String> {
             let x: f32 = parts[0].parse().map_err(|_| format!("bad x at atom {}", i + 1))?;
             let y: f32 = parts[1].parse().map_err(|_| format!("bad y at atom {}", i + 1))?;
             let z: f32 = parts[2].parse().map_err(|_| format!("bad z at atom {}", i + 1))?;
-            let sym = capitalize_symbol(parts[3]);
+            let sym = crate::parser::capitalize(parts[3]);
             positions.push(x);
             positions.push(y);
             positions.push(z);
@@ -77,7 +69,7 @@ pub fn parse(text: &str) -> Result<MolData, String> {
                 .trim()
                 .parse()
                 .map_err(|_| format!("bad z at atom {}", i + 1))?;
-            let sym = capitalize_symbol(line[31..34].trim());
+            let sym = crate::parser::capitalize(line[31..34].trim());
             positions.push(x);
             positions.push(y);
             positions.push(z);
@@ -111,12 +103,15 @@ pub fn parse(text: &str) -> Result<MolData, String> {
         }
     }
 
-    Ok(MolData {
+    Ok(crate::parser::ParsedStructure {
         n_atoms,
         positions,
         elements,
         bonds,
-        bond_orders,
+        n_file_bonds: n_bonds,
+        bond_orders: Some(bond_orders),
+        box_matrix: None,
+        frame_positions: Vec::new(),
     })
 }
 
@@ -132,14 +127,3 @@ fn parse_mol_int(line: &str, start: usize, end: usize) -> Result<usize, String> 
         .map_err(|_| format!("cannot parse integer from '{}'", &line[start..end]))
 }
 
-fn capitalize_symbol(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => {
-            let upper: String = c.to_uppercase().collect();
-            let lower: String = chars.flat_map(|c| c.to_lowercase()).collect();
-            format!("{}{}", upper, lower)
-        }
-    }
-}

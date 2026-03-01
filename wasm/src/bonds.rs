@@ -59,18 +59,21 @@ const BOND_TOLERANCE: f32 = 1.3;
 const MIN_BOND_DIST: f32 = 0.4;
 const VDW_BOND_FACTOR: f32 = 0.6;
 
-/// Infer bonds using a cell-list (spatial hashing) approach.
-pub fn infer_bonds(
+/// Generic cell-list spatial scan that iterates over all nearby atom pairs
+/// and calls `check_pair(i, j)` for each. The closure returns `Some((a, b))`
+/// if the pair should be recorded as a bond.
+fn cell_list_scan<F>(
     positions: &[f32],
-    elements: &[u8],
     n_atoms: usize,
-    existing_bonds: &HashSet<(u32, u32)>,
-) -> Vec<(u32, u32)> {
+    cell_size: f32,
+    mut check_pair: F,
+) -> Vec<(u32, u32)>
+where
+    F: FnMut(usize, usize) -> Option<(u32, u32)>,
+{
     if n_atoms == 0 {
         return Vec::new();
     }
-
-    let cell_size: f32 = 2.5;
 
     // Bounding box
     let (mut min_x, mut min_y, mut min_z) = (f32::MAX, f32::MAX, f32::MAX);
@@ -128,14 +131,12 @@ pub fn infer_bonds(
                 // Pairs within the same cell
                 for ii in 0..cell.len() {
                     let i = cell[ii];
-                    let ri = covalent_radius(elements[i]);
-                    let (ix, iy, iz) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
 
                     for jj in (ii + 1)..cell.len() {
                         let j = cell[jj];
-                        check_bond(
-                            i, j, ri, ix, iy, iz, positions, elements, existing_bonds, &mut bonds,
-                        );
+                        if let Some(bond) = check_pair(i, j) {
+                            bonds.push(bond);
+                        }
                     }
 
                     // Pairs with neighboring cells (half-shell)
@@ -155,10 +156,9 @@ pub fn infer_bonds(
                         let neighbor_idx =
                             ncx as usize * ny * nz + ncy as usize * nz + ncz as usize;
                         for &j in &cells[neighbor_idx] {
-                            check_bond(
-                                i, j, ri, ix, iy, iz, positions, elements, existing_bonds,
-                                &mut bonds,
-                            );
+                            if let Some(bond) = check_pair(i, j) {
+                                bonds.push(bond);
+                            }
                         }
                     }
                 }
@@ -169,36 +169,37 @@ pub fn infer_bonds(
     bonds
 }
 
-#[inline]
-fn check_bond(
-    i: usize,
-    j: usize,
-    ri: f32,
-    ix: f32,
-    iy: f32,
-    iz: f32,
+/// Infer bonds using a cell-list (spatial hashing) approach.
+pub fn infer_bonds(
     positions: &[f32],
     elements: &[u8],
+    n_atoms: usize,
     existing_bonds: &HashSet<(u32, u32)>,
-    bonds: &mut Vec<(u32, u32)>,
-) {
-    let a = i.min(j) as u32;
-    let b = i.max(j) as u32;
-    if existing_bonds.contains(&(a, b)) {
-        return;
-    }
+) -> Vec<(u32, u32)> {
+    let cell_size: f32 = 2.5;
 
-    let rj = covalent_radius(elements[j]);
-    let threshold = (ri + rj) * BOND_TOLERANCE;
+    cell_list_scan(positions, n_atoms, cell_size, |i, j| {
+        let a = i.min(j) as u32;
+        let b = i.max(j) as u32;
+        if existing_bonds.contains(&(a, b)) {
+            return None;
+        }
 
-    let dx = positions[j * 3] - ix;
-    let dy = positions[j * 3 + 1] - iy;
-    let dz = positions[j * 3 + 2] - iz;
+        let ri = covalent_radius(elements[i]);
+        let rj = covalent_radius(elements[j]);
+        let threshold = (ri + rj) * BOND_TOLERANCE;
 
-    let dist_sq = dx * dx + dy * dy + dz * dz;
-    if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
-        bonds.push((a, b));
-    }
+        let dx = positions[j * 3] - positions[i * 3];
+        let dy = positions[j * 3 + 1] - positions[i * 3 + 1];
+        let dz = positions[j * 3 + 2] - positions[i * 3 + 2];
+
+        let dist_sq = dx * dx + dy * dy + dz * dz;
+        if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
+            Some((a, b))
+        } else {
+            None
+        }
+    })
 }
 
 /// Infer bonds using VDW radii: bond if distance <= (vdw_i + vdw_j) * 0.6.
@@ -207,112 +208,24 @@ pub fn infer_bonds_vdw(
     elements: &[u8],
     n_atoms: usize,
 ) -> Vec<(u32, u32)> {
-    if n_atoms == 0 {
-        return Vec::new();
-    }
-
     let cell_size: f32 = 2.0;
 
-    // Bounding box
-    let (mut min_x, mut min_y, mut min_z) = (f32::MAX, f32::MAX, f32::MAX);
-    let (mut max_x, mut max_y, mut max_z) = (f32::MIN, f32::MIN, f32::MIN);
+    cell_list_scan(positions, n_atoms, cell_size, |i, j| {
+        let ri = vdw_radius(elements[i]);
+        let rj = vdw_radius(elements[j]);
+        let threshold = (ri + rj) * VDW_BOND_FACTOR;
 
-    for i in 0..n_atoms {
-        let (x, y, z) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-        min_x = min_x.min(x);
-        min_y = min_y.min(y);
-        min_z = min_z.min(z);
-        max_x = max_x.max(x);
-        max_y = max_y.max(y);
-        max_z = max_z.max(z);
-    }
+        let dx = positions[j * 3] - positions[i * 3];
+        let dy = positions[j * 3 + 1] - positions[i * 3 + 1];
+        let dz = positions[j * 3 + 2] - positions[i * 3 + 2];
 
-    let nx = ((max_x - min_x) / cell_size).ceil().max(1.0) as usize;
-    let ny = ((max_y - min_y) / cell_size).ceil().max(1.0) as usize;
-    let nz = ((max_z - min_z) / cell_size).ceil().max(1.0) as usize;
-
-    let mut cells: Vec<Vec<usize>> = vec![Vec::new(); nx * ny * nz];
-
-    for i in 0..n_atoms {
-        let cx = (((positions[i * 3] - min_x) / cell_size) as usize).min(nx - 1);
-        let cy = (((positions[i * 3 + 1] - min_y) / cell_size) as usize).min(ny - 1);
-        let cz = (((positions[i * 3 + 2] - min_z) / cell_size) as usize).min(nz - 1);
-        cells[cx * ny * nz + cy * nz + cz].push(i);
-    }
-
-    let mut bonds = Vec::new();
-
-    let offsets: [(isize, isize, isize); 13] = [
-        (0, 0, 1),
-        (0, 1, -1), (0, 1, 0), (0, 1, 1),
-        (1, -1, -1), (1, -1, 0), (1, -1, 1),
-        (1, 0, -1), (1, 0, 0), (1, 0, 1),
-        (1, 1, -1), (1, 1, 0), (1, 1, 1),
-    ];
-
-    for cx in 0..nx {
-        for cy in 0..ny {
-            for cz in 0..nz {
-                let cell_idx = cx * ny * nz + cy * nz + cz;
-                let cell = &cells[cell_idx];
-
-                for ii in 0..cell.len() {
-                    let i = cell[ii];
-                    let ri = vdw_radius(elements[i]);
-                    let (ix, iy, iz) = (positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
-
-                    for jj in (ii + 1)..cell.len() {
-                        let j = cell[jj];
-                        check_bond_vdw(i, j, ri, ix, iy, iz, positions, elements, &mut bonds);
-                    }
-
-                    for &(dx, dy, dz) in &offsets {
-                        let ncx = cx as isize + dx;
-                        let ncy = cy as isize + dy;
-                        let ncz = cz as isize + dz;
-                        if ncx < 0 || ncy < 0 || ncz < 0
-                            || ncx >= nx as isize
-                            || ncy >= ny as isize
-                            || ncz >= nz as isize
-                        {
-                            continue;
-                        }
-                        let neighbor_idx = ncx as usize * ny * nz + ncy as usize * nz + ncz as usize;
-                        for &j in &cells[neighbor_idx] {
-                            check_bond_vdw(i, j, ri, ix, iy, iz, positions, elements, &mut bonds);
-                        }
-                    }
-                }
-            }
+        let dist_sq = dx * dx + dy * dy + dz * dz;
+        if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
+            let a = i.min(j) as u32;
+            let b = i.max(j) as u32;
+            Some((a, b))
+        } else {
+            None
         }
-    }
-
-    bonds
-}
-
-#[inline]
-fn check_bond_vdw(
-    i: usize,
-    j: usize,
-    ri: f32,
-    ix: f32,
-    iy: f32,
-    iz: f32,
-    positions: &[f32],
-    elements: &[u8],
-    bonds: &mut Vec<(u32, u32)>,
-) {
-    let rj = vdw_radius(elements[j]);
-    let threshold = (ri + rj) * VDW_BOND_FACTOR;
-
-    let dx = positions[j * 3] - ix;
-    let dy = positions[j * 3 + 1] - iy;
-    let dz = positions[j * 3 + 2] - iz;
-
-    let dist_sq = dx * dx + dy * dy + dz * dz;
-    if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
-        let a = i.min(j) as u32;
-        let b = i.max(j) as u32;
-        bonds.push((a, b));
-    }
+    })
 }

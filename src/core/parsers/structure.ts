@@ -6,7 +6,7 @@
 
 import type { Snapshot, Frame, TrajectoryMeta } from "../types";
 
-export interface PDBParseResult {
+export interface StructureParseResult {
   snapshot: Snapshot;
   frames: Frame[];
   meta: TrajectoryMeta | null;
@@ -78,9 +78,9 @@ function getParserForExtension(ext: string): ParseFn {
 }
 
 /**
- * Parse PDB text directly using the WASM parser.
+ * Parse structure text (PDB format) using the WASM parser.
  */
-export async function parsePDBText(text: string): Promise<PDBParseResult> {
+export async function parseStructureText(text: string): Promise<StructureParseResult> {
   await ensureInit();
   return parseWithFn(wasmModule!.parse_pdb, text);
 }
@@ -90,7 +90,7 @@ export async function parsePDBText(text: string): Promise<PDBParseResult> {
  * Auto-detects format from file extension (.pdb, .gro, .xyz, .mol, .sdf).
  * Returns a Snapshot (first model) and optional trajectory Frames.
  */
-export async function parsePDBFile(file: File): Promise<PDBParseResult> {
+export async function parseStructureFile(file: File): Promise<StructureParseResult> {
   await ensureInit();
 
   const text = await file.text();
@@ -99,7 +99,7 @@ export async function parsePDBFile(file: File): Promise<PDBParseResult> {
   return parseWithFn(parseFn, text);
 }
 
-function parseWithFn(parseFn: ParseFn, text: string): PDBParseResult {
+function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
   const result = parseFn(text) as WasmParseResult;
 
   const snapshot: Snapshot = {

@@ -12,15 +12,16 @@ pub struct Atom {
     pub element: u8,
 }
 
-/// Result of parsing a PDB file.
-pub struct PdbData {
+/// Common result type for all structure format parsers.
+pub struct ParsedStructure {
     pub n_atoms: usize,
-    pub positions: Vec<f32>,   // first model positions (n_atoms * 3)
-    pub elements: Vec<u8>,     // atomic numbers (n_atoms)
-    pub bonds: Vec<(u32, u32)>, // CONECT bonds + inferred bonds (a < b)
-    pub n_file_bonds: usize,   // count of bonds from the file itself (CONECT)
-    pub box_matrix: Option<[f32; 9]>, // 3x3 cell matrix, row-major
-    pub frame_positions: Vec<Vec<f32>>, // additional model positions
+    pub positions: Vec<f32>,
+    pub elements: Vec<u8>,
+    pub bonds: Vec<(u32, u32)>,
+    pub n_file_bonds: usize,
+    pub bond_orders: Option<Vec<u8>>,
+    pub box_matrix: Option<[f32; 9]>,
+    pub frame_positions: Vec<Vec<f32>>,
 }
 
 /// Element symbol → atomic number lookup.
@@ -92,7 +93,7 @@ fn parse_element(line: &str) -> u8 {
     0 // unknown
 }
 
-fn capitalize(s: &str) -> String {
+pub fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
         None => String::new(),
@@ -203,7 +204,7 @@ fn parse_conect_line(line: &str, serial_to_index: &HashMap<i32, usize>) -> Vec<(
 }
 
 /// Parse a PDB file text into structured data.
-pub fn parse(text: &str) -> Result<PdbData, String> {
+pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut box_matrix: Option<[f32; 9]> = None;
     let mut serial_to_index: HashMap<i32, usize> = HashMap::new();
     let mut conect_bonds: Vec<(u32, u32)> = Vec::new();
@@ -298,12 +299,13 @@ pub fn parse(text: &str) -> Result<PdbData, String> {
         frame_positions.push(frame_pos);
     }
 
-    Ok(PdbData {
+    Ok(ParsedStructure {
         n_atoms,
         positions,
         elements,
         bonds: unique_bonds,
         n_file_bonds,
+        bond_orders: None,
         box_matrix,
         frame_positions,
     })

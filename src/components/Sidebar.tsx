@@ -5,32 +5,38 @@
 import { useCallback, useRef } from "react";
 import type { BondSource, TrajectorySource } from "../core/types";
 
+export interface BondConfig {
+  source: BondSource;
+  onSourceChange: (source: BondSource) => void;
+  onUploadFile: (file: File) => void;
+  fileName: string | null;
+  count: number;
+}
+
+export interface TrajectoryConfig {
+  source: TrajectorySource;
+  onSourceChange: (source: TrajectorySource) => void;
+  hasStructureFrames: boolean;
+  hasFileFrames: boolean;
+  fileName: string | null;
+  totalFrames: number;
+  timestepPs: number;
+  onUploadXtc: (file: File) => void;
+}
+
 interface SidebarProps {
   mode: "streaming" | "local";
   onToggleMode: () => void;
-  atomCount: number;
-  bondCount: number;
-  pdbFileName: string | null;
-  xtcFileName: string | null;
-  totalFrames: number;
-  timestepPs: number;
-  onUploadPdb: (pdb: File) => void;
-  onUploadXtc: (xtc: File) => void;
+  structure: { atomCount: number; fileName: string | null };
+  bonds: BondConfig;
+  trajectory: TrajectoryConfig;
+  onUploadStructure: (file: File) => void;
   onResetView: () => void;
   hasCell: boolean;
   cellVisible: boolean;
   onToggleCell: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  bondSource: BondSource;
-  onBondSourceChange: (source: BondSource) => void;
-  onUploadBondFile: (file: File) => void;
-  bondFileName: string | null;
-  hasStructureBonds: boolean;
-  trajectorySource: TrajectorySource;
-  onTrajectorySourceChange: (source: TrajectorySource) => void;
-  hasStructureFrames: boolean;
-  hasFileFrames: boolean;
 }
 
 const sectionLabelStyle: React.CSSProperties = {
@@ -156,7 +162,7 @@ function DropZone({
   );
 }
 
-/** Tab-style selector for 2-3 options. */
+/** Tab-style selector for 2-4 options. */
 function TabSelector<T extends string>({
   options,
   value,
@@ -210,29 +216,16 @@ function TabSelector<T extends string>({
 export function Sidebar({
   mode,
   onToggleMode,
-  atomCount,
-  bondCount,
-  pdbFileName,
-  xtcFileName,
-  totalFrames,
-  timestepPs,
-  onUploadPdb,
-  onUploadXtc,
+  structure,
+  bonds,
+  trajectory,
+  onUploadStructure,
   onResetView,
   hasCell,
   cellVisible,
   onToggleCell,
   collapsed,
   onToggleCollapse,
-  bondSource,
-  onBondSourceChange,
-  onUploadBondFile,
-  bondFileName,
-  hasStructureBonds,
-  trajectorySource,
-  onTrajectorySourceChange,
-  hasStructureFrames,
-  hasFileFrames,
 }: SidebarProps) {
   if (collapsed) {
     return (
@@ -394,13 +387,13 @@ export function Sidebar({
         {/* Structure Section */}
         <div>
           <div style={sectionLabelStyle}>Structure</div>
-          <DropZone accept={STRUCTURE_ACCEPT} exts={STRUCTURE_EXTS} onFile={onUploadPdb} label="Change...">
-            {pdbFileName ? (
+          <DropZone accept={STRUCTURE_ACCEPT} exts={STRUCTURE_EXTS} onFile={onUploadStructure} label="Change...">
+            {structure.fileName ? (
               <>
-                <div style={fileNameStyle}>{pdbFileName}</div>
-                {atomCount > 0 && (
+                <div style={fileNameStyle}>{structure.fileName}</div>
+                {structure.atomCount > 0 && (
                   <div style={statsStyle}>
-                    {atomCount.toLocaleString()} atoms
+                    {structure.atomCount.toLocaleString()} atoms
                   </div>
                 )}
               </>
@@ -420,24 +413,24 @@ export function Sidebar({
               { value: "file", label: "File" },
               { value: "distance", label: "Distance" },
             ]}
-            value={bondSource}
-            onChange={onBondSourceChange}
+            value={bonds.source}
+            onChange={bonds.onSourceChange}
           />
-          {bondSource === "file" && (
+          {bonds.source === "file" && (
             <DropZone
               accept={BOND_FILE_ACCEPT}
               exts={BOND_FILE_EXTS}
-              onFile={onUploadBondFile}
+              onFile={bonds.onUploadFile}
               label="Load PDB/TOP..."
             >
-              {bondFileName && (
-                <div style={fileNameStyle}>{bondFileName}</div>
+              {bonds.fileName && (
+                <div style={fileNameStyle}>{bonds.fileName}</div>
               )}
             </DropZone>
           )}
-          {bondSource !== "none" && (
+          {bonds.source !== "none" && (
             <div style={statsStyle}>
-              {bondCount.toLocaleString()} bonds
+              {bonds.count.toLocaleString()} bonds
             </div>
           )}
         </div>
@@ -450,24 +443,24 @@ export function Sidebar({
               { value: "structure", label: "Structure" },
               { value: "file", label: "File" },
             ]}
-            value={trajectorySource}
-            onChange={onTrajectorySourceChange}
+            value={trajectory.source}
+            onChange={trajectory.onSourceChange}
             disabledOptions={
               new Set<TrajectorySource>([
-                ...(!hasStructureFrames ? ["structure" as TrajectorySource] : []),
-                ...(!hasFileFrames ? ["file" as TrajectorySource] : []),
+                ...(!trajectory.hasStructureFrames ? ["structure" as TrajectorySource] : []),
+                ...(!trajectory.hasFileFrames ? ["file" as TrajectorySource] : []),
               ])
             }
           />
-          {trajectorySource === "file" && (
-            <DropZone accept=".xtc" exts={[".xtc"]} onFile={onUploadXtc} label="Load XTC...">
-              {xtcFileName ? (
+          {trajectory.source === "file" && (
+            <DropZone accept=".xtc" exts={[".xtc"]} onFile={trajectory.onUploadXtc} label="Load XTC...">
+              {trajectory.fileName ? (
                 <>
-                  <div style={fileNameStyle}>{xtcFileName}</div>
+                  <div style={fileNameStyle}>{trajectory.fileName}</div>
                   <div style={statsStyle}>
-                    {totalFrames.toLocaleString()} frames
-                    {timestepPs > 0 &&
-                      ` · ${timestepPs.toFixed(1)} ps/frame`}
+                    {trajectory.totalFrames.toLocaleString()} frames
+                    {trajectory.timestepPs > 0 &&
+                      ` \u00b7 ${trajectory.timestepPs.toFixed(1)} ps/frame`}
                   </div>
                 </>
               ) : (
@@ -475,12 +468,12 @@ export function Sidebar({
               )}
             </DropZone>
           )}
-          {trajectorySource === "structure" && (
-            xtcFileName ? (
+          {trajectory.source === "structure" && (
+            trajectory.fileName ? (
               <>
-                <div style={fileNameStyle}>{xtcFileName}</div>
+                <div style={fileNameStyle}>{trajectory.fileName}</div>
                 <div style={statsStyle}>
-                  {totalFrames.toLocaleString()} frames
+                  {trajectory.totalFrames.toLocaleString()} frames
                 </div>
               </>
             ) : (
