@@ -143,8 +143,16 @@ function App() {
       onUploadXtc={handleUploadXtc}
       mode={mode}
       onToggleMode={handleModeToggle}
-      pdbFileName={mode === "streaming" ? streamPdbFileName : local.pdbFileName}
-      xtcFileName={mode === "streaming" ? streamXtcFileName : local.xtcFileName}
+      pdbFileName={
+        mode === "streaming"
+          ? streamPdbFileName || ws.meta?.pdbName || null
+          : local.pdbFileName
+      }
+      xtcFileName={
+        mode === "streaming"
+          ? streamXtcFileName || ws.meta?.xtcName || null
+          : local.xtcFileName
+      }
       timestepPs={meta?.timestepPs ?? 0}
     />
   );

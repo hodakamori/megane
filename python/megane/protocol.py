@@ -110,8 +110,22 @@ def encode_frame(frame_id: int, positions: np.ndarray) -> bytes:
     return header + frame_header + pos_bytes
 
 
-def encode_metadata(n_frames: int, timestep_ps: float, n_atoms: int) -> bytes:
-    """Encode trajectory metadata message."""
+def encode_metadata(
+    n_frames: int,
+    timestep_ps: float,
+    n_atoms: int,
+    pdb_name: str = "",
+    xtc_name: str = "",
+) -> bytes:
+    """Encode trajectory metadata message.
+
+    Includes optional file name strings appended as length-prefixed UTF-8.
+    """
     header = MAGIC + struct.pack("<BBH", MSG_METADATA, 0, 0)
     payload = struct.pack("<IfI", n_frames, timestep_ps, n_atoms)
+    # Append file names as length-prefixed UTF-8
+    pdb_bytes = pdb_name.encode("utf-8")
+    xtc_bytes = xtc_name.encode("utf-8")
+    payload += struct.pack("<H", len(pdb_bytes)) + pdb_bytes
+    payload += struct.pack("<H", len(xtc_bytes)) + xtc_bytes
     return header + payload

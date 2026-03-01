@@ -23,6 +23,8 @@ export interface TrajectoryMeta {
   nFrames: number;
   timestepPs: number;
   nAtoms: number;
+  pdbName?: string;
+  xtcName?: string;
 }
 
 /** Interface for atom rendering backends. */
