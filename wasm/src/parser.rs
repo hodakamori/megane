@@ -17,7 +17,8 @@ pub struct PdbData {
     pub n_atoms: usize,
     pub positions: Vec<f32>,   // first model positions (n_atoms * 3)
     pub elements: Vec<u8>,     // atomic numbers (n_atoms)
-    pub bonds: Vec<(u32, u32)>, // CONECT bonds (a < b)
+    pub bonds: Vec<(u32, u32)>, // CONECT bonds + inferred bonds (a < b)
+    pub n_file_bonds: usize,   // count of bonds from the file itself (CONECT)
     pub box_matrix: Option<[f32; 9]>, // 3x3 cell matrix, row-major
     pub frame_positions: Vec<Vec<f32>>, // additional model positions
 }
@@ -276,6 +277,7 @@ pub fn parse(text: &str) -> Result<PdbData, String> {
             unique_bonds.push((*a, *b));
         }
     }
+    let n_file_bonds = unique_bonds.len();
 
     // Infer bonds using cell-list spatial search
     let inferred = crate::bonds::infer_bonds(&positions, &elements, n_atoms, &bond_set);
@@ -301,6 +303,7 @@ pub fn parse(text: &str) -> Result<PdbData, String> {
         positions,
         elements,
         bonds: unique_bonds,
+        n_file_bonds,
         box_matrix,
         frame_positions,
     })

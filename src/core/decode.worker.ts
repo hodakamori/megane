@@ -60,6 +60,7 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
           data: {
             nAtoms: snapshot.nAtoms,
             nBonds: snapshot.nBonds,
+            nFileBonds: snapshot.nFileBonds,
             positions: snapshot.positions,
             elements: snapshot.elements,
             bonds: snapshot.bonds,
