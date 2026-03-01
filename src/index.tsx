@@ -161,15 +161,15 @@ function App() {
           : local.xtcFileName
       }
       timestepPs={meta?.timestepPs ?? 0}
-      bondSource={local.bondSource}
-      onBondSourceChange={local.setBondSource}
-      onUploadBondFile={local.loadBondFile}
-      bondFileName={local.bondFileName}
-      hasStructureBonds={local.hasStructureBonds}
-      trajectorySource={local.trajectorySource}
-      onTrajectorySourceChange={local.setTrajectorySource}
-      hasStructureFrames={local.hasStructureFrames}
-      hasFileFrames={local.hasFileFrames}
+      bondSource={mode === "streaming" ? ws.bondSource : local.bondSource}
+      onBondSourceChange={mode === "streaming" ? ws.setBondSource : local.setBondSource}
+      onUploadBondFile={mode === "streaming" ? ws.loadBondFile : local.loadBondFile}
+      bondFileName={mode === "streaming" ? ws.bondFileName : local.bondFileName}
+      hasStructureBonds={mode === "streaming" ? ws.hasStructureBonds : local.hasStructureBonds}
+      trajectorySource={mode === "streaming" ? ws.trajectorySource : local.trajectorySource}
+      onTrajectorySourceChange={mode === "streaming" ? ws.setTrajectorySource : local.setTrajectorySource}
+      hasStructureFrames={mode === "streaming" ? ws.hasStructureFrames : local.hasStructureFrames}
+      hasFileFrames={mode === "streaming" ? ws.hasFileFrames : local.hasFileFrames}
     />
   );
 }

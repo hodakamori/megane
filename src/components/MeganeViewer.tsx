@@ -3,7 +3,7 @@
  * Combines Viewport, Sidebar, Timeline, Tooltip, and MeasurementPanel.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Sidebar } from "./Sidebar";
 import { Timeline } from "./Timeline";
@@ -124,6 +124,11 @@ export function MeganeViewer({
   const handleToggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => !prev);
   }, []);
+
+  // Toggle bond visibility when bondSource changes to/from "none"
+  useEffect(() => {
+    rendererRef.current?.setBondsVisible(bondSource !== "none");
+  }, [bondSource]);
 
   // Check if snapshot has a non-zero box
   const hasCell =

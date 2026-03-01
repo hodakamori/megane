@@ -92,6 +92,11 @@ export function useMeganeLocal(): MeganeLocalState {
     const base = baseSnapshotRef.current;
     if (!base) return;
 
+    if (source === "none") {
+      // Visibility toggled by MeganeViewer; no snapshot change needed.
+      return;
+    }
+
     let newSnapshot: Snapshot;
     switch (source) {
       case "structure":
