@@ -289,6 +289,12 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
     let mut output = Vec::with_capacity(size3);
     let mut prevcoord = [0i32; 3];
 
+    // `run` and `is_smaller` persist across iterations of the outer loop,
+    // matching the C xdrfile reference. When flag=0 the decoder reuses the
+    // previous run length to read delta coordinates from the bitstream.
+    let mut run: usize = 0;
+    let mut is_smaller: i32;
+
     let mut i: usize = 0;
     while i < natoms {
         // Read large (absolute) coordinate
@@ -315,8 +321,7 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
 
         // Read run-length flag
         let flag = bits.decode_bits(1);
-        let mut is_smaller: i32 = 0;
-        let mut run: usize = 0;
+        is_smaller = 0;
         if flag == 1 {
             let run_val = bits.decode_bits(5) as i32;
             is_smaller = run_val % 3;
@@ -475,18 +480,27 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_parse_demo_xtc() {
         let data = std::fs::read("../src/assets/1crn_vibration.xtc").expect("read XTC");
-        println!("XTC file size: {} bytes", data.len());
-        match parse_xtc(&data) {
-            Ok(result) => {
-                println!("SUCCESS: n_atoms={}, n_frames={}", result.n_atoms, result.n_frames);
-            }
-            Err(e) => {
-                panic!("XTC parse error: {}", e);
-            }
-        }
+        let result = parse_xtc(&data).expect("parse XTC");
+        assert_eq!(result.n_atoms, 327);
+        assert_eq!(result.n_frames, 100);
+
+        // Reference values from MDAnalysis (Angstroms)
+        let frame0 = &result.frame_positions[0];
+        let check = |idx: usize, ex: f32, ey: f32, ez: f32| {
+            let (x, y, z) = (frame0[idx * 3], frame0[idx * 3 + 1], frame0[idx * 3 + 2]);
+            assert!(
+                (x - ex).abs() < 0.02 && (y - ey).abs() < 0.02 && (z - ez).abs() < 0.02,
+                "atom {} mismatch: got ({:.4},{:.4},{:.4}), expected ({:.4},{:.4},{:.4})",
+                idx, x, y, z, ex, ey, ez,
+            );
+        };
+        check(0, 17.22, 14.25, 3.76);
+        check(169, 7.09, 15.22, 0.81);
+        check(200, 1.44, 13.00, 6.36);
+        check(326, 12.61, 4.89, 10.66);
     }
 }
