@@ -18,6 +18,7 @@ let wasmModule: WasmModule | null = null;
 interface WasmParseResult {
   n_atoms: number;
   n_bonds: number;
+  n_file_bonds: number;
   n_frames: number;
   has_box: boolean;
   positions(): Float32Array;
@@ -36,6 +37,9 @@ interface WasmModule {
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
   parse_mol: ParseFn;
+  infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
+  parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
+  parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
 }
 
 async function ensureInit(): Promise<void> {
@@ -49,6 +53,9 @@ async function ensureInit(): Promise<void> {
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
         parse_mol: wasm.parse_mol,
+        infer_bonds_vdw: wasm.infer_bonds_vdw,
+        parse_top_bonds: wasm.parse_top_bonds,
+        parse_pdb_bonds: wasm.parse_pdb_bonds,
       };
     })();
   }
@@ -98,6 +105,7 @@ function parseWithFn(parseFn: ParseFn, text: string): PDBParseResult {
   const snapshot: Snapshot = {
     nAtoms: result.n_atoms,
     nBonds: result.n_bonds,
+    nFileBonds: result.n_file_bonds,
     positions: result.positions(),
     elements: result.elements(),
     bonds: result.bonds(),
@@ -126,4 +134,32 @@ function parseWithFn(parseFn: ParseFn, text: string): PDBParseResult {
       : null;
 
   return { snapshot, frames, meta };
+}
+
+/** Infer bonds using VDW radii (threshold = vdw_sum * 0.6). */
+export async function inferBondsVdw(
+  positions: Float32Array,
+  elements: Uint8Array,
+  nAtoms: number,
+): Promise<Uint32Array> {
+  await ensureInit();
+  return wasmModule!.infer_bonds_vdw(positions, elements, nAtoms);
+}
+
+/** Parse GROMACS .top file and extract bond pairs. */
+export async function parseTopBonds(
+  text: string,
+  nAtoms: number,
+): Promise<Uint32Array> {
+  await ensureInit();
+  return wasmModule!.parse_top_bonds(text, nAtoms);
+}
+
+/** Extract only CONECT bonds from a PDB file. */
+export async function parsePdbBonds(
+  text: string,
+  nAtoms: number,
+): Promise<Uint32Array> {
+  await ensureInit();
+  return wasmModule!.parse_pdb_bonds(text, nAtoms);
 }

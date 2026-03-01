@@ -5,6 +5,7 @@ mod bonds;
 mod gro;
 mod mol;
 mod parser;
+mod top;
 mod xtc;
 mod xyz;
 
@@ -13,6 +14,7 @@ mod xyz;
 pub struct ParseResult {
     n_atoms: u32,
     n_bonds: u32,
+    n_file_bonds: u32,
     n_frames: u32,
     has_box: bool,
     positions: Vec<f32>,
@@ -33,6 +35,11 @@ impl ParseResult {
     #[wasm_bindgen(getter)]
     pub fn n_bonds(&self) -> u32 {
         self.n_bonds
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_file_bonds(&self) -> u32 {
+        self.n_file_bonds
     }
 
     #[wasm_bindgen(getter)]
@@ -153,6 +160,7 @@ pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {
 
     let n_atoms = data.n_atoms as u32;
     let n_bonds = data.bonds.len() as u32;
+    let n_file_bonds = data.n_file_bonds as u32;
     let n_frames = data.frame_positions.len() as u32;
 
     // Flatten bonds to [a0, b0, a1, b1, ...]
@@ -181,6 +189,7 @@ pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult {
         n_atoms,
         n_bonds,
+        n_file_bonds,
         n_frames,
         has_box,
         positions: data.positions,
@@ -214,6 +223,7 @@ pub fn parse_gro(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult {
         n_atoms: data.n_atoms as u32,
         n_bonds,
+        n_file_bonds: 0,
         n_frames: 0,
         has_box,
         positions: data.positions,
@@ -247,6 +257,7 @@ pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult {
         n_atoms: data.n_atoms as u32,
         n_bonds,
+        n_file_bonds: 0,
         n_frames,
         has_box: false,
         positions: data.positions,
@@ -273,6 +284,7 @@ pub fn parse_mol(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult {
         n_atoms: data.n_atoms as u32,
         n_bonds,
+        n_file_bonds: n_bonds,
         n_frames: 0,
         has_box: false,
         positions: data.positions,
@@ -282,4 +294,61 @@ pub fn parse_mol(text: &str) -> Result<ParseResult, JsError> {
         box_matrix: Vec::new(),
         frame_data: Vec::new(),
     })
+}
+
+/// Infer bonds using VDW radii (threshold = vdw_sum * 0.6).
+/// Returns flat Uint32Array [a0, b0, a1, b1, ...].
+#[wasm_bindgen]
+pub fn infer_bonds_vdw(
+    positions: &[f32],
+    elements: &[u8],
+    n_atoms: u32,
+) -> Uint32Array {
+    let result = bonds::infer_bonds_vdw(positions, elements, n_atoms as usize);
+    let mut flat: Vec<u32> = Vec::with_capacity(result.len() * 2);
+    for (a, b) in &result {
+        flat.push(*a);
+        flat.push(*b);
+    }
+    Uint32Array::from(&flat[..])
+}
+
+/// Parse GROMACS .top file and extract bond pairs.
+/// Returns flat Uint32Array [a0, b0, a1, b1, ...].
+#[wasm_bindgen]
+pub fn parse_top_bonds(text: &str, n_atoms: u32) -> Uint32Array {
+    let result = top::parse_top_bonds(text, n_atoms as usize);
+    let mut flat: Vec<u32> = Vec::with_capacity(result.len() * 2);
+    for (a, b) in &result {
+        flat.push(*a);
+        flat.push(*b);
+    }
+    Uint32Array::from(&flat[..])
+}
+
+/// Extract only CONECT bonds from a PDB file text.
+/// Returns flat Uint32Array [a0, b0, a1, b1, ...].
+#[wasm_bindgen]
+pub fn parse_pdb_bonds(text: &str, n_atoms: u32) -> Uint32Array {
+    let data = match parser::parse(text) {
+        Ok(d) => d,
+        Err(_) => return Uint32Array::new_with_length(0),
+    };
+    // Only return file bonds (CONECT), not inferred ones
+    let file_bonds = &data.bonds[..data.n_file_bonds];
+    let mut flat: Vec<u32> = Vec::with_capacity(file_bonds.len() * 2);
+    for (a, b) in file_bonds {
+        flat.push(*a);
+        flat.push(*b);
+    }
+    // Validate atom indices
+    let limit = n_atoms;
+    let mut valid: Vec<u32> = Vec::new();
+    for chunk in flat.chunks(2) {
+        if chunk[0] < limit && chunk[1] < limit {
+            valid.push(chunk[0]);
+            valid.push(chunk[1]);
+        }
+    }
+    Uint32Array::from(&valid[..])
 }

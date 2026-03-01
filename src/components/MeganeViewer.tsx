@@ -16,6 +16,8 @@ import type {
   HoverInfo,
   SelectionState,
   Measurement,
+  BondSource,
+  TrajectorySource,
 } from "../core/types";
 
 interface MeganeViewerProps {
@@ -37,6 +39,15 @@ interface MeganeViewerProps {
   timestepPs?: number;
   width?: string | number;
   height?: string | number;
+  bondSource?: BondSource;
+  onBondSourceChange?: (source: BondSource) => void;
+  onUploadBondFile?: (file: File) => void;
+  bondFileName?: string | null;
+  hasStructureBonds?: boolean;
+  trajectorySource?: TrajectorySource;
+  onTrajectorySourceChange?: (source: TrajectorySource) => void;
+  hasStructureFrames?: boolean;
+  hasFileFrames?: boolean;
 }
 
 export function MeganeViewer({
@@ -58,6 +69,15 @@ export function MeganeViewer({
   timestepPs = 0,
   width = "100%",
   height = "100%",
+  bondSource = "structure",
+  onBondSourceChange,
+  onUploadBondFile,
+  bondFileName = null,
+  hasStructureBonds = false,
+  trajectorySource = "structure",
+  onTrajectorySourceChange,
+  hasStructureFrames = false,
+  hasFileFrames = false,
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [cellVisible, setCellVisible] = useState(true);
@@ -136,6 +156,15 @@ export function MeganeViewer({
         onToggleCell={handleToggleCell}
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
+        bondSource={bondSource}
+        onBondSourceChange={onBondSourceChange ?? (() => {})}
+        onUploadBondFile={onUploadBondFile ?? (() => {})}
+        bondFileName={bondFileName}
+        hasStructureBonds={hasStructureBonds}
+        trajectorySource={trajectorySource}
+        onTrajectorySourceChange={onTrajectorySourceChange ?? (() => {})}
+        hasStructureFrames={hasStructureFrames}
+        hasFileFrames={hasFileFrames}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

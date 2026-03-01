@@ -4,12 +4,19 @@ import type * as THREE from "three";
 export interface Snapshot {
   nAtoms: number;
   nBonds: number;
+  nFileBonds: number; // count of bonds from the structure file itself
   positions: Float32Array; // length = nAtoms * 3
   elements: Uint8Array; // length = nAtoms (atomic numbers)
   bonds: Uint32Array; // length = nBonds * 2
   bondOrders: Uint8Array | null; // length = nBonds (1=single,2=double,3=triple,4=aromatic)
   box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
 }
+
+/** Bond source mode. */
+export type BondSource = "structure" | "file" | "distance";
+
+/** Trajectory source mode. */
+export type TrajectorySource = "structure" | "file";
 
 /** Decoded trajectory frame. */
 export interface Frame {

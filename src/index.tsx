@@ -161,6 +161,15 @@ function App() {
           : local.xtcFileName
       }
       timestepPs={meta?.timestepPs ?? 0}
+      bondSource={local.bondSource}
+      onBondSourceChange={local.setBondSource}
+      onUploadBondFile={local.loadBondFile}
+      bondFileName={local.bondFileName}
+      hasStructureBonds={local.hasStructureBonds}
+      trajectorySource={local.trajectorySource}
+      onTrajectorySourceChange={local.setTrajectorySource}
+      hasStructureFrames={local.hasStructureFrames}
+      hasFileFrames={local.hasFileFrames}
     />
   );
 }
