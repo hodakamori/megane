@@ -1,0 +1,7 @@
+[workspace]
+members = ["crates/megane-core", "crates/megane-python", "wasm"]
+resolver = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true

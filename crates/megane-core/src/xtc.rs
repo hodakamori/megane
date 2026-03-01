@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_parse_demo_xtc() {
-        let data = std::fs::read("../src/assets/1crn_vibration.xtc").expect("read XTC");
+        let data = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/1crn_vibration.xtc")).expect("read XTC");
         let result = parse_xtc(&data).expect("parse XTC");
         assert_eq!(result.n_atoms, 327);
         assert_eq!(result.n_frames, 100);

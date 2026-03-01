@@ -1,0 +1,13 @@
+[package]
+name = "megane-python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "megane_parser"
+crate-type = ["cdylib"]
+
+[dependencies]
+megane-core = { path = "../megane-core" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+numpy = "0.23"
