@@ -16,7 +16,7 @@ import {
   MSG_FRAME,
   MSG_METADATA,
 } from "../core/protocol";
-import { inferBondsVdw, parseTopBonds, parsePdbBonds } from "../core/parsers/pdb";
+import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
 import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource } from "../core/types";
 
 export interface MeganeWebSocketState {
@@ -39,20 +39,6 @@ export interface MeganeWebSocketState {
   hasFileFrames: boolean;
 }
 
-/** Rebuild a snapshot with different bonds. */
-function withBonds(
-  base: Snapshot,
-  bonds: Uint32Array,
-  bondOrders: Uint8Array | null,
-): Snapshot {
-  return {
-    ...base,
-    nBonds: bonds.length / 2,
-    bonds,
-    bondOrders,
-  };
-}
-
 export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [frame, setFrame] = useState<Frame | null>(null);
@@ -70,35 +56,16 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
   const fileBondsRef = useRef<Uint32Array | null>(null);
   const vdwBondsRef = useRef<Uint32Array | null>(null);
 
-  /** Apply bond source to the base snapshot. */
   const applyBondSource = useCallback(async (source: BondSource, base: Snapshot) => {
-    if (source === "none") return;
-
-    let newSnapshot: Snapshot;
-    switch (source) {
-      case "structure":
-        newSnapshot = base;
-        break;
-      case "file":
-        if (fileBondsRef.current) {
-          newSnapshot = withBonds(base, fileBondsRef.current, null);
-        } else {
-          newSnapshot = withBonds(base, new Uint32Array(0), null);
-        }
-        break;
-      case "distance": {
-        if (!vdwBondsRef.current) {
-          vdwBondsRef.current = await inferBondsVdw(
-            base.positions,
-            base.elements,
-            base.nAtoms,
-          );
-        }
-        newSnapshot = withBonds(base, vdwBondsRef.current, null);
-        break;
-      }
+    const result = await computeBondsForSource(source, {
+      baseSnapshot: base,
+      fileBonds: fileBondsRef.current,
+      vdwBonds: vdwBondsRef.current,
+    });
+    if (source === "distance" && result) {
+      vdwBondsRef.current = result.bonds;
     }
-    setSnapshot(newSnapshot);
+    if (result) setSnapshot(result);
   }, []);
 
   useEffect(() => {
@@ -112,7 +79,6 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
           const decoded = decodeSnapshot(data);
           baseSnapshotRef.current = decoded;
           setHasStructureBonds(decoded.nFileBonds > 0);
-          // Clear caches for new molecule
           fileBondsRef.current = null;
           vdwBondsRef.current = null;
           setBondFileName(null);
@@ -154,23 +120,13 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
     const base = baseSnapshotRef.current;
     if (!base) return;
 
-    const text = await file.text();
-    const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
-
-    let bonds: Uint32Array;
-    if (ext === ".top") {
-      bonds = await parseTopBonds(text, base.nAtoms);
-    } else {
-      bonds = await parsePdbBonds(text, base.nAtoms);
-    }
-
+    const { bonds, fileName } = await loadBondFileData(file, base.nAtoms);
     fileBondsRef.current = bonds;
-    setBondFileName(file.name);
+    setBondFileName(fileName);
     setBondSourceState("file");
     setSnapshot(withBonds(base, bonds, null));
   }, []);
 
-  // Streaming: hasStructureFrames is always false, hasFileFrames when server has trajectory
   const hasFileFrames = meta != null && meta.nFrames > 0;
 
   return {

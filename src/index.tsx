@@ -2,12 +2,13 @@
  * megane - Standalone web application entry point.
  * Supports two data modes:
  *   - "streaming": connects to Python backend via WebSocket
- *   - "local": parses PDB files in-browser via WASM (no server needed)
+ *   - "local": parses structure files in-browser via WASM (no server needed)
  */
 
-import { StrictMode, useState, useEffect, useRef, useCallback } from "react";
+import { StrictMode, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
+import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "./assets/1crn.pdb?raw";
@@ -103,15 +104,15 @@ function App() {
     setFps(newFps);
   }, []);
 
-  const handleUploadPdb = useCallback(
-    (pdb: File) => {
+  const handleUploadStructure = useCallback(
+    (file: File) => {
       setPlaying(false);
       if (mode === "streaming") {
-        uploadFiles(pdb);
-        setStreamPdbFileName(pdb.name);
+        uploadFiles(file);
+        setStreamPdbFileName(file.name);
         setStreamXtcFileName(null);
       } else {
-        local.loadFile(pdb);
+        local.loadFile(file);
       }
     },
     [mode, local.loadFile],
@@ -135,6 +136,41 @@ function App() {
     setMode((prev) => (prev === "streaming" ? "local" : "streaming"));
   }, []);
 
+  const pdbFileName = mode === "streaming"
+    ? streamPdbFileName || ws.meta?.pdbName || null
+    : local.pdbFileName;
+
+  const xtcFileName = mode === "streaming"
+    ? streamXtcFileName || ws.meta?.xtcName || null
+    : local.xtcFileName;
+
+  const bondConfig: BondConfig = useMemo(() => ({
+    source: mode === "streaming" ? ws.bondSource : local.bondSource,
+    onSourceChange: mode === "streaming" ? ws.setBondSource : local.setBondSource,
+    onUploadFile: mode === "streaming" ? ws.loadBondFile : local.loadBondFile,
+    fileName: mode === "streaming" ? ws.bondFileName : local.bondFileName,
+    count: snapshot?.nBonds ?? 0,
+  }), [
+    mode, snapshot?.nBonds,
+    ws.bondSource, ws.setBondSource, ws.loadBondFile, ws.bondFileName,
+    local.bondSource, local.setBondSource, local.loadBondFile, local.bondFileName,
+  ]);
+
+  const trajectoryConfig: TrajectoryConfig = useMemo(() => ({
+    source: mode === "streaming" ? ws.trajectorySource : local.trajectorySource,
+    onSourceChange: mode === "streaming" ? ws.setTrajectorySource : local.setTrajectorySource,
+    hasStructureFrames: mode === "streaming" ? ws.hasStructureFrames : local.hasStructureFrames,
+    hasFileFrames: mode === "streaming" ? ws.hasFileFrames : local.hasFileFrames,
+    fileName: xtcFileName,
+    totalFrames: meta?.nFrames ?? 0,
+    timestepPs: meta?.timestepPs ?? 0,
+    onUploadXtc: handleUploadXtc,
+  }), [
+    mode, xtcFileName, meta?.nFrames, meta?.timestepPs, handleUploadXtc,
+    ws.trajectorySource, ws.setTrajectorySource, ws.hasStructureFrames, ws.hasFileFrames,
+    local.trajectorySource, local.setTrajectorySource, local.hasStructureFrames, local.hasFileFrames,
+  ]);
+
   return (
     <MeganeViewer
       snapshot={snapshot}
@@ -146,30 +182,12 @@ function App() {
       onSeek={handleSeek}
       onPlayPause={handlePlayPause}
       onFpsChange={handleFpsChange}
-      onUploadPdb={handleUploadPdb}
-      onUploadXtc={handleUploadXtc}
+      onUploadStructure={handleUploadStructure}
       mode={mode}
       onToggleMode={handleModeToggle}
-      pdbFileName={
-        mode === "streaming"
-          ? streamPdbFileName || ws.meta?.pdbName || null
-          : local.pdbFileName
-      }
-      xtcFileName={
-        mode === "streaming"
-          ? streamXtcFileName || ws.meta?.xtcName || null
-          : local.xtcFileName
-      }
-      timestepPs={meta?.timestepPs ?? 0}
-      bondSource={mode === "streaming" ? ws.bondSource : local.bondSource}
-      onBondSourceChange={mode === "streaming" ? ws.setBondSource : local.setBondSource}
-      onUploadBondFile={mode === "streaming" ? ws.loadBondFile : local.loadBondFile}
-      bondFileName={mode === "streaming" ? ws.bondFileName : local.bondFileName}
-      hasStructureBonds={mode === "streaming" ? ws.hasStructureBonds : local.hasStructureBonds}
-      trajectorySource={mode === "streaming" ? ws.trajectorySource : local.trajectorySource}
-      onTrajectorySourceChange={mode === "streaming" ? ws.setTrajectorySource : local.setTrajectorySource}
-      hasStructureFrames={mode === "streaming" ? ws.hasStructureFrames : local.hasStructureFrames}
-      hasFileFrames={mode === "streaming" ? ws.hasFileFrames : local.hasFileFrames}
+      pdbFileName={pdbFileName}
+      bonds={bondConfig}
+      trajectory={trajectoryConfig}
     />
   );
 }

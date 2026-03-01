@@ -9,15 +9,7 @@ use std::collections::HashSet;
 use crate::bonds;
 use crate::parser::symbol_to_atomic_num;
 
-pub struct XyzData {
-    pub n_atoms: usize,
-    pub positions: Vec<f32>,
-    pub elements: Vec<u8>,
-    pub bonds: Vec<(u32, u32)>,
-    pub frame_positions: Vec<Vec<f32>>,
-}
-
-pub fn parse(text: &str) -> Result<XyzData, String> {
+pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
     if lines.len() < 3 {
         return Err("XYZ file too short".into());
@@ -58,7 +50,7 @@ pub fn parse(text: &str) -> Result<XyzData, String> {
             }
 
             // Element symbol
-            let sym = capitalize_symbol(parts[0]);
+            let sym = crate::parser::capitalize(parts[0]);
             elements.push(symbol_to_atomic_num(&sym));
 
             // Coordinates (already in Angstrom)
@@ -95,24 +87,15 @@ pub fn parse(text: &str) -> Result<XyzData, String> {
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, first_n_atoms, &empty_bonds);
 
-    Ok(XyzData {
+    Ok(crate::parser::ParsedStructure {
         n_atoms: first_n_atoms,
         positions,
         elements,
         bonds,
+        n_file_bonds: 0,
+        bond_orders: None,
+        box_matrix: None,
         frame_positions,
     })
 }
 
-/// Capitalize element symbol: first char upper, rest lower.
-fn capitalize_symbol(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => {
-            let upper: String = c.to_uppercase().collect();
-            let lower: String = chars.flat_map(|c| c.to_lowercase()).collect();
-            format!("{}{}", upper, lower)
-        }
-    }
-}

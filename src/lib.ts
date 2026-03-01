@@ -9,6 +9,9 @@ export { Viewport } from "./components/Viewport";
 export { Sidebar } from "./components/Sidebar";
 export { Timeline } from "./components/Timeline";
 
+// Sidebar config types
+export type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
+
 // Core renderer (framework-agnostic)
 export { MoleculeRenderer } from "./core/MoleculeRenderer";
 
@@ -31,6 +34,8 @@ export type {
   Snapshot,
   Frame,
   TrajectoryMeta,
+  BondSource,
+  TrajectorySource,
   AtomRenderer,
   BondRenderer,
   HoverInfo,
