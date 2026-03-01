@@ -3,16 +3,19 @@
  *
  * Measures PDB parsing, VDW bond inference, and streaming decode times
  * across varying atom counts using the WASM module from Node.js.
+ * Also runs the Python server-side benchmark (RDKit parse + binary encode)
+ * and merges results for a fair local vs streaming comparison.
  *
  * Usage: node bench/run.mjs
  * Output: bench/results/bench_results.json
  */
 
 import { createRequire } from "module";
-import { writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { performance } from "perf_hooks";
+import { execSync } from "child_process";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -165,6 +168,33 @@ function main() {
 
     const fmt = (ms) => ms < 1 ? `${(ms * 1000).toFixed(0)} us` : ms < 1000 ? `${ms.toFixed(1)} ms` : `${(ms / 1000).toFixed(2)} s`;
     console.log(`parse=${fmt(entry.pdbParse)}  bonds=${fmt(entry.bondInference)} (${entry.nBonds})  decode=${fmt(entry.streamingDecode)}`);
+  }
+
+  // Run Python server-side benchmark (RDKit parse + protocol encode)
+  console.log("\n--- Running server-side benchmark (Python/RDKit) ---\n");
+  try {
+    const pyScript = join(__dirname, "run_server.py");
+    execSync(`python3 ${pyScript}`, { stdio: "inherit" });
+  } catch (e) {
+    console.error("Python server benchmark failed:", e.message);
+  }
+
+  // Merge server-side results if available
+  const serverResultsPath = join(__dirname, "results", "bench_server_results.json");
+  if (existsSync(serverResultsPath)) {
+    const serverResults = JSON.parse(readFileSync(serverResultsPath, "utf-8"));
+    const serverMap = new Map(serverResults.map(r => [r.nAtoms, r]));
+
+    for (const entry of results) {
+      const server = serverMap.get(entry.nAtoms);
+      if (server) {
+        entry.rdkitParse = server.rdkitParse;
+        entry.protocolEncode = server.protocolEncode;
+        entry.serverTotal = server.serverTotal;
+        // End-to-end streaming = server parse + encode + client decode
+        entry.streamingEndToEnd = server.serverTotal + entry.streamingDecode;
+      }
+    }
   }
 
   // Write results

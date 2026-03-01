@@ -41,31 +41,50 @@ def main():
     atoms = [d["nAtoms"] for d in data]
     pdb_parse = [d["pdbParse"] for d in data]
     bond_inf = [d["bondInference"] for d in data]
-    decode = [d["streamingDecode"] for d in data]
+
+    has_server = data[0].get("streamingEndToEnd") is not None
 
     fig, ax = plt.subplots(figsize=(10, 6))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("white")
 
+    # Local mode: WASM PDB parse
     ax.loglog(atoms, pdb_parse, "o-", color="#f59e0b", linewidth=2, markersize=6,
-              label="PDB Parse (local mode)")
+              label="Local: WASM PDB Parse")
+
+    # Bond inference
     ax.loglog(atoms, bond_inf, "s-", color="#10b981", linewidth=2, markersize=6,
-              label="Bond Inference VDW (distance mode)")
-    ax.loglog(atoms, decode, "^-", color="#8b5cf6", linewidth=2, markersize=6,
-              label="Streaming Decode (binary protocol)")
+              label="Bond Inference (VDW)")
+
+    if has_server:
+        streaming_e2e = [d["streamingEndToEnd"] for d in data]
+        rdkit_parse = [d["rdkitParse"] for d in data]
+        protocol_encode = [d["protocolEncode"] for d in data]
+
+        # Streaming end-to-end: server parse + encode + client decode
+        ax.loglog(atoms, streaming_e2e, "D-", color="#ef4444", linewidth=2, markersize=6,
+                  label="Streaming: End-to-End (server parse + encode + decode)")
+
+        # Breakdown: RDKit parse only
+        ax.loglog(atoms, rdkit_parse, "^--", color="#8b5cf6", linewidth=1.5, markersize=5,
+                  alpha=0.7, label="  \u2514 Server: RDKit Parse")
+
+        # Breakdown: Protocol encode only
+        ax.loglog(atoms, protocol_encode, "v--", color="#06b6d4", linewidth=1.5, markersize=5,
+                  alpha=0.7, label="  \u2514 Server: Protocol Encode")
 
     ax.set_xlabel("Number of Atoms", fontsize=12)
     ax.set_ylabel("Time (ms)", fontsize=12)
-    ax.set_title("megane Processing Time vs Atom Count", fontsize=14, fontweight="bold")
+    ax.set_title("megane: Local vs Streaming Processing Time", fontsize=14, fontweight="bold")
 
     ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_atoms))
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(format_time))
 
     ax.grid(True, which="major", alpha=0.3)
     ax.grid(True, which="minor", alpha=0.1)
-    ax.legend(fontsize=11, loc="upper left")
+    ax.legend(fontsize=10, loc="upper left")
 
-    # Add reference lines for O(n) and O(n^2)
+    # Add reference line for O(n)
     x = np.array(atoms)
     y_linear = pdb_parse[0] * (x / atoms[0])
     ax.plot(x, y_linear, "--", color="#cbd5e1", linewidth=1, alpha=0.5, label="_nolegend_")

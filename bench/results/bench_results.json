@@ -1,51 +1,51 @@
 [
   {
     "nAtoms": 100,
-    "pdbParse": 0.4363969999999995,
-    "bondInference": 0.06972199999999873,
-    "nBonds": 202,
-    "streamingDecode": 0.0019570000000044274
+    "pdbParse": 0.47704400000000646,
+    "bondInference": 0.07262600000001385,
+    "nBonds": 197,
+    "streamingDecode": 0.0029220000000123036
   },
   {
     "nAtoms": 500,
-    "pdbParse": 1.0736830000000026,
-    "bondInference": 0.33690500000000156,
-    "nBonds": 1086,
-    "streamingDecode": 0.0010370000000108348
+    "pdbParse": 1.1446129999999926,
+    "bondInference": 0.3359140000000025,
+    "nBonds": 1106,
+    "streamingDecode": 0.0012540000000171858
   },
   {
     "nAtoms": 1000,
-    "pdbParse": 1.2401469999999932,
-    "bondInference": 0.32692199999999616,
-    "nBonds": 2319,
-    "streamingDecode": 0.0004100000000022419
+    "pdbParse": 2.2805449999999894,
+    "bondInference": 0.4546630000000107,
+    "nBonds": 2295,
+    "streamingDecode": 0.000618000000002894
   },
   {
     "nAtoms": 5000,
-    "pdbParse": 5.291258999999997,
-    "bondInference": 1.9314200000000028,
-    "nBonds": 11968,
-    "streamingDecode": 0.0004619999999988522
+    "pdbParse": 6.304604999999981,
+    "bondInference": 2.3574839999999995,
+    "nBonds": 11978,
+    "streamingDecode": 0.00043499999998175554
   },
   {
     "nAtoms": 10000,
-    "pdbParse": 10.56580600000001,
-    "bondInference": 4.214371999999969,
-    "nBonds": 24240,
-    "streamingDecode": 0.0005419999999958236
+    "pdbParse": 12.253465000000006,
+    "bondInference": 5.375211000000036,
+    "nBonds": 24258,
+    "streamingDecode": 0.0005509999999731008
   },
   {
     "nAtoms": 50000,
-    "pdbParse": 52.943895,
-    "bondInference": 20.41105600000003,
-    "nBonds": 123782,
-    "streamingDecode": 0.0009280000000444488
+    "pdbParse": 62.306768000000034,
+    "bondInference": 25.98385600000006,
+    "nBonds": 123911,
+    "streamingDecode": 0.0006140000000414148
   },
   {
     "nAtoms": 100000,
-    "pdbParse": 107.32125300000007,
-    "bondInference": 43.91462100000035,
-    "nBonds": 249150,
-    "streamingDecode": 0.00038700000004610047
+    "pdbParse": 133.3277109999999,
+    "bondInference": 54.73874500000011,
+    "nBonds": 249246,
+    "streamingDecode": 0.000551999999970576
   }
 ]
