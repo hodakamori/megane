@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Sidebar } from "./Sidebar";
-import type { BondConfig, TrajectoryConfig } from "./Sidebar";
+import type { BondConfig, TrajectoryConfig, LabelConfig } from "./Sidebar";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
@@ -36,6 +36,8 @@ interface MeganeViewerProps {
   pdbFileName: string | null;
   bonds: BondConfig;
   trajectory: TrajectoryConfig;
+  labels: LabelConfig;
+  atomLabels?: string[] | null;
   width?: string | number;
   height?: string | number;
 }
@@ -56,6 +58,8 @@ export function MeganeViewer({
   pdbFileName,
   bonds,
   trajectory,
+  labels,
+  atomLabels,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
@@ -119,6 +123,7 @@ export function MeganeViewer({
       <Viewport
         snapshot={snapshot}
         frame={frame}
+        atomLabels={atomLabels}
         onRendererReady={handleRendererReady}
         onHover={setHoverInfo}
         onAtomRightClick={handleAtomRightClick}
@@ -133,6 +138,7 @@ export function MeganeViewer({
         }}
         bonds={bonds}
         trajectory={trajectory}
+        labels={labels}
         onUploadStructure={onUploadStructure}
         onResetView={handleResetView}
         hasCell={hasCell}

@@ -25,10 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from python.megane.parsers.pdb import load_pdb
 from python.megane.protocol import encode_snapshot
 
-# RDKit PDB parse has super-quadratic scaling for dense grids due to bond
-# perception. 50K atoms takes ~300s, 100K would take 30+ minutes.
-# Cap at 10K for practical benchmark times; 50K/100K use WASM-only data.
-ATOM_COUNTS = [100, 500, 1_000, 5_000, 10_000]
+# Rust parser scales linearly, so we can benchmark all sizes.
+ATOM_COUNTS = [100, 500, 1_000, 5_000, 10_000, 50_000, 100_000]
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
@@ -36,7 +34,7 @@ RESULTS_DIR = Path(__file__).parent / "results"
 def get_runs(n_atoms):
     """Return (warmup, measure) run counts based on atom count."""
     if n_atoms >= 50_000:
-        return 0, 1  # Single run for very large (RDKit is extremely slow)
+        return 1, 3
     if n_atoms >= 10_000:
         return 1, 3
     return 2, 5
@@ -80,7 +78,7 @@ def benchmark(fn, runs, warmup):
 
 
 def main():
-    print("=== megane Server-Side Benchmark (RDKit + Protocol) ===\n")
+    print("=== megane Server-Side Benchmark (Rust + Protocol) ===\n")
     print(f"Atom counts: {', '.join(f'{n:,}' for n in ATOM_COUNTS)}\n")
 
     results = []
@@ -95,7 +93,7 @@ def main():
 
         entry = {
             "nAtoms": n_atoms,
-            "rdkitParse": None,
+            "rustParse": None,
             "protocolEncode": None,
             "serverTotal": None,
         }
@@ -114,7 +112,7 @@ def main():
                 nonlocal structure
                 structure = load_pdb(tmp_path)
 
-            entry["rdkitParse"] = benchmark(do_parse, runs, warmup)
+            entry["rustParse"] = benchmark(do_parse, runs, warmup)
 
             # 2. Binary Protocol Encode (very fast, use same structure)
             def do_encode():
@@ -123,7 +121,7 @@ def main():
             entry["protocolEncode"] = benchmark(do_encode, runs, warmup)
 
             # 3. Server total = parse + encode (summed, avoid extra slow runs)
-            entry["serverTotal"] = entry["rdkitParse"] + entry["protocolEncode"]
+            entry["serverTotal"] = entry["rustParse"] + entry["protocolEncode"]
 
         finally:
             os.unlink(tmp_path)
@@ -138,7 +136,7 @@ def main():
             return f"{ms / 1000:.2f} s"
 
         print(
-            f"parse={fmt(entry['rdkitParse'])}  "
+            f"parse={fmt(entry['rustParse'])}  "
             f"encode={fmt(entry['protocolEncode'])}  "
             f"total={fmt(entry['serverTotal'])}"
         )

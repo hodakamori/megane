@@ -10,6 +10,7 @@ import type { Snapshot, Frame, HoverInfo } from "../core/types";
 interface ViewportProps {
   snapshot: Snapshot | null;
   frame: Frame | null;
+  atomLabels?: string[] | null;
   onRendererReady?: (renderer: MoleculeRenderer) => void;
   onHover?: (info: HoverInfo) => void;
   onAtomRightClick?: (atomIndex: number) => void;
@@ -19,6 +20,7 @@ interface ViewportProps {
 export function Viewport({
   snapshot,
   frame,
+  atomLabels,
   onRendererReady,
   onHover,
   onAtomRightClick,
@@ -102,6 +104,10 @@ export function Viewport({
       onFrameUpdatedRef.current?.();
     }
   }, [frame]);
+
+  useEffect(() => {
+    rendererRef.current?.setLabels(atomLabels ?? null);
+  }, [atomLabels]);
 
   return (
     <div

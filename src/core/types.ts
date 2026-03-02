@@ -18,6 +18,9 @@ export type BondSource = "structure" | "file" | "distance" | "none";
 /** Trajectory source mode. */
 export type TrajectorySource = "structure" | "file";
 
+/** Label source mode. */
+export type LabelSource = "none" | "structure" | "file";
+
 /** Decoded trajectory frame. */
 export interface Frame {
   frameId: number;

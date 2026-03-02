@@ -70,12 +70,18 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
 
     let mut positions = Vec::with_capacity(n_atoms * 3);
     let mut elements = Vec::with_capacity(n_atoms);
+    let mut labels = Vec::with_capacity(n_atoms);
 
     for i in 0..n_atoms {
         let line = lines[i + 2];
         if line.len() < 44 {
             return Err(format!("GRO atom line {} too short", i + 1));
         }
+
+        // Residue number (cols 0-5) and residue name (cols 5-10)
+        let res_num = if line.len() >= 5 { line[0..5].trim() } else { "" };
+        let res_name = if line.len() >= 10 { line[5..10].trim() } else { "" };
+        labels.push(format!("{}{}", res_name, res_num));
 
         // Atom name: columns 11-15 (0-indexed: 10..15)
         let atom_name = if line.len() >= 15 { &line[10..15] } else { "" };
@@ -108,6 +114,12 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
 
+    let atom_labels = if labels.iter().any(|l| !l.is_empty()) {
+        Some(labels)
+    } else {
+        None
+    };
+
     Ok(crate::parser::ParsedStructure {
         n_atoms,
         positions,
@@ -117,6 +129,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         bond_orders: None,
         box_matrix,
         frame_positions: Vec::new(),
+        atom_labels,
     })
 }
 

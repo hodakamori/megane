@@ -10,7 +10,8 @@ import { useState, useRef, useCallback } from "react";
 import { parseStructureFile, parseStructureText } from "../core/parsers/structure";
 import { parseXTCFile } from "../core/parsers/xtc";
 import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource } from "../core/types";
+import { computeLabelsForSource, loadLabelFileData } from "../core/labelSourceLogic";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource } from "../core/types";
 
 export interface MeganeLocalState {
   snapshot: Snapshot | null;
@@ -34,6 +35,12 @@ export interface MeganeLocalState {
   hasStructureBonds: boolean;
   hasStructureFrames: boolean;
   hasFileFrames: boolean;
+  labelSource: LabelSource;
+  setLabelSource: (source: LabelSource) => void;
+  loadLabelFile: (file: File) => Promise<void>;
+  labelFileName: string | null;
+  hasStructureLabels: boolean;
+  atomLabels: string[] | null;
 }
 
 export function useMeganeLocal(): MeganeLocalState {
@@ -49,6 +56,10 @@ export function useMeganeLocal(): MeganeLocalState {
   const [hasStructureBonds, setHasStructureBonds] = useState(false);
   const [hasStructureFrames, setHasStructureFrames] = useState(false);
   const [hasFileFrames, setHasFileFrames] = useState(false);
+  const [labelSource, setLabelSourceState] = useState<LabelSource>("none");
+  const [labelFileName, setLabelFileName] = useState<string | null>(null);
+  const [hasStructureLabels, setHasStructureLabels] = useState(false);
+  const [atomLabels, setAtomLabels] = useState<string[] | null>(null);
 
   const currentFrameRef = useRef(0);
   const structureFramesRef = useRef<Frame[]>([]);
@@ -59,6 +70,8 @@ export function useMeganeLocal(): MeganeLocalState {
   const xtcFileNameRef = useRef<string | null>(null);
   const fileTrajMetaRef = useRef<TrajectoryMeta | null>(null);
   const currentTrajSourceRef = useRef<TrajectorySource>("structure");
+  const structureLabelsRef = useRef<string[] | null>(null);
+  const fileLabelsRef = useRef<string[] | null>(null);
 
   const resetPlayback = useCallback(() => {
     setFrame(null);
@@ -104,7 +117,7 @@ export function useMeganeLocal(): MeganeLocalState {
   }, []);
 
   const applyResult = useCallback(
-    (result: { snapshot: Snapshot; frames: Frame[]; meta: TrajectoryMeta | null }) => {
+    (result: { snapshot: Snapshot; frames: Frame[]; meta: TrajectoryMeta | null; labels: string[] | null }) => {
       baseSnapshotRef.current = result.snapshot;
       structureFramesRef.current = result.frames;
       fileFramesRef.current = [];
@@ -113,6 +126,14 @@ export function useMeganeLocal(): MeganeLocalState {
       fileTrajMetaRef.current = null;
       xtcFileNameRef.current = null;
       setBondFileName(null);
+
+      // Label state reset
+      structureLabelsRef.current = result.labels;
+      fileLabelsRef.current = null;
+      setLabelFileName(null);
+      setHasStructureLabels(result.labels != null);
+      setLabelSourceState("none");
+      setAtomLabels(null);
 
       setHasStructureBonds(result.snapshot.nFileBonds > 0);
       setHasStructureFrames(result.frames.length > 0);
@@ -213,6 +234,31 @@ export function useMeganeLocal(): MeganeLocalState {
     setSnapshot(withBonds(base, bonds, null));
   }, []);
 
+  const setLabelSource = useCallback((source: LabelSource) => {
+    setLabelSourceState(source);
+    const base = baseSnapshotRef.current;
+    if (!base) {
+      setAtomLabels(null);
+      return;
+    }
+    const labels = computeLabelsForSource(source, {
+      structureLabels: structureLabelsRef.current,
+      fileLabels: fileLabelsRef.current,
+    }, base.nAtoms);
+    setAtomLabels(labels);
+  }, []);
+
+  const loadLabelFile = useCallback(async (file: File) => {
+    const base = baseSnapshotRef.current;
+    if (!base) return;
+
+    const { labels, fileName } = await loadLabelFileData(file, base.nAtoms);
+    fileLabelsRef.current = labels;
+    setLabelFileName(fileName);
+    setLabelSourceState("file");
+    setAtomLabels(labels);
+  }, []);
+
   return {
     snapshot,
     frame,
@@ -235,5 +281,11 @@ export function useMeganeLocal(): MeganeLocalState {
     hasStructureBonds,
     hasStructureFrames,
     hasFileFrames,
+    labelSource,
+    setLabelSource,
+    loadLabelFile,
+    labelFileName,
+    hasStructureLabels,
+    atomLabels,
   };
 }

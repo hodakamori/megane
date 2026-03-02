@@ -3,7 +3,7 @@
 /// Format (repeating blocks for multi-frame):
 ///   Line 1: number of atoms
 ///   Line 2: comment
-///   Lines 3..n+2: element x y z (Angstrom)
+///   Lines 3..n+2: element x y z [extra_fields...] (Angstrom)
 
 use std::collections::HashSet;
 use crate::bonds;
@@ -18,6 +18,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let mut offset = 0;
     let mut first_positions: Option<Vec<f32>> = None;
     let mut first_elements: Option<Vec<u8>> = None;
+    let mut first_labels: Option<Vec<String>> = None;
     let mut first_n_atoms = 0usize;
     let mut frame_positions: Vec<Vec<f32>> = Vec::new();
 
@@ -41,6 +42,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
 
         let mut positions = Vec::with_capacity(n_atoms * 3);
         let mut elements = Vec::with_capacity(n_atoms);
+        let mut labels = Vec::with_capacity(n_atoms);
 
         for i in 0..n_atoms {
             let line = lines[offset + i];
@@ -52,6 +54,14 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             // Element symbol
             let sym = crate::parser::capitalize(parts[0]);
             elements.push(symbol_to_atomic_num(&sym));
+
+            // Extra fields after x y z as label
+            let label = if parts.len() > 4 {
+                parts[4..].join(" ")
+            } else {
+                String::new()
+            };
+            labels.push(label);
 
             // Coordinates (already in Angstrom)
             let x: f32 = parts[1]
@@ -75,6 +85,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             first_n_atoms = n_atoms;
             first_positions = Some(positions);
             first_elements = Some(elements);
+            first_labels = Some(labels);
         } else if n_atoms == first_n_atoms {
             frame_positions.push(positions);
         }
@@ -87,6 +98,14 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, first_n_atoms, &empty_bonds);
 
+    let atom_labels = first_labels.and_then(|labels| {
+        if labels.iter().any(|l| !l.is_empty()) {
+            Some(labels)
+        } else {
+            None
+        }
+    });
+
     Ok(crate::parser::ParsedStructure {
         n_atoms: first_n_atoms,
         positions,
@@ -96,6 +115,6 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         bond_orders: None,
         box_matrix: None,
         frame_positions,
+        atom_labels,
     })
 }
-
