@@ -17,7 +17,8 @@ import {
   MSG_METADATA,
 } from "../core/protocol";
 import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource } from "../core/types";
+import { computeLabelsForSource, loadLabelFileData } from "../core/labelSourceLogic";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource } from "../core/types";
 
 export interface MeganeWebSocketState {
   snapshot: Snapshot | null;
@@ -37,6 +38,12 @@ export interface MeganeWebSocketState {
   hasStructureBonds: boolean;
   hasStructureFrames: boolean;
   hasFileFrames: boolean;
+  labelSource: LabelSource;
+  setLabelSource: (source: LabelSource) => void;
+  loadLabelFile: (file: File) => Promise<void>;
+  labelFileName: string | null;
+  hasStructureLabels: boolean;
+  atomLabels: string[] | null;
 }
 
 export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
@@ -49,12 +56,16 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
   const [trajectorySource, setTrajectorySourceState] = useState<TrajectorySource>("file");
   const [bondFileName, setBondFileName] = useState<string | null>(null);
   const [hasStructureBonds, setHasStructureBonds] = useState(false);
+  const [labelSource, setLabelSourceState] = useState<LabelSource>("none");
+  const [labelFileName, setLabelFileName] = useState<string | null>(null);
+  const [atomLabels, setAtomLabels] = useState<string[] | null>(null);
 
   const clientRef = useRef<WebSocketClient | null>(null);
   const currentFrameRef = useRef(0);
   const baseSnapshotRef = useRef<Snapshot | null>(null);
   const fileBondsRef = useRef<Uint32Array | null>(null);
   const vdwBondsRef = useRef<Uint32Array | null>(null);
+  const fileLabelsRef = useRef<string[] | null>(null);
 
   const applyBondSource = useCallback(async (source: BondSource, base: Snapshot) => {
     const result = await computeBondsForSource(source, {
@@ -83,6 +94,10 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
           vdwBondsRef.current = null;
           setBondFileName(null);
           setBondSourceState("structure");
+          fileLabelsRef.current = null;
+          setLabelFileName(null);
+          setLabelSourceState("none");
+          setAtomLabels(null);
           setSnapshot(decoded);
         } else if (msgType === MSG_FRAME) {
           const decoded = decodeFrame(data);
@@ -127,6 +142,31 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
     setSnapshot(withBonds(base, bonds, null));
   }, []);
 
+  const setLabelSource = useCallback((source: LabelSource) => {
+    setLabelSourceState(source);
+    const base = baseSnapshotRef.current;
+    if (!base) {
+      setAtomLabels(null);
+      return;
+    }
+    const labels = computeLabelsForSource(source, {
+      structureLabels: null, // streaming mode has no structure labels
+      fileLabels: fileLabelsRef.current,
+    }, base.nAtoms);
+    setAtomLabels(labels);
+  }, []);
+
+  const loadLabelFile = useCallback(async (file: File) => {
+    const base = baseSnapshotRef.current;
+    if (!base) return;
+
+    const { labels, fileName } = await loadLabelFileData(file, base.nAtoms);
+    fileLabelsRef.current = labels;
+    setLabelFileName(fileName);
+    setLabelSourceState("file");
+    setAtomLabels(labels);
+  }, []);
+
   const hasFileFrames = meta != null && meta.nFrames > 0;
 
   return {
@@ -147,5 +187,11 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
     hasStructureBonds,
     hasStructureFrames: false,
     hasFileFrames,
+    labelSource,
+    setLabelSource,
+    loadLabelFile,
+    labelFileName,
+    hasStructureLabels: false,
+    atomLabels,
   };
 }

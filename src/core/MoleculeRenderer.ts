@@ -24,6 +24,7 @@ import { BondMesh } from "./BondMesh";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
+import { LabelOverlay } from "./LabelOverlay";
 import {
   getElementSymbol,
   getRadius,
@@ -43,6 +44,7 @@ export class MoleculeRenderer {
   private atomRenderer: AtomRenderer | null = null;
   private bondRenderer: BondRenderer | null = null;
   private cellRenderer: CellRenderer | null = null;
+  private labelOverlay: LabelOverlay | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
@@ -71,6 +73,15 @@ export class MoleculeRenderer {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setClearColor(0xffffff, 1);
     container.appendChild(this.renderer.domElement);
+
+    // Label overlay (Canvas 2D on top of WebGL)
+    this.labelOverlay = new LabelOverlay();
+    container.appendChild(this.labelOverlay.getCanvas());
+    this.labelOverlay.resize(
+      container.clientWidth,
+      container.clientHeight,
+      Math.min(window.devicePixelRatio, 2),
+    );
 
     // Scene
     this.scene = new THREE.Scene();
@@ -138,6 +149,12 @@ export class MoleculeRenderer {
     this.atomRenderer!.loadSnapshot(snapshot);
     this.bondRenderer!.loadSnapshot(snapshot);
 
+    // Update label overlay
+    if (this.labelOverlay) {
+      this.labelOverlay.setAtomData(snapshot.elements, snapshot.nAtoms);
+      this.labelOverlay.setPositions(snapshot.positions);
+    }
+
     // Update simulation cell
     if (snapshot.box) {
       const hasNonZero = snapshot.box.some((v) => v !== 0);
@@ -158,6 +175,7 @@ export class MoleculeRenderer {
     if (!this.snapshot || !this.atomRenderer || !this.bondRenderer) return;
     this.currentPositions = new Float32Array(frame.positions);
     this.atomRenderer.updatePositions(frame.positions);
+    this.labelOverlay?.setPositions(frame.positions);
     this.bondRenderer.updatePositions(
       frame.positions,
       this.snapshot.bonds,
@@ -166,6 +184,11 @@ export class MoleculeRenderer {
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
     }
+  }
+
+  /** Set per-atom labels for overlay display. */
+  setLabels(labels: string[] | null): void {
+    this.labelOverlay?.setLabels(labels);
   }
 
   /** Toggle bond visibility. */
@@ -488,6 +511,7 @@ export class MoleculeRenderer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.labelOverlay?.resize(w, h, Math.min(window.devicePixelRatio, 2));
   }
 
   private animate = (): void => {
@@ -495,6 +519,14 @@ export class MoleculeRenderer {
     this.controls.update();
 
     this.renderer.render(this.scene, this.camera);
+
+    if (this.labelOverlay && this.container) {
+      this.labelOverlay.render(
+        this.camera,
+        this.container.clientWidth,
+        this.container.clientHeight,
+      );
+    }
   };
 
   /** Clean up all resources. */
@@ -506,6 +538,7 @@ export class MoleculeRenderer {
     if (this.atomRenderer) this.atomRenderer.dispose();
     if (this.bondRenderer) this.bondRenderer.dispose();
     if (this.cellRenderer) this.cellRenderer.dispose();
+    if (this.labelOverlay) this.labelOverlay.dispose();
     this.controls.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {

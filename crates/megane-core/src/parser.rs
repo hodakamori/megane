@@ -22,6 +22,7 @@ pub struct ParsedStructure {
     pub bond_orders: Option<Vec<u8>>,
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
+    pub atom_labels: Option<Vec<String>>,
 }
 
 /// Element symbol → atomic number lookup.
@@ -211,6 +212,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
 
     let mut all_models: Vec<Vec<Atom>> = Vec::new();
     let mut current_model: Vec<Atom> = Vec::new();
+    let mut current_labels: Vec<String> = Vec::new();
+    let mut first_model_labels: Vec<String> = Vec::new();
     let mut has_model_record = false;
     let mut model_count: usize = 0;
 
@@ -221,8 +224,12 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
             "MODEL" => {
                 has_model_record = true;
                 current_model = Vec::new();
+                current_labels = Vec::new();
             }
             "ENDMDL" => {
+                if model_count == 0 {
+                    first_model_labels = std::mem::take(&mut current_labels);
+                }
                 all_models.push(std::mem::take(&mut current_model));
                 model_count += 1;
             }
@@ -237,6 +244,10 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                     if !has_model_record || model_count == 0 {
                         serial_to_index.insert(serial, current_model.len());
                     }
+                    // Extract residue label: resName (cols 17-20) + resSeq (cols 22-26)
+                    let res_name = if line.len() >= 20 { line[17..20].trim() } else { "" };
+                    let res_seq = if line.len() >= 26 { line[22..26].trim() } else { "" };
+                    current_labels.push(format!("{}{}", res_name, res_seq));
                     current_model.push(atom);
                 }
             }
@@ -250,6 +261,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
 
     // If no MODEL/ENDMDL, treat all atoms as a single model
     if !has_model_record && !current_model.is_empty() {
+        first_model_labels = current_labels;
         all_models.push(current_model);
     }
 
@@ -299,6 +311,13 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         frame_positions.push(frame_pos);
     }
 
+    // Check if any labels are non-empty
+    let atom_labels = if first_model_labels.iter().any(|l| !l.is_empty()) {
+        Some(first_model_labels)
+    } else {
+        None
+    };
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -308,5 +327,6 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         bond_orders: None,
         box_matrix,
         frame_positions,
+        atom_labels,
     })
 }

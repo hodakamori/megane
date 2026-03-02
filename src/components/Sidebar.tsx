@@ -3,7 +3,7 @@
  */
 
 import { useCallback, useRef } from "react";
-import type { BondSource, TrajectorySource } from "../core/types";
+import type { BondSource, TrajectorySource, LabelSource } from "../core/types";
 
 export interface BondConfig {
   source: BondSource;
@@ -11,6 +11,14 @@ export interface BondConfig {
   onUploadFile: (file: File) => void;
   fileName: string | null;
   count: number;
+}
+
+export interface LabelConfig {
+  source: LabelSource;
+  onSourceChange: (source: LabelSource) => void;
+  onUploadFile: (file: File) => void;
+  fileName: string | null;
+  hasStructureLabels: boolean;
 }
 
 export interface TrajectoryConfig {
@@ -30,6 +38,7 @@ interface SidebarProps {
   structure: { atomCount: number; fileName: string | null };
   bonds: BondConfig;
   trajectory: TrajectoryConfig;
+  labels: LabelConfig;
   onUploadStructure: (file: File) => void;
   onResetView: () => void;
   hasCell: boolean;
@@ -90,6 +99,8 @@ const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf";
 const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf"];
 const BOND_FILE_ACCEPT = ".pdb,.top";
 const BOND_FILE_EXTS = [".pdb", ".top"];
+const LABEL_FILE_ACCEPT = ".pdb,.gro,.xyz,.txt";
+const LABEL_FILE_EXTS = [".pdb", ".gro", ".xyz", ".txt"];
 
 function matchesAccept(name: string, exts: string[]): boolean {
   const lower = name.toLowerCase();
@@ -219,6 +230,7 @@ export function Sidebar({
   structure,
   bonds,
   trajectory,
+  labels,
   onUploadStructure,
   onResetView,
   hasCell,
@@ -479,6 +491,37 @@ export function Sidebar({
             ) : (
               <div style={placeholderStyle}>No multi-model data</div>
             )
+          )}
+        </div>
+
+        {/* Labels Section */}
+        <div>
+          <div style={sectionLabelStyle}>Labels</div>
+          <TabSelector<LabelSource>
+            options={[
+              { value: "none", label: "None" },
+              { value: "structure", label: "Structure" },
+              { value: "file", label: "File" },
+            ]}
+            value={labels.source}
+            onChange={labels.onSourceChange}
+            disabledOptions={
+              new Set<LabelSource>([
+                ...(!labels.hasStructureLabels ? ["structure" as LabelSource] : []),
+              ])
+            }
+          />
+          {labels.source === "file" && (
+            <DropZone
+              accept={LABEL_FILE_ACCEPT}
+              exts={LABEL_FILE_EXTS}
+              onFile={labels.onUploadFile}
+              label="Load labels..."
+            >
+              {labels.fileName && (
+                <div style={fileNameStyle}>{labels.fileName}</div>
+              )}
+            </DropZone>
           )}
         </div>
       </div>

@@ -10,6 +10,7 @@ export interface StructureParseResult {
   snapshot: Snapshot;
   frames: Frame[];
   meta: TrajectoryMeta | null;
+  labels: string[] | null;
 }
 
 let initPromise: Promise<void> | null = null;
@@ -21,6 +22,8 @@ interface WasmParseResult {
   n_file_bonds: number;
   n_frames: number;
   has_box: boolean;
+  has_atom_labels: boolean;
+  atom_labels: string;
   positions(): Float32Array;
   elements(): Uint8Array;
   bonds(): Uint32Array;
@@ -40,6 +43,7 @@ interface WasmModule {
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
+  extract_labels: (text: string, format: string) => string;
 }
 
 async function ensureInit(): Promise<void> {
@@ -56,6 +60,7 @@ async function ensureInit(): Promise<void> {
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_pdb_bonds: wasm.parse_pdb_bonds,
+        extract_labels: wasm.extract_labels,
       };
     })();
   }
@@ -126,6 +131,10 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
     }
   }
 
+  const labels: string[] | null = result.has_atom_labels
+    ? result.atom_labels.split("\n")
+    : null;
+
   result.free();
 
   const meta: TrajectoryMeta | null =
@@ -133,7 +142,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
       ? { nFrames: frames.length + 1, timestepPs: 1.0, nAtoms: snapshot.nAtoms }
       : null;
 
-  return { snapshot, frames, meta };
+  return { snapshot, frames, meta, labels };
 }
 
 /** Infer bonds using VDW radii (threshold = vdw_sum * 0.6). */
@@ -162,4 +171,32 @@ export async function parsePdbBonds(
 ): Promise<Uint32Array> {
   await ensureInit();
   return wasmModule!.parse_pdb_bonds(text, nAtoms);
+}
+
+/** Extract atom labels from a file (structure format or plain text). */
+export async function extractLabelsFromFile(
+  file: File,
+  nAtoms: number,
+): Promise<string[]> {
+  const text = await file.text();
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
+
+  let labels: string[];
+  if (ext === ".txt") {
+    labels = text.split("\n").map((l) => l.trim());
+  } else {
+    await ensureInit();
+    const format = ext === ".gro" ? "gro" : ext === ".xyz" ? "xyz" : "pdb";
+    const raw = wasmModule!.extract_labels(text, format);
+    labels = raw ? raw.split("\n") : [];
+  }
+
+  // Pad or trim to match nAtoms
+  if (labels.length > nAtoms) {
+    labels = labels.slice(0, nAtoms);
+  }
+  while (labels.length < nAtoms) {
+    labels.push("");
+  }
+  return labels;
 }

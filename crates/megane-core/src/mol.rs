@@ -112,6 +112,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         bond_orders: Some(bond_orders),
         box_matrix: None,
         frame_positions: Vec::new(),
+        atom_labels: None,
     })
 }
 

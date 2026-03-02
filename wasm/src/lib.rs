@@ -11,12 +11,14 @@ pub struct ParseResult {
     n_file_bonds: u32,
     n_frames: u32,
     has_box: bool,
+    has_atom_labels: bool,
     positions: Vec<f32>,
     elements: Vec<u8>,
     bonds: Vec<u32>,
     bond_orders: Vec<u8>,
     box_matrix: Vec<f32>,
     frame_data: Vec<f32>,
+    atom_labels: String,
 }
 
 #[wasm_bindgen]
@@ -44,6 +46,17 @@ impl ParseResult {
     #[wasm_bindgen(getter)]
     pub fn has_box(&self) -> bool {
         self.has_box
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn has_atom_labels(&self) -> bool {
+        self.has_atom_labels
+    }
+
+    /// Per-atom labels as newline-delimited string.
+    #[wasm_bindgen(getter)]
+    pub fn atom_labels(&self) -> String {
+        self.atom_labels.clone()
     }
 
     /// Atom positions as Float32Array [x0,y0,z0, x1,y1,z1, ...]
@@ -91,6 +104,8 @@ impl ParseResult {
         let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
         let n_frames = data.frame_positions.len() as u32;
         let frame_data: Vec<f32> = data.frame_positions.into_iter().flat_map(|f| f.into_iter()).collect();
+        let has_atom_labels = data.atom_labels.is_some();
+        let atom_labels = data.atom_labels.map(|l| l.join("\n")).unwrap_or_default();
 
         Self {
             n_atoms: data.n_atoms as u32,
@@ -98,12 +113,14 @@ impl ParseResult {
             n_file_bonds: data.n_file_bonds as u32,
             n_frames,
             has_box,
+            has_atom_labels,
             positions: data.positions,
             elements: data.elements,
             bonds: bonds_flat,
             bond_orders,
             box_matrix,
             frame_data,
+            atom_labels,
         }
     }
 }
@@ -233,6 +250,21 @@ pub fn parse_top_bonds(text: &str, n_atoms: u32) -> Uint32Array {
         flat.push(*b);
     }
     Uint32Array::from(&flat[..])
+}
+
+/// Extract atom labels from a structure file text.
+/// Returns newline-delimited labels string.
+#[wasm_bindgen]
+pub fn extract_labels(text: &str, format: &str) -> String {
+    let result = match format {
+        "gro" => gro::parse(text),
+        "xyz" => xyz::parse(text),
+        _ => parser::parse(text),
+    };
+    match result {
+        Ok(data) => data.atom_labels.map(|l| l.join("\n")).unwrap_or_default(),
+        Err(_) => String::new(),
+    }
 }
 
 /// Extract only CONECT bonds from a PDB file text.

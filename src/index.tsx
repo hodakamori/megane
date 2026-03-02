@@ -8,7 +8,7 @@
 import { StrictMode, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
-import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
+import type { BondConfig, TrajectoryConfig, LabelConfig } from "./components/Sidebar";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "./assets/1crn.pdb?raw";
@@ -171,6 +171,20 @@ function App() {
     local.trajectorySource, local.setTrajectorySource, local.hasStructureFrames, local.hasFileFrames,
   ]);
 
+  const labelConfig: LabelConfig = useMemo(() => ({
+    source: mode === "streaming" ? ws.labelSource : local.labelSource,
+    onSourceChange: mode === "streaming" ? ws.setLabelSource : local.setLabelSource,
+    onUploadFile: mode === "streaming" ? ws.loadLabelFile : local.loadLabelFile,
+    fileName: mode === "streaming" ? ws.labelFileName : local.labelFileName,
+    hasStructureLabels: mode === "streaming" ? ws.hasStructureLabels : local.hasStructureLabels,
+  }), [
+    mode,
+    ws.labelSource, ws.setLabelSource, ws.loadLabelFile, ws.labelFileName, ws.hasStructureLabels,
+    local.labelSource, local.setLabelSource, local.loadLabelFile, local.labelFileName, local.hasStructureLabels,
+  ]);
+
+  const atomLabels = mode === "streaming" ? ws.atomLabels : local.atomLabels;
+
   return (
     <MeganeViewer
       snapshot={snapshot}
@@ -188,6 +202,8 @@ function App() {
       pdbFileName={pdbFileName}
       bonds={bondConfig}
       trajectory={trajectoryConfig}
+      labels={labelConfig}
+      atomLabels={atomLabels}
     />
   );
 }
