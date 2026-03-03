@@ -7,22 +7,7 @@ COPY crates/ crates/
 COPY wasm/ wasm/
 RUN cd wasm && wasm-pack build --target web --release
 
-# Stage 1: Build Python native extension (megane-parser)
-# Use python:3.11 as base to match the runtime stage Python version
-FROM python:3.11-slim AS pyext
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl build-essential && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    pip install --no-cache-dir maturin
-ENV PATH="/root/.cargo/bin:${PATH}"
-WORKDIR /app
-COPY Cargo.toml ./
-COPY crates/ crates/
-COPY wasm/ wasm/
-RUN cd crates/megane-python && maturin build --release --out /app/dist
-
-# Stage 2: Build frontend
+# Stage 1: Build frontend
 FROM node:20-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -32,20 +17,35 @@ COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index
 COPY src/ src/
 RUN npx tsc && npx vite build && npx vite build --config vite.widget.config.ts
 
-# Stage 3: Python runtime
+# Stage 2: Build and install Python package with Rust extension
 FROM python:3.11-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl build-essential && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    pip install --no-cache-dir maturin
+ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /app
 
-# Install the native extension wheel
-COPY --from=pyext /app/dist/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl && rm /tmp/*.whl
-
-# Install Python deps
+# Copy source needed for maturin build
+COPY Cargo.toml ./
+COPY crates/ crates/
+COPY wasm/ wasm/
 COPY pyproject.toml ./
 COPY python/ python/
 COPY --from=frontend /app/python/megane/static/ python/megane/static/
-RUN test -f python/megane/static/app/index.html || (echo "ERROR: Frontend build missing app/index.html" && exit 1)
+
+# Verify frontend assets
+RUN test -f python/megane/static/app/index.html || \
+    (echo "ERROR: Frontend build missing app/index.html" && exit 1)
+
+# Unified install: compiles Rust extension + installs Python package
 RUN pip install --no-cache-dir ".[trajectory]"
+
+# Clean up build tools
+RUN apt-get purge -y build-essential && apt-get autoremove -y && \
+    rm -rf /root/.cargo /app/target /root/.rustup && \
+    pip uninstall -y maturin
 
 # Copy demo data
 COPY tests/fixtures/1crn.pdb /data/1crn.pdb
