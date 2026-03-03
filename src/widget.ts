@@ -1,6 +1,11 @@
 /**
  * anywidget entry point.
  * Bridges the Python widget model to the MoleculeRenderer core.
+ *
+ * Handles deferred initialization: Jupyter widget output areas may have
+ * zero dimensions when the render function is first called.  We use a
+ * ResizeObserver to wait until the container is laid out before creating
+ * the Three.js WebGL context.
  */
 
 import { MoleculeRenderer } from "./core/MoleculeRenderer";
@@ -32,13 +37,34 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   info.innerHTML = '<strong>megane</strong>';
   container.appendChild(info);
 
-  // Renderer
-  const renderer = new MoleculeRenderer();
-  renderer.mount(container);
-
+  let renderer: MoleculeRenderer | null = null;
   let currentSnapshot: Snapshot | null = null;
+  let disposed = false;
+
+  function initRenderer(): boolean {
+    if (renderer || disposed) return !!renderer;
+    if (container.clientWidth === 0 || container.clientHeight === 0) return false;
+    try {
+      renderer = new MoleculeRenderer();
+      renderer.mount(container);
+      loadSnapshot();
+      return true;
+    } catch (e) {
+      console.error("megane: failed to initialize renderer", e);
+      info.innerHTML = '<strong>megane</strong> &mdash; WebGL not available';
+      return false;
+    }
+  }
+
+  // Defer initialization until the container has real dimensions.
+  const ro = new ResizeObserver(() => {
+    if (!renderer && !disposed) initRenderer();
+  });
+  ro.observe(container);
+  initRenderer();
 
   function loadSnapshot() {
+    if (!renderer) return;
     const data = model.get("_snapshot_data") as DataView | null;
     if (!data || data.byteLength === 0) return;
 
@@ -53,6 +79,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   }
 
   function loadFrame() {
+    if (!renderer) return;
     const data = model.get("_frame_data") as DataView | null;
     if (!data || data.byteLength === 0 || !currentSnapshot) return;
 
@@ -65,16 +92,15 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     }
   }
 
-  // Load initial data
-  loadSnapshot();
-
   // React to model changes
-  model.on("change:_snapshot_data", loadSnapshot);
+  model.on("change:_snapshot_data", () => { if (renderer) loadSnapshot(); else initRenderer(); });
   model.on("change:_frame_data", loadFrame);
 
   // Cleanup
   return () => {
-    renderer.dispose();
+    disposed = true;
+    ro.disconnect();
+    renderer?.dispose();
   };
 }
 
