@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-import megane_parser
+from megane import megane_parser
 
 # Bond order encoding: matches frontend constants
 BOND_SINGLE = 1
