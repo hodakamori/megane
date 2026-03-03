@@ -9,8 +9,7 @@
  * RawShaderMaterial requires explicit uniform/attribute declarations.
  */
 
-export const atomVertexShader = /* glsl */ `#version 300 es
-  precision highp float;
+export const atomVertexShader = /* glsl */ `precision highp float;
 
   // Three.js built-in uniforms (must declare explicitly for RawShaderMaterial)
   uniform mat4 modelViewMatrix;
@@ -46,8 +45,7 @@ export const atomVertexShader = /* glsl */ `#version 300 es
   }
 `;
 
-export const atomFragmentShader = /* glsl */ `#version 300 es
-  precision highp float;
+export const atomFragmentShader = /* glsl */ `precision highp float;
 
   in vec3 vColor;
   in vec2 vUv;
@@ -103,8 +101,7 @@ export const atomFragmentShader = /* glsl */ `#version 300 es
   }
 `;
 
-export const bondVertexShader = /* glsl */ `#version 300 es
-  precision highp float;
+export const bondVertexShader = /* glsl */ `precision highp float;
 
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
@@ -146,8 +143,7 @@ export const bondVertexShader = /* glsl */ `#version 300 es
   }
 `;
 
-export const bondFragmentShader = /* glsl */ `#version 300 es
-  precision highp float;
+export const bondFragmentShader = /* glsl */ `precision highp float;
 
   in vec3 vColor;
   in vec2 vCylUv;
