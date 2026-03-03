@@ -3,9 +3,8 @@
  * Owns the Three.js scene, camera, renderer, and controls.
  * Imperative API - framework agnostic.
  *
- * Automatically selects rendering strategy based on atom count:
- *   <=5,000 atoms  -> InstancedMesh (sphere/cylinder geometry)
- *   >5,000 atoms   -> Billboard impostors (2-triangle quads + shader)
+ * Uses billboard impostor rendering (2-triangle quads + shader) for all
+ * atom counts. Scales to 1M+ atoms on mid-range GPUs.
  */
 
 import * as THREE from "three";
@@ -19,8 +18,6 @@ import type {
   SelectionState,
   Measurement,
 } from "./types";
-import { AtomMesh } from "./AtomMesh";
-import { BondMesh } from "./BondMesh";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
@@ -31,9 +28,6 @@ import {
   BALL_STICK_ATOM_SCALE,
   BOND_ORDER_NAMES,
 } from "./constants";
-
-/** Threshold above which we use impostor rendering. */
-const IMPOSTOR_THRESHOLD = 5_000;
 
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
@@ -139,15 +133,9 @@ export class MoleculeRenderer {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
-    // Pick rendering strategy based on atom count
-    const shouldUseImpostor = snapshot.nAtoms > IMPOSTOR_THRESHOLD;
-
-    // Rebuild renderers if strategy changed or first load
-    if (
-      this.atomRenderer === null ||
-      shouldUseImpostor !== this.useImpostor
-    ) {
-      this.swapRenderers(shouldUseImpostor);
+    // Always use impostor rendering for consistent behavior at any atom count
+    if (this.atomRenderer === null || !this.useImpostor) {
+      this.swapRenderers(true);
     }
 
     this.atomRenderer!.loadSnapshot(snapshot);
@@ -264,17 +252,10 @@ export class MoleculeRenderer {
 
     this.useImpostor = impostor;
 
-    if (impostor) {
-      const atoms = new ImpostorAtomMesh();
-      const bonds = new ImpostorBondMesh();
-      this.atomRenderer = atoms;
-      this.bondRenderer = bonds;
-    } else {
-      const atoms = new AtomMesh();
-      const bonds = new BondMesh();
-      this.atomRenderer = atoms;
-      this.bondRenderer = bonds;
-    }
+    const atoms = new ImpostorAtomMesh();
+    const bonds = new ImpostorBondMesh();
+    this.atomRenderer = atoms;
+    this.bondRenderer = bonds;
 
     this.scene.add(this.atomRenderer.mesh);
     this.scene.add(this.bondRenderer.mesh);
@@ -389,32 +370,10 @@ export class MoleculeRenderer {
   }
 
   private getBondInfoFromInstance(
-    instanceId: number,
+    _instanceId: number,
   ): { atomA: number; atomB: number; bondOrder: number; bondLength: number } | null {
-    if (!this.snapshot || !this.bondRenderer || this.useImpostor) return null;
-    const bondMesh = this.bondRenderer as BondMesh;
-    if (instanceId >= bondMesh.visualBonds.length) return null;
-
-    const vb = bondMesh.visualBonds[instanceId];
-    const pos = this.getCurrentPositions();
-    const dx = pos[vb.bi * 3] - pos[vb.ai * 3];
-    const dy = pos[vb.bi * 3 + 1] - pos[vb.ai * 3 + 1];
-    const dz = pos[vb.bi * 3 + 2] - pos[vb.ai * 3 + 2];
-    const bondLength = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-    let bondOrder = 1;
-    if (this.snapshot.bondOrders) {
-      const bonds = this.snapshot.bonds;
-      for (let i = 0; i < this.snapshot.nBonds; i++) {
-        const a = bonds[i * 2], b = bonds[i * 2 + 1];
-        if ((a === vb.ai && b === vb.bi) || (a === vb.bi && b === vb.ai)) {
-          bondOrder = this.snapshot.bondOrders[i];
-          break;
-        }
-      }
-    }
-
-    return { atomA: vb.ai, atomB: vb.bi, bondOrder, bondLength };
+    // Impostor rendering does not support instance-level raycasting
+    return null;
   }
 
   // ---- Selection & Measurement ----

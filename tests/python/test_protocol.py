@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from megane.parsers.pdb import load_pdb
+from megane.parsers.pdb import Structure, load_pdb
 from megane.protocol import (
     MAGIC,
     MSG_SNAPSHOT,
@@ -15,6 +15,74 @@ from megane.protocol import (
 )
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
+
+
+def _make_water_structure(n_molecules: int) -> Structure:
+    """Create a Structure with randomly placed water molecules.
+
+    Each water molecule: O + H1 + H2 (3 atoms, 2 bonds).
+    """
+    rng = np.random.RandomState(42)
+    n_atoms = n_molecules * 3
+    n_bonds = n_molecules * 2
+
+    # Water geometry
+    oh_length = 0.96
+    half_angle = np.radians(104.5 / 2)
+    h1_offset = np.array(
+        [oh_length * np.sin(half_angle), oh_length * np.cos(half_angle), 0.0],
+        dtype=np.float32,
+    )
+    h2_offset = np.array(
+        [-oh_length * np.sin(half_angle), oh_length * np.cos(half_angle), 0.0],
+        dtype=np.float32,
+    )
+
+    # Place molecules on a cubic grid with random offset
+    side = int(np.ceil(n_molecules ** (1.0 / 3.0)))
+    spacing = 3.5
+    positions = np.empty((n_atoms, 3), dtype=np.float32)
+    elements = np.empty(n_atoms, dtype=np.uint8)
+    bonds = np.empty((n_bonds, 2), dtype=np.uint32)
+    bond_orders = np.ones(n_bonds, dtype=np.uint8)
+
+    mol = 0
+    for iz in range(side):
+        for iy in range(side):
+            for ix in range(side):
+                if mol >= n_molecules:
+                    break
+                center = np.array(
+                    [ix * spacing, iy * spacing, iz * spacing], dtype=np.float32
+                )
+                center += rng.uniform(-0.5, 0.5, size=3).astype(np.float32)
+
+                base = mol * 3
+                positions[base] = center
+                positions[base + 1] = center + h1_offset
+                positions[base + 2] = center + h2_offset
+
+                elements[base] = 8  # O
+                elements[base + 1] = 1  # H
+                elements[base + 2] = 1  # H
+
+                bonds[mol * 2] = [base, base + 1]
+                bonds[mol * 2 + 1] = [base, base + 2]
+
+                mol += 1
+            if mol >= n_molecules:
+                break
+        if mol >= n_molecules:
+            break
+
+    return Structure(
+        n_atoms=n_atoms,
+        positions=positions,
+        elements=elements,
+        bonds=bonds,
+        bond_orders=bond_orders,
+        box=np.zeros((3, 3), dtype=np.float32),
+    )
 
 
 def test_encode_snapshot_header():
@@ -93,3 +161,57 @@ def test_encode_decode_roundtrip():
     if flags & HAS_BOX:
         box = np.frombuffer(data[offset : offset + 36], dtype=np.float32).reshape(3, 3)
         np.testing.assert_array_almost_equal(box, s.box, decimal=5)
+
+
+def test_encode_snapshot_100k_atoms():
+    """Test that 100k atoms can be encoded and decoded correctly."""
+    n_molecules = 33_334  # 100,002 atoms
+    s = _make_water_structure(n_molecules)
+    n_atoms_expected = n_molecules * 3
+    n_bonds_expected = n_molecules * 2
+
+    assert s.n_atoms == n_atoms_expected
+
+    data = encode_snapshot(s)
+
+    # Decode and verify
+    offset = 8  # skip header
+    n_atoms = struct.unpack("<I", data[offset : offset + 4])[0]
+    offset += 4
+    n_bonds = struct.unpack("<I", data[offset : offset + 4])[0]
+    offset += 4
+
+    assert n_atoms == n_atoms_expected
+    assert n_bonds == n_bonds_expected
+
+    # Positions roundtrip
+    positions = np.frombuffer(
+        data[offset : offset + n_atoms * 12], dtype=np.float32
+    ).reshape(n_atoms, 3)
+    offset += n_atoms * 12
+    np.testing.assert_array_almost_equal(positions, s.positions, decimal=5)
+
+    # Elements roundtrip
+    elements = np.frombuffer(data[offset : offset + n_atoms], dtype=np.uint8)
+    offset += n_atoms
+    offset += (4 - (offset % 4)) % 4
+    np.testing.assert_array_equal(elements, s.elements)
+
+    # Verify element distribution: 1/3 oxygen (8), 2/3 hydrogen (1)
+    unique, counts = np.unique(elements, return_counts=True)
+    elem_counts = dict(zip(unique, counts))
+    assert elem_counts[8] == n_molecules  # O
+    assert elem_counts[1] == n_molecules * 2  # H
+
+    # Bonds roundtrip
+    bonds = np.frombuffer(
+        data[offset : offset + n_bonds * 8], dtype=np.uint32
+    ).reshape(n_bonds, 2)
+    offset += n_bonds * 8
+    np.testing.assert_array_equal(bonds, s.bonds)
+
+    # Bond orders
+    flags = struct.unpack("<B", data[5:6])[0]
+    if flags & HAS_BOND_ORDERS:
+        bond_orders = np.frombuffer(data[offset : offset + n_bonds], dtype=np.uint8)
+        np.testing.assert_array_equal(bond_orders, np.ones(n_bonds, dtype=np.uint8))
