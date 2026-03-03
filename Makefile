@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-all clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -17,9 +17,20 @@ dev:
 install: build-frontend
 	pip install .
 
-# Run tests
+# Run Python tests
 test:
-	pytest
+	python -m pytest
+
+# Run widget Python tests only
+test-widget:
+	python -m pytest tests/python/test_widget.py -v
+
+# Run E2E browser test (requires playwright + chromium)
+test-e2e:
+	node tests/e2e/test_widget_render.mjs
+
+# Run all tests (Python + E2E)
+test-all: test test-e2e
 
 # Clean build artifacts
 clean:
