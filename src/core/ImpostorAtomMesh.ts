@@ -62,6 +62,7 @@ export class ImpostorAtomMesh {
 
     // Custom shader material with uniforms for scale and opacity
     this.material = new THREE.RawShaderMaterial({
+      glslVersion: THREE.GLSL3,
       vertexShader: atomVertexShader,
       fragmentShader: atomFragmentShader,
       uniforms: {
@@ -128,15 +129,25 @@ export class ImpostorAtomMesh {
   private grow(needed: number): void {
     this.capacity = Math.max(needed, this.capacity * 2);
 
-    this.centerBuf = new Float32Array(this.capacity * 3);
-    this.radiusBuf = new Float32Array(this.capacity);
-    this.colorBuf = new Float32Array(this.capacity * 3);
+    const newCenter = new Float32Array(this.capacity * 3);
+    const newRadius = new Float32Array(this.capacity);
+    const newColor = new Float32Array(this.capacity * 3);
+
+    newCenter.set(this.centerBuf);
+    newRadius.set(this.radiusBuf);
+    newColor.set(this.colorBuf);
+
+    this.centerBuf = newCenter;
+    this.radiusBuf = newRadius;
+    this.colorBuf = newColor;
 
     this.centerAttr = new THREE.InstancedBufferAttribute(this.centerBuf, 3);
     this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
     this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
 
     this.centerAttr.setUsage(THREE.DynamicDrawUsage);
+    this.radiusAttr.setUsage(THREE.StaticDrawUsage);
+    this.colorAttr.setUsage(THREE.StaticDrawUsage);
 
     this.geo.setAttribute("instanceCenter", this.centerAttr);
     this.geo.setAttribute("instanceRadius", this.radiusAttr);

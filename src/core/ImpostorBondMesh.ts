@@ -100,6 +100,7 @@ export class ImpostorBondMesh {
     this.geo.setAttribute("instanceDashed", this.dashedAttr);
 
     this.bondMaterial = new THREE.RawShaderMaterial({
+      glslVersion: THREE.GLSL3,
       vertexShader: bondVertexShader,
       fragmentShader: bondFragmentShader,
       uniforms: {
@@ -360,11 +361,23 @@ export class ImpostorBondMesh {
   private grow(needed: number): void {
     this.capacity = Math.max(needed, this.capacity * 2);
 
-    this.startBuf = new Float32Array(this.capacity * 3);
-    this.endBuf = new Float32Array(this.capacity * 3);
-    this.colorBuf = new Float32Array(this.capacity * 3);
-    this.radiusBuf = new Float32Array(this.capacity);
-    this.dashedBuf = new Float32Array(this.capacity);
+    const newStart = new Float32Array(this.capacity * 3);
+    const newEnd = new Float32Array(this.capacity * 3);
+    const newColor = new Float32Array(this.capacity * 3);
+    const newRadius = new Float32Array(this.capacity);
+    const newDashed = new Float32Array(this.capacity);
+
+    newStart.set(this.startBuf);
+    newEnd.set(this.endBuf);
+    newColor.set(this.colorBuf);
+    newRadius.set(this.radiusBuf);
+    newDashed.set(this.dashedBuf);
+
+    this.startBuf = newStart;
+    this.endBuf = newEnd;
+    this.colorBuf = newColor;
+    this.radiusBuf = newRadius;
+    this.dashedBuf = newDashed;
 
     this.startAttr = new THREE.InstancedBufferAttribute(this.startBuf, 3);
     this.endAttr = new THREE.InstancedBufferAttribute(this.endBuf, 3);
@@ -374,6 +387,9 @@ export class ImpostorBondMesh {
 
     this.startAttr.setUsage(THREE.DynamicDrawUsage);
     this.endAttr.setUsage(THREE.DynamicDrawUsage);
+    this.colorAttr.setUsage(THREE.StaticDrawUsage);
+    this.radiusAttr.setUsage(THREE.StaticDrawUsage);
+    this.dashedAttr.setUsage(THREE.StaticDrawUsage);
 
     this.geo.setAttribute("instanceStart", this.startAttr);
     this.geo.setAttribute("instanceEnd", this.endAttr);
