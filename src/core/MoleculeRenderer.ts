@@ -50,6 +50,8 @@ export class MoleculeRenderer {
   private snapshot: Snapshot | null = null;
   private lastExtent = 1;
   private currentPositions: Float32Array | null = null;
+  private atomScale = 1.0;
+  private atomOpacity = 1.0;
 
   // Raycasting
   private raycaster = new THREE.Raycaster();
@@ -149,6 +151,11 @@ export class MoleculeRenderer {
     this.atomRenderer!.loadSnapshot(snapshot);
     this.bondRenderer!.loadSnapshot(snapshot);
 
+    // Re-apply stored scale after loading snapshot data
+    if (this.atomScale !== 1.0 && this.atomRenderer!.setScale) {
+      this.atomRenderer!.setScale(this.atomScale, snapshot);
+    }
+
     // Update label overlay
     if (this.labelOverlay) {
       this.labelOverlay.setAtomData(snapshot.elements, snapshot.nAtoms);
@@ -189,6 +196,21 @@ export class MoleculeRenderer {
   /** Set per-atom labels for overlay display. */
   setLabels(labels: string[] | null): void {
     this.labelOverlay?.setLabels(labels);
+  }
+
+  /** Set atom radius scale multiplier. */
+  setAtomScale(scale: number): void {
+    this.atomScale = scale;
+    if (this.atomRenderer?.setScale && this.snapshot) {
+      this.atomRenderer.setScale(scale, this.snapshot);
+    }
+  }
+
+  /** Set atom and bond opacity. */
+  setAtomOpacity(opacity: number): void {
+    this.atomOpacity = opacity;
+    this.atomRenderer?.setOpacity?.(opacity);
+    this.bondRenderer?.setOpacity?.(opacity);
   }
 
   /** Toggle bond visibility. */
@@ -238,6 +260,12 @@ export class MoleculeRenderer {
 
     this.scene.add(this.atomRenderer.mesh);
     this.scene.add(this.bondRenderer.mesh);
+
+    // Re-apply stored appearance settings
+    if (this.atomOpacity !== 1.0) {
+      this.atomRenderer.setOpacity?.(this.atomOpacity);
+      this.bondRenderer.setOpacity?.(this.atomOpacity);
+    }
   }
 
   /** Fit camera to show all atoms. */

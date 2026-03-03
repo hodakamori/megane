@@ -280,6 +280,15 @@ export class BondMesh {
     this.mesh.setMatrixAt(instanceIdx, _matrix);
   }
 
+  /** Set global bond opacity. */
+  setOpacity(opacity: number): void {
+    const mat = this.mesh.material as THREE.MeshPhysicalMaterial;
+    mat.opacity = opacity;
+    mat.transparent = opacity < 1;
+    mat.depthWrite = opacity >= 1;
+    mat.needsUpdate = true;
+  }
+
   dispose(): void {
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();

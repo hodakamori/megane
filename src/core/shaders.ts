@@ -15,6 +15,7 @@ export const atomVertexShader = /* glsl */ `#version 300 es
   // Three.js built-in uniforms (must declare explicitly for RawShaderMaterial)
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
+  uniform float uScaleMultiplier;
 
   // Per-vertex (quad corners)
   in vec3 position;
@@ -32,13 +33,14 @@ export const atomVertexShader = /* glsl */ `#version 300 es
   void main() {
     vColor = instanceColor;
     vUv = position.xy;
-    vRadius = instanceRadius;
+    float scaledRadius = instanceRadius * uScaleMultiplier;
+    vRadius = scaledRadius;
 
     vec4 viewCenter = modelViewMatrix * vec4(instanceCenter, 1.0);
     vViewCenter = viewCenter.xyz;
 
     vec3 viewPos = viewCenter.xyz;
-    viewPos.xy += position.xy * instanceRadius;
+    viewPos.xy += position.xy * scaledRadius;
 
     gl_Position = projectionMatrix * vec4(viewPos, 1.0);
   }
@@ -53,6 +55,7 @@ export const atomFragmentShader = /* glsl */ `#version 300 es
   in vec3 vViewCenter;
 
   uniform mat4 projectionMatrix;
+  uniform float uOpacity;
 
   out vec4 fragColor;
 
@@ -96,7 +99,7 @@ export const atomFragmentShader = /* glsl */ `#version 300 es
     vec3 color = vColor * (ambient + diffuse) * edgeFactor
                + vec3(1.0) * spec * 0.3
                + vec3(0.15) * fresnel;
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(color, uOpacity);
   }
 `;
 
@@ -149,6 +152,8 @@ export const bondFragmentShader = /* glsl */ `#version 300 es
   in vec2 vCylUv;
   in float vDashed;
 
+  uniform float uOpacity;
+
   out vec4 fragColor;
 
   void main() {
@@ -185,6 +190,6 @@ export const bondFragmentShader = /* glsl */ `#version 300 es
     vec3 color = vColor * (ambient + diffuse)
                + vec3(1.0) * spec * 0.2
                + vec3(0.1) * fresnel;
-    fragColor = vec4(color, 1.0);
+    fragColor = vec4(color, uOpacity);
   }
 `;
