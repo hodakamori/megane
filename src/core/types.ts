@@ -57,6 +57,7 @@ export interface BondRenderer {
     nBonds: number,
   ): void;
   setOpacity?(opacity: number): void;
+  setScale?(scale: number, snapshot: Snapshot): void;
   dispose(): void;
 }
 

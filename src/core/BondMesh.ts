@@ -46,6 +46,7 @@ export interface VisualBond {
 export class BondMesh {
   readonly mesh: THREE.InstancedMesh;
   readonly visualBonds: VisualBond[] = [];
+  private scaleFactor = 1.0;
 
   constructor(maxInstances: number = 3_000_000) {
     const geometry = new THREE.CylinderGeometry(1, 1, 1, 6, 1);
@@ -274,7 +275,7 @@ export class BondMesh {
     _dir.normalize();
 
     _quat.setFromUnitVectors(_up, _dir);
-    _scale.set(radius, length, radius);
+    _scale.set(radius * this.scaleFactor, length, radius * this.scaleFactor);
     _matrix.compose(_mid, _quat, _scale);
 
     this.mesh.setMatrixAt(instanceIdx, _matrix);
@@ -287,6 +288,26 @@ export class BondMesh {
     mat.transparent = opacity < 1;
     mat.depthWrite = opacity >= 1;
     mat.needsUpdate = true;
+  }
+
+  /** Set bond radius scale multiplier. Iterates all instance matrices. */
+  setScale(scale: number): void {
+    this.scaleFactor = scale;
+    const _tmpMatrix = new THREE.Matrix4();
+    const _tmpPos = new THREE.Vector3();
+    const _tmpQuat = new THREE.Quaternion();
+    const _tmpScale = new THREE.Vector3();
+
+    for (let i = 0; i < this.visualBonds.length; i++) {
+      this.mesh.getMatrixAt(i, _tmpMatrix);
+      _tmpMatrix.decompose(_tmpPos, _tmpQuat, _tmpScale);
+      const newRadius = this.visualBonds[i].radius * scale;
+      _tmpScale.x = newRadius;
+      _tmpScale.z = newRadius;
+      _tmpMatrix.compose(_tmpPos, _tmpQuat, _tmpScale);
+      this.mesh.setMatrixAt(i, _tmpMatrix);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
   }
 
   dispose(): void {

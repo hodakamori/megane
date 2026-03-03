@@ -104,6 +104,7 @@ export class ImpostorBondMesh {
       fragmentShader: bondFragmentShader,
       uniforms: {
         uOpacity: { value: 1.0 },
+        uBondScaleMultiplier: { value: 1.0 },
       },
       depthWrite: true,
       depthTest: true,
@@ -387,6 +388,11 @@ export class ImpostorBondMesh {
     this.bondMaterial.transparent = opacity < 1;
     this.bondMaterial.depthWrite = opacity >= 1;
     this.bondMaterial.needsUpdate = true;
+  }
+
+  /** Set bond radius scale multiplier (O(1) via shader uniform). */
+  setScale(scale: number): void {
+    this.bondMaterial.uniforms.uBondScaleMultiplier.value = scale;
   }
 
   dispose(): void {
