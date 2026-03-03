@@ -18,6 +18,7 @@ import { atomVertexShader, atomFragmentShader } from "./shaders";
 export class ImpostorAtomMesh {
   readonly mesh: THREE.Mesh;
   private geo: THREE.InstancedBufferGeometry;
+  private material: THREE.RawShaderMaterial;
 
   private centerAttr: THREE.InstancedBufferAttribute;
   private radiusAttr: THREE.InstancedBufferAttribute;
@@ -59,15 +60,19 @@ export class ImpostorAtomMesh {
     this.geo.setAttribute("instanceRadius", this.radiusAttr);
     this.geo.setAttribute("instanceColor", this.colorAttr);
 
-    // Custom shader material
-    const material = new THREE.RawShaderMaterial({
+    // Custom shader material with uniforms for scale and opacity
+    this.material = new THREE.RawShaderMaterial({
       vertexShader: atomVertexShader,
       fragmentShader: atomFragmentShader,
+      uniforms: {
+        uScaleMultiplier: { value: 1.0 },
+        uOpacity: { value: 1.0 },
+      },
       depthWrite: true,
       depthTest: true,
     });
 
-    this.mesh = new THREE.Mesh(this.geo, material);
+    this.mesh = new THREE.Mesh(this.geo, this.material);
     this.mesh.frustumCulled = false;
   }
 
@@ -107,6 +112,19 @@ export class ImpostorAtomMesh {
     this.centerAttr.needsUpdate = true;
   }
 
+  /** Update atom radius scale (O(1) via shader uniform). */
+  setScale(_scale: number, _snapshot: Snapshot): void {
+    this.material.uniforms.uScaleMultiplier.value = _scale;
+  }
+
+  /** Set global atom opacity. */
+  setOpacity(opacity: number): void {
+    this.material.uniforms.uOpacity.value = opacity;
+    this.material.transparent = opacity < 1;
+    this.material.depthWrite = opacity >= 1;
+    this.material.needsUpdate = true;
+  }
+
   private grow(needed: number): void {
     this.capacity = Math.max(needed, this.capacity * 2);
 
@@ -127,6 +145,6 @@ export class ImpostorAtomMesh {
 
   dispose(): void {
     this.geo.dispose();
-    (this.mesh.material as THREE.Material).dispose();
+    this.material.dispose();
   }
 }

@@ -19,18 +19,21 @@ const SPHERE_SEGMENTS = 32;
 
 export class AtomMesh {
   readonly mesh: THREE.InstancedMesh;
+  private material: THREE.MeshPhysicalMaterial;
   private nAtoms = 0;
+  private elements: Uint8Array | null = null;
+  private scaleFactor = 1.0;
 
   constructor(maxAtoms: number = 5_000) {
     const geometry = new THREE.SphereGeometry(1, SPHERE_SEGMENTS, SPHERE_SEGMENTS);
-    const material = new THREE.MeshPhysicalMaterial({
+    this.material = new THREE.MeshPhysicalMaterial({
       roughness: 0.35,
       metalness: 0.05,
       clearcoat: 0.1,
       envMapIntensity: 0.4,
     });
 
-    this.mesh = new THREE.InstancedMesh(geometry, material, maxAtoms);
+    this.mesh = new THREE.InstancedMesh(geometry, this.material, maxAtoms);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
   }
@@ -39,13 +42,14 @@ export class AtomMesh {
   loadSnapshot(snapshot: Snapshot): void {
     const { nAtoms, positions, elements } = snapshot;
     this.nAtoms = nAtoms;
+    this.elements = elements;
     this.mesh.count = nAtoms;
 
     for (let i = 0; i < nAtoms; i++) {
       const x = positions[i * 3];
       const y = positions[i * 3 + 1];
       const z = positions[i * 3 + 2];
-      const r = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
+      const r = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE * this.scaleFactor;
 
       _matrix.makeScale(r, r, r);
       _matrix.setPosition(x, y, z);
@@ -81,8 +85,31 @@ export class AtomMesh {
     this.mesh.instanceMatrix.needsUpdate = true;
   }
 
+  /** Update atom radius scale factor. */
+  setScale(scale: number, snapshot: Snapshot): void {
+    this.scaleFactor = scale;
+    const { nAtoms, elements } = snapshot;
+    for (let i = 0; i < nAtoms; i++) {
+      this.mesh.getMatrixAt(i, _tmpMatrix);
+      _tmpMatrix.decompose(_pos, _quat, _scale);
+      const r = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE * scale;
+      _matrix.makeScale(r, r, r);
+      _matrix.setPosition(_pos.x, _pos.y, _pos.z);
+      this.mesh.setMatrixAt(i, _matrix);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Set global atom opacity. */
+  setOpacity(opacity: number): void {
+    this.material.opacity = opacity;
+    this.material.transparent = opacity < 1;
+    this.material.depthWrite = opacity >= 1;
+    this.material.needsUpdate = true;
+  }
+
   dispose(): void {
     this.mesh.geometry.dispose();
-    (this.mesh.material as THREE.Material).dispose();
+    this.material.dispose();
   }
 }

@@ -42,6 +42,8 @@ export interface AtomRenderer {
   readonly mesh: THREE.Object3D;
   loadSnapshot(snapshot: Snapshot): void;
   updatePositions(positions: Float32Array): void;
+  setScale?(scale: number, snapshot: Snapshot): void;
+  setOpacity?(opacity: number): void;
   dispose(): void;
 }
 
@@ -54,6 +56,7 @@ export interface BondRenderer {
     bonds: Uint32Array,
     nBonds: number,
   ): void;
+  setOpacity?(opacity: number): void;
   dispose(): void;
 }
 

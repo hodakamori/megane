@@ -43,6 +43,7 @@ interface VisualBondInfo {
 export class ImpostorBondMesh {
   readonly mesh: THREE.Mesh;
   private geo: THREE.InstancedBufferGeometry;
+  private bondMaterial: THREE.RawShaderMaterial;
 
   private startAttr: THREE.InstancedBufferAttribute;
   private endAttr: THREE.InstancedBufferAttribute;
@@ -98,14 +99,17 @@ export class ImpostorBondMesh {
     this.geo.setAttribute("instanceRadius", this.radiusAttr);
     this.geo.setAttribute("instanceDashed", this.dashedAttr);
 
-    const material = new THREE.RawShaderMaterial({
+    this.bondMaterial = new THREE.RawShaderMaterial({
       vertexShader: bondVertexShader,
       fragmentShader: bondFragmentShader,
+      uniforms: {
+        uOpacity: { value: 1.0 },
+      },
       depthWrite: true,
       depthTest: true,
     });
 
-    this.mesh = new THREE.Mesh(this.geo, material);
+    this.mesh = new THREE.Mesh(this.geo, this.bondMaterial);
     this.mesh.frustumCulled = false;
   }
 
@@ -377,8 +381,16 @@ export class ImpostorBondMesh {
     this.geo.setAttribute("instanceDashed", this.dashedAttr);
   }
 
+  /** Set global bond opacity. */
+  setOpacity(opacity: number): void {
+    this.bondMaterial.uniforms.uOpacity.value = opacity;
+    this.bondMaterial.transparent = opacity < 1;
+    this.bondMaterial.depthWrite = opacity >= 1;
+    this.bondMaterial.needsUpdate = true;
+  }
+
   dispose(): void {
     this.geo.dispose();
-    (this.mesh.material as THREE.Material).dispose();
+    this.bondMaterial.dispose();
   }
 }

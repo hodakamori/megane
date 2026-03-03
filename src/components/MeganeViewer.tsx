@@ -1,12 +1,14 @@
 /**
  * Main megane viewer React component.
- * Combines Viewport, Sidebar, Timeline, Tooltip, and MeasurementPanel.
+ * Combines Viewport, Sidebar, Timeline, Tooltip, MeasurementPanel, and AppearancePanel.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Sidebar } from "./Sidebar";
-import type { BondConfig, TrajectoryConfig, LabelConfig } from "./Sidebar";
+import type { BondConfig, TrajectoryConfig } from "./Sidebar";
+import { AppearancePanel } from "./AppearancePanel";
+import type { LabelConfig } from "./AppearancePanel";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
@@ -69,6 +71,9 @@ export function MeganeViewer({
   const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [atomScale, setAtomScale] = useState(1.0);
+  const [atomOpacity, setAtomOpacity] = useState(1.0);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -109,6 +114,20 @@ export function MeganeViewer({
     setSidebarCollapsed((prev) => !prev);
   }, []);
 
+  const handleToggleRightPanel = useCallback(() => {
+    setRightPanelCollapsed((prev) => !prev);
+  }, []);
+
+  const handleAtomScaleChange = useCallback((scale: number) => {
+    setAtomScale(scale);
+    rendererRef.current?.setAtomScale(scale);
+  }, []);
+
+  const handleAtomOpacityChange = useCallback((opacity: number) => {
+    setAtomOpacity(opacity);
+    rendererRef.current?.setAtomOpacity(opacity);
+  }, []);
+
   // Toggle bond visibility when bondSource changes to/from "none"
   useEffect(() => {
     rendererRef.current?.setBondsVisible(bonds.source !== "none");
@@ -138,7 +157,6 @@ export function MeganeViewer({
         }}
         bonds={bonds}
         trajectory={trajectory}
-        labels={labels}
         onUploadStructure={onUploadStructure}
         onResetView={handleResetView}
         hasCell={hasCell}
@@ -146,6 +164,15 @@ export function MeganeViewer({
         onToggleCell={handleToggleCell}
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
+      />
+      <AppearancePanel
+        atomScale={atomScale}
+        onAtomScaleChange={handleAtomScaleChange}
+        atomOpacity={atomOpacity}
+        onAtomOpacityChange={handleAtomOpacityChange}
+        labels={labels}
+        collapsed={rightPanelCollapsed}
+        onToggleCollapse={handleToggleRightPanel}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

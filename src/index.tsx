@@ -8,7 +8,8 @@
 import { StrictMode, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
-import type { BondConfig, TrajectoryConfig, LabelConfig } from "./components/Sidebar";
+import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
+import type { LabelConfig } from "./components/AppearancePanel";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "./assets/1crn.pdb?raw";
