@@ -74,6 +74,8 @@ export function MeganeViewer({
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [atomScale, setAtomScale] = useState(1.0);
   const [atomOpacity, setAtomOpacity] = useState(1.0);
+  const [bondScale, setBondScale] = useState(1.0);
+  const [bondOpacity, setBondOpacity] = useState(1.0);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -128,6 +130,16 @@ export function MeganeViewer({
     rendererRef.current?.setAtomOpacity(opacity);
   }, []);
 
+  const handleBondScaleChange = useCallback((scale: number) => {
+    setBondScale(scale);
+    rendererRef.current?.setBondScale(scale);
+  }, []);
+
+  const handleBondOpacityChange = useCallback((opacity: number) => {
+    setBondOpacity(opacity);
+    rendererRef.current?.setBondOpacity(opacity);
+  }, []);
+
   // Toggle bond visibility when bondSource changes to/from "none"
   useEffect(() => {
     rendererRef.current?.setBondsVisible(bonds.source !== "none");
@@ -170,6 +182,10 @@ export function MeganeViewer({
         onAtomScaleChange={handleAtomScaleChange}
         atomOpacity={atomOpacity}
         onAtomOpacityChange={handleAtomOpacityChange}
+        bondScale={bondScale}
+        onBondScaleChange={handleBondScaleChange}
+        bondOpacity={bondOpacity}
+        onBondOpacityChange={handleBondOpacityChange}
         labels={labels}
         collapsed={rightPanelCollapsed}
         onToggleCollapse={handleToggleRightPanel}

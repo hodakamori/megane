@@ -52,6 +52,8 @@ export class MoleculeRenderer {
   private currentPositions: Float32Array | null = null;
   private atomScale = 1.0;
   private atomOpacity = 1.0;
+  private bondScale = 1.0;
+  private bondOpacity = 1.0;
 
   // Raycasting
   private raycaster = new THREE.Raycaster();
@@ -155,6 +157,9 @@ export class MoleculeRenderer {
     if (this.atomScale !== 1.0 && this.atomRenderer!.setScale) {
       this.atomRenderer!.setScale(this.atomScale, snapshot);
     }
+    if (this.bondScale !== 1.0 && this.bondRenderer!.setScale) {
+      this.bondRenderer!.setScale(this.bondScale, snapshot);
+    }
 
     // Update label overlay
     if (this.labelOverlay) {
@@ -206,10 +211,23 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Set atom and bond opacity. */
+  /** Set atom opacity (independent of bonds). */
   setAtomOpacity(opacity: number): void {
     this.atomOpacity = opacity;
     this.atomRenderer?.setOpacity?.(opacity);
+  }
+
+  /** Set bond radius scale multiplier. */
+  setBondScale(scale: number): void {
+    this.bondScale = scale;
+    if (this.bondRenderer?.setScale && this.snapshot) {
+      this.bondRenderer.setScale(scale, this.snapshot);
+    }
+  }
+
+  /** Set bond opacity (independent of atoms). */
+  setBondOpacity(opacity: number): void {
+    this.bondOpacity = opacity;
     this.bondRenderer?.setOpacity?.(opacity);
   }
 
@@ -264,7 +282,9 @@ export class MoleculeRenderer {
     // Re-apply stored appearance settings
     if (this.atomOpacity !== 1.0) {
       this.atomRenderer.setOpacity?.(this.atomOpacity);
-      this.bondRenderer.setOpacity?.(this.atomOpacity);
+    }
+    if (this.bondOpacity !== 1.0) {
+      this.bondRenderer.setOpacity?.(this.bondOpacity);
     }
   }
 

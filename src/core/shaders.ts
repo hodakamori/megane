@@ -108,6 +108,7 @@ export const bondVertexShader = /* glsl */ `#version 300 es
 
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
+  uniform float uBondScaleMultiplier;
 
   in vec3 position;
   in vec2 uv;
@@ -139,7 +140,7 @@ export const bondVertexShader = /* glsl */ `#version 300 es
 
     vec3 viewPos = viewMid
       + dir * (position.y * len * 0.5)
-      + side * (position.x * instanceRadius);
+      + side * (position.x * instanceRadius * uBondScaleMultiplier);
 
     gl_Position = projectionMatrix * vec4(viewPos, 1.0);
   }

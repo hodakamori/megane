@@ -1,6 +1,6 @@
 /**
- * Right-side collapsible panel for atom appearance controls.
- * Contains: Radius scale slider, Opacity slider, Labels section.
+ * Right-side collapsible panel for atom/bond appearance controls.
+ * Contains: Atom Radius, Atom Opacity, Bond Thickness, Bond Opacity, Labels.
  */
 
 import type { LabelSource } from "../core/types";
@@ -25,6 +25,10 @@ interface AppearancePanelProps {
   onAtomScaleChange: (scale: number) => void;
   atomOpacity: number;
   onAtomOpacityChange: (opacity: number) => void;
+  bondScale: number;
+  onBondScaleChange: (scale: number) => void;
+  bondOpacity: number;
+  onBondOpacityChange: (opacity: number) => void;
   labels: LabelConfig;
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -56,6 +60,10 @@ export function AppearancePanel({
   onAtomScaleChange,
   atomOpacity,
   onAtomOpacityChange,
+  bondScale,
+  onBondScaleChange,
+  bondOpacity,
+  onBondOpacityChange,
   labels,
   collapsed,
   onToggleCollapse,
@@ -168,9 +176,9 @@ export function AppearancePanel({
           gap: 14,
         }}
       >
-        {/* Radius Section */}
+        {/* Atom Radius Section */}
         <div>
-          <div style={sectionLabelStyle}>Radius</div>
+          <div style={sectionLabelStyle}>Atom Radius</div>
           <div
             style={{
               display: "flex",
@@ -193,9 +201,9 @@ export function AppearancePanel({
           </div>
         </div>
 
-        {/* Opacity Section */}
+        {/* Atom Opacity Section */}
         <div>
-          <div style={sectionLabelStyle}>Opacity</div>
+          <div style={sectionLabelStyle}>Atom Opacity</div>
           <div
             style={{
               display: "flex",
@@ -214,6 +222,56 @@ export function AppearancePanel({
             />
             <span style={valueDisplayStyle}>
               {Math.round(atomOpacity * 100)}%
+            </span>
+          </div>
+        </div>
+
+        {/* Bond Thickness Section */}
+        <div>
+          <div style={sectionLabelStyle}>Bond Thickness</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <input
+              type="range"
+              min="0.1"
+              max="3.0"
+              step="0.01"
+              value={bondScale}
+              onChange={(e) => onBondScaleChange(parseFloat(e.target.value))}
+              style={sliderTrackStyle}
+            />
+            <span style={valueDisplayStyle}>
+              {bondScale.toFixed(2)}
+            </span>
+          </div>
+        </div>
+
+        {/* Bond Opacity Section */}
+        <div>
+          <div style={sectionLabelStyle}>Bond Opacity</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={bondOpacity}
+              onChange={(e) => onBondOpacityChange(parseFloat(e.target.value))}
+              style={sliderTrackStyle}
+            />
+            <span style={valueDisplayStyle}>
+              {Math.round(bondOpacity * 100)}%
             </span>
           </div>
         </div>
