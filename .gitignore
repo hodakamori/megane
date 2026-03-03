@@ -10,3 +10,5 @@ tests/fixtures/.*.npz
 *.ppm
 target/
 wasm/pkg/
+*.so
+.ipynb_checkpoints/
