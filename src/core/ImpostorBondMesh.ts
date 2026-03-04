@@ -139,26 +139,30 @@ export class ImpostorBondMesh {
     const { nAtoms, nBonds, positions, elements, bonds, bondOrders } = snapshot;
     this.nAtoms = nAtoms;
 
-    // (Re-)create position texture sized to nAtoms
-    this.positionTexWidth = Math.min(nAtoms, TEX_MAX_WIDTH);
-    this.positionTexHeight = Math.max(1, Math.ceil(nAtoms / this.positionTexWidth));
-    this.positionTexData = new Float32Array(this.positionTexWidth * this.positionTexHeight * 4);
-    this.copyPositionsToTexData(positions);
+    // Update position texture — only recreate if size changed
+    const texWidth = Math.min(nAtoms, TEX_MAX_WIDTH);
+    const texHeight = Math.max(1, Math.ceil(nAtoms / texWidth));
 
-    this.positionTex.dispose();
-    this.positionTex = new THREE.DataTexture(
-      this.positionTexData,
-      this.positionTexWidth,
-      this.positionTexHeight,
-      THREE.RGBAFormat,
-      THREE.FloatType,
-    );
-    this.positionTex.minFilter = THREE.NearestFilter;
-    this.positionTex.magFilter = THREE.NearestFilter;
-    this.positionTex.generateMipmaps = false;
+    if (this.positionTexWidth !== texWidth || this.positionTexHeight !== texHeight) {
+      this.positionTexWidth = texWidth;
+      this.positionTexHeight = texHeight;
+      this.positionTexData = new Float32Array(texWidth * texHeight * 4);
+      this.positionTex.dispose();
+      this.positionTex = new THREE.DataTexture(
+        this.positionTexData,
+        texWidth,
+        texHeight,
+        THREE.RGBAFormat,
+        THREE.FloatType,
+      );
+      this.positionTex.minFilter = THREE.NearestFilter;
+      this.positionTex.magFilter = THREE.NearestFilter;
+      this.positionTex.generateMipmaps = false;
+      this.bondMaterial.uniforms.uPositionTex.value = this.positionTex;
+      this.bondMaterial.uniforms.uPositionTexWidth.value = texWidth;
+    }
+    this.copyPositionsToTexData(positions);
     this.positionTex.needsUpdate = true;
-    this.bondMaterial.uniforms.uPositionTex.value = this.positionTex;
-    this.bondMaterial.uniforms.uPositionTexWidth.value = this.positionTexWidth;
 
     // Count total visual instances
     let totalInstances = 0;
@@ -220,13 +224,24 @@ export class ImpostorBondMesh {
       }
     }
 
-    this.atomAAttr.needsUpdate = true;
-    this.atomBAttr.needsUpdate = true;
-    this.offsetXAttr.needsUpdate = true;
-    this.offsetYAttr.needsUpdate = true;
-    this.colorAttr.needsUpdate = true;
-    this.radiusAttr.needsUpdate = true;
-    this.dashedAttr.needsUpdate = true;
+    // Re-create attribute objects and re-register on geometry to guarantee
+    // GPU upload. This is the same pattern used by grow() and ensures
+    // Three.js creates fresh GL buffers with the latest data.
+    this.atomAAttr = new THREE.InstancedBufferAttribute(this.atomABuf, 1);
+    this.atomBAttr = new THREE.InstancedBufferAttribute(this.atomBBuf, 1);
+    this.offsetXAttr = new THREE.InstancedBufferAttribute(this.offsetXBuf, 1);
+    this.offsetYAttr = new THREE.InstancedBufferAttribute(this.offsetYBuf, 1);
+    this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
+    this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
+    this.dashedAttr = new THREE.InstancedBufferAttribute(this.dashedBuf, 1);
+
+    this.geo.setAttribute("instanceAtomA", this.atomAAttr);
+    this.geo.setAttribute("instanceAtomB", this.atomBAttr);
+    this.geo.setAttribute("instanceOffsetX", this.offsetXAttr);
+    this.geo.setAttribute("instanceOffsetY", this.offsetYAttr);
+    this.geo.setAttribute("instanceColor", this.colorAttr);
+    this.geo.setAttribute("instanceRadius", this.radiusAttr);
+    this.geo.setAttribute("instanceDashed", this.dashedAttr);
     this.geo.instanceCount = idx;
   }
 
