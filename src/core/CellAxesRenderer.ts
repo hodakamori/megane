@@ -89,7 +89,10 @@ export class CellAxesRenderer {
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+    }
 
     ctx.clearRect(0, 0, size, size);
 
