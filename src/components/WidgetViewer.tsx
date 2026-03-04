@@ -53,7 +53,9 @@ export function WidgetViewer({
   const [fps, setFps] = useState(30);
   const [bondSource, setBondSource] = useState<BondSource>("structure");
   const [bondCount, setBondCount] = useState(0);
+  const [vdwScale, setVdwScale] = useState(0.6);
   const bondSourceRef = useRef<BondSource>("structure");
+  const vdwScaleRef = useRef(0.6);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -82,7 +84,7 @@ export function WidgetViewer({
       } else if (source === "distance") {
         // Compute distance bonds from current positions
         const positions = frame?.positions ?? snapshot.positions;
-        const bonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms);
+        const bonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms, vdwScaleRef.current);
         renderer.updateBonds(bonds, null);
         setBondCount(bonds.length / 2);
       }
@@ -104,7 +106,7 @@ export function WidgetViewer({
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const bonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms);
+    const bonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms, vdwScaleRef.current);
     renderer.updateBonds(bonds, null);
     setBondCount(bonds.length / 2);
   }, [frame, snapshot]);
@@ -151,6 +153,18 @@ export function WidgetViewer({
     setBondOpacity(opacity);
     rendererRef.current?.setBondOpacity(opacity);
   }, []);
+
+  const handleVdwScaleChange = useCallback((scale: number) => {
+    setVdwScale(scale);
+    vdwScaleRef.current = scale;
+    if (bondSourceRef.current !== "distance") return;
+    const renderer = rendererRef.current;
+    if (!renderer || !snapshot) return;
+    const positions = frame?.positions ?? snapshot.positions;
+    const bonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms, scale);
+    renderer.updateBonds(bonds, null);
+    setBondCount(bonds.length / 2);
+  }, [snapshot, frame]);
 
   const handleToggleCellAxes = useCallback(() => {
     setCellAxesVisible((prev) => {
@@ -326,6 +340,8 @@ export function WidgetViewer({
         onBondScaleChange={handleBondScaleChange}
         bondOpacity={bondOpacity}
         onBondOpacityChange={handleBondOpacityChange}
+        vdwScale={vdwScale}
+        onVdwScaleChange={handleVdwScaleChange}
         labels={labelConfig}
         hasCell={hasCell}
         cellAxesVisible={cellAxesVisible}
