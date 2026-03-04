@@ -289,7 +289,6 @@ export function Sidebar({
             disabledOptions={
               new Set<TrajectorySource>([
                 ...(!trajectory.hasStructureFrames ? ["structure" as TrajectorySource] : []),
-                ...(!trajectory.hasFileFrames ? ["file" as TrajectorySource] : []),
               ])
             }
           />

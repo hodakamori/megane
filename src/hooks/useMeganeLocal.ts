@@ -139,9 +139,10 @@ export function useMeganeLocal(): MeganeLocalState {
       setHasStructureFrames(result.frames.length > 0);
       setHasFileFrames(false);
 
-      currentTrajSourceRef.current = "structure";
+      const initialTrajSource = result.frames.length > 0 ? "structure" : "file";
+      currentTrajSourceRef.current = initialTrajSource;
       setBondSourceState("structure");
-      setTrajectorySourceState("structure");
+      setTrajectorySourceState(initialTrajSource);
 
       setSnapshot(result.snapshot);
       setMeta(result.meta);
