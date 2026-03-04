@@ -21,6 +21,7 @@ import type {
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
+import { CellAxesRenderer } from "./CellAxesRenderer";
 import { LabelOverlay } from "./LabelOverlay";
 import {
   getElementSymbol,
@@ -38,6 +39,7 @@ export class MoleculeRenderer {
   private atomRenderer: AtomRenderer | null = null;
   private bondRenderer: BondRenderer | null = null;
   private cellRenderer: CellRenderer | null = null;
+  private cellAxesRenderer: CellAxesRenderer | null = null;
   private labelOverlay: LabelOverlay | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
@@ -166,6 +168,12 @@ export class MoleculeRenderer {
         }
         this.cellRenderer.loadBox(snapshot.box);
       }
+      if (hasNonZero) {
+        if (!this.cellAxesRenderer) {
+          this.cellAxesRenderer = new CellAxesRenderer();
+        }
+        this.cellAxesRenderer.loadBox(snapshot.box);
+      }
     }
 
     this.fitToView(snapshot);
@@ -237,6 +245,18 @@ export class MoleculeRenderer {
   /** Check if cell data exists. */
   hasCell(): boolean {
     return this.cellRenderer !== null && this.cellRenderer.mesh.visible;
+  }
+
+  /** Toggle cell axes indicator visibility. */
+  setCellAxesVisible(visible: boolean): void {
+    if (this.cellAxesRenderer) {
+      this.cellAxesRenderer.setVisible(visible);
+    }
+  }
+
+  /** Check if cell axes data exists. */
+  hasCellAxes(): boolean {
+    return this.cellAxesRenderer !== null;
   }
 
   /** Swap between InstancedMesh and Impostor renderers. */
@@ -528,6 +548,17 @@ export class MoleculeRenderer {
 
     this.renderer.render(this.scene, this.camera);
 
+    // Render cell axes inset (after main scene, before label overlay)
+    if (this.cellAxesRenderer && this.container) {
+      this.cellAxesRenderer.render(
+        this.renderer,
+        this.camera,
+        this.container.clientWidth,
+        this.container.clientHeight,
+        Math.min(window.devicePixelRatio, 2),
+      );
+    }
+
     if (this.labelOverlay && this.container) {
       this.labelOverlay.render(
         this.camera,
@@ -546,6 +577,7 @@ export class MoleculeRenderer {
     if (this.atomRenderer) this.atomRenderer.dispose();
     if (this.bondRenderer) this.bondRenderer.dispose();
     if (this.cellRenderer) this.cellRenderer.dispose();
+    if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     this.controls.dispose();
     this.renderer.dispose();

@@ -7,6 +7,7 @@ import type { LabelSource } from "../core/types";
 import {
   sectionLabelStyle,
   smallBtnStyle,
+  activeBtnStyle,
   fileNameStyle,
   TabSelector,
   DropZone,
@@ -30,6 +31,9 @@ interface AppearancePanelProps {
   bondOpacity: number;
   onBondOpacityChange: (opacity: number) => void;
   labels: LabelConfig;
+  hasCell?: boolean;
+  cellAxesVisible?: boolean;
+  onToggleCellAxes?: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -65,6 +69,9 @@ export function AppearancePanel({
   bondOpacity,
   onBondOpacityChange,
   labels,
+  hasCell,
+  cellAxesVisible,
+  onToggleCellAxes,
   collapsed,
   onToggleCollapse,
 }: AppearancePanelProps) {
@@ -306,6 +313,22 @@ export function AppearancePanel({
             </DropZone>
           )}
         </div>
+
+        {/* Cell Axes Indicator */}
+        {hasCell && onToggleCellAxes && (
+          <div>
+            <div style={sectionLabelStyle}>Display</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={onToggleCellAxes}
+                style={cellAxesVisible ? activeBtnStyle : smallBtnStyle}
+                title="Toggle cell axes indicator"
+              >
+                Cell Axes
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
