@@ -335,7 +335,7 @@ export class ImpostorBondMesh {
   }
 
   /** Set bond radius scale multiplier (O(1) via shader uniform). */
-  setScale(scale: number): void {
+  setScale(scale: number, _snapshot?: Snapshot): void {
     this.bondMaterial.uniforms.uBondScaleMultiplier.value = scale;
   }
 
