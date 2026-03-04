@@ -30,6 +30,9 @@ import {
   BOND_ORDER_NAMES,
 } from "./constants";
 
+// Temporary vector for screen-space projection (avoids allocation per atom)
+const _projVec = new THREE.Vector4();
+
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
   private renderer!: THREE.WebGLRenderer;
@@ -51,9 +54,7 @@ export class MoleculeRenderer {
   private bondScale = 1.0;
   private bondOpacity = 1.0;
 
-  // Raycasting
-  private raycaster = new THREE.Raycaster();
-  private mouse = new THREE.Vector2();
+  // (screen-space picking replaces Three.js raycasting)
 
   // Atom selection & measurement
   private selectedAtoms: number[] = [];
@@ -379,52 +380,124 @@ export class MoleculeRenderer {
 
   // ---- Raycasting ----
 
-  /** Perform a raycast at the given screen coordinates. */
+  /** Project a 3D point to screen coordinates. Returns {sx, sy, depth} in pixels. */
+  private projectToScreen(
+    x: number, y: number, z: number,
+    w: number, h: number,
+  ): { sx: number; sy: number; depth: number } {
+    _projVec.set(x, y, z, 1);
+    _projVec.applyMatrix4(this.camera.matrixWorldInverse);
+    const depth = -_projVec.z; // camera-space depth (positive = in front)
+    _projVec.applyMatrix4(this.camera.projectionMatrix);
+    // NDC to pixels
+    const sx = ((_projVec.x / _projVec.w) * 0.5 + 0.5) * w;
+    const sy = ((-_projVec.y / _projVec.w) * 0.5 + 0.5) * h;
+    return { sx, sy, depth };
+  }
+
+  /** Estimate the screen-space radius (in pixels) of a sphere at the given depth. */
+  private screenRadius(worldRadius: number, depth: number, h: number): number {
+    const fovRad = (this.camera.fov * Math.PI) / 180;
+    // pixels per world-unit at the given depth
+    const pxPerUnit = h / (2 * depth * Math.tan(fovRad / 2));
+    return worldRadius * pxPerUnit;
+  }
+
+  /** Perform a pick at the given screen coordinates using CPU screen-space projection. */
   raycastAtPixel(clientX: number, clientY: number): HoverInfo {
     if (!this.container || !this.snapshot) return null;
 
     const rect = this.container.getBoundingClientRect();
-    this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const mx = clientX - rect.left; // mouse in pixels relative to container
+    const my = clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
 
-    // Try atoms first
-    if (this.atomRenderer && !this.useImpostor) {
-      const hits = this.raycaster.intersectObject(this.atomRenderer.mesh, false);
-      if (hits.length > 0 && hits[0].instanceId !== undefined) {
-        const idx = hits[0].instanceId;
-        const pos = this.getCurrentPositions();
-        const atomicNum = this.snapshot.elements[idx];
-        return {
-          kind: "atom",
-          atomIndex: idx,
-          elementSymbol: getElementSymbol(atomicNum),
-          atomicNumber: atomicNum,
-          position: [pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2]],
-          screenX: clientX,
-          screenY: clientY,
-        };
+    const pos = this.getCurrentPositions();
+    const elements = this.snapshot.elements;
+    const nAtoms = this.snapshot.nAtoms;
+
+    // --- Atom picking ---
+    let bestAtomIdx = -1;
+    let bestAtomDepth = Infinity;
+
+    for (let i = 0; i < nAtoms; i++) {
+      const { sx, sy, depth } = this.projectToScreen(
+        pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], w, h,
+      );
+      if (depth <= 0) continue; // behind camera
+
+      const worldR = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE * this.atomScale;
+      const screenR = this.screenRadius(worldR, depth, h);
+      const dx = mx - sx;
+      const dy = my - sy;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq <= screenR * screenR && depth < bestAtomDepth) {
+        bestAtomIdx = i;
+        bestAtomDepth = depth;
       }
     }
 
-    // Try bonds
-    if (this.bondRenderer && !this.useImpostor) {
-      const hits = this.raycaster.intersectObject(this.bondRenderer.mesh, false);
-      if (hits.length > 0 && hits[0].instanceId !== undefined) {
-        const info = this.getBondInfoFromInstance(hits[0].instanceId);
-        if (info) {
-          return { kind: "bond", ...info, screenX: clientX, screenY: clientY };
-        }
+    if (bestAtomIdx >= 0) {
+      const idx = bestAtomIdx;
+      const atomicNum = elements[idx];
+      return {
+        kind: "atom",
+        atomIndex: idx,
+        elementSymbol: getElementSymbol(atomicNum),
+        atomicNumber: atomicNum,
+        position: [pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2]],
+        screenX: clientX,
+        screenY: clientY,
+      };
+    }
+
+    // --- Bond picking ---
+    const BOND_PICK_THRESHOLD_PX = 8;
+    const bonds = this.snapshot.bonds;
+    const nBonds = this.snapshot.nBonds;
+    const bondOrders = this.snapshot.bondOrders;
+    let bestBondIdx = -1;
+    let bestBondDepth = Infinity;
+
+    for (let b = 0; b < nBonds; b++) {
+      const ai = bonds[b * 2];
+      const bi = bonds[b * 2 + 1];
+      // midpoint
+      const midX = (pos[ai * 3] + pos[bi * 3]) * 0.5;
+      const midY = (pos[ai * 3 + 1] + pos[bi * 3 + 1]) * 0.5;
+      const midZ = (pos[ai * 3 + 2] + pos[bi * 3 + 2]) * 0.5;
+      const { sx, sy, depth } = this.projectToScreen(midX, midY, midZ, w, h);
+      if (depth <= 0) continue;
+      const dx = mx - sx;
+      const dy = my - sy;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= BOND_PICK_THRESHOLD_PX * BOND_PICK_THRESHOLD_PX && depth < bestBondDepth) {
+        bestBondIdx = b;
+        bestBondDepth = depth;
       }
     }
 
-    return null;
-  }
+    if (bestBondIdx >= 0) {
+      const ai = bonds[bestBondIdx * 2];
+      const bi = bonds[bestBondIdx * 2 + 1];
+      const dxw = pos[bi * 3] - pos[ai * 3];
+      const dyw = pos[bi * 3 + 1] - pos[ai * 3 + 1];
+      const dzw = pos[bi * 3 + 2] - pos[ai * 3 + 2];
+      const bondLength = Math.sqrt(dxw * dxw + dyw * dyw + dzw * dzw);
+      const bondOrder = bondOrders ? bondOrders[bestBondIdx] : 1;
+      return {
+        kind: "bond",
+        atomA: ai,
+        atomB: bi,
+        bondOrder,
+        bondLength,
+        screenX: clientX,
+        screenY: clientY,
+      };
+    }
 
-  private getBondInfoFromInstance(
-    _instanceId: number,
-  ): { atomA: number; atomB: number; bondOrder: number; bondLength: number } | null {
-    // Impostor rendering does not support instance-level raycasting
     return null;
   }
 
