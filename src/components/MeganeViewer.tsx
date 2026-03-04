@@ -67,6 +67,7 @@ export function MeganeViewer({
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [cellVisible, setCellVisible] = useState(true);
+  const [cellAxesVisible, setCellAxesVisible] = useState(true);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
@@ -89,6 +90,14 @@ export function MeganeViewer({
     setCellVisible((prev) => {
       const next = !prev;
       rendererRef.current?.setCellVisible(next);
+      return next;
+    });
+  }, []);
+
+  const handleToggleCellAxes = useCallback(() => {
+    setCellAxesVisible((prev) => {
+      const next = !prev;
+      rendererRef.current?.setCellAxesVisible(next);
       return next;
     });
   }, []);
@@ -187,6 +196,9 @@ export function MeganeViewer({
         bondOpacity={bondOpacity}
         onBondOpacityChange={handleBondOpacityChange}
         labels={labels}
+        hasCell={hasCell}
+        cellAxesVisible={cellAxesVisible}
+        onToggleCellAxes={handleToggleCellAxes}
         collapsed={rightPanelCollapsed}
         onToggleCollapse={handleToggleRightPanel}
       />

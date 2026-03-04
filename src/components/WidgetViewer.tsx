@@ -45,6 +45,7 @@ export function WidgetViewer({
   const [atomOpacity, setAtomOpacity] = useState(1.0);
   const [bondScale, setBondScale] = useState(1.0);
   const [bondOpacity, setBondOpacity] = useState(1.0);
+  const [cellAxesVisible, setCellAxesVisible] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
 
@@ -95,6 +96,14 @@ export function WidgetViewer({
     rendererRef.current?.setBondOpacity(opacity);
   }, []);
 
+  const handleToggleCellAxes = useCallback(() => {
+    setCellAxesVisible((prev) => {
+      const next = !prev;
+      rendererRef.current?.setCellAxesVisible(next);
+      return next;
+    });
+  }, []);
+
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
       if (prev) {
@@ -141,6 +150,9 @@ export function WidgetViewer({
     },
     [onSeek, playing],
   );
+
+  const hasCell =
+    snapshot?.box != null && snapshot.box.some((v) => v !== 0);
 
   // Dummy label config (no label switching in widget for now)
   const labelConfig = {
@@ -226,6 +238,9 @@ export function WidgetViewer({
         bondOpacity={bondOpacity}
         onBondOpacityChange={handleBondOpacityChange}
         labels={labelConfig}
+        hasCell={hasCell}
+        cellAxesVisible={cellAxesVisible}
+        onToggleCellAxes={handleToggleCellAxes}
         collapsed={rightPanelCollapsed}
         onToggleCollapse={() => setRightPanelCollapsed((p) => !p)}
       />
