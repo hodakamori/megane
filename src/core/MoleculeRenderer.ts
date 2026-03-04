@@ -188,7 +188,10 @@ export class MoleculeRenderer {
   /** Update positions from a trajectory frame. */
   updateFrame(frame: Frame): void {
     if (!this.snapshot || !this.atomRenderer || !this.bondRenderer) return;
-    this.currentPositions = new Float32Array(frame.positions);
+    if (!this.currentPositions || this.currentPositions.length < frame.positions.length) {
+      this.currentPositions = new Float32Array(frame.positions.length);
+    }
+    this.currentPositions.set(frame.positions);
     this.atomRenderer.updatePositions(frame.positions);
     this.labelOverlay?.setPositions(frame.positions);
     this.bondRenderer.updatePositions(
