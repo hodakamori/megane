@@ -169,10 +169,15 @@ export class MoleculeRenderer {
         this.cellRenderer.loadBox(snapshot.box);
       }
       if (hasNonZero) {
-        if (!this.cellAxesRenderer) {
-          this.cellAxesRenderer = new CellAxesRenderer();
+        try {
+          if (!this.cellAxesRenderer) {
+            this.cellAxesRenderer = new CellAxesRenderer();
+          }
+          this.cellAxesRenderer.loadBox(snapshot.box);
+        } catch (e) {
+          console.warn("CellAxesRenderer init error:", e);
+          this.cellAxesRenderer = null;
         }
-        this.cellAxesRenderer.loadBox(snapshot.box);
       }
     }
 
@@ -550,13 +555,18 @@ export class MoleculeRenderer {
 
     // Render cell axes inset (after main scene, before label overlay)
     if (this.cellAxesRenderer && this.container) {
-      this.cellAxesRenderer.render(
-        this.renderer,
-        this.camera,
-        this.container.clientWidth,
-        this.container.clientHeight,
-        Math.min(window.devicePixelRatio, 2),
-      );
+      try {
+        this.cellAxesRenderer.render(
+          this.renderer,
+          this.camera,
+          this.container.clientWidth,
+          this.container.clientHeight,
+          Math.min(window.devicePixelRatio, 2),
+        );
+      } catch (e) {
+        console.warn("CellAxesRenderer render error:", e);
+        this.cellAxesRenderer = null;
+      }
     }
 
     if (this.labelOverlay && this.container) {
