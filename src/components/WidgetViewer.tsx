@@ -4,19 +4,22 @@
  * but omits the Sidebar (file upload, mode toggle, bond source switching).
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { AppearancePanel } from "./AppearancePanel";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
+import { TabSelector } from "./ui";
 import { MoleculeRenderer } from "../core/MoleculeRenderer";
+import { inferBondsVdwJS } from "../core/inferBondsJS";
 import type {
   Snapshot,
   Frame,
   HoverInfo,
   SelectionState,
   Measurement,
+  BondSource,
   LabelSource,
 } from "../core/types";
 
@@ -48,10 +51,63 @@ export function WidgetViewer({
   const [cellAxesVisible, setCellAxesVisible] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
+  const [bondSource, setBondSource] = useState<BondSource>("structure");
+  const [bondCount, setBondCount] = useState(0);
+  const bondSourceRef = useRef<BondSource>("structure");
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
   }, []);
+
+  // Recompute bonds when bond source changes
+  const handleBondSourceChange = useCallback(
+    (source: BondSource) => {
+      setBondSource(source);
+      bondSourceRef.current = source;
+      const renderer = rendererRef.current;
+      if (!renderer || !snapshot) return;
+
+      if (source === "none") {
+        renderer.setBondsVisible(false);
+        setBondCount(0);
+        return;
+      }
+
+      renderer.setBondsVisible(true);
+
+      if (source === "structure") {
+        // Restore original bonds from snapshot
+        renderer.updateBonds(snapshot.bonds, snapshot.bondOrders);
+        setBondCount(snapshot.nBonds);
+      } else if (source === "distance") {
+        // Compute distance bonds from current positions
+        const positions = frame?.positions ?? snapshot.positions;
+        const bonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms);
+        renderer.updateBonds(bonds, null);
+        setBondCount(bonds.length / 2);
+      }
+    },
+    [snapshot, frame],
+  );
+
+  // Update bond count when snapshot changes
+  useEffect(() => {
+    if (snapshot && bondSource === "structure") {
+      setBondCount(snapshot.nBonds);
+    }
+  }, [snapshot, bondSource]);
+
+  // Per-frame bond recalculation for distance mode
+  useEffect(() => {
+    if (bondSourceRef.current !== "distance") return;
+    if (!snapshot || !frame) return;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    const bonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms);
+    renderer.updateBonds(bonds, null);
+    setBondCount(bonds.length / 2);
+  }, [frame, snapshot]);
 
   const handleResetView = useCallback(() => {
     rendererRef.current?.resetView();
@@ -206,7 +262,7 @@ export function WidgetViewer({
             <>
               {" \u00A0 "}
               {snapshot.nAtoms.toLocaleString()} atoms /{" "}
-              {snapshot.nBonds.toLocaleString()} bonds
+              {bondCount.toLocaleString()} bonds
             </>
           )}
         </span>
@@ -227,6 +283,39 @@ export function WidgetViewer({
           Reset
         </button>
       </div>
+
+      {/* Bond source selector */}
+      {snapshot && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            borderRadius: 8,
+            padding: "4px 8px",
+            font: "12px system-ui, -apple-system, sans-serif",
+            color: "#495057",
+            zIndex: 10,
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", marginBottom: 2 }}>
+            Bonds
+          </div>
+          <TabSelector<BondSource>
+            options={[
+              { value: "none", label: "None" },
+              { value: "structure", label: "Structure" },
+              { value: "distance", label: "Distance" },
+            ]}
+            value={bondSource}
+            onChange={handleBondSourceChange}
+          />
+        </div>
+      )}
 
       <AppearancePanel
         atomScale={atomScale}

@@ -200,6 +200,32 @@ export class MoleculeRenderer {
     }
   }
 
+  /**
+   * Replace bond data and re-render bonds without resetting the camera.
+   * Used for per-frame bond recalculation (e.g. distance-based bonds).
+   */
+  updateBonds(
+    bonds: Uint32Array,
+    bondOrders: Uint8Array | null,
+  ): void {
+    if (!this.snapshot || !this.bondRenderer) return;
+    const positions = this.currentPositions ?? this.snapshot.positions;
+    const updated: Snapshot = {
+      ...this.snapshot,
+      nBonds: bonds.length / 2,
+      bonds,
+      bondOrders,
+    };
+    this.snapshot = updated;
+    this.bondRenderer.loadSnapshot({
+      ...updated,
+      positions,
+    });
+    if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
+      this.bondRenderer.setScale(this.bondScale, updated);
+    }
+  }
+
   /** Set per-atom labels for overlay display. */
   setLabels(labels: string[] | null): void {
     this.labelOverlay?.setLabels(labels);
