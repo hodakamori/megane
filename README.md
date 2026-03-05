@@ -66,22 +66,30 @@ viewer.frame_index = 50
 
 ```bash
 uv run pytest           # Python tests
-npm run build           # TypeScript build
+npm test                # TypeScript unit tests
+cargo test -p megane-core  # Rust tests
+make test-all           # All tests
 ```
 
 ## Project Structure
 
 ```
 src/                     TypeScript frontend
-  core/                  Three.js renderer, protocol, shaders
+  renderer/              Three.js rendering (impostor, mesh, shaders)
+  protocol/              Binary protocol decoder + web workers
+  parsers/               WASM-based file parsers (PDB, GRO, XYZ, MOL, XTC)
+  logic/                 Bond / label / vector source logic
   components/            React UI components
   hooks/                 Custom React hooks
   stream/                WebSocket client
+crates/                  Rust workspace
+  megane-core/           Core parsers and bond inference
+  megane-python/         PyO3 Python extension
+  megane-wasm/           WASM bindings (wasm-bindgen)
 python/megane/           Python backend
   parsers/               PDB / XTC parsers
   protocol.py            Binary protocol encoder
   server.py              FastAPI WebSocket server
   widget.py              anywidget Jupyter widget
-scripts/                 Benchmarks, headless rendering
-tests/                   Tests
+tests/                   Tests (Python, TypeScript, E2E)
 ```

@@ -19,7 +19,7 @@ import { execSync } from "child_process";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const wasm = require("../wasm/pkg-node");
+const wasm = require("../crates/megane-wasm/pkg-node");
 
 const ATOM_COUNTS = [100, 500, 1_000, 5_000, 10_000, 50_000, 100_000];
 const WARMUP_RUNS = 2;
