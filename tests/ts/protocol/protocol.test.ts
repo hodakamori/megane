@@ -7,7 +7,7 @@ import {
   MSG_SNAPSHOT,
   MSG_FRAME,
   MSG_METADATA,
-} from "@/core/protocol";
+} from "@/protocol/protocol";
 
 const MAGIC = 0x4e47454d; // "MEGN" little-endian
 

@@ -6,7 +6,7 @@
  * Uses a cell-list spatial data structure for O(N) performance.
  */
 
-import { VDW_RADII, DEFAULT_RADIUS } from "./constants";
+import { VDW_RADII, DEFAULT_RADIUS } from "../constants";
 
 const DEFAULT_VDW_BOND_FACTOR = 0.6;
 const MIN_BOND_DIST = 0.4;

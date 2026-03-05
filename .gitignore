@@ -9,6 +9,7 @@ __pycache__/
 tests/fixtures/.*.npz
 *.ppm
 target/
-wasm/pkg/
+crates/megane-wasm/pkg/
 *.so
+python/megane/static/
 .ipynb_checkpoints/

@@ -50,7 +50,7 @@ async function ensureInit(): Promise<void> {
   if (wasmModule) return;
   if (!initPromise) {
     initPromise = (async () => {
-      const wasm = await import("../../../wasm/pkg");
+      const wasm = await import("../../crates/megane-wasm/pkg");
       await wasm.default();
       wasmModule = {
         parse_pdb: wasm.parse_pdb,

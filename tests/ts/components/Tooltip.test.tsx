@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Tooltip } from "@/components/Tooltip";
-import type { AtomHoverInfo, BondHoverInfo } from "@/core/types";
+import type { AtomHoverInfo, BondHoverInfo } from "@/types";
 
 describe("Tooltip", () => {
   it("renders nothing when info is null", () => {

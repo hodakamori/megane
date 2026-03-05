@@ -15,11 +15,11 @@ import {
   MSG_SNAPSHOT,
   MSG_FRAME,
   MSG_METADATA,
-} from "../core/protocol";
-import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
-import { computeLabelsForSource, loadLabelFileData } from "../core/labelSourceLogic";
-import { getVectorsForFrame, loadVectorFileData } from "../core/vectorSourceLogic";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../core/types";
+} from "../protocol/protocol";
+import { withBonds, computeBondsForSource, loadBondFileData } from "../logic/bondSourceLogic";
+import { computeLabelsForSource, loadLabelFileData } from "../logic/labelSourceLogic";
+import { getVectorsForFrame, loadVectorFileData } from "../logic/vectorSourceLogic";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../types";
 
 export interface MeganeWebSocketState {
   snapshot: Snapshot | null;

@@ -5,7 +5,7 @@
  */
 
 import * as THREE from "three";
-import type { Snapshot } from "./types";
+import type { Snapshot } from "../types";
 import {
   getColor,
   BOND_RADIUS,
@@ -19,7 +19,7 @@ import {
   TRIPLE_BOND_RADIUS,
   AROMATIC_BOND_RADIUS,
   AROMATIC_DASH_RADIUS,
-} from "./constants";
+} from "../constants";
 
 const _va = new THREE.Vector3();
 const _vb = new THREE.Vector3();

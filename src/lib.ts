@@ -13,10 +13,10 @@ export { Timeline } from "./components/Timeline";
 export type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
 
 // Core renderer (framework-agnostic)
-export { MoleculeRenderer } from "./core/MoleculeRenderer";
+export { MoleculeRenderer } from "./renderer/MoleculeRenderer";
 
 // Worker pool for off-main-thread decoding
-export { WorkerPool } from "./core/WorkerPool";
+export { WorkerPool } from "./protocol/WorkerPool";
 
 // Protocol
 export {
@@ -27,7 +27,7 @@ export {
   MSG_SNAPSHOT,
   MSG_FRAME,
   MSG_METADATA,
-} from "./core/protocol";
+} from "./protocol/protocol";
 
 // Types
 export type {
@@ -43,4 +43,4 @@ export type {
   BondHoverInfo,
   SelectionState,
   Measurement,
-} from "./core/types";
+} from "./types";

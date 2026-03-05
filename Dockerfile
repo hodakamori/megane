@@ -4,17 +4,17 @@ RUN rustup target add wasm32-unknown-unknown && cargo install wasm-pack
 WORKDIR /app
 COPY Cargo.toml ./
 COPY crates/ crates/
-COPY wasm/ wasm/
-RUN cd wasm && wasm-pack build --target web --release
+RUN cd crates/megane-wasm && wasm-pack build --target web --release
 
 # Stage 1: Build frontend
 FROM node:20-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY --from=wasm /app/wasm/pkg/ wasm/pkg/
+COPY --from=wasm /app/crates/megane-wasm/pkg/ crates/megane-wasm/pkg/
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index.html ./
 COPY src/ src/
+COPY tests/fixtures/ tests/fixtures/
 RUN npx tsc && npx vite build && npx vite build --config vite.widget.config.ts
 
 # Stage 2: Build and install Python package with Rust extension
@@ -30,7 +30,6 @@ WORKDIR /app
 # Copy source needed for maturin build
 COPY Cargo.toml ./
 COPY crates/ crates/
-COPY wasm/ wasm/
 COPY pyproject.toml ./
 COPY python/ python/
 COPY --from=frontend /app/python/megane/static/ python/megane/static/

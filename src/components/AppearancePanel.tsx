@@ -3,7 +3,7 @@
  * Contains: Atom Radius, Atom Opacity, Bond Thickness, Bond Opacity, Labels.
  */
 
-import type { LabelSource, VectorSource } from "../core/types";
+import type { LabelSource, VectorSource } from "../types";
 import {
   sectionLabelStyle,
   smallBtnStyle,

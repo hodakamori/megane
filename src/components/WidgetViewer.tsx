@@ -11,8 +11,8 @@ import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { TabSelector } from "./ui";
-import { MoleculeRenderer } from "../core/MoleculeRenderer";
-import { inferBondsVdwJS } from "../core/inferBondsJS";
+import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
+import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import type {
   Snapshot,
   Frame,
@@ -21,7 +21,7 @@ import type {
   Measurement,
   BondSource,
   LabelSource,
-} from "../core/types";
+} from "../types";
 
 interface WidgetViewerProps {
   snapshot: Snapshot | null;

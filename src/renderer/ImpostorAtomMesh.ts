@@ -11,8 +11,8 @@
  */
 
 import * as THREE from "three";
-import type { Snapshot } from "./types";
-import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "./constants";
+import type { Snapshot } from "../types";
+import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { atomVertexShader, atomFragmentShader } from "./shaders";
 
 export class ImpostorAtomMesh {

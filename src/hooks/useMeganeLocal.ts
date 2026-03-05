@@ -7,12 +7,12 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-import { parseStructureFile, parseStructureText } from "../core/parsers/structure";
-import { parseXTCFile } from "../core/parsers/xtc";
-import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
-import { computeLabelsForSource, loadLabelFileData } from "../core/labelSourceLogic";
-import { getVectorsForFrame, loadVectorFileData, generateDemoVectors } from "../core/vectorSourceLogic";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../core/types";
+import { parseStructureFile, parseStructureText } from "../parsers/structure";
+import { parseXTCFile } from "../parsers/xtc";
+import { withBonds, computeBondsForSource, loadBondFileData } from "../logic/bondSourceLogic";
+import { computeLabelsForSource, loadLabelFileData } from "../logic/labelSourceLogic";
+import { getVectorsForFrame, loadVectorFileData, generateDemoVectors } from "../logic/vectorSourceLogic";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../types";
 
 export interface MeganeLocalState {
   snapshot: Snapshot | null;

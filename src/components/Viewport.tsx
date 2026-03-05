@@ -4,8 +4,8 @@
  */
 
 import { useEffect, useRef } from "react";
-import { MoleculeRenderer } from "../core/MoleculeRenderer";
-import type { Snapshot, Frame, HoverInfo } from "../core/types";
+import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
+import type { Snapshot, Frame, HoverInfo } from "../types";
 
 interface ViewportProps {
   snapshot: Snapshot | null;

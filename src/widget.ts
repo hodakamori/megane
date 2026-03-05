@@ -16,8 +16,8 @@ import {
   decodeHeader,
   MSG_SNAPSHOT,
   MSG_FRAME,
-} from "./core/protocol";
-import type { Snapshot, Frame, Measurement } from "./core/types";
+} from "./protocol/protocol";
+import type { Snapshot, Frame, Measurement } from "./types";
 
 interface AnyWidgetModel {
   get(key: string): unknown;

@@ -27,7 +27,7 @@ async function ensureInit(): Promise<void> {
   if (wasmParseXtc) return;
   if (!initPromise) {
     initPromise = (async () => {
-      const wasm = await import("../../../wasm/pkg");
+      const wasm = await import("../../crates/megane-wasm/pkg");
       await wasm.default();
       wasmParseXtc = wasm.parse_xtc_file;
     })();

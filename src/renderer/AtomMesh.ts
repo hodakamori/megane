@@ -4,8 +4,8 @@
  */
 
 import * as THREE from "three";
-import type { Snapshot } from "./types";
-import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "./constants";
+import type { Snapshot } from "../types";
+import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 
 // Reusable temp objects to avoid per-atom GC pressure (matches BondMesh pattern)
 const _matrix = new THREE.Matrix4();

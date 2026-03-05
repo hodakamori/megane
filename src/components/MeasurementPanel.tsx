@@ -2,8 +2,8 @@
  * Panel showing selected atoms and geometric measurement results.
  */
 
-import type { SelectionState, Measurement } from "../core/types";
-import { getElementSymbol } from "../core/constants";
+import type { SelectionState, Measurement } from "../types";
+import { getElementSymbol } from "../constants";
 
 interface MeasurementPanelProps {
   selection: SelectionState;

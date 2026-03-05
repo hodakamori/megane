@@ -5,7 +5,7 @@
  * Header: "MEGN" (4 bytes) + msg_type (u8) + flags (u8) + reserved (u16)
  */
 
-import type { Snapshot, Frame, TrajectoryMeta } from "./types";
+import type { Snapshot, Frame, TrajectoryMeta } from "../types";
 
 const MAGIC = 0x4e47454d; // "MEGN" in little-endian
 

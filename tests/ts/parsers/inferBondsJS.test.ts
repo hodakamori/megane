@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inferBondsVdwJS } from "@/core/inferBondsJS";
+import { inferBondsVdwJS } from "@/parsers/inferBondsJS";
 
 describe("inferBondsVdwJS", () => {
   it("returns empty array for 0 atoms", () => {

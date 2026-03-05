@@ -3,7 +3,7 @@
  * Follows the same pattern as labelSourceLogic.ts.
  */
 
-import type { VectorFrame } from "./types";
+import type { VectorFrame } from "../types";
 
 /** Mutable refs for vector caching. */
 export interface VectorSourceRefs {
