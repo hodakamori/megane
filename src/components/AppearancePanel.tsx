@@ -33,6 +33,8 @@ interface AppearancePanelProps {
   vdwScale?: number;
   onVdwScaleChange?: (scale: number) => void;
   labels: LabelConfig;
+  perspective?: boolean;
+  onPerspectiveChange?: (enabled: boolean) => void;
   hasCell?: boolean;
   cellAxesVisible?: boolean;
   onToggleCellAxes?: () => void;
@@ -73,6 +75,8 @@ export function AppearancePanel({
   vdwScale,
   onVdwScaleChange,
   labels,
+  perspective,
+  onPerspectiveChange,
   hasCell,
   cellAxesVisible,
   onToggleCellAxes,
@@ -345,18 +349,29 @@ export function AppearancePanel({
           )}
         </div>
 
-        {/* Cell Axes Indicator */}
-        {hasCell && onToggleCellAxes && (
+        {/* Display Section */}
+        {(onPerspectiveChange || (hasCell && onToggleCellAxes)) && (
           <div>
             <div style={sectionLabelStyle}>Display</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                onClick={onToggleCellAxes}
-                style={cellAxesVisible ? activeBtnStyle : smallBtnStyle}
-                title="Toggle cell axes indicator"
-              >
-                Cell Axes
-              </button>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {onPerspectiveChange && (
+                <button
+                  onClick={() => onPerspectiveChange(!perspective)}
+                  style={perspective ? activeBtnStyle : smallBtnStyle}
+                  title="Toggle perspective projection"
+                >
+                  Perspective
+                </button>
+              )}
+              {hasCell && onToggleCellAxes && (
+                <button
+                  onClick={onToggleCellAxes}
+                  style={cellAxesVisible ? activeBtnStyle : smallBtnStyle}
+                  title="Toggle cell axes indicator"
+                >
+                  Cell Axes
+                </button>
+              )}
             </div>
           </div>
         )}

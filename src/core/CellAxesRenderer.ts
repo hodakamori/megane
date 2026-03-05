@@ -118,7 +118,7 @@ export class CellAxesRenderer {
    */
   render(
     renderer: THREE.WebGLRenderer,
-    mainCamera: THREE.PerspectiveCamera,
+    mainCamera: THREE.Camera,
     containerWidth: number,
     containerHeight: number,
     pixelRatio: number,

@@ -54,7 +54,7 @@ export class LabelOverlay {
     this.ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   }
 
-  render(camera: THREE.PerspectiveCamera, width: number, height: number): void {
+  render(camera: THREE.Camera, width: number, height: number): void {
     this.ctx.clearRect(0, 0, width, height);
 
     if (!this.labels || !this.positions || !this.elements || this.nAtoms === 0) {
