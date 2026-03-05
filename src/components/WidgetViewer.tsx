@@ -29,6 +29,8 @@ interface WidgetViewerProps {
   currentFrame: number;
   totalFrames: number;
   onSeek: (frame: number) => void;
+  selectedAtoms?: number[];
+  onMeasurementChange?: (measurement: Measurement | null) => void;
 }
 
 export function WidgetViewer({
@@ -37,6 +39,8 @@ export function WidgetViewer({
   currentFrame,
   totalFrames,
   onSeek,
+  selectedAtoms: externalSelectedAtoms,
+  onMeasurementChange,
 }: WidgetViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -116,24 +120,51 @@ export function WidgetViewer({
     rendererRef.current?.resetView();
   }, []);
 
+  const onMeasurementChangeRef = useRef(onMeasurementChange);
+  onMeasurementChangeRef.current = onMeasurementChange;
+
+  const updateMeasurement = useCallback((m: Measurement | null) => {
+    setMeasurement(m);
+    onMeasurementChangeRef.current?.(m);
+  }, []);
+
   const handleAtomRightClick = useCallback((atomIndex: number) => {
     if (!rendererRef.current) return;
     const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
     setSelection(newSelection);
-    setMeasurement(rendererRef.current.getMeasurement());
-  }, []);
+    updateMeasurement(rendererRef.current.getMeasurement());
+  }, [updateMeasurement]);
 
   const handleClearSelection = useCallback(() => {
     rendererRef.current?.clearSelection();
     setSelection({ atoms: [] });
-    setMeasurement(null);
-  }, []);
+    updateMeasurement(null);
+  }, [updateMeasurement]);
 
   const handleFrameUpdated = useCallback(() => {
     if (!rendererRef.current) return;
     const m = rendererRef.current.getMeasurement();
-    if (m) setMeasurement(m);
-  }, []);
+    updateMeasurement(m);
+  }, [updateMeasurement]);
+
+  // Apply external atom selection
+  const prevExternalAtomsRef = useRef<string>("");
+  useEffect(() => {
+    if (!externalSelectedAtoms || !rendererRef.current) return;
+    const key = JSON.stringify(externalSelectedAtoms);
+    if (key === prevExternalAtomsRef.current) return;
+    prevExternalAtomsRef.current = key;
+
+    if (externalSelectedAtoms.length === 0) {
+      rendererRef.current.clearSelection();
+      setSelection({ atoms: [] });
+      updateMeasurement(null);
+    } else {
+      const newSelection = rendererRef.current.setSelection(externalSelectedAtoms);
+      setSelection(newSelection);
+      updateMeasurement(rendererRef.current.getMeasurement());
+    }
+  }, [externalSelectedAtoms, updateMeasurement]);
 
   const handleAtomScaleChange = useCallback((scale: number) => {
     setAtomScale(scale);

@@ -17,7 +17,7 @@ import {
   MSG_SNAPSHOT,
   MSG_FRAME,
 } from "./core/protocol";
-import type { Snapshot, Frame } from "./core/types";
+import type { Snapshot, Frame, Measurement } from "./core/types";
 
 interface AnyWidgetModel {
   get(key: string): unknown;
@@ -83,10 +83,17 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     model.save_changes();
   }
 
+  function handleMeasurementChange(measurement: Measurement | null) {
+    const json = measurement ? JSON.stringify(measurement) : "";
+    model.set("_measurement_json", json);
+    model.save_changes();
+  }
+
   function renderApp() {
     if (!root || disposed) return;
     const frameIndex = (model.get("frame_index") as number) || 0;
     const totalFrames = (model.get("total_frames") as number) || 0;
+    const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
 
     root.render(
       createElement(WidgetViewer, {
@@ -95,6 +102,8 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         currentFrame: frameIndex,
         totalFrames: totalFrames,
         onSeek: handleSeek,
+        selectedAtoms: selectedAtoms,
+        onMeasurementChange: handleMeasurementChange,
       }),
     );
   }
@@ -135,6 +144,10 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   });
 
   model.on("change:total_frames", () => {
+    renderApp();
+  });
+
+  model.on("change:selected_atoms", () => {
     renderApp();
   });
 
