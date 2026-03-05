@@ -347,48 +347,96 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Fit camera to show all atoms. */
+  /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
     const { positions, nAtoms } = snapshot;
 
-    // Compute bounding box center and extent
-    let minX = Infinity,
-      minY = Infinity,
-      minZ = Infinity;
-    let maxX = -Infinity,
-      maxY = -Infinity,
-      maxZ = -Infinity;
-
+    // Compute centroid (center of mass assuming equal weights)
+    let sumX = 0, sumY = 0, sumZ = 0;
     for (let i = 0; i < nAtoms; i++) {
-      const x = positions[i * 3];
-      const y = positions[i * 3 + 1];
-      const z = positions[i * 3 + 2];
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      minZ = Math.min(minZ, z);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      maxZ = Math.max(maxZ, z);
+      sumX += positions[i * 3];
+      sumY += positions[i * 3 + 1];
+      sumZ += positions[i * 3 + 2];
     }
 
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const extent = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
-    this.lastExtent = extent;
+    let cx: number, cy: number, cz: number;
+
+    // Determine bounding box for zoom fitting
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    const hasBox = snapshot.box && snapshot.box.some((v) => v !== 0);
+
+    if (hasBox) {
+      const box = snapshot.box!;
+      // Cell center = (va + vb + vc) / 2
+      cx = (box[0] + box[3] + box[6]) / 2;
+      cy = (box[1] + box[4] + box[7]) / 2;
+      cz = (box[2] + box[5] + box[8]) / 2;
+
+      // Compute bounding box from all 8 cell vertices
+      const va = [box[0], box[1], box[2]];
+      const vb = [box[3], box[4], box[5]];
+      const vc = [box[6], box[7], box[8]];
+      for (let ia = 0; ia <= 1; ia++) {
+        for (let ib = 0; ib <= 1; ib++) {
+          for (let ic = 0; ic <= 1; ic++) {
+            const vx = ia * va[0] + ib * vb[0] + ic * vc[0];
+            const vy = ia * va[1] + ib * vb[1] + ic * vc[1];
+            const vz = ia * va[2] + ib * vb[2] + ic * vc[2];
+            minX = Math.min(minX, vx);
+            minY = Math.min(minY, vy);
+            minZ = Math.min(minZ, vz);
+            maxX = Math.max(maxX, vx);
+            maxY = Math.max(maxY, vy);
+            maxZ = Math.max(maxZ, vz);
+          }
+        }
+      }
+    } else {
+      // No cell box: use atom centroid as center
+      cx = nAtoms > 0 ? sumX / nAtoms : 0;
+      cy = nAtoms > 0 ? sumY / nAtoms : 0;
+      cz = nAtoms > 0 ? sumZ / nAtoms : 0;
+
+      // Bounding box from atom positions
+      for (let i = 0; i < nAtoms; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        minZ = Math.min(minZ, z);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        maxZ = Math.max(maxZ, z);
+      }
+    }
+
+    const extentX = maxX - minX;
+    const extentY = maxY - minY;
+    const extentZ = maxZ - minZ;
+    const maxExtent = Math.max(extentX, extentY, extentZ);
+    this.lastExtent = maxExtent;
 
     this.controls.target.set(cx, cy, cz);
-    const distance = extent * 1.2;
+
+    // Aspect-aware zoom: ensure entire model fits regardless of viewport shape
+    const aspect = this.container
+      ? this.container.clientWidth / this.container.clientHeight
+      : 1;
+    const padding = 1.2;
+    // Required frustum half-height to contain both X and Y extents
+    const halfH = Math.max(extentY / 2, extentX / (2 * aspect)) * padding;
+    const frustumHeight = Math.max(halfH * 2, 0.1);
+    const distance = Math.max(maxExtent * 1.2, 0.1);
     this.camera.position.set(cx, cy, cz + distance);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
-      const aspect = this.container
-        ? this.container.clientWidth / this.container.clientHeight
-        : 1;
-      this.camera.left = -distance * aspect / 2;
-      this.camera.right = distance * aspect / 2;
-      this.camera.top = distance / 2;
-      this.camera.bottom = -distance / 2;
+      this.camera.left = -frustumHeight * aspect / 2;
+      this.camera.right = frustumHeight * aspect / 2;
+      this.camera.top = frustumHeight / 2;
+      this.camera.bottom = -frustumHeight / 2;
       this.camera.near = -distance * 10;
       this.camera.far = distance * 10;
       this.camera.zoom = 1;
@@ -405,6 +453,12 @@ export class MoleculeRenderer {
     if (this.snapshot) {
       this.fitToView(this.snapshot);
     }
+  }
+
+  /** Set the rotation center (orbit target) to the given world coordinates. */
+  setRotationCenter(x: number, y: number, z: number): void {
+    this.controls.target.set(x, y, z);
+    this.controls.update();
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -460,6 +514,12 @@ export class MoleculeRenderer {
   /** Get the canvas element for event listener attachment. */
   getCanvas(): HTMLCanvasElement | null {
     return this.renderer?.domElement ?? null;
+  }
+
+  /** Get a copy of current atom positions (public, for external use). */
+  getCurrentPositionsCopy(): Float32Array | null {
+    if (!this.snapshot) return null;
+    return new Float32Array(this.currentPositions ?? this.snapshot.positions);
   }
 
   /** Get current atom positions (may reflect trajectory frame). */
