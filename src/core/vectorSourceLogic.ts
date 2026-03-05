@@ -26,6 +26,33 @@ export function getVectorsForFrame(
 }
 
 /**
+ * Generate demo vector data (small random displacements) for visualization testing.
+ * Produces per-frame vectors that vary smoothly over time using a sine-based pattern.
+ */
+export function generateDemoVectors(
+  nAtoms: number,
+  nFrames: number,
+): VectorFrame[] {
+  const frames: VectorFrame[] = [];
+  for (let f = 0; f < nFrames; f++) {
+    const vectors = new Float32Array(nAtoms * 3);
+    const phase = (f / Math.max(nFrames, 1)) * Math.PI * 2;
+    for (let i = 0; i < nAtoms; i++) {
+      // Deterministic pseudo-random direction per atom, animated by frame phase
+      const seed = i * 1.618033988749895; // golden ratio for spread
+      const theta = (seed % 1) * Math.PI * 2;
+      const phi = ((seed * 0.7) % 1) * Math.PI;
+      const mag = 0.5 + 1.0 * Math.sin(phase + i * 0.3); // oscillating magnitude
+      vectors[i * 3] = Math.sin(phi) * Math.cos(theta) * mag;
+      vectors[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * mag;
+      vectors[i * 3 + 2] = Math.cos(phi) * mag;
+    }
+    frames.push({ frame: f, vectors });
+  }
+  return frames;
+}
+
+/**
  * Parse a .vec file (JSON Lines) and return per-frame vector data.
  * Format: each line is {"frame": N, "vectors": [[vx,vy,vz], ...]}
  */

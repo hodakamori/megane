@@ -11,7 +11,7 @@ import { parseStructureFile, parseStructureText } from "../core/parsers/structur
 import { parseXTCFile } from "../core/parsers/xtc";
 import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
 import { computeLabelsForSource, loadLabelFileData } from "../core/labelSourceLogic";
-import { getVectorsForFrame, loadVectorFileData } from "../core/vectorSourceLogic";
+import { getVectorsForFrame, loadVectorFileData, generateDemoVectors } from "../core/vectorSourceLogic";
 import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../core/types";
 
 export interface MeganeLocalState {
@@ -45,6 +45,7 @@ export interface MeganeLocalState {
   vectorSource: VectorSource;
   setVectorSource: (source: VectorSource) => void;
   loadVectorFile: (file: File) => Promise<void>;
+  loadDemoVectors: () => void;
   vectorFileName: string | null;
   atomVectors: Float32Array | null;
 }
@@ -285,6 +286,16 @@ export function useMeganeLocal(): MeganeLocalState {
     setVectorSourceState(source);
     if (source === "none") {
       setAtomVectors(null);
+    } else if (source === "demo") {
+      // Generate demo vectors on demand
+      const base = baseSnapshotRef.current;
+      if (!base) return;
+      const nFrames = fileTrajMetaRef.current?.nFrames ?? structureFramesRef.current.length + 1;
+      const vectors = generateDemoVectors(base.nAtoms, nFrames);
+      fileVectorsRef.current = vectors;
+      setVectorFileName("demo");
+      const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
+      setAtomVectors(vecs);
     } else if (source === "file" && fileVectorsRef.current) {
       const vecs = getVectorsForFrame({ fileVectors: fileVectorsRef.current }, currentFrameRef.current);
       setAtomVectors(vecs);
@@ -299,6 +310,18 @@ export function useMeganeLocal(): MeganeLocalState {
     fileVectorsRef.current = vectors;
     setVectorFileName(fileName);
     setVectorSourceState("file");
+    const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
+    setAtomVectors(vecs);
+  }, []);
+
+  const loadDemoVectors = useCallback(() => {
+    const base = baseSnapshotRef.current;
+    if (!base) return;
+    const nFrames = fileTrajMetaRef.current?.nFrames ?? structureFramesRef.current.length + 1;
+    const vectors = generateDemoVectors(base.nAtoms, nFrames);
+    fileVectorsRef.current = vectors;
+    setVectorFileName("demo");
+    setVectorSourceState("demo");
     const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
     setAtomVectors(vecs);
   }, []);
@@ -334,6 +357,7 @@ export function useMeganeLocal(): MeganeLocalState {
     vectorSource,
     setVectorSource,
     loadVectorFile,
+    loadDemoVectors,
     vectorFileName,
     atomVectors,
   };

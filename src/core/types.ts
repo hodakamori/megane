@@ -22,7 +22,7 @@ export type TrajectorySource = "structure" | "file";
 export type LabelSource = "none" | "structure" | "file";
 
 /** Vector source mode. */
-export type VectorSource = "none" | "file";
+export type VectorSource = "none" | "file" | "demo";
 
 /** Per-frame vector data. */
 export interface VectorFrame {
