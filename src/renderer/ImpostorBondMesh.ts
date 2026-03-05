@@ -12,7 +12,7 @@
  */
 
 import * as THREE from "three";
-import type { Snapshot } from "./types";
+import type { Snapshot } from "../types";
 import {
   getColor,
   BOND_RADIUS,
@@ -26,7 +26,7 @@ import {
   TRIPLE_BOND_RADIUS,
   AROMATIC_BOND_RADIUS,
   AROMATIC_DASH_RADIUS,
-} from "./constants";
+} from "../constants";
 import { bondVertexShader, bondFragmentShader } from "./shaders";
 
 const TEX_MAX_WIDTH = 4096;

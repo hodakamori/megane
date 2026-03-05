@@ -2,8 +2,8 @@
  * Shared bond source logic used by both useMeganeLocal and useMeganeWebSocket.
  */
 
-import { inferBondsVdw, parseTopBonds, parsePdbBonds } from "./parsers/structure";
-import type { Snapshot, BondSource } from "./types";
+import { inferBondsVdw, parseTopBonds, parsePdbBonds } from "../parsers/structure";
+import type { Snapshot, BondSource } from "../types";
 
 /** Rebuild a snapshot with different bonds. */
 export function withBonds(

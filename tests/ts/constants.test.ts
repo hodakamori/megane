@@ -7,7 +7,7 @@ import {
   VDW_RADII,
   DEFAULT_COLOR,
   DEFAULT_RADIUS,
-} from "@/core/constants";
+} from "@/constants";
 
 describe("getColor", () => {
   it("returns correct color for carbon (6)", () => {

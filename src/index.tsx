@@ -12,8 +12,8 @@ import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
 import type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
-import defaultPDB from "./assets/1crn.pdb?raw";
-import demoXtcUrl from "./assets/1crn_vibration.xtc?url";
+import defaultPDB from "../tests/fixtures/1crn.pdb?raw";
+import demoXtcUrl from "../tests/fixtures/1crn_vibration.xtc?url";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";

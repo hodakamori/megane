@@ -17,7 +17,7 @@ import type {
   HoverInfo,
   SelectionState,
   Measurement,
-} from "./types";
+} from "../types";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
@@ -29,7 +29,7 @@ import {
   getRadius,
   BALL_STICK_ATOM_SCALE,
   BOND_ORDER_NAMES,
-} from "./constants";
+} from "../constants";
 
 // Temporary vector for screen-space projection (avoids allocation per atom)
 const _projVec = new THREE.Vector4();

@@ -2,7 +2,7 @@
  * Left sidebar panel for file management and viewer controls.
  */
 
-import type { BondSource, TrajectorySource } from "../core/types";
+import type { BondSource, TrajectorySource } from "../types";
 import {
   sectionLabelStyle,
   smallBtnStyle,

@@ -2,8 +2,8 @@
  * Shared label source logic used by both useMeganeLocal and useMeganeWebSocket.
  */
 
-import { extractLabelsFromFile } from "./parsers/structure";
-import type { LabelSource } from "./types";
+import { extractLabelsFromFile } from "../parsers/structure";
+import type { LabelSource } from "../types";
 
 /** Mutable refs that both hooks share for label caching. */
 export interface LabelSourceRefs {

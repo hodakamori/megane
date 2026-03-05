@@ -5,7 +5,7 @@
  */
 
 import * as THREE from "three";
-import { getColor } from "./constants";
+import { getColor } from "../constants";
 
 const MAX_VISIBLE_LABELS = 500;
 const FONT = "bold 11px sans-serif";

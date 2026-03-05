@@ -2,8 +2,8 @@
  * Hover tooltip for atoms and bonds.
  */
 
-import type { HoverInfo } from "../core/types";
-import { getElementSymbol, BOND_ORDER_NAMES } from "../core/constants";
+import type { HoverInfo } from "../types";
+import { getElementSymbol, BOND_ORDER_NAMES } from "../constants";
 
 interface TooltipProps {
   info: HoverInfo;
