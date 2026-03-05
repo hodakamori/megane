@@ -8,7 +8,7 @@ import { Viewport } from "./Viewport";
 import { Sidebar } from "./Sidebar";
 import type { BondConfig, TrajectoryConfig } from "./Sidebar";
 import { AppearancePanel } from "./AppearancePanel";
-import type { LabelConfig } from "./AppearancePanel";
+import type { LabelConfig, VectorConfig } from "./AppearancePanel";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
@@ -40,7 +40,9 @@ interface MeganeViewerProps {
   bonds: BondConfig;
   trajectory: TrajectoryConfig;
   labels: LabelConfig;
+  vectors?: VectorConfig;
   atomLabels?: string[] | null;
+  atomVectors?: Float32Array | null;
   width?: string | number;
   height?: string | number;
 }
@@ -62,7 +64,9 @@ export function MeganeViewer({
   bonds,
   trajectory,
   labels,
+  vectors,
   atomLabels,
+  atomVectors,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
@@ -80,6 +84,7 @@ export function MeganeViewer({
   const [bondOpacity, setBondOpacity] = useState(1.0);
   const [vdwScale, setVdwScale] = useState(0.6);
   const [perspective, setPerspective] = useState(false);
+  const [vectorScale, setVectorScale] = useState(1.0);
   const vdwScaleRef = useRef(0.6);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
@@ -171,6 +176,11 @@ export function MeganeViewer({
     renderer.updateBonds(newBonds, null);
   }, [snapshot, frame]);
 
+  const handleVectorScaleChange = useCallback((scale: number) => {
+    setVectorScale(scale);
+    rendererRef.current?.setVectorScale(scale);
+  }, []);
+
   // Toggle bond visibility when bondSource changes to/from "none"
   useEffect(() => {
     rendererRef.current?.setBondsVisible(bonds.source !== "none");
@@ -203,6 +213,7 @@ export function MeganeViewer({
         snapshot={snapshot}
         frame={frame}
         atomLabels={atomLabels}
+        atomVectors={atomVectors}
         onRendererReady={handleRendererReady}
         onHover={setHoverInfo}
         onAtomRightClick={handleAtomRightClick}
@@ -237,6 +248,9 @@ export function MeganeViewer({
         vdwScale={bonds.source === "distance" ? vdwScale : undefined}
         onVdwScaleChange={bonds.source === "distance" ? handleVdwScaleChange : undefined}
         labels={labels}
+        vectors={vectors}
+        vectorScale={vectorScale}
+        onVectorScaleChange={handleVectorScaleChange}
         perspective={perspective}
         onPerspectiveChange={handlePerspectiveChange}
         hasCell={hasCell}

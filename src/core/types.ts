@@ -21,6 +21,15 @@ export type TrajectorySource = "structure" | "file";
 /** Label source mode. */
 export type LabelSource = "none" | "structure" | "file";
 
+/** Vector source mode. */
+export type VectorSource = "none" | "file";
+
+/** Per-frame vector data. */
+export interface VectorFrame {
+  frame: number;
+  vectors: Float32Array; // length = nAtoms * 3
+}
+
 /** Decoded trajectory frame. */
 export interface Frame {
   frameId: number;

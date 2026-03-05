@@ -3,7 +3,7 @@
  * Contains: Atom Radius, Atom Opacity, Bond Thickness, Bond Opacity, Labels.
  */
 
-import type { LabelSource } from "../core/types";
+import type { LabelSource, VectorSource } from "../core/types";
 import {
   sectionLabelStyle,
   smallBtnStyle,
@@ -21,6 +21,13 @@ export interface LabelConfig {
   hasStructureLabels: boolean;
 }
 
+export interface VectorConfig {
+  source: VectorSource;
+  onSourceChange: (source: VectorSource) => void;
+  onUploadFile: (file: File) => void;
+  fileName: string | null;
+}
+
 interface AppearancePanelProps {
   atomScale: number;
   onAtomScaleChange: (scale: number) => void;
@@ -33,6 +40,9 @@ interface AppearancePanelProps {
   vdwScale?: number;
   onVdwScaleChange?: (scale: number) => void;
   labels: LabelConfig;
+  vectors?: VectorConfig;
+  vectorScale?: number;
+  onVectorScaleChange?: (scale: number) => void;
   perspective?: boolean;
   onPerspectiveChange?: (enabled: boolean) => void;
   hasCell?: boolean;
@@ -44,6 +54,8 @@ interface AppearancePanelProps {
 
 const LABEL_FILE_ACCEPT = ".pdb,.gro,.xyz,.txt";
 const LABEL_FILE_EXTS = [".pdb", ".gro", ".xyz", ".txt"];
+const VECTOR_FILE_ACCEPT = ".vec,.json,.jsonl";
+const VECTOR_FILE_EXTS = [".vec", ".json", ".jsonl"];
 
 const sliderTrackStyle: React.CSSProperties = {
   width: "100%",
@@ -75,6 +87,9 @@ export function AppearancePanel({
   vdwScale,
   onVdwScaleChange,
   labels,
+  vectors,
+  vectorScale,
+  onVectorScaleChange,
   perspective,
   onPerspectiveChange,
   hasCell,
@@ -348,6 +363,58 @@ export function AppearancePanel({
             </DropZone>
           )}
         </div>
+
+        {/* Vectors Section */}
+        {vectors && (
+          <div>
+            <div style={sectionLabelStyle}>Vectors</div>
+            <TabSelector<VectorSource>
+              options={[
+                { value: "none", label: "None" },
+                { value: "file", label: "File" },
+              ]}
+              value={vectors.source}
+              onChange={vectors.onSourceChange}
+            />
+            {vectors.source === "file" && (
+              <DropZone
+                accept={VECTOR_FILE_ACCEPT}
+                exts={VECTOR_FILE_EXTS}
+                onFile={vectors.onUploadFile}
+                label="Load vectors..."
+              >
+                {vectors.fileName && (
+                  <div style={fileNameStyle}>{vectors.fileName}</div>
+                )}
+              </DropZone>
+            )}
+            {vectors.source === "file" && vectorScale != null && onVectorScaleChange && (
+              <div style={{ marginTop: 8 }}>
+                <div style={sectionLabelStyle}>Arrow Scale</div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="10.0"
+                    step="0.1"
+                    value={vectorScale}
+                    onChange={(e) => onVectorScaleChange(parseFloat(e.target.value))}
+                    style={sliderTrackStyle}
+                  />
+                  <span style={valueDisplayStyle}>
+                    {vectorScale.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Display Section */}
         {(onPerspectiveChange || (hasCell && onToggleCellAxes)) && (

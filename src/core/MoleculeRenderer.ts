@@ -23,6 +23,7 @@ import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
 import { CellAxesRenderer } from "./CellAxesRenderer";
 import { LabelOverlay } from "./LabelOverlay";
+import { ArrowRenderer } from "./ArrowRenderer";
 import {
   getElementSymbol,
   getRadius,
@@ -45,6 +46,7 @@ export class MoleculeRenderer {
   private cellRenderer: CellRenderer | null = null;
   private cellAxesRenderer: CellAxesRenderer | null = null;
   private labelOverlay: LabelOverlay | null = null;
+  private arrowRenderer: ArrowRenderer | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
@@ -161,6 +163,13 @@ export class MoleculeRenderer {
       this.labelOverlay.setPositions(snapshot.positions);
     }
 
+    // Initialize arrow renderer (lazy)
+    if (!this.arrowRenderer) {
+      this.arrowRenderer = new ArrowRenderer(snapshot.nAtoms);
+      this.scene.add(this.arrowRenderer.mesh);
+    }
+    this.arrowRenderer.setAtomPositions(snapshot.positions, snapshot.nAtoms);
+
     // Update simulation cell
     if (snapshot.box) {
       const hasNonZero = snapshot.box.some((v) => v !== 0);
@@ -196,6 +205,7 @@ export class MoleculeRenderer {
     this.currentPositions.set(frame.positions);
     this.atomRenderer.updatePositions(frame.positions);
     this.labelOverlay?.setPositions(frame.positions);
+    this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
     this.bondRenderer.updatePositions(
       frame.positions,
       this.snapshot.bonds,
@@ -235,6 +245,16 @@ export class MoleculeRenderer {
   /** Set per-atom labels for overlay display. */
   setLabels(labels: string[] | null): void {
     this.labelOverlay?.setLabels(labels);
+  }
+
+  /** Set per-atom vector data for arrow display. */
+  setVectors(vectors: Float32Array | null): void {
+    this.arrowRenderer?.setVectors(vectors);
+  }
+
+  /** Set arrow scale multiplier. */
+  setVectorScale(scale: number): void {
+    this.arrowRenderer?.setScale(scale);
   }
 
   /** Set atom radius scale multiplier. */
@@ -769,6 +789,7 @@ export class MoleculeRenderer {
     if (this.bondRenderer) this.bondRenderer.dispose();
     if (this.cellRenderer) this.cellRenderer.dispose();
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
+    if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     this.controls.dispose();
     this.renderer.dispose();

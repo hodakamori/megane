@@ -9,7 +9,7 @@ import { StrictMode, useState, useEffect, useRef, useCallback, useMemo } from "r
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
 import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
-import type { LabelConfig } from "./components/AppearancePanel";
+import type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "./assets/1crn.pdb?raw";
@@ -184,7 +184,19 @@ function App() {
     local.labelSource, local.setLabelSource, local.loadLabelFile, local.labelFileName, local.hasStructureLabels,
   ]);
 
+  const vectorConfig: VectorConfig = useMemo(() => ({
+    source: mode === "streaming" ? ws.vectorSource : local.vectorSource,
+    onSourceChange: mode === "streaming" ? ws.setVectorSource : local.setVectorSource,
+    onUploadFile: mode === "streaming" ? ws.loadVectorFile : local.loadVectorFile,
+    fileName: mode === "streaming" ? ws.vectorFileName : local.vectorFileName,
+  }), [
+    mode,
+    ws.vectorSource, ws.setVectorSource, ws.loadVectorFile, ws.vectorFileName,
+    local.vectorSource, local.setVectorSource, local.loadVectorFile, local.vectorFileName,
+  ]);
+
   const atomLabels = mode === "streaming" ? ws.atomLabels : local.atomLabels;
+  const atomVectors = mode === "streaming" ? ws.atomVectors : local.atomVectors;
 
   return (
     <MeganeViewer
@@ -204,7 +216,9 @@ function App() {
       bonds={bondConfig}
       trajectory={trajectoryConfig}
       labels={labelConfig}
+      vectors={vectorConfig}
       atomLabels={atomLabels}
+      atomVectors={atomVectors}
     />
   );
 }
