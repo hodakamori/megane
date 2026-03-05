@@ -8,6 +8,7 @@ __pycache__/
 *.whl
 tests/fixtures/.*.npz
 *.ppm
+tests/e2e/screenshot_*.png
 target/
 crates/megane-wasm/pkg/
 *.so
