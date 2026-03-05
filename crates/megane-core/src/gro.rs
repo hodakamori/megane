@@ -158,3 +158,58 @@ fn parse_box_line(line: &str) -> Option<[f32; 9]> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_element_from_atom_name() {
+        assert_eq!(element_from_atom_name("CA"), 20);  // Ca (Calcium) — GRO "CA" maps to two-char "Ca"
+        assert_eq!(element_from_atom_name("OW"), 8);   // Oxygen (water)
+        assert_eq!(element_from_atom_name("HW1"), 1);  // Hydrogen
+        assert_eq!(element_from_atom_name("N"), 7);    // Nitrogen
+        assert_eq!(element_from_atom_name("  CL"), 17); // Chlorine
+        assert_eq!(element_from_atom_name(""), 0);     // Empty
+    }
+
+    #[test]
+    fn test_parse_simple_gro() {
+        let gro = "Water\n3\n    1SOL     OW    1   0.100   0.200   0.300\n    1SOL    HW1    2   0.150   0.250   0.350\n    1SOL    HW2    3   0.050   0.150   0.250\n   1.00000   1.00000   1.00000\n";
+        let result = parse(gro).expect("parse failed");
+        assert_eq!(result.n_atoms, 3);
+        // Positions should be in Angstroms (nm * 10)
+        assert!((result.positions[0] - 1.0).abs() < 0.01);   // 0.100 nm → 1.0 Å
+        assert!((result.positions[1] - 2.0).abs() < 0.01);   // 0.200 nm → 2.0 Å
+        assert!((result.positions[2] - 3.0).abs() < 0.01);   // 0.300 nm → 3.0 Å
+        // Elements
+        assert_eq!(result.elements[0], 8);  // O
+        assert_eq!(result.elements[1], 1);  // H
+        assert_eq!(result.elements[2], 1);  // H
+    }
+
+    #[test]
+    fn test_parse_gro_box() {
+        let gro = "test\n1\n    1ALA      N    1   0.100   0.200   0.300\n   2.50000   3.00000   3.50000\n";
+        let result = parse(gro).expect("parse failed");
+        assert!(result.box_matrix.is_some());
+        let bm = result.box_matrix.unwrap();
+        assert!((bm[0] - 25.0).abs() < 0.01);  // 2.5 nm → 25.0 Å
+        assert!((bm[4] - 30.0).abs() < 0.01);  // 3.0 nm → 30.0 Å
+        assert!((bm[8] - 35.0).abs() < 0.01);  // 3.5 nm → 35.0 Å
+    }
+
+    #[test]
+    fn test_parse_gro_too_short() {
+        let result = parse("title\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_box_line() {
+        let m = parse_box_line("   1.00000   2.00000   3.00000").unwrap();
+        assert!((m[0] - 10.0).abs() < 0.01);
+        assert!((m[4] - 20.0).abs() < 0.01);
+        assert!((m[8] - 30.0).abs() < 0.01);
+    }
+}

@@ -229,3 +229,86 @@ pub fn infer_bonds_vdw(
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// Build a water molecule: O at origin, H1 and H2 at ~0.96 Å.
+    fn water_positions() -> (Vec<f32>, Vec<u8>) {
+        let oh = 0.96f32;
+        let half_angle = (104.5f32 / 2.0).to_radians();
+        let positions = vec![
+            0.0, 0.0, 0.0,                                      // O
+            oh * half_angle.sin(), oh * half_angle.cos(), 0.0,   // H1
+            -oh * half_angle.sin(), oh * half_angle.cos(), 0.0,  // H2
+        ];
+        let elements = vec![8, 1, 1]; // O, H, H
+        (positions, elements)
+    }
+
+    #[test]
+    fn test_infer_bonds_empty() {
+        let bonds = infer_bonds(&[], &[], 0, &HashSet::new());
+        assert!(bonds.is_empty());
+    }
+
+    #[test]
+    fn test_infer_bonds_water() {
+        let (positions, elements) = water_positions();
+        let bonds = infer_bonds(&positions, &elements, 3, &HashSet::new());
+        assert_eq!(bonds.len(), 2);
+        assert!(bonds.contains(&(0, 1)));
+        assert!(bonds.contains(&(0, 2)));
+    }
+
+    #[test]
+    fn test_infer_bonds_skips_existing() {
+        let (positions, elements) = water_positions();
+        let mut existing = HashSet::new();
+        existing.insert((0u32, 1u32));
+        let bonds = infer_bonds(&positions, &elements, 3, &existing);
+        assert_eq!(bonds.len(), 1);
+        assert!(bonds.contains(&(0, 2)));
+    }
+
+    #[test]
+    fn test_infer_bonds_far_apart() {
+        let positions = vec![0.0, 0.0, 0.0, 10.0, 0.0, 0.0];
+        let elements = vec![6, 6];
+        let bonds = infer_bonds(&positions, &elements, 2, &HashSet::new());
+        assert!(bonds.is_empty());
+    }
+
+    #[test]
+    fn test_infer_bonds_too_close() {
+        let positions = vec![0.0, 0.0, 0.0, 0.3, 0.0, 0.0];
+        let elements = vec![6, 6];
+        let bonds = infer_bonds(&positions, &elements, 2, &HashSet::new());
+        assert!(bonds.is_empty());
+    }
+
+    #[test]
+    fn test_infer_bonds_vdw_water() {
+        let (positions, elements) = water_positions();
+        let bonds = infer_bonds_vdw(&positions, &elements, 3);
+        assert!(bonds.len() >= 2);
+        assert!(bonds.contains(&(0, 1)));
+        assert!(bonds.contains(&(0, 2)));
+    }
+
+    #[test]
+    fn test_infer_bonds_vdw_empty() {
+        let bonds = infer_bonds_vdw(&[], &[], 0);
+        assert!(bonds.is_empty());
+    }
+
+    #[test]
+    fn test_infer_bonds_vdw_far_apart() {
+        let positions = vec![0.0, 0.0, 0.0, 10.0, 0.0, 0.0];
+        let elements = vec![6, 6];
+        let bonds = infer_bonds_vdw(&positions, &elements, 2);
+        assert!(bonds.is_empty());
+    }
+}

@@ -330,3 +330,85 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         atom_labels,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_symbol_to_atomic_num_common() {
+        assert_eq!(symbol_to_atomic_num("H"), 1);
+        assert_eq!(symbol_to_atomic_num("C"), 6);
+        assert_eq!(symbol_to_atomic_num("N"), 7);
+        assert_eq!(symbol_to_atomic_num("O"), 8);
+        assert_eq!(symbol_to_atomic_num("S"), 16);
+        assert_eq!(symbol_to_atomic_num("Fe"), 26);
+        assert_eq!(symbol_to_atomic_num("Na"), 11);
+    }
+
+    #[test]
+    fn test_symbol_to_atomic_num_unknown() {
+        assert_eq!(symbol_to_atomic_num("Xx"), 0);
+        assert_eq!(symbol_to_atomic_num(""), 0);
+    }
+
+    #[test]
+    fn test_capitalize() {
+        assert_eq!(capitalize("fe"), "Fe");
+        assert_eq!(capitalize("FE"), "Fe");
+        assert_eq!(capitalize("c"), "C");
+        assert_eq!(capitalize(""), "");
+    }
+
+    #[test]
+    fn test_parse_minimal_pdb() {
+        let pdb = "CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 21          4\nATOM      1  N   THR A   1      17.047  14.099   3.625  1.00 13.79           N  \nATOM      2  CA  THR A   1      16.967  12.784   4.338  1.00 10.80           C  \nATOM      3  C   THR A   1      15.685  12.755   5.133  1.00  9.19           C  \nEND\n";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.n_atoms, 3);
+        assert_eq!(result.elements[0], 7);  // N
+        assert_eq!(result.elements[1], 6);  // C
+        assert_eq!(result.elements[2], 6);  // C
+        assert!((result.positions[0] - 17.047).abs() < 0.01);
+        assert!((result.positions[1] - 14.099).abs() < 0.01);
+        assert!(result.box_matrix.is_some());
+        let bm = result.box_matrix.unwrap();
+        assert!((bm[0] - 40.96).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_parse_pdb_with_conect() {
+        let pdb = "ATOM      1  O   HOH     1       0.000   0.000   0.000  1.00  0.00           O  \nATOM      2  H1  HOH     1       0.757   0.587   0.000  1.00  0.00           H  \nATOM      3  H2  HOH     1      -0.757   0.587   0.000  1.00  0.00           H  \nCONECT    1    2    3\nEND\n";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.n_atoms, 3);
+        assert!(result.n_file_bonds >= 2);
+    }
+
+    #[test]
+    fn test_parse_pdb_multi_model() {
+        let pdb = "MODEL        1\nATOM      1  CA  ALA A   1       1.000   2.000   3.000  1.00  0.00           C  \nENDMDL\nMODEL        2\nATOM      1  CA  ALA A   1       4.000   5.000   6.000  1.00  0.00           C  \nENDMDL\n";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.n_atoms, 1);
+        assert_eq!(result.frame_positions.len(), 1);
+        assert!((result.frame_positions[0][0] - 4.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_empty_pdb_errors() {
+        let result = parse("REMARK test\nEND\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_1crn_fixture() {
+        let text = std::fs::read_to_string(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/1crn.pdb")
+        ).expect("read fixture");
+        let result = parse(&text).expect("parse failed");
+        assert_eq!(result.n_atoms, 327);
+        assert!(!result.bonds.is_empty());
+        assert!(result.elements.contains(&6));  // C
+        assert!(result.elements.contains(&7));  // N
+        assert!(result.elements.contains(&8));  // O
+        assert!(result.elements.contains(&16)); // S
+    }
+}
