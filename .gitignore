@@ -12,5 +12,6 @@ tests/e2e/screenshot_*.png
 target/
 crates/megane-wasm/pkg/
 *.so
-python/megane/static/
+python/megane/static/app/
+python/megane/static/1crn.pdb
 .ipynb_checkpoints/
