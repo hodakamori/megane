@@ -6,7 +6,6 @@
 
 import * as THREE from "three";
 
-const INSET_SIZE = 120;
 const INSET_MARGIN = 8;
 const AXIS_COLORS = [0xdd3333, 0x33aa33, 0x3366dd];
 const ORTHO_EPS = 1e-4;
@@ -132,7 +131,10 @@ export class CellAxesRenderer {
       .applyQuaternion(mainCamera.quaternion);
 
     // Compute inset viewport (bottom-left, in device pixels)
-    const s = INSET_SIZE * pixelRatio;
+    // Responsive size: ~12% of the smaller dimension, clamped 60–140 CSS px
+    const minDim = Math.min(containerWidth, containerHeight);
+    const insetSize = Math.max(60, Math.min(140, Math.round(minDim * 0.12)));
+    const s = insetSize * pixelRatio;
     const m = INSET_MARGIN * pixelRatio;
     const x = m;
     const y = m; // WebGL y=0 is bottom
