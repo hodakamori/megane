@@ -51,6 +51,8 @@ export class MoleculeRenderer {
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
   private lastExtent = 1;
+  private lastExtentX = 1;
+  private lastExtentY = 1;
   private currentPositions: Float32Array | null = null;
   private atomScale = 1.0;
   private atomOpacity = 1.0;
@@ -418,6 +420,8 @@ export class MoleculeRenderer {
     const extentZ = maxZ - minZ;
     const maxExtent = Math.max(extentX, extentY, extentZ);
     this.lastExtent = maxExtent;
+    this.lastExtentX = extentX;
+    this.lastExtentY = extentY;
 
     this.controls.target.set(cx, cy, cz);
 
@@ -801,12 +805,23 @@ export class MoleculeRenderer {
     if (!this.container) return;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
+    if (w === 0 || h === 0) return;
     const aspect = w / h;
 
     if (this.camera instanceof THREE.OrthographicCamera) {
-      const frustumHeight = this.camera.top - this.camera.bottom;
-      this.camera.left = -frustumHeight * aspect / 2;
-      this.camera.right = frustumHeight * aspect / 2;
+      // Recalculate full frustum (top/bottom/left/right) so the view stays
+      // correct when the container aspect ratio changes (e.g. mobile rotation,
+      // address-bar show/hide).  camera.zoom is left untouched so the user's
+      // zoom level is preserved.
+      const padding = 1.2;
+      const halfH =
+        Math.max(this.lastExtentY / 2, this.lastExtentX / (2 * aspect)) *
+        padding;
+      const frustumHeight = Math.max(halfH * 2, 0.1);
+      this.camera.left = (-frustumHeight * aspect) / 2;
+      this.camera.right = (frustumHeight * aspect) / 2;
+      this.camera.top = frustumHeight / 2;
+      this.camera.bottom = -frustumHeight / 2;
     } else {
       this.camera.aspect = aspect;
     }
