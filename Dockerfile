@@ -14,6 +14,7 @@ RUN npm ci
 COPY --from=wasm /app/crates/megane-wasm/pkg/ crates/megane-wasm/pkg/
 COPY tsconfig.json tsconfig.node.json vite.config.ts vite.widget.config.ts index.html ./
 COPY src/ src/
+COPY tests/fixtures/ tests/fixtures/
 RUN npx tsc && npx vite build && npx vite build --config vite.widget.config.ts
 
 # Stage 2: Build and install Python package with Rust extension
