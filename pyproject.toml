@@ -7,6 +7,21 @@ name = "megane"
 version = "0.1.0"
 description = "A fast, beautiful molecular viewer"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "hodakamori" },
+]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Framework :: Jupyter",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+keywords = ["molecular", "viewer", "pdb", "jupyter", "widget", "anywidget"]
 dependencies = [
     "anywidget>=0.9.0",
     "traitlets>=5.0",
@@ -16,6 +31,11 @@ dependencies = [
     "websockets>=12.0",
     "python-multipart>=0.0.6",
 ]
+
+[project.urls]
+Homepage = "https://github.com/hodakamori/megane"
+Repository = "https://github.com/hodakamori/megane"
+Issues = "https://github.com/hodakamori/megane/issues"
 
 [project.optional-dependencies]
 trajectory = ["MDAnalysis>=2.5"]
@@ -29,6 +49,7 @@ manifest-path = "crates/megane-python/Cargo.toml"
 python-source = "python"
 module-name = "megane.megane_parser"
 features = ["pyo3/extension-module"]
+include = ["python/megane/static/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
