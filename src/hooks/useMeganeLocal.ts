@@ -11,7 +11,8 @@ import { parseStructureFile, parseStructureText } from "../core/parsers/structur
 import { parseXTCFile } from "../core/parsers/xtc";
 import { withBonds, computeBondsForSource, loadBondFileData } from "../core/bondSourceLogic";
 import { computeLabelsForSource, loadLabelFileData } from "../core/labelSourceLogic";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource } from "../core/types";
+import { getVectorsForFrame, loadVectorFileData } from "../core/vectorSourceLogic";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../core/types";
 
 export interface MeganeLocalState {
   snapshot: Snapshot | null;
@@ -41,6 +42,11 @@ export interface MeganeLocalState {
   labelFileName: string | null;
   hasStructureLabels: boolean;
   atomLabels: string[] | null;
+  vectorSource: VectorSource;
+  setVectorSource: (source: VectorSource) => void;
+  loadVectorFile: (file: File) => Promise<void>;
+  vectorFileName: string | null;
+  atomVectors: Float32Array | null;
 }
 
 export function useMeganeLocal(): MeganeLocalState {
@@ -60,6 +66,9 @@ export function useMeganeLocal(): MeganeLocalState {
   const [labelFileName, setLabelFileName] = useState<string | null>(null);
   const [hasStructureLabels, setHasStructureLabels] = useState(false);
   const [atomLabels, setAtomLabels] = useState<string[] | null>(null);
+  const [vectorSource, setVectorSourceState] = useState<VectorSource>("none");
+  const [vectorFileName, setVectorFileName] = useState<string | null>(null);
+  const [atomVectors, setAtomVectors] = useState<Float32Array | null>(null);
 
   const currentFrameRef = useRef(0);
   const structureFramesRef = useRef<Frame[]>([]);
@@ -72,6 +81,7 @@ export function useMeganeLocal(): MeganeLocalState {
   const currentTrajSourceRef = useRef<TrajectorySource>("structure");
   const structureLabelsRef = useRef<string[] | null>(null);
   const fileLabelsRef = useRef<string[] | null>(null);
+  const fileVectorsRef = useRef<VectorFrame[] | null>(null);
 
   const resetPlayback = useCallback(() => {
     setFrame(null);
@@ -134,6 +144,12 @@ export function useMeganeLocal(): MeganeLocalState {
       setHasStructureLabels(result.labels != null);
       setLabelSourceState("none");
       setAtomLabels(null);
+
+      // Vector state reset
+      fileVectorsRef.current = null;
+      setVectorFileName(null);
+      setVectorSourceState("none");
+      setAtomVectors(null);
 
       setHasStructureBonds(result.snapshot.nFileBonds > 0);
       setHasStructureFrames(result.frames.length > 0);
@@ -204,6 +220,12 @@ export function useMeganeLocal(): MeganeLocalState {
     }
     setCurrentFrame(frameIdx);
     currentFrameRef.current = frameIdx;
+
+    // Update vectors for this frame
+    if (fileVectorsRef.current) {
+      const vecs = getVectorsForFrame({ fileVectors: fileVectorsRef.current }, frameIdx);
+      setAtomVectors(vecs);
+    }
   }, []);
 
   const setBondSource = useCallback(async (source: BondSource) => {
@@ -260,6 +282,28 @@ export function useMeganeLocal(): MeganeLocalState {
     setAtomLabels(labels);
   }, []);
 
+  const setVectorSource = useCallback((source: VectorSource) => {
+    setVectorSourceState(source);
+    if (source === "none") {
+      setAtomVectors(null);
+    } else if (source === "file" && fileVectorsRef.current) {
+      const vecs = getVectorsForFrame({ fileVectors: fileVectorsRef.current }, currentFrameRef.current);
+      setAtomVectors(vecs);
+    }
+  }, []);
+
+  const loadVectorFile = useCallback(async (file: File) => {
+    const base = baseSnapshotRef.current;
+    if (!base) return;
+
+    const { vectors, fileName } = await loadVectorFileData(file, base.nAtoms);
+    fileVectorsRef.current = vectors;
+    setVectorFileName(fileName);
+    setVectorSourceState("file");
+    const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
+    setAtomVectors(vecs);
+  }, []);
+
   return {
     snapshot,
     frame,
@@ -288,5 +332,10 @@ export function useMeganeLocal(): MeganeLocalState {
     labelFileName,
     hasStructureLabels,
     atomLabels,
+    vectorSource,
+    setVectorSource,
+    loadVectorFile,
+    vectorFileName,
+    atomVectors,
   };
 }

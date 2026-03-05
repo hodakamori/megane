@@ -11,6 +11,7 @@ interface ViewportProps {
   snapshot: Snapshot | null;
   frame: Frame | null;
   atomLabels?: string[] | null;
+  atomVectors?: Float32Array | null;
   onRendererReady?: (renderer: MoleculeRenderer) => void;
   onHover?: (info: HoverInfo) => void;
   onAtomRightClick?: (atomIndex: number) => void;
@@ -21,6 +22,7 @@ export function Viewport({
   snapshot,
   frame,
   atomLabels,
+  atomVectors,
   onRendererReady,
   onHover,
   onAtomRightClick,
@@ -108,6 +110,10 @@ export function Viewport({
   useEffect(() => {
     rendererRef.current?.setLabels(atomLabels ?? null);
   }, [atomLabels]);
+
+  useEffect(() => {
+    rendererRef.current?.setVectors(atomVectors ?? null);
+  }, [atomVectors]);
 
   return (
     <div
