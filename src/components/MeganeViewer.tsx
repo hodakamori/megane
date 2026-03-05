@@ -78,6 +78,8 @@ export function MeganeViewer({
   const [atomOpacity, setAtomOpacity] = useState(1.0);
   const [bondScale, setBondScale] = useState(1.0);
   const [bondOpacity, setBondOpacity] = useState(1.0);
+  const [vdwScale, setVdwScale] = useState(0.6);
+  const vdwScaleRef = useRef(0.6);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -150,6 +152,19 @@ export function MeganeViewer({
     rendererRef.current?.setBondOpacity(opacity);
   }, []);
 
+  const handleVdwScaleChange = useCallback((scale: number) => {
+    setVdwScale(scale);
+    vdwScaleRef.current = scale;
+    // Recalculate bonds immediately with new scale
+    if (bondSourceRef.current !== "distance") return;
+    const renderer = rendererRef.current;
+    if (!renderer || !snapshot) return;
+    const positions = frame?.positions ?? snapshot?.positions;
+    if (!positions) return;
+    const newBonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms, scale);
+    renderer.updateBonds(newBonds, null);
+  }, [snapshot, frame]);
+
   // Toggle bond visibility when bondSource changes to/from "none"
   useEffect(() => {
     rendererRef.current?.setBondsVisible(bonds.source !== "none");
@@ -168,7 +183,7 @@ export function MeganeViewer({
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const newBonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms);
+    const newBonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms, vdwScaleRef.current);
     renderer.updateBonds(newBonds, null);
   }, [frame, snapshot]);
 
@@ -213,6 +228,8 @@ export function MeganeViewer({
         onBondScaleChange={handleBondScaleChange}
         bondOpacity={bondOpacity}
         onBondOpacityChange={handleBondOpacityChange}
+        vdwScale={bonds.source === "distance" ? vdwScale : undefined}
+        onVdwScaleChange={bonds.source === "distance" ? handleVdwScaleChange : undefined}
         labels={labels}
         hasCell={hasCell}
         cellAxesVisible={cellAxesVisible}
