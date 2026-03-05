@@ -231,11 +231,22 @@ export class ImpostorBondMesh {
       }
     }
 
-    this.startAttr.needsUpdate = true;
-    this.endAttr.needsUpdate = true;
-    this.colorAttr.needsUpdate = true;
-    this.radiusAttr.needsUpdate = true;
-    this.dashedAttr.needsUpdate = true;
+    // Re-create attribute objects and re-register on geometry to guarantee
+    // GPU upload when loadSnapshot() is called again (e.g. from updateBonds).
+    this.startAttr = new THREE.InstancedBufferAttribute(this.startBuf, 3);
+    this.endAttr = new THREE.InstancedBufferAttribute(this.endBuf, 3);
+    this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
+    this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
+    this.dashedAttr = new THREE.InstancedBufferAttribute(this.dashedBuf, 1);
+
+    this.startAttr.setUsage(THREE.DynamicDrawUsage);
+    this.endAttr.setUsage(THREE.DynamicDrawUsage);
+
+    this.geo.setAttribute("instanceStart", this.startAttr);
+    this.geo.setAttribute("instanceEnd", this.endAttr);
+    this.geo.setAttribute("instanceColor", this.colorAttr);
+    this.geo.setAttribute("instanceRadius", this.radiusAttr);
+    this.geo.setAttribute("instanceDashed", this.dashedAttr);
     this.geo.instanceCount = idx;
   }
 
