@@ -12,6 +12,7 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { TabSelector } from "./ui";
 import { MoleculeRenderer } from "../core/MoleculeRenderer";
+import { inferBondsVdwJS } from "../core/inferBondsJS";
 import type {
   Snapshot,
   Frame,
@@ -52,9 +53,7 @@ export function WidgetViewer({
   const [fps, setFps] = useState(30);
   const [bondSource, setBondSource] = useState<BondSource>("structure");
   const [bondCount, setBondCount] = useState(0);
-  const [vdwScale, setVdwScale] = useState(0.6);
   const bondSourceRef = useRef<BondSource>("structure");
-  const vdwScaleRef = useRef(0.6);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -70,7 +69,6 @@ export function WidgetViewer({
 
       if (source === "none") {
         renderer.setBondsVisible(false);
-        renderer.disableDistanceBonds();
         setBondCount(0);
         return;
       }
@@ -78,17 +76,18 @@ export function WidgetViewer({
       renderer.setBondsVisible(true);
 
       if (source === "structure") {
-        renderer.disableDistanceBonds();
+        // Restore original bonds from snapshot
         renderer.updateBonds(snapshot.bonds, snapshot.bondOrders);
         setBondCount(snapshot.nBonds);
       } else if (source === "distance") {
-        const count = renderer.enableDistanceBonds(
-          snapshot.elements, snapshot.nAtoms, vdwScaleRef.current,
-        );
-        setBondCount(count);
+        // Compute distance bonds from current positions
+        const positions = frame?.positions ?? snapshot.positions;
+        const bonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms);
+        renderer.updateBonds(bonds, null);
+        setBondCount(bonds.length / 2);
       }
     },
-    [snapshot],
+    [snapshot, frame],
   );
 
   // Update bond count when snapshot changes
@@ -97,6 +96,18 @@ export function WidgetViewer({
       setBondCount(snapshot.nBonds);
     }
   }, [snapshot, bondSource]);
+
+  // Per-frame bond recalculation for distance mode
+  useEffect(() => {
+    if (bondSourceRef.current !== "distance") return;
+    if (!snapshot || !frame) return;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    const bonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms);
+    renderer.updateBonds(bonds, null);
+    setBondCount(bonds.length / 2);
+  }, [frame, snapshot]);
 
   const handleResetView = useCallback(() => {
     rendererRef.current?.resetView();
@@ -139,17 +150,6 @@ export function WidgetViewer({
   const handleBondOpacityChange = useCallback((opacity: number) => {
     setBondOpacity(opacity);
     rendererRef.current?.setBondOpacity(opacity);
-  }, []);
-
-  const handleVdwScaleChange = useCallback((scale: number) => {
-    setVdwScale(scale);
-    vdwScaleRef.current = scale;
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-    const count = renderer.setVdwScale(scale);
-    if (bondSourceRef.current === "distance") {
-      setBondCount(count);
-    }
   }, []);
 
   const handleToggleCellAxes = useCallback(() => {
@@ -326,8 +326,6 @@ export function WidgetViewer({
         onBondScaleChange={handleBondScaleChange}
         bondOpacity={bondOpacity}
         onBondOpacityChange={handleBondOpacityChange}
-        vdwScale={vdwScale}
-        onVdwScaleChange={handleVdwScaleChange}
         labels={labelConfig}
         hasCell={hasCell}
         cellAxesVisible={cellAxesVisible}
