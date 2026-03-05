@@ -13,6 +13,7 @@ import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../core/MoleculeRenderer";
+import { inferBondsVdwJS } from "../core/inferBondsJS";
 import type {
   Snapshot,
   Frame,
@@ -153,6 +154,23 @@ export function MeganeViewer({
   useEffect(() => {
     rendererRef.current?.setBondsVisible(bonds.source !== "none");
   }, [bonds.source]);
+
+  // Track current bond source for per-frame recalculation
+  const bondSourceRef = useRef<BondSource>(bonds.source);
+  useEffect(() => {
+    bondSourceRef.current = bonds.source;
+  }, [bonds.source]);
+
+  // Per-frame bond recalculation for distance mode
+  useEffect(() => {
+    if (bondSourceRef.current !== "distance") return;
+    if (!snapshot || !frame) return;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    const newBonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms);
+    renderer.updateBonds(newBonds, null);
+  }, [frame, snapshot]);
 
   // Check if snapshot has a non-zero box
   const hasCell =
