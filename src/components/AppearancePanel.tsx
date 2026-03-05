@@ -371,6 +371,7 @@ export function AppearancePanel({
             <TabSelector<VectorSource>
               options={[
                 { value: "none", label: "None" },
+                { value: "demo", label: "Demo" },
                 { value: "file", label: "File" },
               ]}
               value={vectors.source}
@@ -388,7 +389,7 @@ export function AppearancePanel({
                 )}
               </DropZone>
             )}
-            {vectors.source === "file" && vectorScale != null && onVectorScaleChange && (
+            {vectors.source !== "none" && vectorScale != null && onVectorScaleChange && (
               <div style={{ marginTop: 8 }}>
                 <div style={sectionLabelStyle}>Arrow Scale</div>
                 <div

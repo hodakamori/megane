@@ -46,6 +46,8 @@ function App() {
       const buffer = await resp.arrayBuffer();
       const file = new File([buffer], "1crn_vibration.xtc");
       await local.loadXtc(file);
+      // Load demo vectors so arrows are visible by default
+      local.loadDemoVectors();
     })().catch(() => {});
   }, []);
 
