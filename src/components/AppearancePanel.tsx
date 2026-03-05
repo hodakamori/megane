@@ -30,6 +30,8 @@ interface AppearancePanelProps {
   onBondScaleChange: (scale: number) => void;
   bondOpacity: number;
   onBondOpacityChange: (opacity: number) => void;
+  vdwScale?: number;
+  onVdwScaleChange?: (scale: number) => void;
   labels: LabelConfig;
   hasCell?: boolean;
   cellAxesVisible?: boolean;
@@ -68,6 +70,8 @@ export function AppearancePanel({
   onBondScaleChange,
   bondOpacity,
   onBondOpacityChange,
+  vdwScale,
+  onVdwScaleChange,
   labels,
   hasCell,
   cellAxesVisible,
@@ -282,6 +286,33 @@ export function AppearancePanel({
             </span>
           </div>
         </div>
+
+        {/* VDW Scale Section */}
+        {vdwScale != null && onVdwScaleChange && (
+          <div>
+            <div style={sectionLabelStyle}>VDW Scale</div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <input
+                type="range"
+                min="0.1"
+                max="1.5"
+                step="0.01"
+                value={vdwScale}
+                onChange={(e) => onVdwScaleChange(parseFloat(e.target.value))}
+                style={sliderTrackStyle}
+              />
+              <span style={valueDisplayStyle}>
+                {vdwScale.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Labels Section */}
         <div>
