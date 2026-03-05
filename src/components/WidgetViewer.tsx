@@ -49,6 +49,7 @@ export function WidgetViewer({
   const [bondScale, setBondScale] = useState(1.0);
   const [bondOpacity, setBondOpacity] = useState(1.0);
   const [cellAxesVisible, setCellAxesVisible] = useState(true);
+  const [perspective, setPerspective] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
   const [bondSource, setBondSource] = useState<BondSource>("structure");
@@ -173,6 +174,11 @@ export function WidgetViewer({
       rendererRef.current?.setCellAxesVisible(next);
       return next;
     });
+  }, []);
+
+  const handlePerspectiveChange = useCallback((enabled: boolean) => {
+    setPerspective(enabled);
+    rendererRef.current?.setPerspective(enabled);
   }, []);
 
   const handlePlayPause = useCallback(() => {
@@ -344,6 +350,8 @@ export function WidgetViewer({
         vdwScale={bondSource === "distance" ? vdwScale : undefined}
         onVdwScaleChange={bondSource === "distance" ? handleVdwScaleChange : undefined}
         labels={labelConfig}
+        perspective={perspective}
+        onPerspectiveChange={handlePerspectiveChange}
         hasCell={hasCell}
         cellAxesVisible={cellAxesVisible}
         onToggleCellAxes={handleToggleCellAxes}

@@ -37,8 +37,9 @@ export class MoleculeRenderer {
   private container: HTMLElement | null = null;
   private renderer!: THREE.WebGLRenderer;
   private scene!: THREE.Scene;
-  private camera!: THREE.PerspectiveCamera;
+  private camera!: THREE.OrthographicCamera | THREE.PerspectiveCamera;
   private controls!: OrbitControls;
+  private perspectiveMode = false;
   private atomRenderer: AtomRenderer | null = null;
   private bondRenderer: BondRenderer | null = null;
   private cellRenderer: CellRenderer | null = null;
@@ -89,12 +90,13 @@ export class MoleculeRenderer {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xffffff);
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(
-      50,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      10000,
+    // Camera (orthographic by default, like OVITO)
+    const aspect = container.clientWidth / container.clientHeight;
+    const frustumSize = 50;
+    this.camera = new THREE.OrthographicCamera(
+      -frustumSize * aspect / 2, frustumSize * aspect / 2,
+      frustumSize / 2, -frustumSize / 2,
+      0.1, 10000,
     );
     this.camera.position.set(0, 0, 50);
 
@@ -358,14 +360,78 @@ export class MoleculeRenderer {
     this.controls.target.set(cx, cy, cz);
     const distance = extent * 1.2;
     this.camera.position.set(cx, cy, cz + distance);
-    this.camera.near = distance * 0.01;
-    this.camera.far = distance * 10;
+
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      const aspect = this.container
+        ? this.container.clientWidth / this.container.clientHeight
+        : 1;
+      this.camera.left = -distance * aspect / 2;
+      this.camera.right = distance * aspect / 2;
+      this.camera.top = distance / 2;
+      this.camera.bottom = -distance / 2;
+      this.camera.near = -distance * 10;
+      this.camera.far = distance * 10;
+      this.camera.zoom = 1;
+    } else {
+      this.camera.near = distance * 0.01;
+      this.camera.far = distance * 10;
+    }
     this.camera.updateProjectionMatrix();
     this.controls.update();
   }
 
   /** Reset view to fit all atoms. */
   resetView(): void {
+    if (this.snapshot) {
+      this.fitToView(this.snapshot);
+    }
+  }
+
+  /** Switch between orthographic and perspective projection. */
+  setPerspective(enabled: boolean): void {
+    if (this.perspectiveMode === enabled) return;
+    this.perspectiveMode = enabled;
+    if (!this.container) return;
+
+    // Save camera state
+    const pos = this.camera.position.clone();
+    const target = this.controls.target.clone();
+    const up = this.camera.up.clone();
+
+    // Create new camera
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    const aspect = w / h;
+
+    if (enabled) {
+      this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 10000);
+    } else {
+      const frustumSize = 50;
+      this.camera = new THREE.OrthographicCamera(
+        -frustumSize * aspect / 2, frustumSize * aspect / 2,
+        frustumSize / 2, -frustumSize / 2,
+        0.1, 10000,
+      );
+    }
+
+    this.camera.position.copy(pos);
+    this.camera.up.copy(up);
+
+    // Recreate controls with new camera
+    const oldDamping = this.controls.enableDamping;
+    const oldDampingFactor = this.controls.dampingFactor;
+    const oldRotateSpeed = this.controls.rotateSpeed;
+    const oldZoomSpeed = this.controls.zoomSpeed;
+    this.controls.dispose();
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = oldDamping;
+    this.controls.dampingFactor = oldDampingFactor;
+    this.controls.rotateSpeed = oldRotateSpeed;
+    this.controls.zoomSpeed = oldZoomSpeed;
+    this.controls.target.copy(target);
+    this.controls.update();
+
+    // Re-fit to view with new camera type
     if (this.snapshot) {
       this.fitToView(this.snapshot);
     }
@@ -400,8 +466,13 @@ export class MoleculeRenderer {
 
   /** Estimate the screen-space radius (in pixels) of a sphere at the given depth. */
   private screenRadius(worldRadius: number, depth: number, h: number): number {
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      // Orthographic: size is independent of depth
+      const frustumHeight = (this.camera.top - this.camera.bottom) / this.camera.zoom;
+      const pxPerUnit = h / frustumHeight;
+      return worldRadius * pxPerUnit;
+    }
     const fovRad = (this.camera.fov * Math.PI) / 180;
-    // pixels per world-unit at the given depth
     const pxPerUnit = h / (2 * depth * Math.tan(fovRad / 2));
     return worldRadius * pxPerUnit;
   }
@@ -643,7 +714,15 @@ export class MoleculeRenderer {
     if (!this.container) return;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-    this.camera.aspect = w / h;
+    const aspect = w / h;
+
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      const frustumHeight = this.camera.top - this.camera.bottom;
+      this.camera.left = -frustumHeight * aspect / 2;
+      this.camera.right = frustumHeight * aspect / 2;
+    } else {
+      this.camera.aspect = aspect;
+    }
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.labelOverlay?.resize(w, h, Math.min(window.devicePixelRatio, 2));

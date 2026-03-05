@@ -79,6 +79,7 @@ export function MeganeViewer({
   const [bondScale, setBondScale] = useState(1.0);
   const [bondOpacity, setBondOpacity] = useState(1.0);
   const [vdwScale, setVdwScale] = useState(0.6);
+  const [perspective, setPerspective] = useState(false);
   const vdwScaleRef = useRef(0.6);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
@@ -103,6 +104,11 @@ export function MeganeViewer({
       rendererRef.current?.setCellAxesVisible(next);
       return next;
     });
+  }, []);
+
+  const handlePerspectiveChange = useCallback((enabled: boolean) => {
+    setPerspective(enabled);
+    rendererRef.current?.setPerspective(enabled);
   }, []);
 
   const handleAtomRightClick = useCallback((atomIndex: number) => {
@@ -231,6 +237,8 @@ export function MeganeViewer({
         vdwScale={bonds.source === "distance" ? vdwScale : undefined}
         onVdwScaleChange={bonds.source === "distance" ? handleVdwScaleChange : undefined}
         labels={labels}
+        perspective={perspective}
+        onPerspectiveChange={handlePerspectiveChange}
         hasCell={hasCell}
         cellAxesVisible={cellAxesVisible}
         onToggleCellAxes={handleToggleCellAxes}
