@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-all clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -29,8 +29,20 @@ test-widget:
 test-e2e:
 	node tests/e2e/test_widget_render.mjs
 
-# Run all tests (Python + E2E)
-test-all: test test-e2e
+# Run TypeScript unit + component tests
+test-ts:
+	npm test
+
+# Run Rust unit tests
+test-rust:
+	cargo test -p megane-core
+
+# Run E2E snapshot tests (Playwright + Vite dev server)
+test-e2e-snapshot:
+	node tests/e2e/snapshot.test.mjs
+
+# Run all tests (Python + TypeScript + Rust + E2E)
+test-all: test test-ts test-rust test-e2e test-e2e-snapshot
 
 # Clean build artifacts
 clean:
