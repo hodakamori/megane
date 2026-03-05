@@ -54,6 +54,10 @@ export class MoleculeRenderer {
   private lastExtentX = 1;
   private lastExtentY = 1;
   private currentPositions: Float32Array | null = null;
+  /** Axes-inset drag state */
+  private axesDragging = false;
+  private axesDragLastX = 0;
+  private axesDragLastY = 0;
   private atomScale = 1.0;
   private atomOpacity = 1.0;
   private bondScale = 1.0;
@@ -311,6 +315,56 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) {
       this.cellAxesRenderer.setVisible(visible);
     }
+  }
+
+  // ── Axes inset drag API ───────────────────────────────────
+
+  /** Returns true if the CSS-pixel coordinate hits the axes inset. */
+  hitTestAxesInset(cssX: number, cssY: number): boolean {
+    if (!this.cellAxesRenderer || !this.container) return false;
+    return this.cellAxesRenderer.hitTest(
+      cssX,
+      cssY,
+      this.container.clientHeight,
+    );
+  }
+
+  /** Begin an axes-inset drag at the given CSS coordinates. */
+  startAxesDrag(cssX: number, cssY: number): void {
+    this.axesDragging = true;
+    this.axesDragLastX = cssX;
+    this.axesDragLastY = cssY;
+    // Disable orbit controls while dragging the inset
+    this.controls.enabled = false;
+  }
+
+  /** Continue an axes-inset drag. Returns true if currently dragging. */
+  moveAxesDrag(cssX: number, cssY: number): boolean {
+    if (!this.axesDragging || !this.cellAxesRenderer || !this.container)
+      return false;
+    const dx = cssX - this.axesDragLastX;
+    const dy = cssY - this.axesDragLastY;
+    this.axesDragLastX = cssX;
+    this.axesDragLastY = cssY;
+    this.cellAxesRenderer.moveBy(
+      dx,
+      dy,
+      this.container.clientWidth,
+      this.container.clientHeight,
+    );
+    return true;
+  }
+
+  /** End the axes-inset drag. */
+  endAxesDrag(): void {
+    if (!this.axesDragging) return;
+    this.axesDragging = false;
+    this.controls.enabled = true;
+  }
+
+  /** Whether an axes drag is in progress. */
+  isAxesDragging(): boolean {
+    return this.axesDragging;
   }
 
   /** Check if cell axes data exists. */
