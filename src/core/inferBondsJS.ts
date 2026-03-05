@@ -8,20 +8,19 @@
 
 import { VDW_RADII, DEFAULT_RADIUS } from "./constants";
 
-const DEFAULT_VDW_BOND_FACTOR = 0.6;
+const VDW_BOND_FACTOR = 0.6;
 const MIN_BOND_DIST = 0.4;
 const CELL_SIZE = 2.0;
 
 /**
  * Infer bonds based on van der Waals radii.
  * Two atoms are bonded if:
- *   MIN_BOND_DIST < distance <= (vdw_i + vdw_j) * vdwScale
+ *   MIN_BOND_DIST < distance <= (vdw_i + vdw_j) * VDW_BOND_FACTOR
  */
 export function inferBondsVdwJS(
   positions: Float32Array,
   elements: Uint8Array,
   nAtoms: number,
-  vdwScale: number = DEFAULT_VDW_BOND_FACTOR,
 ): Uint32Array {
   if (nAtoms < 2) return new Uint32Array(0);
 
@@ -70,7 +69,7 @@ export function inferBondsVdwJS(
   function checkPair(i: number, j: number): void {
     const ri = VDW_RADII[elements[i]] ?? DEFAULT_RADIUS;
     const rj = VDW_RADII[elements[j]] ?? DEFAULT_RADIUS;
-    const threshold = (ri + rj) * vdwScale;
+    const threshold = (ri + rj) * VDW_BOND_FACTOR;
     const thresholdSq = threshold * threshold;
 
     const dx = positions[j * 3] - positions[i * 3];

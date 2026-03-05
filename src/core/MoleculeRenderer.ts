@@ -20,7 +20,6 @@ import type {
 } from "./types";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
-import { inferBondsVdwJS } from "./inferBondsJS";
 import { CellRenderer } from "./CellRenderer";
 import { CellAxesRenderer } from "./CellAxesRenderer";
 import { LabelOverlay } from "./LabelOverlay";
@@ -54,7 +53,6 @@ export class MoleculeRenderer {
   private atomOpacity = 1.0;
   private bondScale = 1.0;
   private bondOpacity = 1.0;
-  private distanceBondConfig: { elements: Uint8Array; nAtoms: number; vdwScale: number } | null = null;
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -190,10 +188,7 @@ export class MoleculeRenderer {
   /** Update positions from a trajectory frame. */
   updateFrame(frame: Frame): void {
     if (!this.snapshot || !this.atomRenderer || !this.bondRenderer) return;
-    if (!this.currentPositions || this.currentPositions.length < frame.positions.length) {
-      this.currentPositions = new Float32Array(frame.positions.length);
-    }
-    this.currentPositions.set(frame.positions);
+    this.currentPositions = new Float32Array(frame.positions);
     this.atomRenderer.updatePositions(frame.positions);
     this.labelOverlay?.setPositions(frame.positions);
     this.bondRenderer.updatePositions(
@@ -201,11 +196,6 @@ export class MoleculeRenderer {
       this.snapshot.bonds,
       this.snapshot.nBonds,
     );
-    if (this.distanceBondConfig) {
-      const { elements, nAtoms, vdwScale } = this.distanceBondConfig;
-      const bonds = inferBondsVdwJS(frame.positions, elements, nAtoms, vdwScale);
-      this.updateBonds(bonds, null);
-    }
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
     }
@@ -235,42 +225,6 @@ export class MoleculeRenderer {
     if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
       this.bondRenderer.setScale(this.bondScale, updated);
     }
-  }
-
-  /**
-   * Enable automatic distance-based bond recalculation in updateFrame().
-   * Returns the initial bond count.
-   */
-  enableDistanceBonds(elements: Uint8Array, nAtoms: number, vdwScale: number): number {
-    this.distanceBondConfig = { elements, nAtoms, vdwScale };
-    // Compute bonds for current positions immediately
-    const positions = this.currentPositions ?? this.snapshot?.positions;
-    if (positions) {
-      const bonds = inferBondsVdwJS(positions, elements, nAtoms, vdwScale);
-      this.updateBonds(bonds, null);
-      return bonds.length / 2;
-    }
-    return 0;
-  }
-
-  /** Disable automatic distance-based bond recalculation. */
-  disableDistanceBonds(): void {
-    this.distanceBondConfig = null;
-  }
-
-  /** Update VDW scale and immediately recalculate bonds. Returns bond count. */
-  setVdwScale(vdwScale: number): number {
-    if (this.distanceBondConfig) {
-      this.distanceBondConfig.vdwScale = vdwScale;
-      const positions = this.currentPositions ?? this.snapshot?.positions;
-      if (positions) {
-        const { elements, nAtoms } = this.distanceBondConfig;
-        const bonds = inferBondsVdwJS(positions, elements, nAtoms, vdwScale);
-        this.updateBonds(bonds, null);
-        return bonds.length / 2;
-      }
-    }
-    return 0;
   }
 
   /** Set per-atom labels for overlay display. */

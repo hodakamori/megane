@@ -77,7 +77,6 @@ export function MeganeViewer({
   const [atomOpacity, setAtomOpacity] = useState(1.0);
   const [bondScale, setBondScale] = useState(1.0);
   const [bondOpacity, setBondOpacity] = useState(1.0);
-  const [vdwScale, setVdwScale] = useState(0.6);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -150,11 +149,6 @@ export function MeganeViewer({
     rendererRef.current?.setBondOpacity(opacity);
   }, []);
 
-  const handleVdwScaleChange = useCallback((scale: number) => {
-    setVdwScale(scale);
-    rendererRef.current?.setVdwScale(scale);
-  }, []);
-
   // Toggle bond visibility when bondSource changes to/from "none"
   useEffect(() => {
     rendererRef.current?.setBondsVisible(bonds.source !== "none");
@@ -201,8 +195,6 @@ export function MeganeViewer({
         onBondScaleChange={handleBondScaleChange}
         bondOpacity={bondOpacity}
         onBondOpacityChange={handleBondOpacityChange}
-        vdwScale={vdwScale}
-        onVdwScaleChange={handleVdwScaleChange}
         labels={labels}
         hasCell={hasCell}
         cellAxesVisible={cellAxesVisible}
