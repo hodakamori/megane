@@ -612,6 +612,13 @@ export class MoleculeRenderer {
     return { atoms: [...this.selectedAtoms] };
   }
 
+  /** Set selected atoms directly (for external triggers). Returns new selection state. */
+  setSelection(atomIndices: number[]): SelectionState {
+    this.selectedAtoms = atomIndices.slice(0, 4);
+    this.updateSelectionVisuals();
+    return { atoms: [...this.selectedAtoms] };
+  }
+
   /** Clear all selected atoms. */
   clearSelection(): void {
     this.selectedAtoms = [];
