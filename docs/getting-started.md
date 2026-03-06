@@ -1,5 +1,7 @@
 # Getting Started
 
+<MoleculeDemo src="/megane/data/1crn.json" height="300px" :autoRotate="true" />
+
 ## Prerequisites
 
 - Python 3.10 or later
@@ -11,6 +13,12 @@
 
 ```bash
 pip install megane
+```
+
+For XTC trajectory support:
+
+```bash
+pip install megane[trajectory]
 ```
 
 ### npm (for React embedding)
@@ -65,10 +73,36 @@ You can also start the server without a file and upload from the browser:
 megane serve
 ```
 
+### React Component
+
+```tsx
+import { MeganeViewer } from "megane";
+
+function App() {
+  return (
+    <MeganeViewer
+      snapshot={snapshot}
+      mode="local"
+      // ... see Web/React guide for full example
+    />
+  );
+}
+```
+
+## Supported File Formats
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| PDB | `.pdb` | Protein Data Bank — most common molecular structure format |
+| GRO | `.gro` | GROMACS structure file |
+| XYZ | `.xyz` | Simple cartesian coordinate format |
+| MOL | `.mol` | MDL Molfile (V2000) — small molecules with bond information |
+| XTC | `.xtc` | GROMACS compressed trajectory |
+
 ## Next Steps
 
-- [Jupyter Widget Guide](/guide/jupyter) — Detailed widget usage and event handling
+- [Jupyter Widget Guide](/guide/jupyter) — Detailed widget usage, event handling, and Plotly integration
 - [CLI Guide](/guide/cli) — All CLI options and development mode
-- [Web / React Guide](/guide/web) — Embedding in React applications
+- [Web / React Guide](/guide/web) — Embedding in React applications, imperative renderer API
 - [Python API Reference](/api/python/) — Full Python API documentation
 - [TypeScript API Reference](/api/typescript/) — Full TypeScript API documentation
