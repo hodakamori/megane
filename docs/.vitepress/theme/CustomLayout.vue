@@ -59,6 +59,7 @@ const { Layout } = DefaultTheme;
   .VPHero.has-image .main {
     max-width: 40%;
     flex-shrink: 0;
+    padding-right: 32px;
   }
 
   .VPHero.has-image .image {

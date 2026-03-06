@@ -2,6 +2,12 @@
 import { ref } from "vue";
 
 const activeTab = ref(0);
+const activeInstall = ref(0);
+
+const installCommands = [
+  { label: "pip", command: "pip install megane" },
+  { label: "npm", command: "npm install megane" },
+];
 
 const tabs = [
   { label: "Python" },
@@ -12,9 +18,21 @@ const tabs = [
 
 <template>
   <div class="hero-code-tabs">
-    <div class="install-command">
-      <span class="install-prompt">$</span>
-      <span class="install-text">pip install megane</span>
+    <div class="install-bar">
+      <div class="install-tabs">
+        <button
+          v-for="(cmd, i) in installCommands"
+          :key="cmd.label"
+          :class="['install-tab', { active: activeInstall === i }]"
+          @click="activeInstall = i"
+        >
+          {{ cmd.label }}
+        </button>
+      </div>
+      <div class="install-command">
+        <span class="install-prompt">$</span>
+        <span class="install-text">{{ installCommands[activeInstall].command }}</span>
+      </div>
     </div>
     <div class="tab-buttons">
       <button
@@ -56,17 +74,49 @@ const tabs = [
   text-align: left;
 }
 
+.install-bar {
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+}
+
+.install-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.install-tab {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--vp-font-family-base);
+  color: var(--vp-c-text-3);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.install-tab:hover {
+  color: var(--vp-c-text-1);
+}
+
+.install-tab.active {
+  color: var(--vp-c-text-1);
+  border-bottom-color: var(--vp-c-text-1);
+}
+
 .install-command {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: var(--vp-c-bg-soft);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px 8px 0 0;
   font-family: var(--vp-font-family-mono);
   font-size: 14px;
-  margin-bottom: -1px;
 }
 
 .install-prompt {
@@ -119,6 +169,7 @@ const tabs = [
   font-family: var(--vp-font-family-mono);
   font-size: 13px;
   line-height: 1.7;
+  min-height: 165px;
   overflow-x: auto;
   text-align: left;
 }
