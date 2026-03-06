@@ -25,6 +25,10 @@ async function uploadFiles(pdb: File, xtc?: File): Promise<void> {
   await fetch("/api/upload", { method: "POST", body: form });
 }
 
+/** True when the app is embedded inside an iframe (e.g. docs site). */
+const isEmbedded =
+  typeof window !== "undefined" && window.self !== window.top;
+
 function App() {
   const [mode, setMode] = useState<DataMode>("local");
 
@@ -213,7 +217,7 @@ function App() {
       onFpsChange={handleFpsChange}
       onUploadStructure={handleUploadStructure}
       mode={mode}
-      onToggleMode={handleModeToggle}
+      onToggleMode={isEmbedded ? undefined : handleModeToggle}
       pdbFileName={pdbFileName}
       bonds={bondConfig}
       trajectory={trajectoryConfig}
