@@ -64,6 +64,8 @@ export class MoleculeRenderer {
   private bondOpacity = 1.0;
   private viewInsetLeft = 0;
   private viewInsetRight = 0;
+  private dprMediaQuery: MediaQueryList | null = null;
+  private dprChangeHandler: (() => void) | null = null;
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -83,9 +85,20 @@ export class MoleculeRenderer {
       preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(container.clientWidth, container.clientHeight, false);
     this.renderer.setClearColor(0xffffff, 1);
-    container.appendChild(this.renderer.domElement);
+    // Position both canvases identically within the container
+    // to prevent sub-pixel layout drift at non-100% browser zoom.
+    // Use CSS 100% sizing instead of explicit pixel values so the canvas
+    // always matches the container exactly, even at fractional zoom levels.
+    const domEl = this.renderer.domElement;
+    domEl.style.display = "block";
+    domEl.style.position = "absolute";
+    domEl.style.top = "0";
+    domEl.style.left = "0";
+    domEl.style.width = "100%";
+    domEl.style.height = "100%";
+    container.appendChild(domEl);
 
     // Label overlay (Canvas 2D on top of WebGL)
     this.labelOverlay = new LabelOverlay();
@@ -139,6 +152,9 @@ export class MoleculeRenderer {
     // Resize observer
     const resizeObserver = new ResizeObserver(() => this.onResize());
     resizeObserver.observe(container);
+
+    // Listen for DPR changes (e.g. moving window between displays)
+    this.setupDprListener();
 
     // Start render loop
     this.animate();
@@ -902,6 +918,24 @@ export class MoleculeRenderer {
     }
   }
 
+  private setupDprListener(): void {
+    const update = () => {
+      this.onResize();
+      // Re-register for the new DPR value
+      this.dprMediaQuery?.removeEventListener("change", update);
+      this.dprMediaQuery = window.matchMedia(
+        `(resolution: ${window.devicePixelRatio}dppx)`,
+      );
+      this.dprChangeHandler = update;
+      this.dprMediaQuery.addEventListener("change", update);
+    };
+    this.dprMediaQuery = window.matchMedia(
+      `(resolution: ${window.devicePixelRatio}dppx)`,
+    );
+    this.dprChangeHandler = update;
+    this.dprMediaQuery.addEventListener("change", update);
+  }
+
   private onResize(): void {
     if (!this.container) return;
     const w = this.container.clientWidth;
@@ -922,7 +956,7 @@ export class MoleculeRenderer {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
     }
-    this.renderer.setSize(w, h);
+    this.renderer.setSize(w, h, false);
     this.labelOverlay?.resize(w, h, dpr);
   }
 
@@ -953,6 +987,7 @@ export class MoleculeRenderer {
         this.camera,
         this.container.clientWidth,
         this.container.clientHeight,
+        Math.min(window.devicePixelRatio, 2),
       );
     }
   };
@@ -969,6 +1004,9 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
+    if (this.dprMediaQuery && this.dprChangeHandler) {
+      this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);
+    }
     this.controls.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {

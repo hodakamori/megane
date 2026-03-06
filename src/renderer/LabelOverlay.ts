@@ -19,12 +19,17 @@ export class LabelOverlay {
   private nAtoms = 0;
   private positions: Float32Array | null = null;
   private tmpVec = new THREE.Vector3();
+  private lastWidth = 0;
+  private lastHeight = 0;
+  private lastPixelRatio = 1;
 
   constructor() {
     this.canvas = document.createElement("canvas");
     this.canvas.style.position = "absolute";
     this.canvas.style.top = "0";
     this.canvas.style.left = "0";
+    this.canvas.style.width = "100%";
+    this.canvas.style.height = "100%";
     this.canvas.style.pointerEvents = "none";
     this.ctx = this.canvas.getContext("2d")!;
   }
@@ -47,14 +52,24 @@ export class LabelOverlay {
   }
 
   resize(width: number, height: number, pixelRatio: number): void {
-    this.canvas.width = width * pixelRatio;
-    this.canvas.height = height * pixelRatio;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
+    this.lastWidth = width;
+    this.lastHeight = height;
+    this.lastPixelRatio = pixelRatio;
+    this.canvas.width = Math.round(width * pixelRatio);
+    this.canvas.height = Math.round(height * pixelRatio);
+    // CSS size is set to 100% in constructor; only update physical canvas + transform
     this.ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   }
 
-  render(camera: THREE.Camera, width: number, height: number): void {
+  render(camera: THREE.Camera, width: number, height: number, pixelRatio: number = 1): void {
+    // Auto-sync canvas size if dimensions or pixelRatio changed
+    if (
+      this.lastWidth !== width ||
+      this.lastHeight !== height ||
+      this.lastPixelRatio !== pixelRatio
+    ) {
+      this.resize(width, height, pixelRatio);
+    }
     this.ctx.clearRect(0, 0, width, height);
 
     if (!this.labels || !this.positions || !this.elements || this.nAtoms === 0) {
