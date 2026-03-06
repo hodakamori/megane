@@ -69,6 +69,8 @@ const tabs = [
 <style scoped>
 .hero-code-tabs {
   margin-top: 24px;
+  margin-left: auto;
+  margin-right: auto;
   width: 100%;
   max-width: 420px;
   text-align: left;
