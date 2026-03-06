@@ -41,11 +41,10 @@ const route = useRoute();
   }
 }
 
-/* On mobile, shrink the viewer */
+/* On mobile, hide the viewer (iframe is too large and not touch-friendly) */
 @media (max-width: 959px) {
   .hero-viewer-wrapper {
-    max-width: 100%;
-    padding: 0 16px;
+    display: none;
   }
 }
 </style>

@@ -6,13 +6,13 @@ megane provides an [anywidget](https://anywidget.dev/)-based Jupyter widget for 
 
 The following is an actual executed notebook showing basic usage — loading structures, navigating trajectories, atom selection, measurement, and side-by-side viewers.
 
-<NotebookRenderer src="/megane/notebooks/demo.json" />
+<NotebookRenderer src="/megane/notebooks/demo.html" />
 
 ## Advanced: External Events
 
 This notebook demonstrates event handling, Plotly integration, bidirectional sync, dihedral analysis, and custom widget composition.
 
-<NotebookRenderer src="/megane/notebooks/external_events.json" />
+<NotebookRenderer src="/megane/notebooks/external_events.html" />
 
 ---
 
