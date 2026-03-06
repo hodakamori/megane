@@ -198,14 +198,14 @@ def parse_pdb(text: str) -> dict:
 
 def main():
     repo_root = Path(__file__).resolve().parent.parent.parent
-    pdb_path = repo_root / "tests" / "fixtures" / "1crn.pdb"
+    pdb_path = repo_root / "tests" / "fixtures" / "caffeine_water.pdb"
     out_dir = repo_root / "docs" / "public" / "data"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     text = pdb_path.read_text()
     snapshot = parse_pdb(text)
 
-    out_path = out_dir / "1crn.json"
+    out_path = out_dir / "caffeine_water.json"
     with open(out_path, "w") as f:
         json.dump(snapshot, f, separators=(",", ":"))
 

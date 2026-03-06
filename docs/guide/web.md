@@ -131,7 +131,7 @@ function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
 }
 ```
 
-<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 
 ### `Sidebar`, `Timeline`, `AppearancePanel`
 
@@ -221,7 +221,7 @@ renderer.setCellVisible(true);
 renderer.dispose();
 ```
 
-<MoleculeDemo src="/megane/data/1crn.json" height="350px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="350px" />
 
 ### Atom Selection & Measurement
 
@@ -296,14 +296,14 @@ export function ProteinDemo() {
   );
 }
 
-# Crambin (1CRN)
+# Caffeine in Water
 
-A small protein commonly used as a benchmark for molecular visualization.
+A caffeine molecule solvated by water — 3024 atoms rendered in real time.
 
 <ProteinDemo />
 
 The viewer above uses WASM-powered parsing and billboard impostor rendering
-to display all 327 atoms with bonds inferred from van der Waals radii.
+to display all 3024 atoms with bonds inferred from van der Waals radii.
 ```
 
 ### Viewport-Only in MDX
@@ -318,7 +318,7 @@ export function SimpleViewer() {
   const [snapshot, setSnapshot] = useState(null);
 
   useEffect(() => {
-    fetch("/data/crambin.pdb")
+    fetch("/data/caffeine_water.pdb")
       .then((r) => r.text())
       .then(async (text) => {
         const result = await parseStructureText(text);
