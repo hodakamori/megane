@@ -15,3 +15,8 @@ crates/megane-wasm/pkg/
 python/megane/static/app/
 python/megane/static/1crn.pdb
 .ipynb_checkpoints/
+docs/.vitepress/dist
+docs/.vitepress/cache
+docs/node_modules
+docs/api/python/
+docs/api/typescript/
