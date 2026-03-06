@@ -125,7 +125,8 @@ export class MoleculeRenderer {
       frustumSize / 2, -frustumSize / 2,
       0.1, 10000,
     );
-    this.camera.position.set(0, 0, 50);
+    this.camera.position.set(0, -50, 0);
+    this.camera.up.set(0, 0, 1);
 
     // Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -502,7 +503,7 @@ export class MoleculeRenderer {
     this.controls.target.set(cx, cy, cz);
 
     const distance = Math.max(maxExtent * 1.2, 0.1);
-    this.camera.position.set(cx, cy, cz + distance);
+    this.camera.position.set(cx, cy - distance, cz);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.camera.near = -distance * 10;
