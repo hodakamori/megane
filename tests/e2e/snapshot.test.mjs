@@ -384,6 +384,49 @@ async function testHiDpiView(page) {
   }
 }
 
+async function testBrowserZoomLabels(page) {
+  console.log("\n=== Test: Browser Zoom (150%) Labels Alignment via CDP ===");
+
+  // Use Chrome DevTools Protocol to set actual browser zoom (page scale factor)
+  const cdpSession = await page.context().newCDPSession(page);
+  await cdpSession.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1.5 });
+  console.log("  Browser zoom set to 150% via CDP");
+
+  await page.goto(`http://127.0.0.1:${PORT}`, { waitUntil: "networkidle", timeout: 30000 });
+  await page.waitForSelector("canvas", { timeout: 15000 });
+  console.log("  Canvas found (1280×720 at 150% zoom)");
+
+  await page.waitForTimeout(2000);
+
+  // Enable "Structure" labels
+  if (await enableStructureLabels(page)) {
+    console.log("  Labels enabled (Structure)");
+  } else {
+    console.log("  SKIP: Structure button not found");
+  }
+
+  await page.waitForTimeout(1500);
+
+  const screenshot = await page.screenshot({ type: "png" });
+  const snapshotPath = join(SNAPSHOTS_DIR, "zoom-150-labels.png");
+  const result = comparePNG(snapshotPath, screenshot, "zoom-150-labels");
+
+  if (result.isNew) {
+    console.log("  INFO: New baseline created (first run)");
+    assert(true, "Browser zoom 150% labels snapshot baseline created");
+  } else if (result.sizeMismatch) {
+    assert(false, "Browser zoom 150% labels snapshot size mismatch");
+  } else {
+    console.log(`  Diff: ${result.diffPixels}/${result.totalPixels} pixels (${result.diffPercent.toFixed(2)}%)`);
+    assert(
+      result.diffPercent <= MAX_DIFF_PERCENT,
+      `Browser zoom 150% labels snapshot matches baseline (${result.diffPercent.toFixed(2)}% diff, max ${MAX_DIFF_PERCENT}%)`
+    );
+  }
+
+  await cdpSession.detach();
+}
+
 // ---- Main ----
 
 let server = null;
@@ -398,6 +441,7 @@ try {
       "default-view.png", "sidebar-collapsed.png",
       "mobile-view.png", "desktop-sidebar-expanded.png",
       "desktop-labels.png", "mobile-labels.png", "hidpi-view.png",
+      "zoom-150-labels.png",
     ]) {
       const p = join(SNAPSHOTS_DIR, name);
       try { unlinkSync(p); } catch {}
@@ -431,6 +475,14 @@ try {
   const hiDpiPage = await hiDpiContext.newPage();
   await testHiDpiView(hiDpiPage);
   await hiDpiContext.close();
+
+  // Test with real browser zoom via CDP (simulates Ctrl++ to 150%)
+  const zoomContext = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+  });
+  const zoomPage = await zoomContext.newPage();
+  await testBrowserZoomLabels(zoomPage);
+  await zoomContext.close();
 
   console.log("\n--- All E2E snapshot tests passed ---");
 } catch (err) {
