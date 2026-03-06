@@ -62,7 +62,7 @@ jobs:
 
       - name: Prepare notebook data
         run: |
-          pip install markdown
+          pip install markdown nbformat nbconvert
           python3 docs/scripts/prepare-notebooks.py
 
       - name: Create WASM type stubs (for TypeDoc)
