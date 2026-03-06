@@ -1,14 +1,16 @@
 import DefaultTheme from "vitepress/theme";
+import CustomLayout from "./CustomLayout.vue";
 import MoleculeDemo from "../components/MoleculeDemo.vue";
 import FullViewerDemo from "../components/FullViewerDemo.vue";
-import JupyterLiteEmbed from "../components/JupyterLiteEmbed.vue";
+import NotebookCell from "../components/NotebookCell.vue";
 import "./custom.css";
 
 export default {
   extends: DefaultTheme,
+  Layout: CustomLayout,
   enhanceApp({ app }: { app: any }) {
     app.component("MoleculeDemo", MoleculeDemo);
     app.component("FullViewerDemo", FullViewerDemo);
-    app.component("JupyterLiteEmbed", JupyterLiteEmbed);
+    app.component("NotebookCell", NotebookCell);
   },
 };

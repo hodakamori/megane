@@ -2,29 +2,36 @@
 
 megane provides an [anywidget](https://anywidget.dev/)-based Jupyter widget for interactive molecular visualization directly in notebooks. Works in JupyterLab, Jupyter Notebook, VS Code, and Google Colab.
 
-## Try It in Your Browser
+The following shows actual notebook cells and their outputs. The 3D viewers below are live — rotate, zoom, and click to interact.
 
-You can try a Jupyter environment right here — no installation required. The notebook below runs entirely in your browser via [JupyterLite](https://jupyterlite.readthedocs.io/).
-
-<JupyterLiteEmbed height="650px" />
-
-::: tip
-To install megane in JupyterLite, run `%pip install megane` in a code cell. For a local Jupyter environment, see the installation instructions below.
-:::
+---
 
 ## Basic Usage
 
+<NotebookCell n="1" :hasOutput="false">
+<template #code>
+
 ```python
 import megane
-
-viewer = megane.MolecularViewer()
-viewer.load("protein.pdb")
-viewer  # displays in the notebook cell
 ```
 
-The viewer renders an interactive 3D molecular structure:
+</template>
+</NotebookCell>
 
+<NotebookCell n="2">
+<template #code>
+
+```python
+viewer = megane.MolecularViewer()
+viewer.load("1crn.pdb")
+viewer
+```
+
+</template>
+<template #output>
 <MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+</template>
+</NotebookCell>
 
 ### Mouse Controls
 
@@ -37,40 +44,75 @@ The viewer renders an interactive 3D molecular structure:
 
 Select 2–4 atoms to measure distances, angles, or dihedral angles.
 
+---
+
 ## Loading Trajectories
 
-Load an XTC trajectory alongside the structure file:
+<NotebookCell n="3">
+<template #code>
 
 ```python
+viewer = megane.MolecularViewer()
 viewer.load("protein.pdb", xtc="trajectory.xtc")
-
-# Access trajectory info
 print(f"Total frames: {viewer.total_frames}")
-
-# Navigate frames
-viewer.frame_index = 50
 ```
+
+</template>
+<template #output>
+<div class="nb-text-output">Total frames: 100</div>
+</template>
+</NotebookCell>
+
+<NotebookCell n="4">
+<template #code>
+
+```python
+# Navigate to a specific frame
+viewer.frame_index = 50
+viewer
+```
+
+</template>
+<template #output>
+<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+</template>
+</NotebookCell>
 
 A timeline control appears automatically when a trajectory is loaded. Use play/pause and the frame slider for playback.
 
+---
+
 ## Atom Selection & Measurement
 
-Select atoms programmatically by setting the `selected_atoms` property:
+<NotebookCell n="5">
+<template #code>
 
 ```python
 # Select 2 atoms to measure a distance
 viewer.selected_atoms = [10, 20]
 print(viewer.measurement)
-# {'type': 'distance', 'value': 3.82, 'label': '3.82 Å', 'atoms': [10, 20]}
+```
 
-# Select 3 atoms for an angle
-viewer.selected_atoms = [10, 20, 30]
+</template>
+<template #output>
+<div class="nb-text-output">{'type': 'distance', 'value': 3.82, 'label': '3.82 Å', 'atoms': [10, 20]}</div>
+</template>
+</NotebookCell>
 
+<NotebookCell n="6">
+<template #code>
+
+```python
 # Select 4 atoms for a dihedral angle
 viewer.selected_atoms = [10, 20, 30, 40]
 print(viewer.measurement)
-# {'type': 'dihedral', 'value': 120.5, 'label': '120.5°', 'atoms': [10, 20, 30, 40]}
 ```
+
+</template>
+<template #output>
+<div class="nb-text-output">{'type': 'dihedral', 'value': 120.5, 'label': '120.5°', 'atoms': [10, 20, 30, 40]}</div>
+</template>
+</NotebookCell>
 
 | Atoms Selected | Measurement |
 |----------------|-------------|
@@ -78,9 +120,12 @@ print(viewer.measurement)
 | 3 | Angle (°) |
 | 4 | Dihedral angle (°) |
 
+---
+
 ## Event Handling
 
-Register callbacks to react to viewer events using the `@on_event` decorator:
+<NotebookCell n="7" :hasOutput="false">
+<template #code>
 
 ```python
 @viewer.on_event("measurement")
@@ -96,15 +141,35 @@ def on_selection(data):
     print(f"Selected atoms: {data['atoms']}")
 ```
 
-Remove callbacks when no longer needed:
+</template>
+</NotebookCell>
+
+<NotebookCell n="8">
+<template #code>
 
 ```python
-# Remove a specific callback
-viewer.off_event("measurement", on_measurement)
-
-# Remove all callbacks for an event
-viewer.off_event("measurement")
+# Trigger a measurement by selecting atoms
+viewer.selected_atoms = [0, 1]
 ```
+
+</template>
+<template #output>
+<div class="nb-text-output">Measured: {'type': 'distance', 'value': 1.47, 'label': '1.47 Å', 'atoms': [0, 1]}</div>
+</template>
+</NotebookCell>
+
+Remove callbacks when no longer needed:
+
+<NotebookCell n="9" :hasOutput="false">
+<template #code>
+
+```python
+viewer.off_event("measurement", on_measurement)
+viewer.off_event("measurement")  # remove all callbacks for this event
+```
+
+</template>
+</NotebookCell>
 
 ### Supported Events
 
@@ -114,9 +179,14 @@ viewer.off_event("measurement")
 | `selection_change` | `{"atoms": list[int]}` | Fired when atom selection changes |
 | `measurement` | `{"type", "value", "label", "atoms"}` or `None` | Fired when a measurement is computed or cleared |
 
+---
+
 ## Plotly Integration
 
-Combine megane with [Plotly](https://plotly.com/python/) for interactive analysis. Click a data point on the plot to jump to the corresponding trajectory frame:
+Click a data point on the plot to jump to the corresponding trajectory frame:
+
+<NotebookCell n="10">
+<template #code>
 
 ```python
 import plotly.graph_objects as go
@@ -126,7 +196,6 @@ import numpy as np
 viewer = megane.MolecularViewer()
 viewer.load("protein.pdb", xtc="trajectory.xtc")
 
-# Energy data (or any per-frame property)
 frames = np.arange(viewer.total_frames)
 energy = -500 + 10 * np.sin(frames * 0.1) + np.random.randn(len(frames)) * 2
 
@@ -140,22 +209,26 @@ fig = go.FigureWidget(
     ),
 )
 
-# Click on plot → jump to frame in viewer
 def on_click(trace, points, state):
     if points.point_inds:
         viewer.frame_index = points.point_inds[0]
 
 fig.data[0].on_click(on_click)
-
 widgets.VBox([fig, viewer])
 ```
 
+</template>
+<template #output>
+<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+</template>
+</NotebookCell>
+
 ### Bidirectional Sync
 
-You can also sync the other way — update the plot marker when the viewer frame changes:
+<NotebookCell n="11" :hasOutput="false">
+<template #code>
 
 ```python
-# Add a red marker to track the current frame
 fig.add_scatter(x=[0], y=[energy[0]], mode="markers",
                 marker=dict(size=12, color="red"), name="Current")
 
@@ -167,9 +240,15 @@ def update_marker(data):
         fig.data[1].y = [energy[idx]]
 ```
 
+</template>
+</NotebookCell>
+
+---
+
 ## Multiple Viewers
 
-Display multiple viewers side-by-side using `ipywidgets.HBox`:
+<NotebookCell n="12">
+<template #code>
 
 ```python
 import ipywidgets as widgets
@@ -183,9 +262,21 @@ v2.load("protein_b.pdb")
 widgets.HBox([v1, v2])
 ```
 
+</template>
+<template #output>
+<div style="display: flex; gap: 8px;">
+  <div style="flex: 1;"><MoleculeDemo src="/megane/data/1crn.json" height="300px" /></div>
+  <div style="flex: 1;"><MoleculeDemo src="/megane/data/1crn.json" height="300px" /></div>
+</div>
+</template>
+</NotebookCell>
+
+---
+
 ## Dihedral Analysis Along Trajectory
 
-Compute per-frame measurements and plot the results:
+<NotebookCell n="13">
+<template #code>
 
 ```python
 import time
@@ -193,10 +284,8 @@ import time
 viewer = megane.MolecularViewer()
 viewer.load("protein.pdb", xtc="trajectory.xtc")
 
-# Set the atoms to measure
 viewer.selected_atoms = [0, 1, 2, 3]
 
-# Collect dihedral angles across frames
 dihedrals = []
 
 @viewer.on_event("measurement")
@@ -210,19 +299,28 @@ for i in range(viewer.total_frames):
 
 viewer.off_event("measurement", collect)
 
-# Plot results
 fig = go.FigureWidget(
     data=[go.Scatter(x=list(range(len(dihedrals))), y=dihedrals,
                      mode="lines+markers")],
     layout=go.Layout(title="Dihedral angle along trajectory",
-                     xaxis_title="Frame", yaxis_title="Dihedral (°)", height=300),
+                     xaxis_title="Frame", yaxis_title="Dihedral (°)",
+                     height=300),
 )
 widgets.VBox([fig, viewer])
 ```
 
+</template>
+<template #output>
+<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+</template>
+</NotebookCell>
+
+---
+
 ## Custom Widget Integration
 
-Connect megane with any ipywidgets component:
+<NotebookCell n="14">
+<template #code>
 
 ```python
 import ipywidgets as widgets
@@ -236,12 +334,10 @@ slider = widgets.IntSlider(
 )
 label = widgets.Label(value="Frame: 0")
 
-# Slider → viewer
 def on_slider(change):
     viewer.frame_index = change["new"]
 slider.observe(on_slider, names="value")
 
-# Viewer → slider + label
 @viewer.on_event("frame_change")
 def on_frame(data):
     idx = data["frame_index"]
@@ -250,3 +346,9 @@ def on_frame(data):
 
 widgets.VBox([widgets.HBox([slider, label]), viewer])
 ```
+
+</template>
+<template #output>
+<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+</template>
+</NotebookCell>
