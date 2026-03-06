@@ -24,6 +24,29 @@ const { Layout } = DefaultTheme;
 </template>
 
 <style>
+/*
+ * Override VitePress .has-image centering on mobile.
+ * VPHero applies text-align:center and margin:0 auto on .has-image
+ * children when < 960px. We want left-aligned on all viewports.
+ */
+.VPHero.has-image .container {
+  text-align: left;
+}
+
+.VPHero.has-image .heading .name,
+.VPHero.has-image .heading .text {
+  margin: 0;
+}
+
+.VPHero.has-image .tagline {
+  margin: 0;
+}
+
+.VPHero.has-image .actions {
+  justify-content: flex-start;
+}
+
+/* Hero molecule viewer (right side) */
 .hero-molecule-wrapper {
   width: 100%;
   max-width: 480px;
@@ -37,18 +60,14 @@ const { Layout } = DefaultTheme;
   overflow: hidden;
 }
 
-/* Make the hero section use more width */
+/* Desktop: widen the hero container */
 @media (min-width: 960px) {
   .VPHero .container {
-    max-width: 1280px !important;
-  }
-
-  .VPHero .main {
-    max-width: 520px;
+    max-width: 1152px;
   }
 }
 
-/* On mobile, hide the 3D viewer */
+/* Mobile: hide the 3D viewer */
 @media (max-width: 959px) {
   .hero-molecule-wrapper {
     display: none;
