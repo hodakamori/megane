@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: megane
-  text: A fast, beautiful molecular viewer
-  tagline: Render PDB structures and XTC trajectories in real time. From Jupyter to the browser.
+  text: Molecular visualization that just works
+  tagline: From Python to the browser. Load PDB structures and XTC trajectories anywhere — Jupyter, CLI, or your own React app.
   actions:
     - theme: brand
       text: Get Started
