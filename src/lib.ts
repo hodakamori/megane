@@ -12,6 +12,14 @@ export { Timeline } from "./components/Timeline";
 // Sidebar config types
 export type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
 
+// Appearance panel & config types
+export { AppearancePanel } from "./components/AppearancePanel";
+export type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
+
+// Structure parsers
+export { parseStructureFile, parseStructureText } from "./parsers/structure";
+export type { StructureParseResult } from "./parsers/structure";
+
 // Core renderer (framework-agnostic)
 export { MoleculeRenderer } from "./renderer/MoleculeRenderer";
 

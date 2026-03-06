@@ -1,7 +1,5 @@
 # Getting Started
 
-<MoleculeDemo src="/megane/data/caffeine_water.json" height="300px" :autoRotate="true" />
-
 ## Prerequisites
 
 - Python 3.10 or later
@@ -13,12 +11,6 @@
 
 ```bash
 pip install megane
-```
-
-For XTC trajectory support:
-
-```bash
-pip install megane[trajectory]
 ```
 
 ### npm (for React embedding)
