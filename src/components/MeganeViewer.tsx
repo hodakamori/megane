@@ -35,7 +35,7 @@ interface MeganeViewerProps {
   onFpsChange?: (fps: number) => void;
   onUploadStructure: (file: File) => void;
   mode: "streaming" | "local";
-  onToggleMode: () => void;
+  onToggleMode?: () => void;
   pdbFileName: string | null;
   bonds: BondConfig;
   trajectory: TrajectoryConfig;
