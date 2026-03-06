@@ -60,13 +60,10 @@ jobs:
       - name: Generate demo data
         run: python3 docs/scripts/generate-demo-data.py
 
-      - name: Prepare notebook outputs
-        run: python3 docs/scripts/prepare-notebooks.py
-
-      - name: Convert notebooks to HTML
+      - name: Prepare notebook data
         run: |
-          pip install nbconvert
-          bash docs/scripts/convert-notebooks.sh
+          pip install markdown
+          python3 docs/scripts/prepare-notebooks.py
 
       - name: Create WASM type stubs (for TypeDoc)
         run: |
