@@ -169,6 +169,7 @@ const tabs = [
   font-family: var(--vp-font-family-mono);
   font-size: 13px;
   line-height: 1.7;
+  min-height: 165px;
   overflow-x: auto;
   text-align: left;
 }
