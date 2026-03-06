@@ -25,9 +25,9 @@ const { Layout } = DefaultTheme;
 
 <style>
 /*
- * Override VitePress .has-image centering on mobile.
- * VPHero applies text-align:center and margin:0 auto on .has-image
- * children when < 960px. We want left-aligned on all viewports.
+ * Override VitePress .has-image centering.
+ * VPHero applies text-align:center and margin:0 auto on mobile.
+ * We want left-aligned on all viewports.
  */
 .VPHero.has-image .container {
   text-align: left;
@@ -46,7 +46,22 @@ const { Layout } = DefaultTheme;
   justify-content: flex-start;
 }
 
-/* Hero molecule viewer (right side) */
+/*
+ * Desktop: molecule LEFT, text RIGHT
+ * Default VPHero: .main order:1 (left), .image order:2 (right)
+ * We flip them.
+ */
+@media (min-width: 960px) {
+  .VPHero .main {
+    order: 2 !important;
+  }
+
+  .VPHero .image {
+    order: 1 !important;
+  }
+}
+
+/* Hero molecule viewer */
 .hero-molecule-wrapper {
   width: 100%;
   max-width: 480px;
@@ -60,17 +75,30 @@ const { Layout } = DefaultTheme;
   overflow: hidden;
 }
 
-/* Desktop: widen the hero container */
-@media (min-width: 960px) {
-  .VPHero .container {
-    max-width: 1152px;
+/*
+ * Mobile: show molecule but tame the VPHero .image negative margins
+ * which are designed for logos, not embedded viewers.
+ */
+@media (max-width: 959px) {
+  .VPHero .image {
+    margin: 0 0 24px;
+  }
+
+  .VPHero .image .image-container {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    max-width: 400px;
+  }
+
+  .hero-molecule-wrapper {
+    max-width: 100%;
   }
 }
 
-/* Mobile: hide the 3D viewer */
-@media (max-width: 959px) {
-  .hero-molecule-wrapper {
-    display: none;
+@media (max-width: 639px) {
+  .VPHero .image .image-container {
+    max-width: 320px;
   }
 }
 </style>
