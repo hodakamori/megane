@@ -170,7 +170,6 @@ export class CellAxesRenderer {
     mainCamera: THREE.Camera,
     containerWidth: number,
     containerHeight: number,
-    pixelRatio: number,
   ): void {
     if (!this.visible || this.arrowGroup.children.length === 0) return;
 
@@ -186,25 +185,19 @@ export class CellAxesRenderer {
     this.lastInsetSize = insetSize;
     this.clampPosition(containerWidth, containerHeight);
 
-    const s = insetSize * pixelRatio;
-    const m = INSET_MARGIN * pixelRatio;
-    const x = this.posX * pixelRatio;
-    const y = this.posY * pixelRatio;
-
-    // Render into inset viewport
+    // Three.js setViewport/setScissor expect CSS pixels — they multiply
+    // by the renderer's internal pixelRatio automatically.
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
-    renderer.setViewport(x, y, s, s);
-    renderer.setScissor(x, y, s, s);
+    renderer.setViewport(this.posX, this.posY, insetSize, insetSize);
+    renderer.setScissor(this.posX, this.posY, insetSize, insetSize);
     renderer.setScissorTest(true);
     renderer.clearDepth();
     renderer.render(this.axesScene, this.axesCamera);
 
-    // Restore
+    // Restore full viewport (CSS pixels)
     renderer.autoClear = prevAutoClear;
-    const fullW = containerWidth * pixelRatio;
-    const fullH = containerHeight * pixelRatio;
-    renderer.setViewport(0, 0, fullW, fullH);
+    renderer.setViewport(0, 0, containerWidth, containerHeight);
     renderer.setScissorTest(false);
   }
 

@@ -974,7 +974,6 @@ export class MoleculeRenderer {
           this.camera,
           this.container.clientWidth,
           this.container.clientHeight,
-          Math.min(window.devicePixelRatio, 2),
         );
       } catch (e) {
         console.warn("CellAxesRenderer render error:", e);
