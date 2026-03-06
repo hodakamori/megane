@@ -12,6 +12,10 @@ const tabs = [
 
 <template>
   <div class="hero-code-tabs">
+    <div class="install-command">
+      <span class="install-prompt">$</span>
+      <span class="install-text">pip install megane</span>
+    </div>
     <div class="tab-buttons">
       <button
         v-for="(tab, i) in tabs"
@@ -50,6 +54,28 @@ const tabs = [
   width: 100%;
   max-width: 420px;
   text-align: left;
+}
+
+.install-command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px 8px 0 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  margin-bottom: -1px;
+}
+
+.install-prompt {
+  color: var(--vp-c-text-3);
+  user-select: none;
+}
+
+.install-text {
+  color: var(--vp-c-text-1);
 }
 
 .tab-buttons {
