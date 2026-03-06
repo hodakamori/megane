@@ -908,6 +908,11 @@ export class MoleculeRenderer {
     const h = this.container.clientHeight;
     if (w === 0 || h === 0) return;
 
+    // Update pixelRatio to handle browser zoom changes —
+    // devicePixelRatio changes when the user zooms the page
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    this.renderer.setPixelRatio(dpr);
+
     if (this.camera instanceof THREE.OrthographicCamera) {
       // Recalculate full frustum accounting for overlay insets so the view
       // stays correct when the container aspect ratio changes.
@@ -918,7 +923,7 @@ export class MoleculeRenderer {
       this.camera.updateProjectionMatrix();
     }
     this.renderer.setSize(w, h);
-    this.labelOverlay?.resize(w, h, Math.min(window.devicePixelRatio, 2));
+    this.labelOverlay?.resize(w, h, dpr);
   }
 
   private animate = (): void => {

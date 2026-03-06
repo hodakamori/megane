@@ -357,6 +357,33 @@ async function testMobileLabels(page) {
   }
 }
 
+async function testHiDpiView(page) {
+  console.log("\n=== Test: HiDPI / Browser Zoom View (DPR=2) ===");
+
+  await page.goto(`http://127.0.0.1:${PORT}`, { waitUntil: "networkidle", timeout: 30000 });
+  await page.waitForSelector("canvas", { timeout: 15000 });
+  console.log("  Canvas found (1280×720, DPR=2)");
+
+  await page.waitForTimeout(3000);
+
+  const screenshot = await page.screenshot({ type: "png" });
+  const snapshotPath = join(SNAPSHOTS_DIR, "hidpi-view.png");
+  const result = comparePNG(snapshotPath, screenshot, "hidpi-view");
+
+  if (result.isNew) {
+    console.log("  INFO: New baseline created (first run)");
+    assert(true, "HiDPI view snapshot baseline created");
+  } else if (result.sizeMismatch) {
+    assert(false, "HiDPI view snapshot size mismatch");
+  } else {
+    console.log(`  Diff: ${result.diffPixels}/${result.totalPixels} pixels (${result.diffPercent.toFixed(2)}%)`);
+    assert(
+      result.diffPercent <= MAX_DIFF_PERCENT,
+      `HiDPI view snapshot matches baseline (${result.diffPercent.toFixed(2)}% diff, max ${MAX_DIFF_PERCENT}%)`
+    );
+  }
+}
+
 // ---- Main ----
 
 let server = null;
@@ -370,7 +397,7 @@ try {
     for (const name of [
       "default-view.png", "sidebar-collapsed.png",
       "mobile-view.png", "desktop-sidebar-expanded.png",
-      "desktop-labels.png", "mobile-labels.png",
+      "desktop-labels.png", "mobile-labels.png", "hidpi-view.png",
     ]) {
       const p = join(SNAPSHOTS_DIR, name);
       try { unlinkSync(p); } catch {}
@@ -394,6 +421,16 @@ try {
   await testDesktopLabels(page);
   await testMobileView(page);
   await testMobileLabels(page);
+
+  // Test with high DPR (simulates browser zoom or HiDPI display)
+  await context.close();
+  const hiDpiContext = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 2,
+  });
+  const hiDpiPage = await hiDpiContext.newPage();
+  await testHiDpiView(hiDpiPage);
+  await hiDpiContext.close();
 
   console.log("\n--- All E2E snapshot tests passed ---");
 } catch (err) {
