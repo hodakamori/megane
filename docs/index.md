@@ -3,23 +3,23 @@ layout: home
 
 hero:
   name: megane
-  text: Molecular visualization that just works
-  tagline: From Python to the browser. Load PDB structures and XTC trajectories anywhere — Jupyter, CLI, or your own React app.
+  text: "Desktop-grade molecular visualization.\nRight in your browser."
+  tagline: "Rust-powered rendering at 1M+ atoms. pip install megane — 3 lines to your first structure."
   actions:
     - theme: brand
       text: Get Started
       link: /getting-started
     - theme: alt
-      text: API Reference
-      link: /api/
+      text: GitHub
+      link: https://github.com/hodakamori/megane
 
 features:
-  - title: Scales to 1M+ Atoms
-    details: Billboard impostor rendering with Three.js delivers real-time performance at any scale — from small molecules to massive protein complexes.
-  - title: Jupyter Widget
-    details: anywidget-based integration for JupyterLab, Notebook, VS Code, and Colab. Load structures and trajectories directly from Python.
-  - title: CLI & Web
-    details: Serve structures from the command line with a single command, or embed the React component library in your own web application.
-  - title: Rust-Powered Parsing
-    details: PDB, GRO, XYZ, MOL, and XTC parsers written in Rust — shared between Python (PyO3) and browser (WASM) for blazing-fast performance.
+  - title: 1M+ Atoms at 60fps
+    details: Billboard impostor rendering with WebGL handles massive protein complexes in real time — no desktop app required.
+  - title: Jupyter, CLI, React
+    details: One pip install. Use as a Jupyter widget, serve from the command line, or embed the React component in your own app.
+  - title: Rust + WASM
+    details: PDB, GRO, XYZ, MOL, and XTC parsers in Rust — shared between Python (PyO3) and browser (WASM). Parse once, run anywhere.
+  - title: Trajectory Streaming
+    details: Stream XTC trajectories over WebSocket in real time. Scrub through thousands of frames without loading everything into memory.
 ---
