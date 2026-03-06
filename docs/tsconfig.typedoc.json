@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../src/*"],
+      "../../crates/megane-wasm/pkg": ["../docs/wasm-stub.d.ts"]
+    }
+  },
+  "include": ["../src"]
+}
