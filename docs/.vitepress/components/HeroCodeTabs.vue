@@ -34,12 +34,12 @@ const tabs = [
 
 <span class="c">Serving on </span><span class="s">http://localhost:8765</span></code></pre>
       <!-- React -->
-      <pre v-show="activeTab === 2"><code><span class="kn">import</span> <span class="p">{</span> <span class="n">MeganeViewer</span> <span class="p">}</span> <span class="kn">from</span> <span class="s">"megane"</span>
+      <pre v-show="activeTab === 2"><code><span class="kn">import</span> <span class="p">{</span> <span class="n">useMeganeLocal</span><span class="p">,</span> <span class="nc">MeganeViewer</span> <span class="p">}</span> <span class="kn">from</span> <span class="s">"megane"</span>
 
-<span class="o">&lt;</span><span class="nc">MeganeViewer</span>
-  <span class="na">snapshot</span><span class="o">=</span><span class="p">{</span><span class="n">snapshot</span><span class="p">}</span>
-  <span class="na">mode</span><span class="o">=</span><span class="s">"local"</span>
-<span class="o">/&gt;</span></code></pre>
+<span class="kn">const</span> <span class="n">mol</span> <span class="o">=</span> <span class="n">useMeganeLocal</span><span class="p">()</span>
+<span class="n">mol</span><span class="o">.</span><span class="n">loadFile</span><span class="p">(</span><span class="s">"protein.pdb"</span><span class="p">)</span>
+
+<span class="o">&lt;</span><span class="nc">MeganeViewer</span> <span class="na">snapshot</span><span class="o">=</span><span class="p">{</span><span class="n">mol</span><span class="o">.</span><span class="n">snapshot</span><span class="p">}</span> <span class="o">/&gt;</span></code></pre>
     </div>
   </div>
 </template>
