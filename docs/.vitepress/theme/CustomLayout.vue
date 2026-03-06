@@ -76,29 +76,12 @@ const { Layout } = DefaultTheme;
 }
 
 /*
- * Mobile: show molecule but tame the VPHero .image negative margins
- * which are designed for logos, not embedded viewers.
+ * Mobile: hide molecule demo to avoid overlap with hero text.
+ * The image slot has negative margins designed for logos, not 3D viewers.
  */
 @media (max-width: 959px) {
   .VPHero .image {
-    margin: 0 0 24px;
-  }
-
-  .VPHero .image .image-container {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 4 / 3;
-    max-width: 400px;
-  }
-
-  .hero-molecule-wrapper {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 639px) {
-  .VPHero .image .image-container {
-    max-width: 320px;
+    display: none;
   }
 }
 </style>

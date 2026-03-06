@@ -37,8 +37,7 @@ const tabs = [
       <pre v-show="activeTab === 2"><code><span class="kn">import</span> <span class="p">{</span> <span class="n">MeganeViewer</span> <span class="p">}</span> <span class="kn">from</span> <span class="s">"megane"</span>
 
 <span class="o">&lt;</span><span class="nc">MeganeViewer</span>
-  <span class="na">snapshot</span><span class="o">=</span><span class="p">{</span><span class="n">snapshot</span><span class="p">}</span>
-  <span class="na">mode</span><span class="o">=</span><span class="s">"local"</span>
+  <span class="na">url</span><span class="o">=</span><span class="s">"ws://localhost:8765"</span>
 <span class="o">/&gt;</span></code></pre>
     </div>
   </div>
