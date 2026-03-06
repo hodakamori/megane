@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import path from "path";
 
 export default defineConfig({
   title: "megane",
@@ -6,6 +7,14 @@ export default defineConfig({
   base: "/megane/",
 
   head: [["link", { rel: "icon", href: "/megane/logo.svg" }]],
+
+  vite: {
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "../../src"),
+      },
+    },
+  },
 
   themeConfig: {
     logo: "/logo.svg",

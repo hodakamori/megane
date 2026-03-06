@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "src/renderer/**"
+      - "src/types.ts"
+      - "src/constants.ts"
   workflow_dispatch:
 
 permissions:
@@ -40,6 +43,9 @@ jobs:
       - name: Install docs dependencies
         working-directory: docs
         run: npm ci
+
+      - name: Generate demo data
+        run: python3 docs/scripts/generate-demo-data.py
 
       - name: Create WASM type stubs
         run: |
