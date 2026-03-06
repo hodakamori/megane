@@ -66,6 +66,10 @@ export class MoleculeRenderer {
   private viewInsetRight = 0;
   private dprMediaQuery: MediaQueryList | null = null;
   private dprChangeHandler: (() => void) | null = null;
+  // Cached dimensions for frame-synchronous resize detection
+  private lastContainerW = 0;
+  private lastContainerH = 0;
+  private lastDpr = 1;
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -942,9 +946,13 @@ export class MoleculeRenderer {
     const h = this.container.clientHeight;
     if (w === 0 || h === 0) return;
 
-    // Update pixelRatio to handle browser zoom changes —
-    // devicePixelRatio changes when the user zooms the page
     const dpr = Math.min(window.devicePixelRatio, 2);
+
+    // Update cached values so animate() doesn't trigger a redundant resize
+    this.lastContainerW = w;
+    this.lastContainerH = h;
+    this.lastDpr = dpr;
+
     this.renderer.setPixelRatio(dpr);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
@@ -962,18 +970,43 @@ export class MoleculeRenderer {
 
   private animate = (): void => {
     this.animationId = requestAnimationFrame(this.animate);
+
+    // Synchronize renderer state BEFORE rendering — this eliminates
+    // timing gaps between ResizeObserver/matchMedia and rAF callbacks.
+    // When browser zoom changes, clientWidth/DPR update immediately but
+    // ResizeObserver may fire after the next rAF, causing the viewport
+    // and canvas buffer to be out of sync for one or more frames.
+    if (this.container) {
+      const w = this.container.clientWidth;
+      const h = this.container.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      if (w !== this.lastContainerW || h !== this.lastContainerH || dpr !== this.lastDpr) {
+        this.lastContainerW = w;
+        this.lastContainerH = h;
+        this.lastDpr = dpr;
+        this.onResize();
+      }
+    }
+
     this.controls.update();
 
     this.renderer.render(this.scene, this.camera);
 
+    // Use renderer's internal size for all post-render passes.
+    // This guarantees the viewport/dimensions match the canvas buffer,
+    // even if container.clientWidth has changed since the last setSize().
+    const _size = new THREE.Vector2();
+    this.renderer.getSize(_size);
+    const _dpr = this.renderer.getPixelRatio();
+
     // Render cell axes inset (after main scene, before label overlay)
-    if (this.cellAxesRenderer && this.container) {
+    if (this.cellAxesRenderer) {
       try {
         this.cellAxesRenderer.render(
           this.renderer,
           this.camera,
-          this.container.clientWidth,
-          this.container.clientHeight,
+          _size.x,
+          _size.y,
         );
       } catch (e) {
         console.warn("CellAxesRenderer render error:", e);
@@ -981,12 +1014,12 @@ export class MoleculeRenderer {
       }
     }
 
-    if (this.labelOverlay && this.container) {
+    if (this.labelOverlay) {
       this.labelOverlay.render(
         this.camera,
-        this.container.clientWidth,
-        this.container.clientHeight,
-        Math.min(window.devicePixelRatio, 2),
+        _size.x,
+        _size.y,
+        _dpr,
       );
     }
   };
