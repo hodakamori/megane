@@ -13,7 +13,7 @@ const { Layout } = DefaultTheme;
     </template>
     <template #home-hero-image>
       <div class="hero-viewer-wrapper">
-        <FullViewerDemo height="480px" />
+        <FullViewerDemo height="600px" />
       </div>
     </template>
   </Layout>
@@ -50,8 +50,21 @@ const { Layout } = DefaultTheme;
 /* Hero viewer wrapper */
 .hero-viewer-wrapper {
   width: 100%;
-  max-width: 560px;
+  max-width: 720px;
   margin: 0 auto;
+}
+
+/* Give the image column more space on desktop */
+@media (min-width: 960px) {
+  .VPHero.has-image .main {
+    max-width: 40%;
+    flex-shrink: 0;
+  }
+
+  .VPHero.has-image .image {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .hero-viewer-wrapper .full-viewer-demo {
