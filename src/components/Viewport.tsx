@@ -97,16 +97,53 @@ export function Viewport({
       }
     };
 
+    // ── Axes-inset drag handlers (pointer events for mouse+touch) ──
+
+    const containerEl = containerRef.current!;
+
+    const toCSSCoords = (e: PointerEvent | MouseEvent) => {
+      const rect = containerEl.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      const { x, y } = toCSSCoords(e);
+      if (renderer.hitTestAxesInset(x, y)) {
+        e.preventDefault();
+        renderer.startAxesDrag(x, y);
+        (e.target as Element)?.setPointerCapture?.(e.pointerId);
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (renderer.isAxesDragging()) {
+        const { x, y } = toCSSCoords(e);
+        renderer.moveAxesDrag(x, y);
+      }
+    };
+
+    const handlePointerUp = (_e: PointerEvent) => {
+      renderer.endAxesDrag();
+    };
+
     canvas.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("contextmenu", handleContextMenu);
     canvas.addEventListener("mouseleave", handleMouseLeave);
     canvas.addEventListener("dblclick", handleDblClick);
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("contextmenu", handleContextMenu);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
       canvas.removeEventListener("dblclick", handleDblClick);
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointercancel", handlePointerUp);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
