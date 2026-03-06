@@ -12,8 +12,6 @@ npm install megane
 
 The easiest way to get started is the `MeganeViewer` component. It includes the 3D viewport, sidebar, appearance panel, timeline, tooltip, and measurement panel — everything you need in a single component.
 
-<FullViewerDemo height="500px" />
-
 ```tsx
 import { useState, useCallback, useMemo } from "react";
 import { MeganeViewer, parseStructureFile } from "megane";
@@ -85,14 +83,19 @@ function App() {
 | `playing` | `boolean` | Playback state |
 | `fps` | `number` | Playback speed |
 | `mode` | `"streaming" \| "local"` | Data source mode |
+| `onToggleMode` | `() => void` | Toggle streaming/local mode |
+| `pdbFileName` | `string \| null` | Name of the loaded structure file |
 | `bonds` | `BondConfig` | Bond display configuration |
 | `trajectory` | `TrajectoryConfig` | Trajectory configuration |
 | `labels` | `LabelConfig` | Atom label configuration |
 | `vectors` | `VectorConfig` | Vector arrow configuration |
+| `atomLabels` | `string[] \| null` | Resolved atom label strings |
+| `atomVectors` | `Float32Array \| null` | Resolved vector arrow data |
 | `width` / `height` | `string \| number` | Viewer dimensions |
 | `onUploadStructure` | `(file: File) => void` | File upload handler |
 | `onSeek` | `(frame: number) => void` | Frame seek handler |
 | `onPlayPause` | `() => void` | Play/pause toggle |
+| `onFpsChange` | `(fps: number) => void` | FPS change handler |
 
 See the [TypeScript API Reference](/api/typescript/) for the complete interface.
 
@@ -130,8 +133,6 @@ function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 ```
-
-<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 
 ### `Sidebar`, `Timeline`, `AppearancePanel`
 
@@ -220,8 +221,6 @@ renderer.setCellVisible(true);
 // Cleanup
 renderer.dispose();
 ```
-
-<MoleculeDemo src="/megane/data/caffeine_water.json" height="350px" />
 
 ### Atom Selection & Measurement
 
@@ -396,14 +395,30 @@ Key TypeScript types exported by megane:
 
 ```ts
 import type {
-  Snapshot,        // Parsed molecular structure (positions, elements, bonds)
-  Frame,           // Single trajectory frame (frameId, positions)
-  TrajectoryMeta,  // Trajectory metadata (nFrames, timestepPs)
-  HoverInfo,       // Atom/bond hover information
-  SelectionState,  // Current atom selection
-  Measurement,     // Distance/angle/dihedral result
-  BondSource,      // "structure" | "file" | "distance" | "none"
-  BondConfig,      // Bond panel configuration
-  TrajectoryConfig,// Trajectory panel configuration
+  Snapshot,            // Parsed molecular structure (positions, elements, bonds)
+  Frame,               // Single trajectory frame (frameId, positions)
+  TrajectoryMeta,      // Trajectory metadata (nFrames, timestepPs)
+  HoverInfo,           // Atom/bond hover information
+  SelectionState,      // Current atom selection
+  Measurement,         // Distance/angle/dihedral result
+  BondSource,          // "structure" | "file" | "distance" | "none"
+  BondConfig,          // Bond panel configuration
+  TrajectoryConfig,    // Trajectory panel configuration
+  LabelConfig,         // Label panel configuration
+  VectorConfig,        // Vector arrow configuration
+  StructureParseResult,// Parse result from parseStructureFile/Text
 } from "megane";
+```
+
+### Parser Functions
+
+```ts
+import { parseStructureFile, parseStructureText } from "megane";
+
+// Parse from File object (drag-and-drop, file input)
+const result = await parseStructureFile(file);
+// result.snapshot, result.frames, result.labels
+
+// Parse from text string (fetched content)
+const result = await parseStructureText(pdbText);
 ```
