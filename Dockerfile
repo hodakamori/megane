@@ -47,9 +47,9 @@ RUN apt-get purge -y build-essential && apt-get autoremove -y && \
     pip uninstall -y maturin
 
 # Copy demo data
-COPY tests/fixtures/1crn.pdb /data/1crn.pdb
-COPY tests/fixtures/1crn_vibration.xtc /data/1crn_vibration.xtc
+COPY tests/fixtures/caffeine_water.pdb /data/caffeine_water.pdb
+COPY tests/fixtures/caffeine_water_vibration.xtc /data/caffeine_water_vibration.xtc
 
 EXPOSE 8080
 
-CMD ["megane", "serve", "/data/1crn.pdb", "--xtc", "/data/1crn_vibration.xtc", "--port", "8080", "--no-browser"]
+CMD ["megane", "serve", "/data/caffeine_water.pdb", "--xtc", "/data/caffeine_water_vibration.xtc", "--port", "8080", "--no-browser"]

@@ -12,8 +12,8 @@ import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
 import type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
-import defaultPDB from "../tests/fixtures/1crn.pdb?raw";
-import demoXtcUrl from "../tests/fixtures/1crn_vibration.xtc?url";
+import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
+import demoXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";
@@ -44,7 +44,7 @@ function App() {
       await local.loadText(defaultPDB);
       const resp = await fetch(demoXtcUrl);
       const buffer = await resp.arrayBuffer();
-      const file = new File([buffer], "1crn_vibration.xtc");
+      const file = new File([buffer], "caffeine_water_vibration.xtc");
       await local.loadXtc(file);
       // Load demo vectors so arrows are visible by default
       local.loadDemoVectors();

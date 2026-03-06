@@ -1,6 +1,6 @@
 # Getting Started
 
-<MoleculeDemo src="/megane/data/1crn.json" height="300px" :autoRotate="true" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="300px" :autoRotate="true" />
 
 ## Prerequisites
 

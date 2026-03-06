@@ -13,7 +13,7 @@ target/
 crates/megane-wasm/pkg/
 *.so
 python/megane/static/app/
-python/megane/static/1crn.pdb
+python/megane/static/caffeine_water.pdb
 .ipynb_checkpoints/
 docs/.vitepress/dist
 docs/.vitepress/cache

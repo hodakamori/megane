@@ -23,13 +23,13 @@ import megane
 
 ```python
 viewer = megane.MolecularViewer()
-viewer.load("1crn.pdb")
+viewer.load("caffeine_water.pdb")
 viewer
 ```
 
 </template>
 <template #output>
-<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 </template>
 </NotebookCell>
 
@@ -74,7 +74,7 @@ viewer
 
 </template>
 <template #output>
-<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 </template>
 </NotebookCell>
 
@@ -219,7 +219,7 @@ widgets.VBox([fig, viewer])
 
 </template>
 <template #output>
-<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 </template>
 </NotebookCell>
 
@@ -265,8 +265,8 @@ widgets.HBox([v1, v2])
 </template>
 <template #output>
 <div style="display: flex; gap: 8px;">
-  <div style="flex: 1;"><MoleculeDemo src="/megane/data/1crn.json" height="300px" /></div>
-  <div style="flex: 1;"><MoleculeDemo src="/megane/data/1crn.json" height="300px" /></div>
+  <div style="flex: 1;"><MoleculeDemo src="/megane/data/caffeine_water.json" height="300px" /></div>
+  <div style="flex: 1;"><MoleculeDemo src="/megane/data/caffeine_water.json" height="300px" /></div>
 </div>
 </template>
 </NotebookCell>
@@ -311,7 +311,7 @@ widgets.VBox([fig, viewer])
 
 </template>
 <template #output>
-<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 </template>
 </NotebookCell>
 
@@ -349,6 +349,6 @@ widgets.VBox([widgets.HBox([slider, label]), viewer])
 
 </template>
 <template #output>
-<MoleculeDemo src="/megane/data/1crn.json" height="400px" />
+<MoleculeDemo src="/megane/data/caffeine_water.json" height="400px" />
 </template>
 </NotebookCell>
