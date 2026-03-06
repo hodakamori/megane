@@ -5,9 +5,8 @@ on:
     branches: [main]
     paths:
       - "docs/**"
-      - "src/renderer/**"
-      - "src/types.ts"
-      - "src/constants.ts"
+      - "src/**"
+      - "crates/**"
   workflow_dispatch:
 
 permissions:
@@ -37,19 +36,32 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install root dependencies (for TypeDoc type resolution)
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install root dependencies
         run: npm ci --ignore-scripts
 
       - name: Install docs dependencies
         working-directory: docs
         run: npm ci
 
+      - name: Build WASM module
+        run: npm run build:wasm
+
+      - name: Build demo app for docs
+        run: npx vite build --config vite.docs-demo.config.ts
+
       - name: Generate demo data
         run: python3 docs/scripts/generate-demo-data.py
 
-      - name: Create WASM type stubs
+      - name: Create WASM type stubs (for TypeDoc)
         run: |
-          mkdir -p crates/megane-wasm/pkg
           cp docs/wasm-stub.d.ts crates/megane-wasm/pkg/index.d.ts
 
       - name: Generate API references

@@ -2,6 +2,16 @@
 
 megane provides an [anywidget](https://anywidget.dev/)-based Jupyter widget for interactive molecular visualization directly in notebooks. Works in JupyterLab, Jupyter Notebook, VS Code, and Google Colab.
 
+## Try It in Your Browser
+
+You can try a Jupyter environment right here — no installation required. The notebook below runs entirely in your browser via [JupyterLite](https://jupyterlite.readthedocs.io/).
+
+<JupyterLiteEmbed height="650px" />
+
+::: tip
+To install megane in JupyterLite, run `%pip install megane` in a code cell. For a local Jupyter environment, see the installation instructions below.
+:::
+
 ## Basic Usage
 
 ```python

@@ -24,34 +24,37 @@ features:
     details: PDB, GRO, XYZ, MOL, and XTC parsers written in Rust — shared between Python (PyO3) and browser (WASM) for blazing-fast performance.
 ---
 
-<div class="demo-section">
-  <div class="demo-header">
-    <h2>Try it now</h2>
-    <p>Interactive 3D viewer — rotate, zoom, and explore Crambin (1CRN, 327 atoms)</p>
-  </div>
-  <MoleculeDemo src="/megane/data/1crn.json" height="450px" :autoRotate="true" />
+<script setup>
+import { useData } from 'vitepress'
+</script>
+
+<!-- Full-featured viewer in the hero area -->
+<div class="hero-viewer">
+  <FullViewerDemo height="500px" />
+  <p class="hero-viewer-caption">
+    Full-featured viewer with sidebar, appearance panel, and file upload.
+    Try dragging a <code>.pdb</code> file onto the viewer.
+  </p>
 </div>
 
 <style>
-.demo-section {
-  max-width: 900px;
-  margin: 48px auto;
+.hero-viewer {
+  max-width: 1152px;
+  margin: -24px auto 48px;
   padding: 0 24px;
 }
 
-.demo-header {
+.hero-viewer-caption {
   text-align: center;
-  margin-bottom: 16px;
+  margin-top: 8px;
+  color: var(--vp-c-text-3);
+  font-size: 0.85rem;
 }
 
-.demo-header h2 {
-  font-size: 1.6rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.demo-header p {
-  color: var(--vp-c-text-2);
-  font-size: 0.95rem;
+.hero-viewer-caption code {
+  font-size: 0.8rem;
+  background: var(--vp-c-bg-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 </style>
