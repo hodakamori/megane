@@ -89,6 +89,11 @@ export function MeganeViewer({
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
+    // Set initial view insets so fitToView() accounts for overlay panels
+    renderer.setViewInsets(
+      sidebarCollapsed ? 0 : 252,      // 12px gap + 240px sidebar
+      rightPanelCollapsed ? 0 : 232,   // 12px gap + 220px panel
+    );
   }, []);
 
   const handleResetView = useCallback(() => {
@@ -142,6 +147,14 @@ export function MeganeViewer({
   const handleToggleRightPanel = useCallback(() => {
     setRightPanelCollapsed((prev) => !prev);
   }, []);
+
+  // Update view insets when overlay panels are toggled
+  useEffect(() => {
+    rendererRef.current?.setViewInsets(
+      sidebarCollapsed ? 0 : 252,      // 12px gap + 240px sidebar
+      rightPanelCollapsed ? 0 : 232,   // 12px gap + 220px panel
+    );
+  }, [sidebarCollapsed, rightPanelCollapsed]);
 
   const handleAtomScaleChange = useCallback((scale: number) => {
     setAtomScale(scale);

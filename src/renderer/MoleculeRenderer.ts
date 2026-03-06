@@ -62,6 +62,8 @@ export class MoleculeRenderer {
   private atomOpacity = 1.0;
   private bondScale = 1.0;
   private bondOpacity = 1.0;
+  private viewInsetLeft = 0;
+  private viewInsetRight = 0;
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -479,30 +481,19 @@ export class MoleculeRenderer {
 
     this.controls.target.set(cx, cy, cz);
 
-    // Aspect-aware zoom: ensure entire model fits regardless of viewport shape
-    const aspect = this.container
-      ? this.container.clientWidth / this.container.clientHeight
-      : 1;
-    const padding = 1.2;
-    // Required frustum half-height to contain both X and Y extents
-    const halfH = Math.max(extentY / 2, extentX / (2 * aspect)) * padding;
-    const frustumHeight = Math.max(halfH * 2, 0.1);
     const distance = Math.max(maxExtent * 1.2, 0.1);
     this.camera.position.set(cx, cy, cz + distance);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
-      this.camera.left = -frustumHeight * aspect / 2;
-      this.camera.right = frustumHeight * aspect / 2;
-      this.camera.top = frustumHeight / 2;
-      this.camera.bottom = -frustumHeight / 2;
       this.camera.near = -distance * 10;
       this.camera.far = distance * 10;
       this.camera.zoom = 1;
+      this.applyFrustumInsets();
     } else {
       this.camera.near = distance * 0.01;
       this.camera.far = distance * 10;
+      this.camera.updateProjectionMatrix();
     }
-    this.camera.updateProjectionMatrix();
     this.controls.update();
   }
 
@@ -517,6 +508,60 @@ export class MoleculeRenderer {
   setRotationCenter(x: number, y: number, z: number): void {
     this.controls.target.set(x, y, z);
     this.controls.update();
+  }
+
+  /** Set pixel insets for overlay panels that occlude viewport edges. */
+  setViewInsets(left: number, right: number): void {
+    this.viewInsetLeft = left;
+    this.viewInsetRight = right;
+    this.applyFrustumInsets();
+  }
+
+  /**
+   * Recalculate the orthographic frustum so the model fits within the
+   * visible area (accounting for overlay insets) and appears centered
+   * in that visible area.
+   */
+  private applyFrustumInsets(): void {
+    if (!(this.camera instanceof THREE.OrthographicCamera)) return;
+    if (!this.container) return;
+
+    const W = this.container.clientWidth;
+    const H = this.container.clientHeight;
+    if (W === 0 || H === 0) return;
+
+    const leftInset = this.viewInsetLeft;
+    const rightInset = this.viewInsetRight;
+
+    // Effective visible width and its aspect ratio
+    const effectiveWidth = Math.max(W - leftInset - rightInset, 1);
+    const effectiveAspect = effectiveWidth / H;
+
+    // Size the frustum so the model fits within the visible area
+    const padding = 1.2;
+    const halfH =
+      Math.max(this.lastExtentY / 2, this.lastExtentX / (2 * effectiveAspect)) *
+      padding;
+    const frustumHeight = Math.max(halfH * 2, 0.1);
+
+    // The frustum must cover the full container (full aspect)
+    const fullAspect = W / H;
+    const halfW = (frustumHeight * fullAspect) / 2;
+
+    // Start with symmetric frustum for full container
+    this.camera.left = -halfW;
+    this.camera.right = halfW;
+    this.camera.top = frustumHeight / 2;
+    this.camera.bottom = -frustumHeight / 2;
+
+    // Offset so the model center maps to the center of the visible area.
+    // visible center is (leftInset - rightInset)/2 pixels right of container center.
+    const frustumWidth = 2 * halfW;
+    const shift = ((leftInset - rightInset) / (2 * W)) * frustumWidth;
+    this.camera.left -= shift;
+    this.camera.right -= shift;
+
+    this.camera.updateProjectionMatrix();
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -860,26 +905,16 @@ export class MoleculeRenderer {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     if (w === 0 || h === 0) return;
-    const aspect = w / h;
 
     if (this.camera instanceof THREE.OrthographicCamera) {
-      // Recalculate full frustum (top/bottom/left/right) so the view stays
-      // correct when the container aspect ratio changes (e.g. mobile rotation,
-      // address-bar show/hide).  camera.zoom is left untouched so the user's
-      // zoom level is preserved.
-      const padding = 1.2;
-      const halfH =
-        Math.max(this.lastExtentY / 2, this.lastExtentX / (2 * aspect)) *
-        padding;
-      const frustumHeight = Math.max(halfH * 2, 0.1);
-      this.camera.left = (-frustumHeight * aspect) / 2;
-      this.camera.right = (frustumHeight * aspect) / 2;
-      this.camera.top = frustumHeight / 2;
-      this.camera.bottom = -frustumHeight / 2;
+      // Recalculate full frustum accounting for overlay insets so the view
+      // stays correct when the container aspect ratio changes.
+      // camera.zoom is left untouched so the user's zoom level is preserved.
+      this.applyFrustumInsets();
     } else {
-      this.camera.aspect = aspect;
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
     }
-    this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.labelOverlay?.resize(w, h, Math.min(window.devicePixelRatio, 2));
   }
