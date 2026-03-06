@@ -9,6 +9,27 @@ use std::collections::HashSet;
 use crate::bonds;
 use crate::parser::symbol_to_atomic_num;
 
+/// Parse `Lattice="ax ay az bx by bz cx cy cz"` from an extended XYZ comment line.
+fn parse_lattice(comment: &str) -> Option<[f32; 9]> {
+    let idx = comment.find("Lattice=")?;
+    let rest = &comment[idx + 8..];
+    let quote_char = rest.chars().next()?;
+    if quote_char != '"' && quote_char != '\'' {
+        return None;
+    }
+    let inner_start = quote_char.len_utf8();
+    let inner_end = rest[inner_start..].find(quote_char)?;
+    let inner = &rest[inner_start..inner_start + inner_end];
+    let vals: Vec<f32> = inner.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+    if vals.len() == 9 {
+        let mut m = [0.0f32; 9];
+        m.copy_from_slice(&vals);
+        Some(m)
+    } else {
+        None
+    }
+}
+
 pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
     if lines.len() < 3 {
@@ -21,6 +42,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let mut first_labels: Option<Vec<String>> = None;
     let mut first_n_atoms = 0usize;
     let mut frame_positions: Vec<Vec<f32>> = Vec::new();
+    let mut box_matrix: Option<[f32; 9]> = None;
 
     while offset < lines.len() {
         // Line 1: atom count
@@ -37,7 +59,11 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             break; // incomplete frame, skip
         }
 
-        // Line 2: comment (skip)
+        // Line 2: comment — parse lattice if present
+        let comment_line = lines[offset + 1];
+        if box_matrix.is_none() {
+            box_matrix = parse_lattice(comment_line);
+        }
         offset += 2;
 
         let mut positions = Vec::with_capacity(n_atoms * 3);
@@ -113,8 +139,86 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         bonds,
         n_file_bonds: 0,
         bond_orders: None,
-        box_matrix: None,
+        box_matrix,
         frame_positions,
         atom_labels,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_lattice_double_quotes() {
+        let comment = r#"Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44""#;
+        let m = parse_lattice(comment).unwrap();
+        assert!((m[0] - 5.44).abs() < 1e-5);
+        assert!((m[4] - 5.44).abs() < 1e-5);
+        assert!((m[8] - 5.44).abs() < 1e-5);
+        assert!((m[1]).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_parse_lattice_single_quotes() {
+        let comment = "Lattice='10.0 0.0 0.0 0.0 10.0 0.0 0.0 0.0 10.0'";
+        let m = parse_lattice(comment).unwrap();
+        assert!((m[0] - 10.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_parse_lattice_with_other_keys() {
+        let comment = r#"Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3 pbc="T T T""#;
+        let m = parse_lattice(comment).unwrap();
+        assert!((m[0] - 5.44).abs() < 1e-5);
+        assert!((m[8] - 5.44).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_parse_lattice_missing() {
+        assert!(parse_lattice("just a comment").is_none());
+        assert!(parse_lattice("").is_none());
+    }
+
+    #[test]
+    fn test_parse_lattice_incomplete() {
+        let comment = r#"Lattice="1.0 2.0 3.0""#;
+        assert!(parse_lattice(comment).is_none());
+    }
+
+    #[test]
+    fn test_parse_xyz_with_lattice() {
+        let xyz = r#"2
+Lattice="10.0 0.0 0.0 0.0 10.0 0.0 0.0 0.0 10.0"
+H 0.0 0.0 0.0
+O 1.0 0.0 0.0
+"#;
+        let result = parse(xyz).expect("parse failed");
+        assert_eq!(result.n_atoms, 2);
+        let bm = result.box_matrix.expect("box_matrix should be Some");
+        assert!((bm[0] - 10.0).abs() < 1e-5);
+        assert!((bm[4] - 10.0).abs() < 1e-5);
+        assert!((bm[8] - 10.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_parse_xyz_without_lattice() {
+        let xyz = "2\nwater molecule\nH 0.0 0.0 0.0\nO 1.0 0.0 0.0\n";
+        let result = parse(xyz).expect("parse failed");
+        assert!(result.box_matrix.is_none());
+    }
+
+    #[test]
+    fn test_parse_xyz_fixture() {
+        let text = std::fs::read_to_string(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/si_diamond.xyz")
+        ).expect("read fixture");
+        let result = parse(&text).expect("parse failed");
+        assert_eq!(result.n_atoms, 8);
+        assert!(result.elements.iter().all(|&e| e == 14)); // Si = 14
+        let bm = result.box_matrix.expect("box_matrix should be Some");
+        assert!((bm[0] - 5.44).abs() < 1e-5);
+        assert!((bm[4] - 5.44).abs() < 1e-5);
+        assert!((bm[8] - 5.44).abs() < 1e-5);
+    }
 }
