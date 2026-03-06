@@ -20,3 +20,5 @@ docs/.vitepress/cache
 docs/node_modules
 docs/api/python/
 docs/api/typescript/
+docs/notebooks/
+docs/public/notebooks/
