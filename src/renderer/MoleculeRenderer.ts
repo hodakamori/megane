@@ -533,8 +533,10 @@ export class MoleculeRenderer {
     const leftInset = this.viewInsetLeft;
     const rightInset = this.viewInsetRight;
 
-    // Effective visible width and its aspect ratio
-    const effectiveWidth = Math.max(W - leftInset - rightInset, 1);
+    // Effective visible width — guarantee at least 30% of container width
+    // (or 100px) to prevent degenerate frustum on narrow viewports
+    const minVisible = Math.max(W * 0.3, 100);
+    const effectiveWidth = Math.max(W - leftInset - rightInset, minVisible);
     const effectiveAspect = effectiveWidth / H;
 
     // Size the frustum so the model fits within the visible area

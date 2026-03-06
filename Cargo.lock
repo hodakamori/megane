@@ -66,21 +66,21 @@ name = "megane-core"
 version = "0.1.0"
 
 [[package]]
-name = "megane-pdb-wasm"
-version = "0.1.0"
-dependencies = [
- "js-sys",
- "megane-core",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "megane-python"
 version = "0.1.0"
 dependencies = [
  "megane-core",
  "numpy",
  "pyo3",
+]
+
+[[package]]
+name = "megane-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "megane-core",
+ "wasm-bindgen",
 ]
 
 [[package]]
