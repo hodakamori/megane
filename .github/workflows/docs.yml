@@ -7,6 +7,7 @@ on:
       - "docs/**"
       - "src/**"
       - "crates/**"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
