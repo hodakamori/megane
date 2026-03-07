@@ -15,6 +15,13 @@ export function applyViewportState(
   current: ViewportState,
   previous: ViewportState | null,
 ): void {
+  // ─── Atom visibility (hide when no viewport node produces data) ──
+  const hasParticles = current.particles.length > 0;
+  const hadParticles = (previous?.particles.length ?? 0) > 0;
+  if (!previous || hasParticles !== hadParticles) {
+    renderer.setAtomsVisible(hasParticles);
+  }
+
   // ─── Atom scale/opacity from particle data ─────────────────
   applyParticleOverrides(renderer, current.particles, previous?.particles ?? null);
 

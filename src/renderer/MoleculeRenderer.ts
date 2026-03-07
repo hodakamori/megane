@@ -329,6 +329,13 @@ export class MoleculeRenderer {
     this.bondRenderer?.setOpacity?.(opacity);
   }
 
+  /** Toggle atom visibility. */
+  setAtomsVisible(visible: boolean): void {
+    if (this.atomRenderer) {
+      this.atomRenderer.mesh.visible = visible;
+    }
+  }
+
   /** Toggle bond visibility. */
   setBondsVisible(visible: boolean): void {
     if (this.bondRenderer) {
