@@ -11,7 +11,6 @@ import {
   Controls,
   Background,
   BackgroundVariant,
-  MarkerType,
 } from "@xyflow/react";
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -35,11 +34,11 @@ const nodeTypes = {
 };
 
 const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
+  "data_loader",
   "filter",
   "modify",
   "label_generator",
   "polyhedron_generator",
-  "viewport",
 ];
 
 const panelStyle: React.CSSProperties = {
@@ -159,12 +158,6 @@ function PipelineEditorInner({
       return {
         ...edge,
         animated: true,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color,
-          width: 16,
-          height: 16,
-        },
         style: {
           stroke: color,
           strokeWidth: 2,
@@ -282,7 +275,7 @@ function PipelineEditorInner({
           isValidConnection={isValidConnection}
           nodeTypes={memoizedNodeTypes}
           fitView
-          fitViewOptions={{ padding: 1.2, maxZoom: 0.65 }}
+          fitViewOptions={{ padding: 1.2, maxZoom: 1.95 }}
           minZoom={0.3}
           maxZoom={2}
           defaultEdgeOptions={{
