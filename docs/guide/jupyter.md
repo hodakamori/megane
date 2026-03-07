@@ -50,3 +50,24 @@ Select 2–4 atoms to measure distances, angles, or dihedral angles.
 | 2 | Distance (Å) |
 | 3 | Angle (°) |
 | 4 | Dihedral angle (°) |
+
+## Troubleshooting
+
+### VS Code: "Failed to load model class 'AnyModel' from module 'anywidget'"
+
+This is a [known issue](https://github.com/manzt/anywidget/issues/684) with VS Code's Jupyter extension and affects many anywidget-based projects. VS Code uses its own ipywidgets renderer (`@vscode/jupyter-ipywidgets8`) which has a different widget module registration mechanism than browser-based Jupyter.
+
+**Workarounds:**
+
+1. **Reload the VS Code window** after installing megane:
+   - Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+   - Run `Developer: Reload Window`
+
+2. **Ensure ipywidgets v8.x is installed:**
+   ```bash
+   pip install "ipywidgets>=8.0.0"
+   ```
+
+3. **Update the VS Code Jupyter extension** to the latest version.
+
+4. **Restart the kernel** and re-run the notebook cells.
