@@ -41,7 +41,7 @@ jobs:
             echo '```' >> "$GITHUB_OUTPUT"
             echo "" >> "$GITHUB_OUTPUT"
             echo '```bash' >> "$GITHUB_OUTPUT"
-            echo "npm install @hodakamori/megane@${TAG#v}" >> "$GITHUB_OUTPUT"
+            echo "npm install megane-viewer@${TAG#v}" >> "$GITHUB_OUTPUT"
             echo '```' >> "$GITHUB_OUTPUT"
             echo "$EOF" >> "$GITHUB_OUTPUT"
           fi

@@ -1,5 +1,5 @@
 {
-  "name": "@hodakamori/megane",
+  "name": "megane-viewer",
   "version": "0.1.0",
   "type": "module",
   "description": "A fast, beautiful molecular viewer – anywidget-compatible",
