@@ -49,7 +49,7 @@ manifest-path = "crates/megane-python/Cargo.toml"
 python-source = "python"
 module-name = "megane.megane_parser"
 features = ["pyo3/extension-module"]
-include = ["python/megane/static/**"]
+include = ["python/megane/static/**", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
