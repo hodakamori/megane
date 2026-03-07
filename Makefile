@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all clean preview preview-screenshot preview-video preview-clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -43,6 +43,22 @@ test-e2e-snapshot:
 
 # Run all tests (Python + TypeScript + Rust + E2E)
 test-all: test test-ts test-rust test-e2e test-e2e-snapshot
+
+# Dev preview: capture screenshots + video for mobile dev review
+preview:
+	node scripts/dev-preview.mjs --interact
+
+# Dev preview: screenshots only
+preview-screenshot:
+	node scripts/dev-preview.mjs --screenshot
+
+# Dev preview: video only
+preview-video:
+	node scripts/dev-preview.mjs --video --interact
+
+# Dev preview: clean previous captures
+preview-clean:
+	rm -rf dev-preview/
 
 # Clean build artifacts
 clean:
