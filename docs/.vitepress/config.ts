@@ -6,7 +6,7 @@ export default defineConfig({
   description: "A fast, beautiful molecular viewer",
   base: "/megane/",
 
-  head: [["link", { rel: "icon", href: "/megane/logo.svg" }]],
+  head: [["link", { rel: "icon", href: "/megane/logo.png" }]],
 
   vite: {
     resolve: {
@@ -17,7 +17,7 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: "/logo.svg",
+    logo: "/logo.png",
 
     nav: [
       { text: "Guide", link: "/getting-started" },
