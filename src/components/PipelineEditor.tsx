@@ -275,7 +275,7 @@ function PipelineEditorInner({
           isValidConnection={isValidConnection}
           nodeTypes={memoizedNodeTypes}
           fitView
-          fitViewOptions={{ padding: 1.2, maxZoom: 0.975 }}
+          fitViewOptions={{ padding: 1.2, maxZoom: 1.95 }}
           minZoom={0.3}
           maxZoom={2}
           defaultEdgeOptions={{
