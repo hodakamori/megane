@@ -24,6 +24,8 @@ import { CellRenderer } from "./CellRenderer";
 import { CellAxesRenderer } from "./CellAxesRenderer";
 import { LabelOverlay } from "./LabelOverlay";
 import { ArrowRenderer } from "./ArrowRenderer";
+import { PolyhedronRenderer } from "./PolyhedronRenderer";
+import type { MeshData } from "../pipeline/types";
 import {
   getElementSymbol,
   getRadius,
@@ -47,6 +49,7 @@ export class MoleculeRenderer {
   private cellAxesRenderer: CellAxesRenderer | null = null;
   private labelOverlay: LabelOverlay | null = null;
   private arrowRenderer: ArrowRenderer | null = null;
+  private polyhedronRenderer: PolyhedronRenderer | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
@@ -284,6 +287,22 @@ export class MoleculeRenderer {
   /** Set arrow scale multiplier. */
   setVectorScale(scale: number): void {
     this.arrowRenderer?.setScale(scale);
+  }
+
+  /** Load polyhedra mesh data for rendering. */
+  loadPolyhedra(data: MeshData): void {
+    if (!this.polyhedronRenderer) {
+      this.polyhedronRenderer = new PolyhedronRenderer();
+      this.scene.add(this.polyhedronRenderer.group);
+    }
+    this.polyhedronRenderer.loadMeshData(data);
+  }
+
+  /** Clear all polyhedra from the scene. */
+  clearPolyhedra(): void {
+    if (this.polyhedronRenderer) {
+      this.polyhedronRenderer.clear();
+    }
   }
 
   /** Set atom radius scale multiplier. */
@@ -1058,6 +1077,7 @@ export class MoleculeRenderer {
     if (this.cellRenderer) this.cellRenderer.dispose();
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.arrowRenderer) this.arrowRenderer.dispose();
+    if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     if (this.dprMediaQuery && this.dprChangeHandler) {
       this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);

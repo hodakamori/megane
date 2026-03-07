@@ -55,9 +55,16 @@ export interface LabelData {
   particleRef: ParticleData;
 }
 
-/** Mesh data (reserved for future use). */
+/** Mesh data for polyhedron rendering. */
 export interface MeshData {
   type: "mesh";
+  positions: Float32Array;          // flat xyz vertex positions
+  indices: Uint32Array;             // triangle indices
+  normals: Float32Array;            // per-vertex normals
+  colors: Float32Array;             // per-vertex RGBA (length = nVertices * 4)
+  opacity: number;
+  showEdges: boolean;
+  edgePositions: Float32Array | null; // line segment pairs for wireframe
 }
 
 /** Union of all pipeline data types. */
@@ -83,7 +90,8 @@ export type PipelineNodeType =
   | "viewport"
   | "filter"
   | "modify"
-  | "label_generator";
+  | "label_generator"
+  | "polyhedron_generator";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -92,6 +100,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   filter: "Filter",
   modify: "Modify",
   label_generator: "Labels",
+  polyhedron_generator: "Polyhedra",
 };
 
 // ─── Port Definitions Per Node Type ───────────────────────────────────
@@ -132,6 +141,10 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   label_generator: {
     inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
     outputs: [{ name: "label", dataType: "label", label: "Label" }],
+  },
+  polyhedron_generator: {
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
   },
 };
 
@@ -174,13 +187,23 @@ export interface LabelGeneratorParams {
   source: "element" | "resname" | "index";
 }
 
+export interface PolyhedronGeneratorParams {
+  type: "polyhedron_generator";
+  centerElements: number[];      // atomic numbers of center atoms
+  ligandElements: number[];      // atomic numbers of ligand atoms
+  maxDistance: number;            // max bond distance in Angstroms
+  opacity: number;               // face opacity 0-1
+  showEdges: boolean;            // wireframe edges
+}
+
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | DataLoaderParams
   | ViewportParams
   | FilterParams
   | ModifyParams
-  | LabelGeneratorParams;
+  | LabelGeneratorParams
+  | PolyhedronGeneratorParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -195,6 +218,15 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       return { type, scale: 1.0, opacity: 1.0 };
     case "label_generator":
       return { type, source: "element" };
+    case "polyhedron_generator":
+      return {
+        type,
+        centerElements: [],
+        ligandElements: [8], // oxygen by default
+        maxDistance: 2.5,
+        opacity: 0.5,
+        showEdges: true,
+      };
   }
 }
 

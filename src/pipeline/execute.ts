@@ -13,18 +13,21 @@ import type {
   BondData,
   CellData,
   LabelData,
+  MeshData,
   ViewportState,
   ViewportParams,
   DataLoaderParams,
   FilterParams,
   ModifyParams,
   LabelGeneratorParams,
+  PolyhedronGeneratorParams,
   PipelineDataType,
   PipelineNodeType,
 } from "./types";
 import { DEFAULT_VIEWPORT_STATE, NODE_PORTS } from "./types";
 import { evaluateSelection } from "./selection";
-import { getElementSymbol } from "../constants";
+import { getElementSymbol, getColor } from "../constants";
+import { computeConvexHull } from "../logic/convexHull";
 
 export interface PipelineNodeData {
   params: PipelineNodeParams;
@@ -310,6 +313,160 @@ function executeLabelGenerator(
   return outputs;
 }
 
+/**
+ * Invert a 3x3 row-major matrix. Returns null if singular.
+ */
+function invert3x3(m: Float32Array): Float32Array | null {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+  if (Math.abs(det) < 1e-20) return null;
+  const invDet = 1 / det;
+  return new Float32Array([
+    (e * i - f * h) * invDet, (c * h - b * i) * invDet, (b * f - c * e) * invDet,
+    (f * g - d * i) * invDet, (a * i - c * g) * invDet, (c * d - a * f) * invDet,
+    (d * h - e * g) * invDet, (b * g - a * h) * invDet, (a * e - b * d) * invDet,
+  ]);
+}
+
+/**
+ * Apply minimum-image convention to a displacement vector using cell matrix.
+ * Returns the PBC-corrected displacement [dx, dy, dz].
+ */
+function minimumImage(
+  dx: number, dy: number, dz: number,
+  box: Float32Array, boxInv: Float32Array,
+): [number, number, number] {
+  // Convert to fractional coordinates
+  let sx = boxInv[0] * dx + boxInv[1] * dy + boxInv[2] * dz;
+  let sy = boxInv[3] * dx + boxInv[4] * dy + boxInv[5] * dz;
+  let sz = boxInv[6] * dx + boxInv[7] * dy + boxInv[8] * dz;
+
+  // Wrap to [-0.5, 0.5)
+  sx -= Math.round(sx);
+  sy -= Math.round(sy);
+  sz -= Math.round(sz);
+
+  // Convert back to Cartesian
+  return [
+    box[0] * sx + box[3] * sy + box[6] * sz,
+    box[1] * sx + box[4] * sy + box[7] * sz,
+    box[2] * sx + box[5] * sy + box[8] * sz,
+  ];
+}
+
+function executePolyhedronGenerator(
+  params: PolyhedronGeneratorParams,
+  inputs: Map<string, PipelineData[]>,
+): Map<string, PipelineData> {
+  const outputs = new Map<string, PipelineData>();
+  const particleData = inputs.get("particle")?.[0] as ParticleData | undefined;
+  if (!particleData) return outputs;
+
+  const snapshot = particleData.source;
+  const { positions, elements, nAtoms } = snapshot;
+  const centerSet = new Set(params.centerElements);
+  const ligandSet = new Set(params.ligandElements);
+
+  if (centerSet.size === 0 || ligandSet.size === 0) return outputs;
+
+  // Classify atoms
+  const centerIndices: number[] = [];
+  const ligandIndices: number[] = [];
+  for (let i = 0; i < nAtoms; i++) {
+    if (centerSet.has(elements[i])) centerIndices.push(i);
+    if (ligandSet.has(elements[i])) ligandIndices.push(i);
+  }
+
+  if (centerIndices.length === 0 || ligandIndices.length === 0) return outputs;
+
+  // PBC setup
+  const box = snapshot.box;
+  let boxInv: Float32Array | null = null;
+  if (box && box.some((v) => v !== 0)) {
+    boxInv = invert3x3(box);
+  }
+
+  const maxDistSq = params.maxDistance * params.maxDistance;
+
+  // Collect all polyhedra geometry
+  const allPositions: number[] = [];
+  const allIndices: number[] = [];
+  const allNormals: number[] = [];
+  const allColors: number[] = [];
+  const allEdgePositions: number[] = [];
+  let vertexOffset = 0;
+
+  for (const ci of centerIndices) {
+    const cx = positions[ci * 3];
+    const cy = positions[ci * 3 + 1];
+    const cz = positions[ci * 3 + 2];
+
+    // Find coordinated ligands
+    const ligandPoints: number[] = []; // flat xyz of PBC-corrected ligand positions
+    for (const li of ligandIndices) {
+      let dx = positions[li * 3] - cx;
+      let dy = positions[li * 3 + 1] - cy;
+      let dz = positions[li * 3 + 2] - cz;
+
+      if (boxInv && box) {
+        [dx, dy, dz] = minimumImage(dx, dy, dz, box, boxInv);
+      }
+
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq <= maxDistSq && distSq > 0.01) {
+        // Store PBC-corrected absolute position
+        ligandPoints.push(cx + dx, cy + dy, cz + dz);
+      }
+    }
+
+    const nLigands = ligandPoints.length / 3;
+    if (nLigands < 4) continue; // Need at least 4 for a polyhedron
+
+    const pts = new Float32Array(ligandPoints);
+    const hull = computeConvexHull(pts, nLigands);
+    if (!hull) continue;
+
+    // Get color from center element
+    const [cr, cg, cb] = getColor(elements[ci]);
+
+    // Add vertices
+    const nVerts = hull.vertices.length / 3;
+    for (let v = 0; v < nVerts; v++) {
+      allPositions.push(hull.vertices[v * 3], hull.vertices[v * 3 + 1], hull.vertices[v * 3 + 2]);
+      allNormals.push(hull.normals[v * 3], hull.normals[v * 3 + 1], hull.normals[v * 3 + 2]);
+      allColors.push(cr, cg, cb, params.opacity);
+    }
+
+    // Add indices (offset by current vertex count)
+    for (let i = 0; i < hull.indices.length; i++) {
+      allIndices.push(hull.indices[i] + vertexOffset);
+    }
+
+    // Add edge positions
+    for (let i = 0; i < hull.edges.length; i++) {
+      allEdgePositions.push(hull.edges[i]);
+    }
+
+    vertexOffset += nVerts;
+  }
+
+  if (allIndices.length === 0) return outputs;
+
+  const meshData: MeshData = {
+    type: "mesh",
+    positions: new Float32Array(allPositions),
+    indices: new Uint32Array(allIndices),
+    normals: new Float32Array(allNormals),
+    colors: new Float32Array(allColors),
+    opacity: params.opacity,
+    showEdges: params.showEdges,
+    edgePositions: params.showEdges ? new Float32Array(allEdgePositions) : null,
+  };
+
+  outputs.set("mesh", meshData);
+  return outputs;
+}
+
 function executeViewport(
   params: ViewportParams,
   inputs: Map<string, PipelineData[]>,
@@ -318,7 +475,7 @@ function executeViewport(
   const bonds = (inputs.get("bond") ?? []) as BondData[];
   const cells = (inputs.get("cell") ?? []) as CellData[];
   const labels = (inputs.get("label") ?? []) as LabelData[];
-  const meshes = (inputs.get("mesh") ?? []) as never[];
+  const meshes = (inputs.get("mesh") ?? []) as MeshData[];
 
   // Auto-filter bonds: drop bonds referencing atoms not in any particle stream
   const filteredBonds = filterBondsByParticles(bonds, particles);
@@ -461,6 +618,14 @@ export function executePipeline(
           data.params as LabelGeneratorParams,
           inputs,
           atomLabels ?? null,
+        );
+        edgeOutputs.set(id, outputs);
+        break;
+      }
+      case "polyhedron_generator": {
+        const outputs = executePolyhedronGenerator(
+          data.params as PolyhedronGeneratorParams,
+          inputs,
         );
         edgeOutputs.set(id, outputs);
         break;
