@@ -225,7 +225,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         ligandElements: [8], // oxygen by default
         maxDistance: 2.5,
         opacity: 0.5,
-        showEdges: true,
+        showEdges: false,
       };
   }
 }
