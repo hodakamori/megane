@@ -42,4 +42,17 @@ export function applyRenderState(
   if (!previous || current.vectorScale !== previous.vectorScale) {
     renderer.setVectorScale(current.vectorScale);
   }
+
+  // Per-atom overrides from selection pipeline
+  if (current.atomScaleOverrides) {
+    renderer.setAtomScaleOverrides(current.atomScaleOverrides);
+  } else if (previous?.atomScaleOverrides) {
+    renderer.clearAtomOverrides();
+  }
+  if (current.atomOpacityOverrides) {
+    renderer.setAtomOpacityOverrides(current.atomOpacityOverrides);
+  } else if (previous?.atomOpacityOverrides && !current.atomScaleOverrides) {
+    // Only clear if scale overrides didn't already clear
+    renderer.clearAtomOverrides();
+  }
 }

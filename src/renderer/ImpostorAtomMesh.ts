@@ -23,10 +23,14 @@ export class ImpostorAtomMesh {
   private centerAttr: THREE.InstancedBufferAttribute;
   private radiusAttr: THREE.InstancedBufferAttribute;
   private colorAttr: THREE.InstancedBufferAttribute;
+  private scaleOverrideAttr: THREE.InstancedBufferAttribute;
+  private opacityOverrideAttr: THREE.InstancedBufferAttribute;
 
   private centerBuf: Float32Array;
   private radiusBuf: Float32Array;
   private colorBuf: Float32Array;
+  private scaleOverrideBuf: Float32Array;
+  private opacityOverrideBuf: Float32Array;
   private nAtoms = 0;
   private capacity: number;
 
@@ -47,18 +51,26 @@ export class ImpostorAtomMesh {
     this.centerBuf = new Float32Array(maxAtoms * 3);
     this.radiusBuf = new Float32Array(maxAtoms);
     this.colorBuf = new Float32Array(maxAtoms * 3);
+    this.scaleOverrideBuf = new Float32Array(maxAtoms).fill(1.0);
+    this.opacityOverrideBuf = new Float32Array(maxAtoms).fill(1.0);
 
     this.centerAttr = new THREE.InstancedBufferAttribute(this.centerBuf, 3);
     this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
     this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
+    this.scaleOverrideAttr = new THREE.InstancedBufferAttribute(this.scaleOverrideBuf, 1);
+    this.opacityOverrideAttr = new THREE.InstancedBufferAttribute(this.opacityOverrideBuf, 1);
 
     this.centerAttr.setUsage(THREE.DynamicDrawUsage);
     this.radiusAttr.setUsage(THREE.StaticDrawUsage);
     this.colorAttr.setUsage(THREE.StaticDrawUsage);
+    this.scaleOverrideAttr.setUsage(THREE.DynamicDrawUsage);
+    this.opacityOverrideAttr.setUsage(THREE.DynamicDrawUsage);
 
     this.geo.setAttribute("instanceCenter", this.centerAttr);
     this.geo.setAttribute("instanceRadius", this.radiusAttr);
     this.geo.setAttribute("instanceColor", this.colorAttr);
+    this.geo.setAttribute("instanceScaleOverride", this.scaleOverrideAttr);
+    this.geo.setAttribute("instanceOpacityOverride", this.opacityOverrideAttr);
 
     // Custom shader material with uniforms for scale and opacity
     this.material = new THREE.RawShaderMaterial({
@@ -68,6 +80,7 @@ export class ImpostorAtomMesh {
       uniforms: {
         uScaleMultiplier: { value: 1.0 },
         uOpacity: { value: 1.0 },
+        uUsePerAtomOverrides: { value: 0 },
       },
       depthWrite: true,
       depthTest: true,
@@ -101,9 +114,15 @@ export class ImpostorAtomMesh {
       this.colorBuf[i3 + 2] = b;
     }
 
+    // Reset overrides on new snapshot
+    this.scaleOverrideBuf.fill(1.0, 0, nAtoms);
+    this.opacityOverrideBuf.fill(1.0, 0, nAtoms);
+
     this.centerAttr.needsUpdate = true;
     this.radiusAttr.needsUpdate = true;
     this.colorAttr.needsUpdate = true;
+    this.scaleOverrideAttr.needsUpdate = true;
+    this.opacityOverrideAttr.needsUpdate = true;
     this.geo.instanceCount = nAtoms;
   }
 
@@ -126,32 +145,77 @@ export class ImpostorAtomMesh {
     this.material.needsUpdate = true;
   }
 
+  /** Set per-atom scale overrides. */
+  setScaleOverrides(overrides: Float32Array): void {
+    this.scaleOverrideBuf.set(overrides.subarray(0, this.nAtoms));
+    this.scaleOverrideAttr.needsUpdate = true;
+    this.material.uniforms.uUsePerAtomOverrides.value = 1;
+  }
+
+  /** Set per-atom opacity overrides. */
+  setOpacityOverrides(overrides: Float32Array): void {
+    this.opacityOverrideBuf.set(overrides.subarray(0, this.nAtoms));
+    this.opacityOverrideAttr.needsUpdate = true;
+    this.material.uniforms.uUsePerAtomOverrides.value = 1;
+    // Enable transparency if any atom has opacity < 1
+    let hasTransparent = false;
+    for (let i = 0; i < this.nAtoms; i++) {
+      if (this.opacityOverrideBuf[i] < 1.0) { hasTransparent = true; break; }
+    }
+    if (hasTransparent) {
+      this.material.transparent = true;
+      this.material.depthWrite = false;
+      this.material.needsUpdate = true;
+    }
+  }
+
+  /** Clear all per-atom overrides, reverting to global uniforms. */
+  clearOverrides(): void {
+    this.scaleOverrideBuf.fill(1.0, 0, this.nAtoms);
+    this.opacityOverrideBuf.fill(1.0, 0, this.nAtoms);
+    this.scaleOverrideAttr.needsUpdate = true;
+    this.opacityOverrideAttr.needsUpdate = true;
+    this.material.uniforms.uUsePerAtomOverrides.value = 0;
+  }
+
   private grow(needed: number): void {
     this.capacity = Math.max(needed, this.capacity * 2);
 
     const newCenter = new Float32Array(this.capacity * 3);
     const newRadius = new Float32Array(this.capacity);
     const newColor = new Float32Array(this.capacity * 3);
+    const newScaleOverride = new Float32Array(this.capacity).fill(1.0);
+    const newOpacityOverride = new Float32Array(this.capacity).fill(1.0);
 
     newCenter.set(this.centerBuf);
     newRadius.set(this.radiusBuf);
     newColor.set(this.colorBuf);
+    newScaleOverride.set(this.scaleOverrideBuf);
+    newOpacityOverride.set(this.opacityOverrideBuf);
 
     this.centerBuf = newCenter;
     this.radiusBuf = newRadius;
     this.colorBuf = newColor;
+    this.scaleOverrideBuf = newScaleOverride;
+    this.opacityOverrideBuf = newOpacityOverride;
 
     this.centerAttr = new THREE.InstancedBufferAttribute(this.centerBuf, 3);
     this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
     this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
+    this.scaleOverrideAttr = new THREE.InstancedBufferAttribute(this.scaleOverrideBuf, 1);
+    this.opacityOverrideAttr = new THREE.InstancedBufferAttribute(this.opacityOverrideBuf, 1);
 
     this.centerAttr.setUsage(THREE.DynamicDrawUsage);
     this.radiusAttr.setUsage(THREE.StaticDrawUsage);
     this.colorAttr.setUsage(THREE.StaticDrawUsage);
+    this.scaleOverrideAttr.setUsage(THREE.DynamicDrawUsage);
+    this.opacityOverrideAttr.setUsage(THREE.DynamicDrawUsage);
 
     this.geo.setAttribute("instanceCenter", this.centerAttr);
     this.geo.setAttribute("instanceRadius", this.radiusAttr);
     this.geo.setAttribute("instanceColor", this.colorAttr);
+    this.geo.setAttribute("instanceScaleOverride", this.scaleOverrideAttr);
+    this.geo.setAttribute("instanceOpacityOverride", this.opacityOverrideAttr);
   }
 
   dispose(): void {

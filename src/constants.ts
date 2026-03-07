@@ -94,6 +94,18 @@ export function getRadius(atomicNum: number): number {
   return VDW_RADII[atomicNum] ?? DEFAULT_RADIUS;
 }
 
+// Atomic masses in daltons (indexed by atomic number)
+export const ATOMIC_MASSES: Record<number, number> = {
+  1: 1.008, 2: 4.003, 5: 10.81, 6: 12.011, 7: 14.007, 8: 15.999, 9: 18.998,
+  11: 22.990, 12: 24.305, 13: 26.982, 14: 28.086, 15: 30.974, 16: 32.06,
+  17: 35.45, 18: 39.948, 19: 39.098, 20: 40.078, 26: 55.845, 29: 63.546,
+  30: 65.38, 34: 78.96, 35: 79.904, 53: 126.904,
+};
+
 export function getElementSymbol(atomicNum: number): string {
   return ELEMENT_SYMBOLS[atomicNum] ?? `#${atomicNum}`;
+}
+
+export function getAtomicMass(atomicNum: number): number {
+  return ATOMIC_MASSES[atomicNum] ?? 0;
 }

@@ -82,6 +82,12 @@ export function MeganeViewer({
 
   // Subscribe to pipeline store's renderState
   const renderState = usePipelineStore((s) => s.renderState);
+  const setSnapshot = usePipelineStore((s) => s.setSnapshot);
+
+  // Push snapshot to pipeline store for selection queries
+  useEffect(() => {
+    setSnapshot(snapshot);
+  }, [snapshot, setSnapshot]);
 
   // Wire up node event handlers
   useEffect(() => {

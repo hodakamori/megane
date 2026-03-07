@@ -11,6 +11,7 @@ import { defaultParams } from "./types";
 
 const VALID_NODE_TYPES: Set<string> = new Set([
   "load_structure",
+  "selection",
   "set_atom",
   "set_bond_source",
   "set_bond",

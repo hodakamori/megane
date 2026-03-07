@@ -8,6 +8,7 @@ import type { BondSource, TrajectorySource, LabelSource, VectorSource } from "..
 /** All possible pipeline node type identifiers. */
 export type PipelineNodeType =
   | "load_structure"
+  | "selection"
   | "set_atom"
   | "set_bond_source"
   | "set_bond"
@@ -19,6 +20,7 @@ export type PipelineNodeType =
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   load_structure: "Load Structure",
+  selection: "Selection",
   set_atom: "Atom",
   set_bond_source: "Bond Source",
   set_bond: "Bond",
@@ -35,6 +37,11 @@ export interface LoadStructureParams {
   fileName: string | null;
   bondSource: BondSource;
   trajectorySource: TrajectorySource;
+}
+
+export interface SelectionParams {
+  type: "selection";
+  query: string;
 }
 
 export interface SetAtomParams {
@@ -82,6 +89,7 @@ export interface SetCellVisibilityParams {
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
+  | SelectionParams
   | SetAtomParams
   | SetBondSourceParams
   | SetBondParams
@@ -95,6 +103,8 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
   switch (type) {
     case "load_structure":
       return { type, fileName: null, bondSource: "structure", trajectorySource: "structure" };
+    case "selection":
+      return { type, query: "" };
     case "set_atom":
       return { type, scale: 1.0, opacity: 1.0 };
     case "set_bond_source":
@@ -131,6 +141,9 @@ export interface RenderState {
   cellVisible: boolean;
   cellAxesVisible: boolean;
   bondsVisible: boolean;
+  // Per-atom overrides (null = use global value for all atoms)
+  atomScaleOverrides: Float32Array | null;
+  atomOpacityOverrides: Float32Array | null;
 }
 
 /** Default render state (matches current defaults in MeganeViewer.tsx). */
@@ -149,6 +162,8 @@ export const DEFAULT_RENDER_STATE: RenderState = {
   cellVisible: true,
   cellAxesVisible: true,
   bondsVisible: true,
+  atomScaleOverrides: null,
+  atomOpacityOverrides: null,
 };
 
 /**
