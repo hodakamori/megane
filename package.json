@@ -2,12 +2,32 @@
   "name": "megane",
   "version": "0.1.0",
   "type": "module",
+  "description": "A fast, beautiful molecular viewer – anywidget-compatible",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hodakamori/megane.git"
+  },
+  "keywords": ["molecular", "viewer", "pdb", "threejs", "chemistry", "anywidget", "jupyter"],
+  "main": "./dist/widget.js",
+  "module": "./dist/widget.js",
+  "exports": {
+    ".": {
+      "import": "./dist/widget.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "dev": "vite",
     "build:wasm": "cd crates/megane-wasm && wasm-pack build --target web --release",
     "build": "npm run build:wasm && tsc && vite build && vite build --config vite.widget.config.ts",
     "build:app": "npm run build:wasm && tsc && vite build",
     "build:widget": "vite build --config vite.widget.config.ts",
+    "build:lib": "npm run build:wasm && vite build --config vite.widget.config.ts --outDir dist",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

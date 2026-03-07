@@ -30,7 +30,7 @@ WORKDIR /app
 # Copy source needed for maturin build
 COPY Cargo.toml ./
 COPY crates/ crates/
-COPY pyproject.toml ./
+COPY pyproject.toml README.md LICENSE ./
 COPY python/ python/
 COPY --from=frontend /app/python/megane/static/ python/megane/static/
 

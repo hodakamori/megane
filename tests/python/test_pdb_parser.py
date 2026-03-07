@@ -51,8 +51,10 @@ def test_bond_orders():
     for bo in s.bond_orders:
         assert bo in (1, 2, 3, 4)
 
-    # Crambin has peptide bonds with C=O double bonds
-    assert 2 in s.bond_orders  # At least some double bonds
+    # PDB CONECT records do not carry bond order info, so the parser
+    # defaults all bonds to single (1).  Only MOL/SDF files provide
+    # explicit bond orders.
+    assert np.all(s.bond_orders == 1)
 
 
 def test_box():
