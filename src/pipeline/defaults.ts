@@ -31,11 +31,11 @@ export function createDefaultPipeline(): {
       {
         id: "filter-caf",
         type: "filter",
-        position: { x: 50, y: 220 },
+        position: { x: 50, y: 180 },
         data: {
           params: {
             type: "filter",
-            query: 'resname == "CAF"',
+            query: "index < 24",
           },
           enabled: true,
         },
@@ -43,11 +43,11 @@ export function createDefaultPipeline(): {
       {
         id: "filter-sol",
         type: "filter",
-        position: { x: 450, y: 220 },
+        position: { x: 450, y: 180 },
         data: {
           params: {
             type: "filter",
-            query: 'resname == "HOH"',
+            query: "index >= 24",
           },
           enabled: true,
         },
@@ -55,11 +55,11 @@ export function createDefaultPipeline(): {
       {
         id: "modify-sol",
         type: "modify",
-        position: { x: 450, y: 420 },
+        position: { x: 450, y: 340 },
         data: {
           params: {
             type: "modify",
-            scale: 0.6,
+            scale: 1.0,
             opacity: 0.15,
           },
           enabled: true,
@@ -68,7 +68,7 @@ export function createDefaultPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 620 },
+        position: { x: 250, y: 500 },
         data: {
           params: {
             type: "viewport",
