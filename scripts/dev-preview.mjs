@@ -15,7 +15,6 @@
  *   --desktop-only    Skip mobile viewport captures
  *   --mobile-only     Skip desktop viewport captures
  *   --interact        Enable mouse interaction during video (rotate molecule)
- *   --no-wasm         Use renderer-only page (skip WASM requirement)
  *   --clean           Remove previous captures before running
  *
  * Output:
@@ -72,7 +71,6 @@ const VIDEO_DURATION = parseInt(getFlagValue("--duration", "5000"), 10);
 const DESKTOP_ONLY = hasFlag("--desktop-only");
 const MOBILE_ONLY = hasFlag("--mobile-only");
 const INTERACT = hasFlag("--interact");
-const NO_WASM = hasFlag("--no-wasm");
 const CLEAN = hasFlag("--clean");
 
 const TIMESTAMP = new Date()
@@ -102,22 +100,15 @@ function ensureDirs() {
   mkdirSync(VIDEOS_DIR, { recursive: true });
 }
 
-function checkWasm() {
-  if (NO_WASM) return false;
+function ensureWasm() {
   const wasmPkg = join(ROOT, "crates", "megane-wasm", "pkg");
   if (existsSync(wasmPkg)) {
     console.log("WASM package found.");
-    return true;
+    return;
   }
-  console.log("WASM package not found. Attempting to build...");
-  try {
-    execSync("npm run build:wasm", { cwd: ROOT, stdio: "inherit", timeout: 120000 });
-    console.log("WASM build succeeded.");
-    return true;
-  } catch {
-    console.log("WASM build failed. Falling back to renderer-only mode.");
-    return false;
-  }
+  console.log("WASM package not found. Building...");
+  execSync("npm run build:wasm", { cwd: ROOT, stdio: "inherit", timeout: 180000 });
+  console.log("WASM build succeeded.");
 }
 
 function startViteServer() {
@@ -150,12 +141,11 @@ function startViteServer() {
   });
 }
 
-async function waitForApp(page, useWasm) {
-  const url = useWasm
-    ? `http://127.0.0.1:${PORT}`
-    : `http://127.0.0.1:${PORT}/scripts/screenshot-page.html`;
-
-  await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+async function waitForApp(page) {
+  await page.goto(`http://127.0.0.1:${PORT}`, {
+    waitUntil: "networkidle",
+    timeout: 30000,
+  });
   await page.waitForSelector("canvas", { timeout: 15000 });
   // Wait for rendering to settle
   await page.waitForTimeout(3000);
@@ -182,14 +172,14 @@ async function simulateInteraction(page, viewport) {
   await page.waitForTimeout(500);
 }
 
-async function captureScreenshot(browser, viewport, useWasm) {
+async function captureScreenshot(browser, viewport) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     deviceScaleFactor: viewport.dpr,
   });
   const page = await context.newPage();
 
-  await waitForApp(page, useWasm);
+  await waitForApp(page);
 
   const filename = `${viewport.name}-${TIMESTAMP}.png`;
   const filepath = join(SCREENSHOTS_DIR, filename);
@@ -201,7 +191,7 @@ async function captureScreenshot(browser, viewport, useWasm) {
   return filename;
 }
 
-async function captureVideo(browser, viewport, useWasm, durationMs) {
+async function captureVideo(browser, viewport, durationMs) {
   const videoDir = join(VIDEOS_DIR, `tmp-${viewport.name}-${TIMESTAMP}`);
   mkdirSync(videoDir, { recursive: true });
 
@@ -215,7 +205,7 @@ async function captureVideo(browser, viewport, useWasm, durationMs) {
   });
   const page = await context.newPage();
 
-  await waitForApp(page, useWasm);
+  await waitForApp(page);
 
   if (INTERACT) {
     // Do some interaction for the video
@@ -291,9 +281,8 @@ let browser = null;
 
 try {
   ensureDirs();
+  ensureWasm();
 
-  const useWasm = checkWasm();
-  console.log(`Mode: ${useWasm ? "Full app (with WASM)" : "Renderer-only (no WASM)"}`);
   console.log(`Viewports: ${VIEWPORTS.map((v) => `${v.name} (${v.width}x${v.height})`).join(", ")}`);
   if (CAPTURE_SCREENSHOTS) console.log("Screenshots: enabled");
   if (CAPTURE_VIDEOS) console.log(`Videos: enabled (${VIDEO_DURATION}ms${INTERACT ? " + interaction" : ""})`);
@@ -311,12 +300,12 @@ try {
     console.log(`\n--- ${viewport.name} (${viewport.width}x${viewport.height}) ---`);
 
     if (CAPTURE_SCREENSHOTS) {
-      const filename = await captureScreenshot(browser, viewport, useWasm);
+      const filename = await captureScreenshot(browser, viewport);
       screenshotResults.push({ name: viewport.name, filename });
     }
 
     if (CAPTURE_VIDEOS) {
-      const filename = await captureVideo(browser, viewport, useWasm, VIDEO_DURATION);
+      const filename = await captureVideo(browser, viewport, VIDEO_DURATION);
       if (filename) {
         videoResults.push({ name: viewport.name, filename });
       }
