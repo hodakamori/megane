@@ -9,7 +9,9 @@ import type { SerializedPipeline, PipelineNodeType } from "./types";
 import { defaultParams } from "./types";
 
 const VALID_NODE_TYPES: Set<string> = new Set([
-  "data_loader",
+  "load_structure",
+  "load_trajectory",
+  "add_bond",
   "viewport",
   "filter",
   "modify",
@@ -25,7 +27,7 @@ export function serializePipeline(
   edges: Edge[],
 ): SerializedPipeline {
   return {
-    version: 2,
+    version: 3,
     nodes: nodes.map((n) => ({
       ...n.data.params,
       id: n.id,
@@ -47,7 +49,7 @@ export function serializePipeline(
 export function deserializePipeline(
   json: SerializedPipeline,
 ): { nodes: Node<PipelineNodeData>[]; edges: Edge[] } {
-  if (json.version !== 2) {
+  if (json.version !== 3) {
     throw new Error(`Unsupported pipeline version: ${json.version}`);
   }
 

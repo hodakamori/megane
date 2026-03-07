@@ -14,6 +14,8 @@ interface NodeShellProps {
   nodeType: PipelineNodeType;
   enabled: boolean;
   children: React.ReactNode;
+  /** Port names that should be visually disabled (grayed out). */
+  disabledPorts?: Set<string>;
 }
 
 const nodeStyle: React.CSSProperties = {
@@ -78,7 +80,8 @@ const handleLabelStyle: React.CSSProperties = {
   pointerEvents: "none",
 };
 
-function getHandleColor(port: PortDefinition): string {
+function getHandleColor(port: PortDefinition, disabled?: boolean): string {
+  if (disabled) return "#cbd5e1"; // slate-300 gray
   return DATA_TYPE_COLORS[port.dataType];
 }
 
@@ -92,7 +95,7 @@ function getHandlePosition(index: number, total: number): string {
   return `${10 + step * index}%`;
 }
 
-export function NodeShell({ id, nodeType, enabled, children }: NodeShellProps) {
+export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: NodeShellProps) {
   const toggleNode = usePipelineStore((s) => s.toggleNode);
   const removeNode = usePipelineStore((s) => s.removeNode);
   const ports = NODE_PORTS[nodeType];
@@ -100,30 +103,34 @@ export function NodeShell({ id, nodeType, enabled, children }: NodeShellProps) {
   return (
     <div style={enabled ? nodeStyle : disabledStyle}>
       {/* Input handles */}
-      {ports.inputs.map((port, i) => (
-        <Handle
-          key={`in-${port.name}`}
-          type="target"
-          position={Position.Top}
-          id={port.name}
-          style={{
-            ...baseHandleStyle,
-            background: getHandleColor(port),
-            left: getHandlePosition(i, ports.inputs.length),
-          }}
-        >
-          <span
+      {ports.inputs.map((port, i) => {
+        const isDisabled = disabledPorts?.has(port.name) ?? false;
+        return (
+          <Handle
+            key={`in-${port.name}`}
+            type="target"
+            position={Position.Top}
+            id={port.name}
             style={{
-              ...handleLabelStyle,
-              top: -14,
-              left: "50%",
-              transform: "translateX(-50%)",
+              ...baseHandleStyle,
+              background: getHandleColor(port, isDisabled),
+              left: getHandlePosition(i, ports.inputs.length),
             }}
           >
-            {port.label}
-          </span>
-        </Handle>
-      ))}
+            <span
+              style={{
+                ...handleLabelStyle,
+                top: -14,
+                left: "50%",
+                transform: "translateX(-50%)",
+                color: isDisabled ? "#cbd5e1" : "#94a3b8",
+              }}
+            >
+              {port.label}
+            </span>
+          </Handle>
+        );
+      })}
 
       <div style={headerStyle}>
         <span style={titleStyle}>{NODE_TYPE_LABELS[nodeType]}</span>
@@ -150,30 +157,34 @@ export function NodeShell({ id, nodeType, enabled, children }: NodeShellProps) {
       <div style={bodyStyle}>{children}</div>
 
       {/* Output handles */}
-      {ports.outputs.map((port, i) => (
-        <Handle
-          key={`out-${port.name}`}
-          type="source"
-          position={Position.Bottom}
-          id={port.name}
-          style={{
-            ...baseHandleStyle,
-            background: getHandleColor(port),
-            left: getHandlePosition(i, ports.outputs.length),
-          }}
-        >
-          <span
+      {ports.outputs.map((port, i) => {
+        const isDisabled = disabledPorts?.has(port.name) ?? false;
+        return (
+          <Handle
+            key={`out-${port.name}`}
+            type="source"
+            position={Position.Bottom}
+            id={port.name}
             style={{
-              ...handleLabelStyle,
-              bottom: -14,
-              left: "50%",
-              transform: "translateX(-50%)",
+              ...baseHandleStyle,
+              background: getHandleColor(port, isDisabled),
+              left: getHandlePosition(i, ports.outputs.length),
             }}
           >
-            {port.label}
-          </span>
-        </Handle>
-      ))}
+            <span
+              style={{
+                ...handleLabelStyle,
+                bottom: -14,
+                left: "50%",
+                transform: "translateX(-50%)",
+                color: isDisabled ? "#cbd5e1" : "#94a3b8",
+              }}
+            >
+              {port.label}
+            </span>
+          </Handle>
+        );
+      })}
     </div>
   );
 }

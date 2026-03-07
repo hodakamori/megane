@@ -9,7 +9,7 @@ import type { Snapshot, Frame, TrajectoryMeta, BondSource } from "../types";
 // ─── Pipeline Data Types ──────────────────────────────────────────────
 
 /** The possible data types flowing through pipeline edges. */
-export type PipelineDataType = "particle" | "bond" | "cell" | "label" | "mesh";
+export type PipelineDataType = "particle" | "bond" | "cell" | "label" | "mesh" | "trajectory";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -18,16 +18,16 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   cell: "#10b981",     // emerald
   label: "#8b5cf6",    // violet
   mesh: "#6b7280",     // gray
+  trajectory: "#ec4899", // pink
 };
 
-/** Particle data flowing through the pipeline. Trajectory is embedded. */
+/** Particle data flowing through the pipeline. */
 export interface ParticleData {
   type: "particle";
   source: Snapshot;
   indices: Uint32Array | null;           // null = all atoms
   scaleOverrides: Float32Array | null;
   opacityOverrides: Float32Array | null;
-  trajectory: { frames: Frame[]; meta: TrajectoryMeta } | null;
 }
 
 /** Bond data flowing through the pipeline. */
@@ -67,8 +67,16 @@ export interface MeshData {
   edgePositions: Float32Array | null; // line segment pairs for wireframe
 }
 
+/** Trajectory data flowing through the pipeline. */
+export interface TrajectoryData {
+  type: "trajectory";
+  frames: Frame[];
+  meta: TrajectoryMeta;
+  source: "structure" | "file";
+}
+
 /** Union of all pipeline data types. */
-export type PipelineData = ParticleData | BondData | CellData | LabelData | MeshData;
+export type PipelineData = ParticleData | BondData | CellData | LabelData | MeshData | TrajectoryData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -86,7 +94,9 @@ export type GenericPortAccepts = PipelineDataType[];
 
 /** All pipeline node type identifiers. */
 export type PipelineNodeType =
-  | "data_loader"
+  | "load_structure"
+  | "load_trajectory"
+  | "add_bond"
   | "viewport"
   | "filter"
   | "modify"
@@ -95,7 +105,9 @@ export type PipelineNodeType =
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
-  data_loader: "Data Loader",
+  load_structure: "Load Structure",
+  load_trajectory: "Load Trajectory",
+  add_bond: "Add Bond",
   viewport: "Viewport",
   filter: "Filter",
   modify: "Modify",
@@ -112,12 +124,28 @@ export interface NodePortConfig {
 
 /** Static port definitions for each node type. */
 export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
-  data_loader: {
+  load_structure: {
     inputs: [],
     outputs: [
       { name: "particle", dataType: "particle", label: "Particle" },
-      { name: "bond", dataType: "bond", label: "Bond" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
       { name: "cell", dataType: "cell", label: "Cell" },
+    ],
+  },
+  load_trajectory: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+    ],
+    outputs: [
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+  },
+  add_bond: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+    ],
+    outputs: [
+      { name: "bond", dataType: "bond", label: "Bond" },
     ],
   },
   viewport: {
@@ -125,6 +153,7 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
       { name: "particle", dataType: "particle", label: "Particle" },
       { name: "bond", dataType: "bond", label: "Bond" },
       { name: "cell", dataType: "cell", label: "Cell" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
       { name: "label", dataType: "label", label: "Label" },
       { name: "mesh", dataType: "mesh", label: "Mesh" },
     ],
@@ -159,9 +188,21 @@ export const GENERIC_NODE_ACCEPTS: Record<string, PipelineDataType[]> = {
 
 // ─── Node Parameters ──────────────────────────────────────────────────
 
-export interface DataLoaderParams {
-  type: "data_loader";
+export interface LoadStructureParams {
+  type: "load_structure";
   fileName: string | null;
+  /** Which output ports have data (determined by the loaded file). */
+  hasTrajectory: boolean;
+  hasCell: boolean;
+}
+
+export interface LoadTrajectoryParams {
+  type: "load_trajectory";
+  fileName: string | null;
+}
+
+export interface AddBondParams {
+  type: "add_bond";
   bondSource: BondSource;
 }
 
@@ -198,7 +239,9 @@ export interface PolyhedronGeneratorParams {
 
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
-  | DataLoaderParams
+  | LoadStructureParams
+  | LoadTrajectoryParams
+  | AddBondParams
   | ViewportParams
   | FilterParams
   | ModifyParams
@@ -208,8 +251,12 @@ export type PipelineNodeParams =
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
   switch (type) {
-    case "data_loader":
-      return { type, fileName: null, bondSource: "structure" };
+    case "load_structure":
+      return { type, fileName: null, hasTrajectory: false, hasCell: false };
+    case "load_trajectory":
+      return { type, fileName: null };
+    case "add_bond":
+      return { type, bondSource: "distance" };
     case "viewport":
       return { type, perspective: false, cellAxesVisible: true };
     case "filter":
@@ -281,6 +328,7 @@ export interface ViewportState {
   particles: ParticleData[];
   bonds: BondData[];
   cells: CellData[];
+  trajectories: TrajectoryData[];
   labels: LabelData[];
   meshes: MeshData[];
   perspective: boolean;
@@ -291,6 +339,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   particles: [],
   bonds: [],
   cells: [],
+  trajectories: [],
   labels: [],
   meshes: [],
   perspective: false,
@@ -300,7 +349,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
 // ─── Serialization Format ─────────────────────────────────────────────
 
 export interface SerializedPipeline {
-  version: 2;
+  version: 3;
   nodes: Array<
     PipelineNodeParams & {
       id: string;

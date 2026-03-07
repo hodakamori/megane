@@ -17,7 +17,9 @@ import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
 import type { PipelineNodeType } from "../pipeline/types";
 import { NODE_TYPE_LABELS, canConnect, DATA_TYPE_COLORS, NODE_PORTS } from "../pipeline/types";
-import { DataLoaderNode } from "./nodes/DataLoaderNode";
+import { LoadStructureNode } from "./nodes/LoadStructureNode";
+import { LoadTrajectoryNode } from "./nodes/LoadTrajectoryNode";
+import { AddBondNode } from "./nodes/AddBondNode";
 import { ViewportNode } from "./nodes/ViewportNode";
 import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
@@ -25,7 +27,9 @@ import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
 
 const nodeTypes = {
-  data_loader: DataLoaderNode,
+  load_structure: LoadStructureNode,
+  load_trajectory: LoadTrajectoryNode,
+  add_bond: AddBondNode,
   viewport: ViewportNode,
   filter: FilterNode,
   modify: ModifyNode,
@@ -34,7 +38,9 @@ const nodeTypes = {
 };
 
 const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
-  "data_loader",
+  "load_structure",
+  "load_trajectory",
+  "add_bond",
   "filter",
   "modify",
   "label_generator",
