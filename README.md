@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/public/logo.svg" alt="megane logo" width="80" />
+  <img src="docs/public/logo.png" alt="megane logo" width="80" />
 </p>
 
 <h1 align="center">megane</h1>
