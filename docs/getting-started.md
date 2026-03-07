@@ -16,7 +16,7 @@ pip install megane
 ### npm (for React embedding)
 
 ```bash
-npm install megane
+npm install megane-viewer
 ```
 
 ## Quick Start
@@ -68,7 +68,7 @@ megane serve
 ### React Component
 
 ```tsx
-import { MeganeViewer } from "megane";
+import { MeganeViewer } from "megane-viewer";
 
 function App() {
   return (

@@ -5,7 +5,7 @@ megane can be embedded in React applications as a component library. It provides
 ## Installation
 
 ```bash
-npm install megane
+npm install megane-viewer
 ```
 
 ## Full-Featured Viewer
@@ -14,8 +14,8 @@ The easiest way to get started is the `MeganeViewer` component. It includes the 
 
 ```tsx
 import { useState, useCallback, useMemo } from "react";
-import { MeganeViewer, parseStructureFile } from "megane";
-import type { Snapshot, BondSource } from "megane";
+import { MeganeViewer, parseStructureFile } from "megane-viewer";
+import type { Snapshot, BondSource } from "megane-viewer";
 
 function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -110,8 +110,8 @@ For custom layouts, megane exports each panel as a separate component. This give
 The core rendering surface without any UI panels:
 
 ```tsx
-import { Viewport } from "megane";
-import type { Snapshot, HoverInfo } from "megane";
+import { Viewport } from "megane-viewer";
+import type { Snapshot, HoverInfo } from "megane-viewer";
 
 function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
   return (
@@ -139,7 +139,7 @@ function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
 Combine individual panels for a custom layout:
 
 ```tsx
-import { Viewport, Sidebar, Timeline, AppearancePanel } from "megane";
+import { Viewport, Sidebar, Timeline, AppearancePanel } from "megane-viewer";
 
 function CustomLayout({ snapshot, frame }) {
   const [renderer, setRenderer] = useState(null);
@@ -198,8 +198,8 @@ function CustomLayout({ snapshot, frame }) {
 For non-React applications (Vue, Svelte, vanilla JS), use `MoleculeRenderer` directly. This is the same Three.js renderer powering all megane components:
 
 ```ts
-import { MoleculeRenderer } from "megane";
-import type { Snapshot } from "megane";
+import { MoleculeRenderer } from "megane-viewer";
+import type { Snapshot } from "megane-viewer";
 
 // Create and mount
 const renderer = new MoleculeRenderer();
@@ -264,7 +264,7 @@ title: Protein Visualization
 ---
 
 import { useState, useEffect } from "react";
-import { MeganeViewer, parseStructureFile } from "megane";
+import { MeganeViewer, parseStructureFile } from "megane-viewer";
 
 export function ProteinDemo() {
   const [snapshot, setSnapshot] = useState(null);
@@ -311,7 +311,7 @@ For a simpler embed without panels:
 
 ```mdx
 import { useState, useEffect } from "react";
-import { Viewport, parseStructureText } from "megane";
+import { Viewport, parseStructureText } from "megane-viewer";
 
 export function SimpleViewer() {
   const [snapshot, setSnapshot] = useState(null);
@@ -366,7 +366,7 @@ import {
   MSG_SNAPSHOT,
   MSG_FRAME,
   MSG_METADATA,
-} from "megane";
+} from "megane-viewer";
 
 ws.onmessage = (event) => {
   const buffer = event.data as ArrayBuffer;
@@ -407,13 +407,13 @@ import type {
   LabelConfig,         // Label panel configuration
   VectorConfig,        // Vector arrow configuration
   StructureParseResult,// Parse result from parseStructureFile/Text
-} from "megane";
+} from "megane-viewer";
 ```
 
 ### Parser Functions
 
 ```ts
-import { parseStructureFile, parseStructureText } from "megane";
+import { parseStructureFile, parseStructureText } from "megane-viewer";
 
 // Parse from File object (drag-and-drop, file input)
 const result = await parseStructureFile(file);
