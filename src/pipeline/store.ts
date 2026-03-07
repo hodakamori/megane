@@ -12,7 +12,7 @@ import type { PipelineNodeType, RenderState, SerializedPipeline } from "./types"
 import { defaultParams, DEFAULT_RENDER_STATE, canConnect } from "./types";
 import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
-import { createDefaultPipeline } from "./defaults";
+import { createDefaultPipeline, createDemoPipeline } from "./defaults";
 
 let nextNodeId = 1;
 
@@ -54,7 +54,9 @@ export interface PipelineStore {
   reset: () => void;
 }
 
-const defaultState = createDefaultPipeline();
+const defaultState = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
+  ? createDemoPipeline()
+  : createDefaultPipeline();
 
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
