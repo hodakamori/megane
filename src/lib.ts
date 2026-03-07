@@ -32,6 +32,7 @@ export type {
   CellData,
   LabelData,
   MeshData,
+  PolyhedronGeneratorParams,
   ViewportState,
   SerializedPipeline,
 } from "./pipeline/types";

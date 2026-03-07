@@ -14,6 +14,7 @@ const VALID_NODE_TYPES: Set<string> = new Set([
   "filter",
   "modify",
   "label_generator",
+  "polyhedron_generator",
 ]);
 
 /**

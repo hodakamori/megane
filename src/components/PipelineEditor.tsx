@@ -22,6 +22,7 @@ import { ViewportNode } from "./nodes/ViewportNode";
 import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
 import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
+import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
 
 const nodeTypes = {
   data_loader: DataLoaderNode,
@@ -29,12 +30,14 @@ const nodeTypes = {
   filter: FilterNode,
   modify: ModifyNode,
   label_generator: LabelGeneratorNode,
+  polyhedron_generator: PolyhedronGeneratorNode,
 };
 
 const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
   "filter",
   "modify",
   "label_generator",
+  "polyhedron_generator",
   "viewport",
 ];
 

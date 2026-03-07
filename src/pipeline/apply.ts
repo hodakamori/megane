@@ -3,7 +3,7 @@
  * Translates the typed data streams into renderer calls.
  */
 
-import type { ViewportState, ParticleData, BondData, CellData, LabelData } from "./types";
+import type { ViewportState, ParticleData, BondData, CellData, LabelData, MeshData } from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 
 /**
@@ -45,6 +45,9 @@ export function applyViewportState(
 
   // ─── Labels ────────────────────────────────────────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);
+
+  // ─── Meshes (polyhedra) ───────────────────────────────────
+  applyMeshes(renderer, current.meshes, previous?.meshes ?? null);
 
   // ─── Bonds visibility ──────────────────────────────────────
   const bondsVisible = current.bonds.length > 0;
@@ -143,5 +146,17 @@ function applyLabels(
     renderer.setLabels(labels[0].labels);
   } else if (prevLabels && prevLabels.length > 0) {
     renderer.setLabels(null);
+  }
+}
+
+function applyMeshes(
+  renderer: MoleculeRenderer,
+  meshes: MeshData[],
+  prevMeshes: MeshData[] | null,
+): void {
+  if (meshes.length > 0) {
+    renderer.loadPolyhedra(meshes[0]);
+  } else if (prevMeshes && prevMeshes.length > 0) {
+    renderer.clearPolyhedra();
   }
 }
