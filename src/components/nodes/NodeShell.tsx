@@ -137,7 +137,7 @@ export function NodeShell({ id, nodeType, enabled, children }: NodeShellProps) {
         >
           {enabled ? "\u25C9" : "\u25CB"}
         </button>
-        {nodeType !== "data_loader" && (
+        {nodeType !== "viewport" && (
           <button
             onClick={() => removeNode(id)}
             style={iconBtnStyle}
