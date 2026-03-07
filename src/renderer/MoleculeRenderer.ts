@@ -53,7 +53,7 @@ export class MoleculeRenderer {
   private arrowRenderer: ArrowRenderer | null = null;
   private polyhedronRenderer: PolyhedronRenderer | null = null;
   private speckPostProcess: SpeckPostProcess | null = null;
-  private speckEnabled = false;
+  private speckEnabled = true;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
@@ -110,6 +110,11 @@ export class MoleculeRenderer {
     domEl.style.width = "100%";
     domEl.style.height = "100%";
     container.appendChild(domEl);
+
+    // Speck-style post-processing (SSAO + outlines), enabled by default
+    if (this.speckEnabled) {
+      this.speckPostProcess = new SpeckPostProcess(this.renderer);
+    }
 
     // Label overlay (Canvas 2D on top of WebGL)
     this.labelOverlay = new LabelOverlay();
