@@ -5,7 +5,10 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { PipelineNodeData } from "./execute";
 
-/** Create the default pipeline: DataLoader → Viewport with typed edges. */
+/**
+ * Create the default pipeline: caffeine + semi-transparent water solvent.
+ * DataLoader → Filter(caffeine) + Filter(water) → Modify(opacity) → Viewport
+ */
 export function createDefaultPipeline(): {
   nodes: Node<PipelineNodeData>[];
   edges: Edge[];
@@ -15,12 +18,49 @@ export function createDefaultPipeline(): {
       {
         id: "loader-1",
         type: "data_loader",
-        position: { x: 250, y: 50 },
+        position: { x: 250, y: 0 },
         data: {
           params: {
             type: "data_loader",
-            fileName: null,
+            fileName: "caffeine_water.pdb",
             bondSource: "structure",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "filter-caf",
+        type: "filter",
+        position: { x: 50, y: 220 },
+        data: {
+          params: {
+            type: "filter",
+            query: 'resname == "CAF"',
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "filter-sol",
+        type: "filter",
+        position: { x: 450, y: 220 },
+        data: {
+          params: {
+            type: "filter",
+            query: 'resname == "HOH"',
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "modify-sol",
+        type: "modify",
+        position: { x: 450, y: 420 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 0.6,
+            opacity: 0.15,
           },
           enabled: true,
         },
@@ -28,7 +68,7 @@ export function createDefaultPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 400 },
+        position: { x: 250, y: 620 },
         data: {
           params: {
             type: "viewport",
@@ -40,27 +80,13 @@ export function createDefaultPipeline(): {
       },
     ],
     edges: [
-      {
-        id: "e-loader-1-particle-viewport-1-particle",
-        source: "loader-1",
-        target: "viewport-1",
-        sourceHandle: "particle",
-        targetHandle: "particle",
-      },
-      {
-        id: "e-loader-1-bond-viewport-1-bond",
-        source: "loader-1",
-        target: "viewport-1",
-        sourceHandle: "bond",
-        targetHandle: "bond",
-      },
-      {
-        id: "e-loader-1-cell-viewport-1-cell",
-        source: "loader-1",
-        target: "viewport-1",
-        sourceHandle: "cell",
-        targetHandle: "cell",
-      },
+      { id: "e1", source: "loader-1", target: "filter-caf", sourceHandle: "particle", targetHandle: "in" },
+      { id: "e2", source: "loader-1", target: "filter-sol", sourceHandle: "particle", targetHandle: "in" },
+      { id: "e3", source: "filter-caf", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e4", source: "filter-sol", target: "modify-sol", sourceHandle: "out", targetHandle: "in" },
+      { id: "e5", source: "modify-sol", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e6", source: "loader-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
+      { id: "e7", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
     ],
   };
 }
