@@ -43,6 +43,8 @@ export type { StructureParseResult } from "./parsers/structure";
 
 // Core renderer (framework-agnostic)
 export { MoleculeRenderer } from "./renderer/MoleculeRenderer";
+export { SpeckPostProcess, DEFAULT_SPECK_PARAMS } from "./renderer/SpeckPostProcess";
+export type { SpeckParams } from "./renderer/SpeckPostProcess";
 
 // Worker pool for off-main-thread decoding
 export { WorkerPool } from "./protocol/WorkerPool";

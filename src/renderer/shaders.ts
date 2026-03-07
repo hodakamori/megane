@@ -239,3 +239,229 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     fragColor = vec4(color, uOpacity);
   }
 `;
+
+// ── Speck-style post-processing shaders ──────────────────────────────
+
+/** Fullscreen triangle vertex shader (covers viewport with a single triangle). */
+export const fullscreenVertexShader = /* glsl */ `precision highp float;
+
+  out vec2 vUv;
+
+  void main() {
+    // Fullscreen triangle: vertices at (-1,-1), (3,-1), (-1,3)
+    float x = -1.0 + float((gl_VertexID & 1) << 2);
+    float y = -1.0 + float((gl_VertexID & 2) << 1);
+    vUv = vec2(x, y) * 0.5 + 0.5;
+    gl_Position = vec4(x, y, 0.0, 1.0);
+  }
+`;
+
+/**
+ * SSAO fragment shader (depth-only, hemisphere sampling).
+ * Reconstructs view-space position from depth buffer and samples
+ * neighboring depths to estimate ambient occlusion.
+ */
+export const ssaoFragmentShader = /* glsl */ `precision highp float;
+
+  in vec2 vUv;
+
+  uniform sampler2D uDepth;
+  uniform vec2 uResolution;
+  uniform float uNear;
+  uniform float uFar;
+  uniform float uAORadius;    // world-space AO radius
+  uniform float uAOIntensity; // AO strength multiplier
+  uniform int uIsOrtho;       // 1 = orthographic, 0 = perspective
+  uniform float uOrthoHeight; // orthographic frustum height
+  uniform float uFov;         // perspective FOV in radians
+
+  out vec4 fragColor;
+
+  // Convert depth buffer value to linear depth
+  float linearizeDepth(float d) {
+    if (uIsOrtho == 1) {
+      return uNear + d * (uFar - uNear);
+    }
+    return (2.0 * uNear * uFar) / (uFar + uNear - (d * 2.0 - 1.0) * (uFar - uNear));
+  }
+
+  // Pseudo-random based on screen position
+  float rand(vec2 co) {
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+  }
+
+  void main() {
+    float depth = texture(uDepth, vUv).r;
+    if (depth >= 1.0) {
+      fragColor = vec4(1.0); // background: no occlusion
+      return;
+    }
+
+    float linearD = linearizeDepth(depth);
+
+    // Convert AO radius from world space to UV space
+    float uvRadius;
+    if (uIsOrtho == 1) {
+      uvRadius = uAORadius / uOrthoHeight;
+    } else {
+      uvRadius = uAORadius / (linearD * tan(uFov * 0.5) * 2.0);
+    }
+
+    // Clamp radius in pixels to avoid artifacts
+    float pixelRadius = uvRadius * uResolution.y;
+    if (pixelRadius < 1.0) {
+      fragColor = vec4(1.0);
+      return;
+    }
+    uvRadius = min(uvRadius, 0.1); // cap maximum screen coverage
+
+    float occlusion = 0.0;
+    const int NUM_SAMPLES = 16;
+
+    // Random rotation per pixel
+    float angle = rand(vUv * uResolution) * 6.2831853;
+    float ca = cos(angle);
+    float sa = sin(angle);
+
+    // Poisson-disk-like sampling pattern
+    vec2 samples[16];
+    samples[0]  = vec2(-0.94201624, -0.39906216);
+    samples[1]  = vec2( 0.94558609, -0.76890725);
+    samples[2]  = vec2(-0.09418410, -0.92938870);
+    samples[3]  = vec2( 0.34495938,  0.29387760);
+    samples[4]  = vec2(-0.91588581,  0.45771432);
+    samples[5]  = vec2(-0.81544232, -0.87912464);
+    samples[6]  = vec2(-0.38277543,  0.27676845);
+    samples[7]  = vec2( 0.97484398,  0.75648379);
+    samples[8]  = vec2( 0.44323325, -0.97511554);
+    samples[9]  = vec2( 0.53742981, -0.47373420);
+    samples[10] = vec2(-0.26496911, -0.41893023);
+    samples[11] = vec2( 0.79197514,  0.19090188);
+    samples[12] = vec2(-0.24188840,  0.99706507);
+    samples[13] = vec2(-0.81409955,  0.91437590);
+    samples[14] = vec2( 0.19984126,  0.78641367);
+    samples[15] = vec2( 0.14383161, -0.14100790);
+
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+      // Rotate sample
+      vec2 s = samples[i];
+      vec2 rotated = vec2(
+        s.x * ca - s.y * sa,
+        s.x * sa + s.y * ca
+      );
+
+      vec2 sampleUV = vUv + rotated * uvRadius;
+      float sampleDepth = texture(uDepth, sampleUV).r;
+
+      if (sampleDepth >= 1.0) continue; // background sample
+
+      float sampleLinear = linearizeDepth(sampleDepth);
+      float diff = linearD - sampleLinear;
+
+      // Occlude if sample is in front (closer to camera) and within range
+      float rangeCheck = smoothstep(0.0, 1.0, uAORadius / max(abs(diff), 0.001));
+      occlusion += step(0.001, diff) * rangeCheck;
+    }
+
+    occlusion /= float(NUM_SAMPLES);
+    float ao = 1.0 - occlusion * uAOIntensity;
+    ao = clamp(ao, 0.0, 1.0);
+
+    fragColor = vec4(ao, ao, ao, 1.0);
+  }
+`;
+
+/** SSAO blur pass - separable Gaussian blur to smooth AO noise. */
+export const ssaoBlurFragmentShader = /* glsl */ `precision highp float;
+
+  in vec2 vUv;
+
+  uniform sampler2D uAO;
+  uniform sampler2D uDepth;
+  uniform vec2 uDirection; // (1/w, 0) or (0, 1/h)
+
+  out vec4 fragColor;
+
+  void main() {
+    float centerDepth = texture(uDepth, vUv).r;
+    if (centerDepth >= 1.0) {
+      fragColor = vec4(1.0);
+      return;
+    }
+
+    float result = 0.0;
+    float weightSum = 0.0;
+
+    // 9-tap bilateral blur
+    float weights[5];
+    weights[0] = 0.227027;
+    weights[1] = 0.194596;
+    weights[2] = 0.121622;
+    weights[3] = 0.054054;
+    weights[4] = 0.016216;
+
+    for (int i = -4; i <= 4; i++) {
+      vec2 offset = uDirection * float(i);
+      float sampleAO = texture(uAO, vUv + offset).r;
+      float sampleDepth = texture(uDepth, vUv + offset).r;
+
+      // Bilateral weight: reject samples with large depth discontinuity
+      float depthDiff = abs(centerDepth - sampleDepth);
+      float bilateral = step(depthDiff, 0.001);
+
+      int idx = i < 0 ? -i : i;
+      float w = weights[idx] * bilateral;
+      result += sampleAO * w;
+      weightSum += w;
+    }
+
+    result /= max(weightSum, 0.001);
+    fragColor = vec4(result, result, result, 1.0);
+  }
+`;
+
+/**
+ * Speck-style composite shader.
+ * Combines scene color with AO and applies depth-based outlines.
+ */
+export const speckCompositeFragmentShader = /* glsl */ `precision highp float;
+
+  in vec2 vUv;
+
+  uniform sampler2D uSceneColor;
+  uniform sampler2D uSceneDepth;
+  uniform sampler2D uAO;
+  uniform vec2 uResolution;
+  uniform float uBrightness;
+  uniform float uOutlineStrength;
+
+  out vec4 fragColor;
+
+  void main() {
+    vec4 sceneColor = texture(uSceneColor, vUv);
+    float ao = texture(uAO, vUv).r;
+    float depth = texture(uSceneDepth, vUv).r;
+
+    vec3 color = sceneColor.rgb;
+
+    // Depth-based outline (Speck-style)
+    if (uOutlineStrength > 0.0 && sceneColor.a > 0.0) {
+      vec2 texel = 1.0 / uResolution;
+      float d0 = abs(texture(uSceneDepth, vUv + vec2(-texel.x, 0.0)).r - depth);
+      float d1 = abs(texture(uSceneDepth, vUv + vec2( texel.x, 0.0)).r - depth);
+      float d2 = abs(texture(uSceneDepth, vUv + vec2(0.0, -texel.y)).r - depth);
+      float d3 = abs(texture(uSceneDepth, vUv + vec2(0.0,  texel.y)).r - depth);
+      float d = max(max(d0, d1), max(d2, d3));
+      color *= pow(1.0 - d, uOutlineStrength * 32.0);
+    }
+
+    // Apply AO with squared falloff (Speck-style)
+    float shade = pow(ao, 2.0);
+
+    // Apply brightness
+    color = uBrightness * color * shade;
+
+    // Preserve original alpha (background remains transparent)
+    fragColor = vec4(color, sceneColor.a);
+  }
+`;
