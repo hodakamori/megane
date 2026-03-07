@@ -53,6 +53,9 @@ export interface AtomRenderer {
   updatePositions(positions: Float32Array): void;
   setScale?(scale: number, snapshot: Snapshot): void;
   setOpacity?(opacity: number): void;
+  setScaleOverrides?(overrides: Float32Array): void;
+  setOpacityOverrides?(overrides: Float32Array): void;
+  clearOverrides?(): void;
   dispose(): void;
 }
 

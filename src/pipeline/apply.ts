@@ -15,12 +15,37 @@ export function applyRenderState(
   current: RenderState,
   previous: RenderState | null,
 ): void {
-  if (!previous || current.atomScale !== previous.atomScale) {
-    renderer.setAtomScale(current.atomScale);
+  // Per-atom overrides take priority over global scale/opacity.
+  // When overrides are active, set global uniform to 1.0 since the
+  // per-atom arrays already contain absolute values.
+  if (current.atomScaleOverrides) {
+    if (!previous || previous.atomScale !== 1.0 || !previous.atomScaleOverrides) {
+      renderer.setAtomScale(1.0);
+    }
+    renderer.setAtomScaleOverrides(current.atomScaleOverrides);
+  } else {
+    if (previous?.atomScaleOverrides) {
+      renderer.clearAtomOverrides();
+    }
+    if (!previous || current.atomScale !== previous.atomScale || previous.atomScaleOverrides) {
+      renderer.setAtomScale(current.atomScale);
+    }
   }
-  if (!previous || current.atomOpacity !== previous.atomOpacity) {
-    renderer.setAtomOpacity(current.atomOpacity);
+
+  if (current.atomOpacityOverrides) {
+    if (!previous || previous.atomOpacity !== 1.0 || !previous.atomOpacityOverrides) {
+      renderer.setAtomOpacity(1.0);
+    }
+    renderer.setAtomOpacityOverrides(current.atomOpacityOverrides);
+  } else {
+    if (previous?.atomOpacityOverrides && !current.atomScaleOverrides) {
+      renderer.clearAtomOverrides();
+    }
+    if (!previous || current.atomOpacity !== previous.atomOpacity || previous.atomOpacityOverrides) {
+      renderer.setAtomOpacity(current.atomOpacity);
+    }
   }
+
   if (!previous || current.bondScale !== previous.bondScale) {
     renderer.setBondScale(current.bondScale);
   }

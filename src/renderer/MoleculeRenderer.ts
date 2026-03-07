@@ -300,6 +300,21 @@ export class MoleculeRenderer {
     this.atomRenderer?.setOpacity?.(opacity);
   }
 
+  /** Set per-atom scale overrides from selection pipeline. */
+  setAtomScaleOverrides(overrides: Float32Array): void {
+    this.atomRenderer?.setScaleOverrides?.(overrides);
+  }
+
+  /** Set per-atom opacity overrides from selection pipeline. */
+  setAtomOpacityOverrides(overrides: Float32Array): void {
+    this.atomRenderer?.setOpacityOverrides?.(overrides);
+  }
+
+  /** Clear all per-atom overrides, reverting to global uniforms. */
+  clearAtomOverrides(): void {
+    this.atomRenderer?.clearOverrides?.();
+  }
+
   /** Set bond radius scale multiplier. */
   setBondScale(scale: number): void {
     this.bondScale = scale;

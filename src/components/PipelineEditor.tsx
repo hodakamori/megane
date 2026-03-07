@@ -27,9 +27,11 @@ import { SetLabelsNode } from "./nodes/SetLabelsNode";
 import { SetVectorsNode } from "./nodes/SetVectorsNode";
 import { SetDisplayNode } from "./nodes/SetDisplayNode";
 import { SetCellVisibilityNode } from "./nodes/SetCellVisibilityNode";
+import { SelectionNode } from "./nodes/SelectionNode";
 
 const nodeTypes = {
   load_structure: LoadStructureNode,
+  selection: SelectionNode,
   set_atom: SetAtomNode,
   set_bond_source: SetBondSourceNode,
   set_bond: SetBondNode,
@@ -40,6 +42,7 @@ const nodeTypes = {
 };
 
 const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
+  "selection",
   "set_atom",
   "set_bond_source",
   "set_bond",
@@ -237,6 +240,7 @@ function PipelineEditorInner({
           onConnect={onConnect}
           nodeTypes={memoizedNodeTypes}
           fitView
+          fitViewOptions={{ padding: 1.2, maxZoom: 0.65 }}
           minZoom={0.3}
           maxZoom={2}
           defaultEdgeOptions={{

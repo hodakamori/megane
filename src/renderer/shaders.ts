@@ -10,11 +10,13 @@
  */
 
 export const atomVertexShader = /* glsl */ `precision highp float;
+  precision highp int;
 
   // Three.js built-in uniforms (must declare explicitly for RawShaderMaterial)
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
   uniform float uScaleMultiplier;
+  uniform int uUsePerAtomOverrides;
 
   // Per-vertex (quad corners)
   in vec3 position;
@@ -23,16 +25,24 @@ export const atomVertexShader = /* glsl */ `precision highp float;
   in vec3 instanceCenter;
   in float instanceRadius;
   in vec3 instanceColor;
+  in float instanceScaleOverride;
+  in float instanceOpacityOverride;
 
   out vec3 vColor;
   out vec2 vUv;
   out float vRadius;
   out vec3 vViewCenter;
+  out float vOpacityOverride;
 
   void main() {
     vColor = instanceColor;
     vUv = position.xy;
-    float scaledRadius = instanceRadius * uScaleMultiplier;
+    vOpacityOverride = instanceOpacityOverride;
+    float effectiveScale = uScaleMultiplier;
+    if (uUsePerAtomOverrides == 1) {
+      effectiveScale *= instanceScaleOverride;
+    }
+    float scaledRadius = instanceRadius * effectiveScale;
     vRadius = scaledRadius;
 
     vec4 viewCenter = modelViewMatrix * vec4(instanceCenter, 1.0);
@@ -46,14 +56,17 @@ export const atomVertexShader = /* glsl */ `precision highp float;
 `;
 
 export const atomFragmentShader = /* glsl */ `precision highp float;
+  precision highp int;
 
   in vec3 vColor;
   in vec2 vUv;
   in float vRadius;
   in vec3 vViewCenter;
+  in float vOpacityOverride;
 
   uniform mat4 projectionMatrix;
   uniform float uOpacity;
+  uniform int uUsePerAtomOverrides;
 
   out vec4 fragColor;
 
@@ -97,7 +110,11 @@ export const atomFragmentShader = /* glsl */ `precision highp float;
     vec3 color = vColor * (ambient + diffuse) * edgeFactor
                + vec3(1.0) * spec * 0.3
                + vec3(0.15) * fresnel;
-    fragColor = vec4(color, uOpacity);
+    float finalOpacity = uOpacity;
+    if (uUsePerAtomOverrides == 1) {
+      finalOpacity *= vOpacityOverride;
+    }
+    fragColor = vec4(color, finalOpacity);
   }
 `;
 

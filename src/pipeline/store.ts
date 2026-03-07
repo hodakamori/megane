@@ -7,6 +7,7 @@ import { create } from "zustand";
 import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData } from "./execute";
+import type { Snapshot } from "../types";
 import type { PipelineNodeType, RenderState, SerializedPipeline } from "./types";
 import { defaultParams, DEFAULT_RENDER_STATE } from "./types";
 import { executePipeline } from "./execute";
@@ -24,6 +25,12 @@ export interface PipelineStore {
   nodes: Node<PipelineNodeData>[];
   edges: Edge[];
   renderState: RenderState;
+
+  // Molecular data for selection queries
+  snapshot: Snapshot | null;
+  atomLabels: string[] | null;
+  setSnapshot: (s: Snapshot | null) => void;
+  setAtomLabels: (labels: string[] | null) => void;
 
   // xyflow change handlers
   onNodesChange: OnNodesChange<Node<PipelineNodeData>>;
@@ -53,6 +60,16 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
   edges: defaultState.edges,
   renderState: { ...DEFAULT_RENDER_STATE },
+  snapshot: null,
+  atomLabels: null,
+  setSnapshot: (s) => {
+    set({ snapshot: s });
+    get().execute();
+  },
+  setAtomLabels: (labels) => {
+    set({ atomLabels: labels });
+    get().execute();
+  },
 
   onNodesChange: (changes) => {
     set((state) => ({
@@ -134,8 +151,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   execute: () => {
-    const { nodes, edges } = get();
-    const renderState = executePipeline(nodes, edges);
+    const { nodes, edges, snapshot, atomLabels } = get();
+    const renderState = executePipeline(nodes, edges, snapshot, atomLabels);
     set({ renderState });
   },
 
