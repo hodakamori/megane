@@ -240,6 +240,7 @@ function PipelineEditorInner({
           onConnect={onConnect}
           nodeTypes={memoizedNodeTypes}
           fitView
+          fitViewOptions={{ padding: 1.2, maxZoom: 0.65 }}
           minZoom={0.3}
           maxZoom={2}
           defaultEdgeOptions={{
