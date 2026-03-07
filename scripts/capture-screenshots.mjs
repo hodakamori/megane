@@ -4,8 +4,9 @@
  * Usage:
  *   node scripts/capture-screenshots.mjs
  *
- * Starts a Vite dev server, opens the app in Playwright Chromium,
- * and captures a high-quality screenshot.
+ * Starts a Vite dev server, opens a standalone renderer page that loads
+ * the caffeine_water.json data (no WASM required), and captures a
+ * high-quality screenshot.
  */
 
 import { spawn } from "child_process";
@@ -66,7 +67,7 @@ try {
 
   browser = await chromium.launch({ headless: true });
 
-  // Hero screenshot: desktop with sidebar expanded (1280x720)
+  // Hero screenshot: caffeine molecule rendered standalone (1280x720, DPR=2)
   {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
@@ -74,7 +75,12 @@ try {
     });
     const page = await context.newPage();
 
-    await page.goto(`http://127.0.0.1:${PORT}`, { waitUntil: "networkidle", timeout: 30000 });
+    // Use the standalone screenshot page that loads JSON data directly
+    // (bypasses WASM — works even without Rust/wasm-pack)
+    await page.goto(`http://127.0.0.1:${PORT}/scripts/screenshot-page.html`, {
+      waitUntil: "networkidle",
+      timeout: 30000,
+    });
     await page.waitForSelector("canvas", { timeout: 15000 });
     console.log("Canvas found (1280x720, DPR=2)");
 
