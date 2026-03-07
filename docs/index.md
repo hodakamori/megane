@@ -4,6 +4,9 @@ layout: home
 hero:
   name: megane
   text: "Desktop-grade molecular visualization.\nRight in your browser."
+  image:
+    src: /logo.png
+    alt: megane
   tagline: "Rust-powered rendering at 1M+ atoms. pip install megane — 3 lines to your first structure."
   actions:
     - theme: brand
