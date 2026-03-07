@@ -36,7 +36,7 @@ export interface TrajectoryConfig {
 
 interface SidebarProps {
   mode: "streaming" | "local";
-  onToggleMode: () => void;
+  onToggleMode?: () => void;
   structure: { atomCount: number; fileName: string | null };
   bonds: BondConfig;
   trajectory: TrajectoryConfig;
@@ -176,7 +176,8 @@ export function Sidebar({
           gap: 14,
         }}
       >
-        {/* Mode Section */}
+        {/* Mode Section (hidden when embedded / stream mode unavailable) */}
+        {onToggleMode && (
         <div>
           <div style={sectionLabelStyle}>Mode</div>
           <div
@@ -224,6 +225,7 @@ export function Sidebar({
             </button>
           </div>
         </div>
+        )}
 
         {/* Structure Section */}
         <div>

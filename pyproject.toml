@@ -30,6 +30,7 @@ dependencies = [
     "uvicorn[standard]>=0.20",
     "websockets>=12.0",
     "python-multipart>=0.0.6",
+    "MDAnalysis>=2.5",
 ]
 
 [project.urls]
@@ -38,7 +39,6 @@ Repository = "https://github.com/hodakamori/megane"
 Issues = "https://github.com/hodakamori/megane/issues"
 
 [project.optional-dependencies]
-trajectory = ["MDAnalysis>=2.5"]
 dev = ["pytest>=7.0", "httpx>=0.24"]
 
 [project.scripts]

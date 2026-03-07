@@ -12,5 +12,13 @@ tests/e2e/screenshot_*.png
 target/
 crates/megane-wasm/pkg/
 *.so
-python/megane/static/
+python/megane/static/app/
+python/megane/static/caffeine_water.pdb
 .ipynb_checkpoints/
+docs/.vitepress/dist
+docs/.vitepress/cache
+docs/node_modules
+docs/api/python/
+docs/api/typescript/
+docs/notebooks/
+docs/public/notebooks/

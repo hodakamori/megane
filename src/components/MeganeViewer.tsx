@@ -35,7 +35,7 @@ interface MeganeViewerProps {
   onFpsChange?: (fps: number) => void;
   onUploadStructure: (file: File) => void;
   mode: "streaming" | "local";
-  onToggleMode: () => void;
+  onToggleMode?: () => void;
   pdbFileName: string | null;
   bonds: BondConfig;
   trajectory: TrajectoryConfig;
@@ -76,8 +76,11 @@ export function MeganeViewer({
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  // Auto-collapse panels on narrow viewports (mobile) to prevent
+  // degenerate frustum calculation when insets exceed viewport width
+  const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isNarrow);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(isNarrow);
   const [atomScale, setAtomScale] = useState(1.0);
   const [atomOpacity, setAtomOpacity] = useState(1.0);
   const [bondScale, setBondScale] = useState(1.0);
@@ -86,9 +89,18 @@ export function MeganeViewer({
   const [perspective, setPerspective] = useState(false);
   const [vectorScale, setVectorScale] = useState(1.0);
   const vdwScaleRef = useRef(0.6);
+  const sidebarCollapsedRef = useRef(isNarrow);
+  const rightPanelCollapsedRef = useRef(isNarrow);
+  useEffect(() => { sidebarCollapsedRef.current = sidebarCollapsed; }, [sidebarCollapsed]);
+  useEffect(() => { rightPanelCollapsedRef.current = rightPanelCollapsed; }, [rightPanelCollapsed]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
+    // Set initial view insets so fitToView() accounts for overlay panels
+    renderer.setViewInsets(
+      sidebarCollapsedRef.current ? 0 : 252,      // 12px gap + 240px sidebar
+      rightPanelCollapsedRef.current ? 0 : 232,   // 12px gap + 220px panel
+    );
   }, []);
 
   const handleResetView = useCallback(() => {
@@ -142,6 +154,14 @@ export function MeganeViewer({
   const handleToggleRightPanel = useCallback(() => {
     setRightPanelCollapsed((prev) => !prev);
   }, []);
+
+  // Update view insets when overlay panels are toggled
+  useEffect(() => {
+    rendererRef.current?.setViewInsets(
+      sidebarCollapsed ? 0 : 252,      // 12px gap + 240px sidebar
+      rightPanelCollapsed ? 0 : 232,   // 12px gap + 220px panel
+    );
+  }, [sidebarCollapsed, rightPanelCollapsed]);
 
   const handleAtomScaleChange = useCallback((scale: number) => {
     setAtomScale(scale);

@@ -51,11 +51,25 @@ export class MoleculeRenderer {
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
   private lastExtent = 1;
+  private lastExtentX = 1;
+  private lastExtentY = 1;
   private currentPositions: Float32Array | null = null;
+  /** Axes-inset drag state */
+  private axesDragging = false;
+  private axesDragLastX = 0;
+  private axesDragLastY = 0;
   private atomScale = 1.0;
   private atomOpacity = 1.0;
   private bondScale = 1.0;
   private bondOpacity = 1.0;
+  private viewInsetLeft = 0;
+  private viewInsetRight = 0;
+  private dprMediaQuery: MediaQueryList | null = null;
+  private dprChangeHandler: (() => void) | null = null;
+  // Cached dimensions for frame-synchronous resize detection
+  private lastContainerW = 0;
+  private lastContainerH = 0;
+  private lastDpr = 1;
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -75,9 +89,20 @@ export class MoleculeRenderer {
       preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(container.clientWidth, container.clientHeight, false);
     this.renderer.setClearColor(0xffffff, 1);
-    container.appendChild(this.renderer.domElement);
+    // Position both canvases identically within the container
+    // to prevent sub-pixel layout drift at non-100% browser zoom.
+    // Use CSS 100% sizing instead of explicit pixel values so the canvas
+    // always matches the container exactly, even at fractional zoom levels.
+    const domEl = this.renderer.domElement;
+    domEl.style.display = "block";
+    domEl.style.position = "absolute";
+    domEl.style.top = "0";
+    domEl.style.left = "0";
+    domEl.style.width = "100%";
+    domEl.style.height = "100%";
+    container.appendChild(domEl);
 
     // Label overlay (Canvas 2D on top of WebGL)
     this.labelOverlay = new LabelOverlay();
@@ -100,7 +125,8 @@ export class MoleculeRenderer {
       frustumSize / 2, -frustumSize / 2,
       0.1, 10000,
     );
-    this.camera.position.set(0, 0, 50);
+    this.camera.position.set(0, -50, 0);
+    this.camera.up.set(0, 0, 1);
 
     // Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -131,6 +157,9 @@ export class MoleculeRenderer {
     // Resize observer
     const resizeObserver = new ResizeObserver(() => this.onResize());
     resizeObserver.observe(container);
+
+    // Listen for DPR changes (e.g. moving window between displays)
+    this.setupDprListener();
 
     // Start render loop
     this.animate();
@@ -311,6 +340,56 @@ export class MoleculeRenderer {
     }
   }
 
+  // ── Axes inset drag API ───────────────────────────────────
+
+  /** Returns true if the CSS-pixel coordinate hits the axes inset. */
+  hitTestAxesInset(cssX: number, cssY: number): boolean {
+    if (!this.cellAxesRenderer || !this.container) return false;
+    return this.cellAxesRenderer.hitTest(
+      cssX,
+      cssY,
+      this.container.clientHeight,
+    );
+  }
+
+  /** Begin an axes-inset drag at the given CSS coordinates. */
+  startAxesDrag(cssX: number, cssY: number): void {
+    this.axesDragging = true;
+    this.axesDragLastX = cssX;
+    this.axesDragLastY = cssY;
+    // Disable orbit controls while dragging the inset
+    this.controls.enabled = false;
+  }
+
+  /** Continue an axes-inset drag. Returns true if currently dragging. */
+  moveAxesDrag(cssX: number, cssY: number): boolean {
+    if (!this.axesDragging || !this.cellAxesRenderer || !this.container)
+      return false;
+    const dx = cssX - this.axesDragLastX;
+    const dy = cssY - this.axesDragLastY;
+    this.axesDragLastX = cssX;
+    this.axesDragLastY = cssY;
+    this.cellAxesRenderer.moveBy(
+      dx,
+      dy,
+      this.container.clientWidth,
+      this.container.clientHeight,
+    );
+    return true;
+  }
+
+  /** End the axes-inset drag. */
+  endAxesDrag(): void {
+    if (!this.axesDragging) return;
+    this.axesDragging = false;
+    this.controls.enabled = true;
+  }
+
+  /** Whether an axes drag is in progress. */
+  isAxesDragging(): boolean {
+    return this.axesDragging;
+  }
+
   /** Check if cell axes data exists. */
   hasCellAxes(): boolean {
     return this.cellAxesRenderer !== null;
@@ -347,56 +426,95 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Fit camera to show all atoms. */
+  /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
     const { positions, nAtoms } = snapshot;
 
-    // Compute bounding box center and extent
-    let minX = Infinity,
-      minY = Infinity,
-      minZ = Infinity;
-    let maxX = -Infinity,
-      maxY = -Infinity,
-      maxZ = -Infinity;
-
+    // Compute centroid (center of mass assuming equal weights)
+    let sumX = 0, sumY = 0, sumZ = 0;
     for (let i = 0; i < nAtoms; i++) {
-      const x = positions[i * 3];
-      const y = positions[i * 3 + 1];
-      const z = positions[i * 3 + 2];
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      minZ = Math.min(minZ, z);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      maxZ = Math.max(maxZ, z);
+      sumX += positions[i * 3];
+      sumY += positions[i * 3 + 1];
+      sumZ += positions[i * 3 + 2];
     }
 
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const extent = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
-    this.lastExtent = extent;
+    let cx: number, cy: number, cz: number;
+
+    // Determine bounding box for zoom fitting
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    const hasBox = snapshot.box && snapshot.box.some((v) => v !== 0);
+
+    if (hasBox) {
+      const box = snapshot.box!;
+      // Cell center = (va + vb + vc) / 2
+      cx = (box[0] + box[3] + box[6]) / 2;
+      cy = (box[1] + box[4] + box[7]) / 2;
+      cz = (box[2] + box[5] + box[8]) / 2;
+
+      // Compute bounding box from all 8 cell vertices
+      const va = [box[0], box[1], box[2]];
+      const vb = [box[3], box[4], box[5]];
+      const vc = [box[6], box[7], box[8]];
+      for (let ia = 0; ia <= 1; ia++) {
+        for (let ib = 0; ib <= 1; ib++) {
+          for (let ic = 0; ic <= 1; ic++) {
+            const vx = ia * va[0] + ib * vb[0] + ic * vc[0];
+            const vy = ia * va[1] + ib * vb[1] + ic * vc[1];
+            const vz = ia * va[2] + ib * vb[2] + ic * vc[2];
+            minX = Math.min(minX, vx);
+            minY = Math.min(minY, vy);
+            minZ = Math.min(minZ, vz);
+            maxX = Math.max(maxX, vx);
+            maxY = Math.max(maxY, vy);
+            maxZ = Math.max(maxZ, vz);
+          }
+        }
+      }
+    } else {
+      // No cell box: use atom centroid as center
+      cx = nAtoms > 0 ? sumX / nAtoms : 0;
+      cy = nAtoms > 0 ? sumY / nAtoms : 0;
+      cz = nAtoms > 0 ? sumZ / nAtoms : 0;
+
+      // Bounding box from atom positions
+      for (let i = 0; i < nAtoms; i++) {
+        const x = positions[i * 3];
+        const y = positions[i * 3 + 1];
+        const z = positions[i * 3 + 2];
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        minZ = Math.min(minZ, z);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        maxZ = Math.max(maxZ, z);
+      }
+    }
+
+    const extentX = maxX - minX;
+    const extentY = maxY - minY;
+    const extentZ = maxZ - minZ;
+    const maxExtent = Math.max(extentX, extentY, extentZ);
+    this.lastExtent = maxExtent;
+    this.lastExtentX = extentX;
+    this.lastExtentY = extentY;
 
     this.controls.target.set(cx, cy, cz);
-    const distance = extent * 1.2;
-    this.camera.position.set(cx, cy, cz + distance);
+
+    const distance = Math.max(maxExtent * 1.2, 0.1);
+    this.camera.position.set(cx, cy - distance, cz);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
-      const aspect = this.container
-        ? this.container.clientWidth / this.container.clientHeight
-        : 1;
-      this.camera.left = -distance * aspect / 2;
-      this.camera.right = distance * aspect / 2;
-      this.camera.top = distance / 2;
-      this.camera.bottom = -distance / 2;
       this.camera.near = -distance * 10;
       this.camera.far = distance * 10;
       this.camera.zoom = 1;
+      this.applyFrustumInsets();
     } else {
       this.camera.near = distance * 0.01;
       this.camera.far = distance * 10;
+      this.camera.updateProjectionMatrix();
     }
-    this.camera.updateProjectionMatrix();
     this.controls.update();
   }
 
@@ -405,6 +523,68 @@ export class MoleculeRenderer {
     if (this.snapshot) {
       this.fitToView(this.snapshot);
     }
+  }
+
+  /** Set the rotation center (orbit target) to the given world coordinates. */
+  setRotationCenter(x: number, y: number, z: number): void {
+    this.controls.target.set(x, y, z);
+    this.controls.update();
+  }
+
+  /** Set pixel insets for overlay panels that occlude viewport edges. */
+  setViewInsets(left: number, right: number): void {
+    this.viewInsetLeft = left;
+    this.viewInsetRight = right;
+    this.applyFrustumInsets();
+  }
+
+  /**
+   * Recalculate the orthographic frustum so the model fits within the
+   * visible area (accounting for overlay insets) and appears centered
+   * in that visible area.
+   */
+  private applyFrustumInsets(): void {
+    if (!(this.camera instanceof THREE.OrthographicCamera)) return;
+    if (!this.container) return;
+
+    const W = this.container.clientWidth;
+    const H = this.container.clientHeight;
+    if (W === 0 || H === 0) return;
+
+    const leftInset = this.viewInsetLeft;
+    const rightInset = this.viewInsetRight;
+
+    // Effective visible width — guarantee at least 30% of container width
+    // (or 100px) to prevent degenerate frustum on narrow viewports
+    const minVisible = Math.max(W * 0.3, 100);
+    const effectiveWidth = Math.max(W - leftInset - rightInset, minVisible);
+    const effectiveAspect = effectiveWidth / H;
+
+    // Size the frustum so the model fits within the visible area
+    const padding = 1.2;
+    const halfH =
+      Math.max(this.lastExtentY / 2, this.lastExtentX / (2 * effectiveAspect)) *
+      padding;
+    const frustumHeight = Math.max(halfH * 2, 0.1);
+
+    // The frustum must cover the full container (full aspect)
+    const fullAspect = W / H;
+    const halfW = (frustumHeight * fullAspect) / 2;
+
+    // Start with symmetric frustum for full container
+    this.camera.left = -halfW;
+    this.camera.right = halfW;
+    this.camera.top = frustumHeight / 2;
+    this.camera.bottom = -frustumHeight / 2;
+
+    // Offset so the model center maps to the center of the visible area.
+    // visible center is (leftInset - rightInset)/2 pixels right of container center.
+    const frustumWidth = 2 * halfW;
+    const shift = ((leftInset - rightInset) / (2 * W)) * frustumWidth;
+    this.camera.left -= shift;
+    this.camera.right -= shift;
+
+    this.camera.updateProjectionMatrix();
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -460,6 +640,12 @@ export class MoleculeRenderer {
   /** Get the canvas element for event listener attachment. */
   getCanvas(): HTMLCanvasElement | null {
     return this.renderer?.domElement ?? null;
+  }
+
+  /** Get a copy of current atom positions (public, for external use). */
+  getCurrentPositionsCopy(): Float32Array | null {
+    if (!this.snapshot) return null;
+    return new Float32Array(this.currentPositions ?? this.snapshot.positions);
   }
 
   /** Get current atom positions (may reflect trajectory frame). */
@@ -737,39 +923,91 @@ export class MoleculeRenderer {
     }
   }
 
+  private setupDprListener(): void {
+    const update = () => {
+      this.onResize();
+      // Re-register for the new DPR value
+      this.dprMediaQuery?.removeEventListener("change", update);
+      this.dprMediaQuery = window.matchMedia(
+        `(resolution: ${window.devicePixelRatio}dppx)`,
+      );
+      this.dprChangeHandler = update;
+      this.dprMediaQuery.addEventListener("change", update);
+    };
+    this.dprMediaQuery = window.matchMedia(
+      `(resolution: ${window.devicePixelRatio}dppx)`,
+    );
+    this.dprChangeHandler = update;
+    this.dprMediaQuery.addEventListener("change", update);
+  }
+
   private onResize(): void {
     if (!this.container) return;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-    const aspect = w / h;
+    if (w === 0 || h === 0) return;
+
+    const dpr = Math.min(window.devicePixelRatio, 2);
+
+    // Update cached values so animate() doesn't trigger a redundant resize
+    this.lastContainerW = w;
+    this.lastContainerH = h;
+    this.lastDpr = dpr;
+
+    this.renderer.setPixelRatio(dpr);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
-      const frustumHeight = this.camera.top - this.camera.bottom;
-      this.camera.left = -frustumHeight * aspect / 2;
-      this.camera.right = frustumHeight * aspect / 2;
+      // Recalculate full frustum accounting for overlay insets so the view
+      // stays correct when the container aspect ratio changes.
+      // camera.zoom is left untouched so the user's zoom level is preserved.
+      this.applyFrustumInsets();
     } else {
-      this.camera.aspect = aspect;
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
     }
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-    this.labelOverlay?.resize(w, h, Math.min(window.devicePixelRatio, 2));
+    this.renderer.setSize(w, h, false);
+    this.labelOverlay?.resize(w, h, dpr);
   }
 
   private animate = (): void => {
     this.animationId = requestAnimationFrame(this.animate);
+
+    // Synchronize renderer state BEFORE rendering — this eliminates
+    // timing gaps between ResizeObserver/matchMedia and rAF callbacks.
+    // When browser zoom changes, clientWidth/DPR update immediately but
+    // ResizeObserver may fire after the next rAF, causing the viewport
+    // and canvas buffer to be out of sync for one or more frames.
+    if (this.container) {
+      const w = this.container.clientWidth;
+      const h = this.container.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      if (w !== this.lastContainerW || h !== this.lastContainerH || dpr !== this.lastDpr) {
+        this.lastContainerW = w;
+        this.lastContainerH = h;
+        this.lastDpr = dpr;
+        this.onResize();
+      }
+    }
+
     this.controls.update();
 
     this.renderer.render(this.scene, this.camera);
 
+    // Use renderer's internal size for all post-render passes.
+    // This guarantees the viewport/dimensions match the canvas buffer,
+    // even if container.clientWidth has changed since the last setSize().
+    const _size = new THREE.Vector2();
+    this.renderer.getSize(_size);
+    const _dpr = this.renderer.getPixelRatio();
+
     // Render cell axes inset (after main scene, before label overlay)
-    if (this.cellAxesRenderer && this.container) {
+    if (this.cellAxesRenderer) {
       try {
         this.cellAxesRenderer.render(
           this.renderer,
           this.camera,
-          this.container.clientWidth,
-          this.container.clientHeight,
-          Math.min(window.devicePixelRatio, 2),
+          _size.x,
+          _size.y,
         );
       } catch (e) {
         console.warn("CellAxesRenderer render error:", e);
@@ -777,11 +1015,12 @@ export class MoleculeRenderer {
       }
     }
 
-    if (this.labelOverlay && this.container) {
+    if (this.labelOverlay) {
       this.labelOverlay.render(
         this.camera,
-        this.container.clientWidth,
-        this.container.clientHeight,
+        _size.x,
+        _size.y,
+        _dpr,
       );
     }
   };
@@ -798,6 +1037,9 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
+    if (this.dprMediaQuery && this.dprChangeHandler) {
+      this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);
+    }
     this.controls.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {

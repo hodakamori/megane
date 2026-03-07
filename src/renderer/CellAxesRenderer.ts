@@ -2,11 +2,11 @@
  * Cell axes indicator renderer.
  * Draws colored arrows (a/b/c or x/y/z) in a small inset viewport
  * that rotates in sync with the main camera.
+ * Supports drag-to-reposition.
  */
 
 import * as THREE from "three";
 
-const INSET_SIZE = 120;
 const INSET_MARGIN = 8;
 const AXIS_COLORS = [0xdd3333, 0x33aa33, 0x3366dd];
 const ORTHO_EPS = 1e-4;
@@ -16,6 +16,12 @@ export class CellAxesRenderer {
   private axesCamera: THREE.PerspectiveCamera;
   private arrowGroup: THREE.Group;
   private visible = true;
+
+  /** Inset position in CSS pixels (bottom-left corner of the inset). */
+  private posX = INSET_MARGIN;
+  private posY = INSET_MARGIN;
+  /** Last computed inset size (CSS pixels), cached for hit-testing. */
+  private lastInsetSize = 60;
 
   constructor() {
     this.axesScene = new THREE.Scene();
@@ -112,8 +118,51 @@ export class CellAxesRenderer {
     return new THREE.Sprite(material);
   }
 
+  // ── Hit-testing & drag ──────────────────────────────────────
+
   /**
-   * Render the axes inset in the bottom-left corner.
+   * Test whether a CSS-pixel coordinate (origin = top-left of container)
+   * lies inside the axes inset.
+   */
+  hitTest(cssX: number, cssY: number, containerHeight: number): boolean {
+    if (!this.visible || this.arrowGroup.children.length === 0) return false;
+    // Convert CSS y (top-down) to bottom-up for comparison
+    const bottomY = containerHeight - cssY;
+    return (
+      cssX >= this.posX &&
+      cssX <= this.posX + this.lastInsetSize &&
+      bottomY >= this.posY &&
+      bottomY <= this.posY + this.lastInsetSize
+    );
+  }
+
+  /**
+   * Move the inset by a delta (CSS pixels), clamped to container bounds.
+   */
+  moveBy(
+    dx: number,
+    dy: number,
+    containerWidth: number,
+    containerHeight: number,
+  ): void {
+    // dx/dy are in screen coords (right = +x, down = +y)
+    // posX/posY are in WebGL coords (right = +x, up = +y)
+    this.posX += dx;
+    this.posY -= dy; // invert Y
+    this.clampPosition(containerWidth, containerHeight);
+  }
+
+  private clampPosition(containerWidth: number, containerHeight: number): void {
+    const s = this.lastInsetSize;
+    const margin = 4;
+    this.posX = Math.max(margin, Math.min(containerWidth - s - margin, this.posX));
+    this.posY = Math.max(margin, Math.min(containerHeight - s - margin, this.posY));
+  }
+
+  // ── Rendering ───────────────────────────────────────────────
+
+  /**
+   * Render the axes inset.
    * Must be called AFTER the main scene render.
    */
   render(
@@ -121,7 +170,6 @@ export class CellAxesRenderer {
     mainCamera: THREE.Camera,
     containerWidth: number,
     containerHeight: number,
-    pixelRatio: number,
   ): void {
     if (!this.visible || this.arrowGroup.children.length === 0) return;
 
@@ -131,26 +179,25 @@ export class CellAxesRenderer {
       .set(0, 0, 3)
       .applyQuaternion(mainCamera.quaternion);
 
-    // Compute inset viewport (bottom-left, in device pixels)
-    const s = INSET_SIZE * pixelRatio;
-    const m = INSET_MARGIN * pixelRatio;
-    const x = m;
-    const y = m; // WebGL y=0 is bottom
+    // Compute responsive inset size
+    const minDim = Math.min(containerWidth, containerHeight);
+    const insetSize = Math.max(60, Math.min(140, Math.round(minDim * 0.12)));
+    this.lastInsetSize = insetSize;
+    this.clampPosition(containerWidth, containerHeight);
 
-    // Render into inset viewport
+    // Three.js setViewport/setScissor expect CSS pixels — they multiply
+    // by the renderer's internal pixelRatio automatically.
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
-    renderer.setViewport(x, y, s, s);
-    renderer.setScissor(x, y, s, s);
+    renderer.setViewport(this.posX, this.posY, insetSize, insetSize);
+    renderer.setScissor(this.posX, this.posY, insetSize, insetSize);
     renderer.setScissorTest(true);
     renderer.clearDepth();
     renderer.render(this.axesScene, this.axesCamera);
 
-    // Restore
+    // Restore full viewport (CSS pixels)
     renderer.autoClear = prevAutoClear;
-    const fullW = containerWidth * pixelRatio;
-    const fullH = containerHeight * pixelRatio;
-    renderer.setViewport(0, 0, fullW, fullH);
+    renderer.setViewport(0, 0, containerWidth, containerHeight);
     renderer.setScissorTest(false);
   }
 

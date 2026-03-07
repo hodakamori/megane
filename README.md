@@ -1,54 +1,56 @@
-# megane
+<h1 align="center">
+  <img src="docs/public/logo.png" alt="" width="32" />
+  megane
+</h1>
 
-A fast, simple molecular viewer. Renders PDB structures and XTC trajectories in real time in the browser.
+<p align="center">Desktop-grade molecular visualization. Right in your browser.</p>
 
-- Scales to 1M atoms with Three.js InstancedMesh + Billboard Impostor
-- High-quality InstancedMesh for <=5,000 atoms; auto-switches to Impostor above that
-- Binary streaming from Python to browser via FastAPI WebSocket
-- Jupyter widget powered by anywidget
+<p align="center">
+  <a href="https://github.com/hodakamori/megane/actions/workflows/ci.yml"><img src="https://github.com/hodakamori/megane/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://pypi.org/project/megane/"><img src="https://img.shields.io/pypi/v/megane" alt="PyPI" /></a>
+  <a href="https://www.npmjs.com/package/megane"><img src="https://img.shields.io/npm/v/megane" alt="npm" /></a>
+  <a href="https://github.com/hodakamori/megane/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+</p>
 
-## Setup
+<p align="center">
+  <a href="https://hodakamori.github.io/megane/">Docs</a> &middot;
+  <a href="https://hodakamori.github.io/megane/getting-started">Getting Started</a> &middot;
+  <a href="https://pypi.org/project/megane/">PyPI</a> &middot;
+  <a href="https://www.npmjs.com/package/megane">npm</a>
+</p>
 
-### Prerequisites
+<p align="center">
+  <img src="docs/public/screenshots/hero.png" alt="megane screenshot" width="640" />
+</p>
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/)
-- Node.js 18+
+---
 
-### Installation
+## Features
+
+- **1M+ atoms at 60fps** — Billboard impostor rendering with WebGL handles massive protein complexes in real time
+- **Jupyter, CLI, React** — Use as a Jupyter widget, serve from the command line, or embed the React component in your own app
+- **Rust + WASM** — PDB, GRO, XYZ, MOL, and XTC parsers in Rust, shared between Python (PyO3) and browser (WASM)
+- **Trajectory streaming** — Stream XTC trajectories over WebSocket in real time, scrub through thousands of frames
+- **Atom selection & measurement** — Select 2–4 atoms to measure distances, angles, or dihedral angles
+- **Adaptive rendering** — High-quality InstancedMesh for small systems, auto-switches to Billboard Impostor for large systems
+
+## Installation
+
+### Python
 
 ```bash
-# Python
-uv sync --extra dev --extra trajectory
-
-# Node.js
-npm install
-npm run build
+pip install megane
 ```
 
-## Usage
-
-### CLI (Standalone)
+### npm (for React embedding)
 
 ```bash
-uv run megane serve protein.pdb
-uv run megane serve protein.pdb --xtc trajectory.xtc
-uv run megane serve protein.pdb --port 9000
+npm install megane
 ```
 
-### Development Mode
+## Quick Start
 
-```bash
-# Terminal 1: Vite dev server
-npm run dev
-
-# Terminal 2: Python backend
-uv run megane serve protein.pdb --dev --no-browser
-```
-
-Open `http://localhost:5173` in your browser.
-
-### Jupyter
+### Jupyter Notebook
 
 ```python
 import megane
@@ -62,13 +64,81 @@ viewer.load("protein.pdb", xtc="trajectory.xtc")
 viewer.frame_index = 50
 ```
 
-## Tests
+### CLI
 
 ```bash
-uv run pytest           # Python tests
-npm test                # TypeScript unit tests
+megane serve protein.pdb
+megane serve protein.pdb --xtc trajectory.xtc
+megane serve  # upload from browser
+```
+
+### React
+
+```tsx
+import { MeganeViewer, parseStructureFile } from "megane";
+
+function App() {
+  const [snapshot, setSnapshot] = useState(null);
+
+  const handleUpload = async (file: File) => {
+    const result = await parseStructureFile(file);
+    setSnapshot(result.snapshot);
+  };
+
+  return <MeganeViewer snapshot={snapshot} mode="local" /* ... */ />;
+}
+```
+
+## Supported File Formats
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| PDB | `.pdb` | Protein Data Bank |
+| GRO | `.gro` | GROMACS structure file |
+| XYZ | `.xyz` | Cartesian coordinate format |
+| MOL/SDF | `.mol`, `.sdf` | MDL Molfile (V2000) |
+| XTC | `.xtc` | GROMACS compressed trajectory |
+
+## Development
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- Rust (for building the parser)
+- [uv](https://docs.astral.sh/uv/)
+
+### Setup
+
+```bash
+git clone https://github.com/hodakamori/megane.git
+cd megane
+
+# Python
+uv sync --extra dev
+
+# Node.js
+npm install
+npm run build
+```
+
+### Development Mode
+
+```bash
+# Terminal 1: Vite dev server
+npm run dev
+
+# Terminal 2: Python backend
+uv run megane serve protein.pdb --dev --no-browser
+```
+
+### Tests
+
+```bash
+uv run pytest              # Python tests
+npm test                   # TypeScript unit tests
 cargo test -p megane-core  # Rust tests
-make test-all           # All tests
+make test-all              # All tests
 ```
 
 ## Project Structure
@@ -93,3 +163,7 @@ python/megane/           Python backend
   widget.py              anywidget Jupyter widget
 tests/                   Tests (Python, TypeScript, E2E)
 ```
+
+## License
+
+[MIT](LICENSE)
