@@ -10,6 +10,7 @@
  */
 
 export const atomVertexShader = /* glsl */ `precision highp float;
+  precision highp int;
 
   // Three.js built-in uniforms (must declare explicitly for RawShaderMaterial)
   uniform mat4 modelViewMatrix;
@@ -55,6 +56,7 @@ export const atomVertexShader = /* glsl */ `precision highp float;
 `;
 
 export const atomFragmentShader = /* glsl */ `precision highp float;
+  precision highp int;
 
   in vec3 vColor;
   in vec2 vUv;
