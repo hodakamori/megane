@@ -11,6 +11,7 @@ import {
   Controls,
   Background,
   BackgroundVariant,
+  MarkerType,
 } from "@xyflow/react";
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -157,6 +158,13 @@ function PipelineEditorInner({
       const color = getEdgeColor(sourceNode?.type, edge.sourceHandle ?? null);
       return {
         ...edge,
+        animated: true,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color,
+          width: 16,
+          height: 16,
+        },
         style: {
           stroke: color,
           strokeWidth: 2,
@@ -278,7 +286,8 @@ function PipelineEditorInner({
           minZoom={0.3}
           maxZoom={2}
           defaultEdgeOptions={{
-            type: "smoothstep",
+            type: "bezier",
+            animated: true,
             style: { stroke: "#94a3b8", strokeWidth: 2 },
           }}
           proOptions={{ hideAttribution: true }}
