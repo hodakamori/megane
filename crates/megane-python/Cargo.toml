@@ -9,5 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 megane-core = { path = "../megane-core" }
-pyo3 = { version = "0.23", features = ["extension-module"] }
-numpy = "0.23"
+pyo3 = { version = "0.24", features = ["extension-module"] }
+numpy = "0.24"
