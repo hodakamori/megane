@@ -8,8 +8,8 @@ import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyfl
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData } from "./execute";
 import type { Snapshot } from "../types";
-import type { PipelineNodeType, RenderState, SerializedPipeline } from "./types";
-import { defaultParams, DEFAULT_RENDER_STATE, canConnect } from "./types";
+import type { PipelineNodeType, ViewportState, SerializedPipeline } from "./types";
+import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
 import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
 import { createDefaultPipeline, createDemoPipeline } from "./defaults";
@@ -24,7 +24,7 @@ export interface PipelineStore {
   // xyflow state
   nodes: Node<PipelineNodeData>[];
   edges: Edge[];
-  renderState: RenderState;
+  viewportState: ViewportState;
 
   // Molecular data for selection queries
   snapshot: Snapshot | null;
@@ -61,7 +61,7 @@ const defaultState = new URLSearchParams(globalThis.location?.search ?? "").has(
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
   edges: defaultState.edges,
-  renderState: { ...DEFAULT_RENDER_STATE },
+  viewportState: { ...DEFAULT_VIEWPORT_STATE },
   snapshot: null,
   atomLabels: null,
   setSnapshot: (s) => {
@@ -77,7 +77,6 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     set((state) => ({
       nodes: applyNodeChanges(changes, state.nodes),
     }));
-    // Re-execute after position/selection changes
     get().execute();
   },
 
@@ -89,16 +88,28 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   onConnect: (connection) => {
-    // Validate connection before adding edge
     const { nodes } = get();
     const sourceNode = nodes.find((n) => n.id === connection.source);
     const targetNode = nodes.find((n) => n.id === connection.target);
     if (!sourceNode?.type || !targetNode?.type) return;
-    if (!canConnect(sourceNode.type as PipelineNodeType, targetNode.type as PipelineNodeType)) return;
+
+    if (
+      !canConnect(
+        sourceNode.type as PipelineNodeType,
+        connection.sourceHandle ?? null,
+        targetNode.type as PipelineNodeType,
+        connection.targetHandle ?? null,
+      )
+    ) {
+      return;
+    }
 
     set((state) => ({
       edges: addEdge(
-        { ...connection, id: `e-${connection.source}-${connection.target}` },
+        {
+          ...connection,
+          id: `e-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
+        },
         state.edges,
       ),
     }));
@@ -110,7 +121,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     const newNode: Node<PipelineNodeData> = {
       id,
       type,
-      position: position ?? { x: 250, y: (get().nodes.length) * 200 + 50 },
+      position: position ?? { x: 250, y: get().nodes.length * 200 + 50 },
       data: {
         params: defaultParams(type),
         enabled: true,
@@ -161,8 +172,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
 
   execute: () => {
     const { nodes, edges, snapshot, atomLabels } = get();
-    const renderState = executePipeline(nodes, edges, snapshot, atomLabels);
-    set({ renderState });
+    const viewportState = executePipeline(nodes, edges, snapshot, atomLabels);
+    set({ viewportState });
   },
 
   serialize: () => {
@@ -181,7 +192,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     set({
       nodes: def.nodes,
       edges: def.edges,
-      renderState: { ...DEFAULT_RENDER_STATE },
+      viewportState: { ...DEFAULT_VIEWPORT_STATE },
     });
   },
 }));

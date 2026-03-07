@@ -1,12 +1,14 @@
 /**
- * Selection node for the pipeline editor.
- * Allows users to filter atoms using Python-like query expressions.
+ * Filter node for the pipeline editor.
+ * Accepts particle or bond input; filters based on query.
+ * When connected to particle: uses the selection query language.
+ * When connected to bond: future bond-order filtering.
  */
 
 import { useState, useCallback, useEffect } from "react";
 import type { NodeProps, Node } from "@xyflow/react";
 import type { PipelineNodeData } from "../../pipeline/execute";
-import type { SelectionParams } from "../../pipeline/types";
+import type { FilterParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { validateQuery } from "../../pipeline/selection";
 import { NodeShell } from "./NodeShell";
@@ -44,13 +46,12 @@ const hintStyle: React.CSSProperties = {
   lineHeight: 1.3,
 };
 
-export function SelectionNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
+export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
-  const params = data.params as SelectionParams;
+  const params = data.params as FilterParams;
   const [localQuery, setLocalQuery] = useState(params.query);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync local state when store changes externally (undo/redo, deserialization)
   useEffect(() => {
     setLocalQuery(params.query);
   }, [params.query]);
@@ -71,7 +72,7 @@ export function SelectionNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   );
 
   return (
-    <NodeShell id={id} nodeType="selection" enabled={data.enabled}>
+    <NodeShell id={id} nodeType="filter" enabled={data.enabled}>
       <input
         value={localQuery}
         onChange={(e) => setLocalQuery(e.target.value)}

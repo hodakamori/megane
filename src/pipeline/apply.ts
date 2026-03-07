@@ -1,70 +1,147 @@
 /**
- * Applies a RenderState to a MoleculeRenderer instance.
- * Only calls renderer methods for properties that changed (diff-based).
+ * Applies a ViewportState to a MoleculeRenderer instance.
+ * Translates the typed data streams into renderer calls.
  */
 
-import type { RenderState } from "./types";
+import type { ViewportState, ParticleData, BondData, CellData, LabelData } from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 
 /**
- * Apply the current RenderState to the renderer, only updating changed properties.
- * If previous is null, all properties are applied.
+ * Apply the current ViewportState to the renderer.
+ * If previous is null, all properties are applied (initial).
  */
-export function applyRenderState(
+export function applyViewportState(
   renderer: MoleculeRenderer,
-  current: RenderState,
-  previous: RenderState | null,
+  current: ViewportState,
+  previous: ViewportState | null,
 ): void {
-  // Per-atom overrides take priority over global scale/opacity.
-  // When overrides are active, set global uniform to 1.0 since the
-  // per-atom arrays already contain absolute values.
-  if (current.atomScaleOverrides) {
-    if (!previous || previous.atomScale !== 1.0 || !previous.atomScaleOverrides) {
-      renderer.setAtomScale(1.0);
-    }
-    renderer.setAtomScaleOverrides(current.atomScaleOverrides);
-  } else {
-    if (previous?.atomScaleOverrides) {
-      renderer.clearAtomOverrides();
-    }
-    if (!previous || current.atomScale !== previous.atomScale || previous.atomScaleOverrides) {
-      renderer.setAtomScale(current.atomScale);
-    }
+  // ─── Atom scale/opacity from particle data ─────────────────
+  applyParticleOverrides(renderer, current.particles, previous?.particles ?? null);
+
+  // ─── Bond scale/opacity ────────────────────────────────────
+  applyBondSettings(renderer, current.bonds, previous?.bonds ?? null);
+
+  // ─── Cell visibility ───────────────────────────────────────
+  const hasCells = current.cells.length > 0;
+  const hadCells = (previous?.cells.length ?? 0) > 0;
+  const cellVisible = hasCells && current.cells.some((c) => c.visible);
+  const prevCellVisible = hadCells && (previous?.cells.some((c) => c.visible) ?? false);
+  if (!previous || cellVisible !== prevCellVisible) {
+    renderer.setCellVisible(cellVisible);
   }
 
-  if (current.atomOpacityOverrides) {
-    if (!previous || previous.atomOpacity !== 1.0 || !previous.atomOpacityOverrides) {
-      renderer.setAtomOpacity(1.0);
-    }
-    renderer.setAtomOpacityOverrides(current.atomOpacityOverrides);
-  } else {
-    if (previous?.atomOpacityOverrides && !current.atomScaleOverrides) {
-      renderer.clearAtomOverrides();
-    }
-    if (!previous || current.atomOpacity !== previous.atomOpacity || previous.atomOpacityOverrides) {
-      renderer.setAtomOpacity(current.atomOpacity);
-    }
+  const cellAxesVisible = hasCells && current.cells.some((c) => c.axesVisible);
+  if (!previous || cellAxesVisible !== (previous.cellAxesVisible ?? true)) {
+    renderer.setCellAxesVisible(cellAxesVisible);
   }
 
-  if (!previous || current.bondScale !== previous.bondScale) {
-    renderer.setBondScale(current.bondScale);
-  }
-  if (!previous || current.bondOpacity !== previous.bondOpacity) {
-    renderer.setBondOpacity(current.bondOpacity);
-  }
-  if (!previous || current.bondsVisible !== previous.bondsVisible) {
-    renderer.setBondsVisible(current.bondsVisible);
-  }
-  if (!previous || current.cellVisible !== previous.cellVisible) {
-    renderer.setCellVisible(current.cellVisible);
+  // ─── Display settings ──────────────────────────────────────
+  if (!previous || current.perspective !== previous.perspective) {
+    renderer.setPerspective(current.perspective);
   }
   if (!previous || current.cellAxesVisible !== previous.cellAxesVisible) {
     renderer.setCellAxesVisible(current.cellAxesVisible);
   }
-  if (!previous || current.perspective !== previous.perspective) {
-    renderer.setPerspective(current.perspective);
+
+  // ─── Labels ────────────────────────────────────────────────
+  applyLabels(renderer, current.labels, previous?.labels ?? null);
+
+  // ─── Bonds visibility ──────────────────────────────────────
+  const bondsVisible = current.bonds.length > 0;
+  const prevBondsVisible = (previous?.bonds.length ?? 0) > 0;
+  if (!previous || bondsVisible !== prevBondsVisible) {
+    renderer.setBondsVisible(bondsVisible);
   }
-  if (!previous || current.vectorScale !== previous.vectorScale) {
-    renderer.setVectorScale(current.vectorScale);
+}
+
+function applyParticleOverrides(
+  renderer: MoleculeRenderer,
+  particles: ParticleData[],
+  prevParticles: ParticleData[] | null,
+): void {
+  if (particles.length === 0) {
+    if (prevParticles && prevParticles.length > 0) {
+      renderer.clearAtomOverrides();
+      renderer.setAtomScale(1.0);
+      renderer.setAtomOpacity(1.0);
+    }
+    return;
+  }
+
+  // Merge overrides from all particle streams
+  // (for now, take the first particle with overrides or the first particle)
+  let mergedScale: Float32Array | null = null;
+  let mergedOpacity: Float32Array | null = null;
+
+  for (const p of particles) {
+    if (p.scaleOverrides) {
+      if (!mergedScale) {
+        mergedScale = new Float32Array(p.scaleOverrides);
+      } else {
+        // Merge: overwrite values where the new override differs
+        for (let i = 0; i < mergedScale.length; i++) {
+          if (p.scaleOverrides[i] !== 1.0) {
+            mergedScale[i] = p.scaleOverrides[i];
+          }
+        }
+      }
+    }
+    if (p.opacityOverrides) {
+      if (!mergedOpacity) {
+        mergedOpacity = new Float32Array(p.opacityOverrides);
+      } else {
+        for (let i = 0; i < mergedOpacity.length; i++) {
+          if (p.opacityOverrides[i] !== 1.0) {
+            mergedOpacity[i] = p.opacityOverrides[i];
+          }
+        }
+      }
+    }
+  }
+
+  if (mergedScale) {
+    renderer.setAtomScale(1.0);
+    renderer.setAtomScaleOverrides(mergedScale);
+  } else {
+    renderer.clearAtomOverrides();
+    renderer.setAtomScale(1.0);
+  }
+
+  if (mergedOpacity) {
+    renderer.setAtomOpacity(1.0);
+    renderer.setAtomOpacityOverrides(mergedOpacity);
+  } else {
+    renderer.setAtomOpacity(1.0);
+  }
+}
+
+function applyBondSettings(
+  renderer: MoleculeRenderer,
+  bonds: BondData[],
+  prevBonds: BondData[] | null,
+): void {
+  if (bonds.length === 0) return;
+
+  // Use the first bond stream's settings (merge is possible in future)
+  const bond = bonds[0];
+  const prevBond = prevBonds?.[0];
+
+  if (!prevBond || bond.scale !== prevBond.scale) {
+    renderer.setBondScale(bond.scale);
+  }
+  if (!prevBond || bond.opacity !== prevBond.opacity) {
+    renderer.setBondOpacity(bond.opacity);
+  }
+}
+
+function applyLabels(
+  renderer: MoleculeRenderer,
+  labels: LabelData[],
+  prevLabels: LabelData[] | null,
+): void {
+  if (labels.length > 0) {
+    renderer.setLabels(labels[0].labels);
+  } else if (prevLabels && prevLabels.length > 0) {
+    renderer.setLabels(null);
   }
 }

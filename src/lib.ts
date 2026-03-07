@@ -20,12 +20,19 @@ export type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
 export { PipelineEditor } from "./components/PipelineEditor";
 export { usePipelineStore } from "./pipeline/store";
 export { executePipeline } from "./pipeline/execute";
-export { applyRenderState } from "./pipeline/apply";
+export { applyViewportState } from "./pipeline/apply";
 export { serializePipeline, deserializePipeline } from "./pipeline/serialize";
 export type {
   PipelineNodeType,
   PipelineNodeParams,
-  RenderState,
+  PipelineDataType,
+  PipelineData,
+  ParticleData,
+  BondData,
+  CellData,
+  LabelData,
+  MeshData,
+  ViewportState,
   SerializedPipeline,
 } from "./pipeline/types";
 

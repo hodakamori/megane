@@ -1,7 +1,7 @@
 /**
  * Main megane viewer React component.
  * Combines Viewport, PipelineEditor, Timeline, Tooltip, and MeasurementPanel.
- * The pipeline store drives all appearance settings via RenderState.
+ * The pipeline store drives all appearance settings via ViewportState.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,10 +13,8 @@ import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { usePipelineStore } from "../pipeline/store";
-import { applyRenderState } from "../pipeline/apply";
-import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
-import { setLabelFileHandler } from "./nodes/SetLabelsNode";
-import { setVectorFileHandler, setDemoVectorsHandler } from "./nodes/SetVectorsNode";
+import { applyViewportState } from "../pipeline/apply";
+import { setStructureLoadHandler } from "./nodes/DataLoaderNode";
 import type {
   Snapshot,
   Frame,
@@ -24,7 +22,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
-import type { RenderState } from "../pipeline/types";
+import type { ViewportState } from "../pipeline/types";
 
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
@@ -74,14 +72,14 @@ export function MeganeViewer({
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
   const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
   const pipelineCollapsedRef = useRef(isNarrow);
-  const prevRenderStateRef = useRef<RenderState | null>(null);
+  const prevViewportStateRef = useRef<ViewportState | null>(null);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
   }, [pipelineCollapsed]);
 
-  // Subscribe to pipeline store's renderState
-  const renderState = usePipelineStore((s) => s.renderState);
+  // Subscribe to pipeline store's viewportState
+  const viewportState = usePipelineStore((s) => s.viewportState);
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
 
   // Push snapshot to pipeline store for selection queries
@@ -92,41 +90,37 @@ export function MeganeViewer({
   // Wire up node event handlers
   useEffect(() => {
     setStructureLoadHandler((file) => onUploadStructure(file));
-    setLabelFileHandler((file) => onLoadLabelFile?.(file));
-    setVectorFileHandler((file) => onLoadVectorFile?.(file));
-    setDemoVectorsHandler(() => onLoadDemoVectors?.());
     return () => {
       setStructureLoadHandler(null);
-      setLabelFileHandler(null);
-      setVectorFileHandler(null);
-      setDemoVectorsHandler(null);
     };
-  }, [onUploadStructure, onLoadLabelFile, onLoadVectorFile, onLoadDemoVectors]);
+  }, [onUploadStructure]);
 
-  // Apply renderState changes to the renderer
+  // Apply viewportState changes to the renderer
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
-    applyRenderState(renderer, renderState, prevRenderStateRef.current);
+    applyViewportState(renderer, viewportState, prevViewportStateRef.current);
 
-    // Notify parent about source changes for data management
-    const prev = prevRenderStateRef.current;
-    if (!prev || renderState.bondSource !== prev.bondSource) {
-      onBondSourceChange?.(renderState.bondSource);
-    }
-    if (!prev || renderState.labelSource !== prev.labelSource) {
-      onLabelSourceChange?.(renderState.labelSource);
-    }
-    if (!prev || renderState.vectorSource !== prev.vectorSource) {
-      onVectorSourceChange?.(renderState.vectorSource);
+    // Notify parent about bond source changes from DataLoader params
+    const nodes = usePipelineStore.getState().nodes;
+    const loaderNode = nodes.find((n) => n.type === "data_loader");
+    if (loaderNode) {
+      const params = loaderNode.data.params;
+      if (params.type === "data_loader") {
+        onBondSourceChange?.(params.bondSource);
+      }
     }
 
-    prevRenderStateRef.current = renderState;
-  }, [renderState, onBondSourceChange, onLabelSourceChange, onVectorSourceChange]);
+    prevViewportStateRef.current = viewportState;
+  }, [viewportState, onBondSourceChange]);
 
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
-    if (renderState.bondSource !== "distance") return;
+    const nodes = usePipelineStore.getState().nodes;
+    const loaderNode = nodes.find((n) => n.type === "data_loader");
+    if (!loaderNode) return;
+    const params = loaderNode.data.params;
+    if (params.type !== "data_loader" || params.bondSource !== "distance") return;
     if (!snapshot || !frame) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
@@ -135,20 +129,19 @@ export function MeganeViewer({
       frame.positions,
       snapshot.elements,
       snapshot.nAtoms,
-      renderState.vdwScale,
+      0.6,
     );
     renderer.updateBonds(newBonds, null);
-  }, [frame, snapshot, renderState.bondSource, renderState.vdwScale]);
+  }, [frame, snapshot]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
     renderer.setViewInsets(
-      pipelineCollapsedRef.current ? 0 : 492, // 12px gap + 480px pipeline panel
+      pipelineCollapsedRef.current ? 0 : 492,
       0,
     );
-    // Apply initial render state
-    applyRenderState(renderer, usePipelineStore.getState().renderState, null);
-    prevRenderStateRef.current = usePipelineStore.getState().renderState;
+    applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
+    prevViewportStateRef.current = usePipelineStore.getState().viewportState;
   }, []);
 
   const handleAtomRightClick = useCallback((atomIndex: number) => {
@@ -174,7 +167,6 @@ export function MeganeViewer({
     setPipelineCollapsed((prev) => !prev);
   }, []);
 
-  // Update view insets when pipeline panel is toggled
   useEffect(() => {
     rendererRef.current?.setViewInsets(
       pipelineCollapsed ? 0 : 492,

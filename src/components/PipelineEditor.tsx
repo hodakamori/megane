@@ -1,7 +1,6 @@
 /**
  * Pipeline editor panel using xyflow.
- * Blender-style free-form canvas for building visualization pipelines.
- * Replaces the left Sidebar and right AppearancePanel.
+ * Typed data-flow pipeline with color-coded handles per data type.
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -17,40 +16,26 @@ import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
 import type { PipelineNodeType } from "../pipeline/types";
-import { NODE_TYPE_LABELS, canConnect } from "../pipeline/types";
-import { LoadStructureNode } from "./nodes/LoadStructureNode";
-import {
-  SetAtomNode,
-  SetBondNode,
-} from "./nodes/SliderNode";
-import { SetBondSourceNode } from "./nodes/SetBondSourceNode";
-import { SetLabelsNode } from "./nodes/SetLabelsNode";
-import { SetVectorsNode } from "./nodes/SetVectorsNode";
-import { SetDisplayNode } from "./nodes/SetDisplayNode";
-import { SetCellVisibilityNode } from "./nodes/SetCellVisibilityNode";
-import { SelectionNode } from "./nodes/SelectionNode";
+import { NODE_TYPE_LABELS, canConnect, DATA_TYPE_COLORS, NODE_PORTS } from "../pipeline/types";
+import { DataLoaderNode } from "./nodes/DataLoaderNode";
+import { ViewportNode } from "./nodes/ViewportNode";
+import { FilterNode } from "./nodes/FilterNode";
+import { ModifyNode } from "./nodes/ModifyNode";
+import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 
 const nodeTypes = {
-  load_structure: LoadStructureNode,
-  selection: SelectionNode,
-  set_atom: SetAtomNode,
-  set_bond_source: SetBondSourceNode,
-  set_bond: SetBondNode,
-  set_labels: SetLabelsNode,
-  set_vectors: SetVectorsNode,
-  set_display: SetDisplayNode,
-  set_cell_visibility: SetCellVisibilityNode,
+  data_loader: DataLoaderNode,
+  viewport: ViewportNode,
+  filter: FilterNode,
+  modify: ModifyNode,
+  label_generator: LabelGeneratorNode,
 };
 
 const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
-  "selection",
-  "set_atom",
-  "set_bond_source",
-  "set_bond",
-  "set_labels",
-  "set_vectors",
-  "set_display",
-  "set_cell_visibility",
+  "filter",
+  "modify",
+  "label_generator",
+  "viewport",
 ];
 
 const panelStyle: React.CSSProperties = {
@@ -117,6 +102,18 @@ const dropdownItemStyle: React.CSSProperties = {
   textAlign: "left",
 };
 
+/**
+ * Determine edge color from the source handle's data type.
+ */
+function getEdgeColor(sourceNodeType: string | undefined, sourceHandle: string | null): string {
+  if (!sourceNodeType || !sourceHandle) return "#94a3b8";
+  const ports = NODE_PORTS[sourceNodeType as PipelineNodeType];
+  if (!ports) return "#94a3b8";
+  const port = ports.outputs.find((p) => p.name === sourceHandle);
+  if (!port) return "#94a3b8";
+  return DATA_TYPE_COLORS[port.dataType];
+}
+
 function PipelineEditorInner({
   collapsed,
   onToggleCollapse,
@@ -132,64 +129,38 @@ function PipelineEditorInner({
   const addNode = usePipelineStore((s) => s.addNode);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
 
-  // Connection validation: block invalid connections during drag
+  // Connection validation using typed port matching
   const isValidConnection = useCallback(
-    (connection: Connection | { source: string; target: string }) => {
+    (connection: Connection | { source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }) => {
       if (connection.source === connection.target) return false;
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
       if (!sourceNode?.type || !targetNode?.type) return false;
       return canConnect(
         sourceNode.type as PipelineNodeType,
+        (connection as Connection).sourceHandle ?? null,
         targetNode.type as PipelineNodeType,
+        (connection as Connection).targetHandle ?? null,
       );
     },
     [nodes],
   );
 
-  // Dim incompatible nodes while dragging a connection
-  const styledNodes = useMemo(() => {
-    if (!connectingFrom) return nodes;
-    const sourceNode = nodes.find((n) => n.id === connectingFrom);
-    if (!sourceNode?.type) return nodes;
-    return nodes.map((n) => {
-      const isValid =
-        n.id === connectingFrom ||
-        canConnect(sourceNode.type as PipelineNodeType, n.type as PipelineNodeType);
-      return {
-        ...n,
-        style: { ...n.style, opacity: isValid ? 1 : 0.3, transition: "opacity 0.15s" },
-      };
-    });
-  }, [nodes, connectingFrom]);
-
-  // Color edges: orange for selection source, grey otherwise
+  // Color edges based on data type
   const styledEdges = useMemo(() => {
     return edges.map((edge) => {
       const sourceNode = nodes.find((n) => n.id === edge.source);
-      const isSelectionEdge = sourceNode?.type === "selection";
+      const color = getEdgeColor(sourceNode?.type, edge.sourceHandle ?? null);
       return {
         ...edge,
         style: {
-          stroke: isSelectionEdge ? "#f59e0b" : "#94a3b8",
+          stroke: color,
           strokeWidth: 2,
         },
       };
     });
   }, [edges, nodes]);
-
-  const onConnectStart = useCallback(
-    (_: unknown, params: { nodeId: string | null }) => {
-      setConnectingFrom(params.nodeId);
-    },
-    [],
-  );
-
-  const onConnectEnd = useCallback(() => {
-    setConnectingFrom(null);
-  }, []);
 
   const handleAddNode = useCallback(
     (type: PipelineNodeType) => {
@@ -292,13 +263,11 @@ function PipelineEditorInner({
 
       <div style={{ flex: 1, position: "relative" }}>
         <ReactFlow
-          nodes={styledNodes}
+          nodes={nodes}
           edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
-          onConnectStart={onConnectStart}
-          onConnectEnd={onConnectEnd}
           isValidConnection={isValidConnection}
           nodeTypes={memoizedNodeTypes}
           fitView

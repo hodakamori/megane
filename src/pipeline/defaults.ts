@@ -5,7 +5,7 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { PipelineNodeData } from "./execute";
 
-/** Create the default pipeline with a single LoadStructure node. */
+/** Create the default pipeline: DataLoader → Viewport with typed edges. */
 export function createDefaultPipeline(): {
   nodes: Node<PipelineNodeData>[];
   edges: Edge[];
@@ -13,118 +13,25 @@ export function createDefaultPipeline(): {
   return {
     nodes: [
       {
-        id: "load-1",
-        type: "load_structure",
+        id: "loader-1",
+        type: "data_loader",
         position: { x: 250, y: 50 },
         data: {
           params: {
-            type: "load_structure",
+            type: "data_loader",
             fileName: null,
             bondSource: "structure",
-            trajectorySource: "structure",
-          },
-          enabled: true,
-        },
-      },
-    ],
-    edges: [],
-  };
-}
-
-/**
- * Create a demo pipeline showcasing selection and atom modifications.
- * Used for screenshots and documentation.
- */
-export function createDemoPipeline(): {
-  nodes: Node<PipelineNodeData>[];
-  edges: Edge[];
-} {
-  return {
-    nodes: [
-      {
-        id: "load-1",
-        type: "load_structure",
-        position: { x: 250, y: 0 },
-        data: {
-          params: {
-            type: "load_structure",
-            fileName: "protein.pdb",
-            bondSource: "structure",
-            trajectorySource: "structure",
           },
           enabled: true,
         },
       },
       {
-        id: "sel-1",
-        type: "selection",
-        position: { x: 50, y: 250 },
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 250, y: 400 },
         data: {
           params: {
-            type: "selection",
-            query: 'element == "C"',
-          },
-          enabled: true,
-        },
-      },
-      {
-        id: "atom-1",
-        type: "set_atom",
-        position: { x: 50, y: 450 },
-        data: {
-          params: {
-            type: "set_atom",
-            scale: 1.5,
-            opacity: 0.8,
-          },
-          enabled: true,
-        },
-      },
-      {
-        id: "sel-2",
-        type: "selection",
-        position: { x: 450, y: 250 },
-        data: {
-          params: {
-            type: "selection",
-            query: 'element == "N"',
-          },
-          enabled: true,
-        },
-      },
-      {
-        id: "atom-2",
-        type: "set_atom",
-        position: { x: 450, y: 450 },
-        data: {
-          params: {
-            type: "set_atom",
-            scale: 0.5,
-            opacity: 0.6,
-          },
-          enabled: true,
-        },
-      },
-      {
-        id: "bond-1",
-        type: "set_bond",
-        position: { x: 250, y: 650 },
-        data: {
-          params: {
-            type: "set_bond",
-            scale: 1.2,
-            opacity: 1.0,
-          },
-          enabled: true,
-        },
-      },
-      {
-        id: "display-1",
-        type: "set_display",
-        position: { x: 250, y: 850 },
-        data: {
-          params: {
-            type: "set_display",
+            type: "viewport",
             perspective: false,
             cellAxesVisible: true,
           },
@@ -133,13 +40,126 @@ export function createDemoPipeline(): {
       },
     ],
     edges: [
-      { id: "e-load-1-sel-1", source: "load-1", target: "sel-1" },
-      { id: "e-sel-1-atom-1", source: "sel-1", target: "atom-1" },
-      { id: "e-load-1-sel-2", source: "load-1", target: "sel-2" },
-      { id: "e-sel-2-atom-2", source: "sel-2", target: "atom-2" },
-      { id: "e-atom-1-bond-1", source: "atom-1", target: "bond-1" },
-      { id: "e-atom-2-bond-1", source: "atom-2", target: "bond-1" },
-      { id: "e-bond-1-display-1", source: "bond-1", target: "display-1" },
+      {
+        id: "e-loader-1-particle-viewport-1-particle",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e-loader-1-bond-viewport-1-bond",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e-loader-1-cell-viewport-1-cell",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+    ],
+  };
+}
+
+/**
+ * Create a demo pipeline showcasing filter and modify nodes.
+ */
+export function createDemoPipeline(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "loader-1",
+        type: "data_loader",
+        position: { x: 250, y: 0 },
+        data: {
+          params: {
+            type: "data_loader",
+            fileName: "protein.pdb",
+            bondSource: "structure",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "filter-1",
+        type: "filter",
+        position: { x: 50, y: 250 },
+        data: {
+          params: {
+            type: "filter",
+            query: 'element == "C"',
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "modify-1",
+        type: "modify",
+        position: { x: 50, y: 450 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 1.5,
+            opacity: 0.8,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "filter-2",
+        type: "filter",
+        position: { x: 450, y: 250 },
+        data: {
+          params: {
+            type: "filter",
+            query: 'element == "N"',
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "modify-2",
+        type: "modify",
+        position: { x: 450, y: 450 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 0.5,
+            opacity: 0.6,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 250, y: 700 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [
+      { id: "e1", source: "loader-1", target: "filter-1", sourceHandle: "particle", targetHandle: "in" },
+      { id: "e2", source: "filter-1", target: "modify-1", sourceHandle: "out", targetHandle: "in" },
+      { id: "e3", source: "loader-1", target: "filter-2", sourceHandle: "particle", targetHandle: "in" },
+      { id: "e4", source: "filter-2", target: "modify-2", sourceHandle: "out", targetHandle: "in" },
+      { id: "e5", source: "modify-1", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e6", source: "modify-2", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e7", source: "loader-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
+      { id: "e8", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
     ],
   };
 }

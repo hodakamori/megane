@@ -1,205 +1,285 @@
 /**
- * Pipeline type definitions.
- * Defines node types, parameters, render state, and serialization format.
+ * Pipeline type definitions for the typed data-flow architecture.
+ * Each edge carries typed data (Particle, Bond, Cell, Label, Mesh).
+ * Nodes declare typed input/output ports; only matching types can connect.
  */
 
-import type { BondSource, TrajectorySource, LabelSource, VectorSource } from "../types";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource } from "../types";
 
-/** All possible pipeline node type identifiers. */
-export type PipelineNodeType =
-  | "load_structure"
-  | "selection"
-  | "set_atom"
-  | "set_bond_source"
-  | "set_bond"
-  | "set_labels"
-  | "set_vectors"
-  | "set_display"
-  | "set_cell_visibility";
+// ─── Pipeline Data Types ──────────────────────────────────────────────
 
-/** Selection nodes can only connect to these target node types. */
-export const SELECTION_VALID_TARGETS: ReadonlySet<PipelineNodeType> = new Set([
-  "selection",
-  "set_atom",
-]);
+/** The possible data types flowing through pipeline edges. */
+export type PipelineDataType = "particle" | "bond" | "cell" | "label" | "mesh";
 
-/** Check whether a connection from sourceType to targetType is valid. */
-export function canConnect(sourceType: PipelineNodeType, targetType: PipelineNodeType): boolean {
-  // load_structure has no input
-  if (targetType === "load_structure") return false;
-  // selection output is only meaningful for selection and set_atom
-  if (sourceType === "selection") return SELECTION_VALID_TARGETS.has(targetType);
-  return true;
+/** Colors for each data type (used for handles and edges). */
+export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
+  particle: "#3b82f6", // blue
+  bond: "#f59e0b",     // amber
+  cell: "#10b981",     // emerald
+  label: "#8b5cf6",    // violet
+  mesh: "#6b7280",     // gray
+};
+
+/** Particle data flowing through the pipeline. Trajectory is embedded. */
+export interface ParticleData {
+  type: "particle";
+  source: Snapshot;
+  indices: Uint32Array | null;           // null = all atoms
+  scaleOverrides: Float32Array | null;
+  opacityOverrides: Float32Array | null;
+  trajectory: { frames: Frame[]; meta: TrajectoryMeta } | null;
 }
+
+/** Bond data flowing through the pipeline. */
+export interface BondData {
+  type: "bond";
+  bondIndices: Uint32Array;  // pairs: [a0,b0, a1,b1, ...]
+  bondOrders: Uint8Array | null;
+  nBonds: number;
+  scale: number;
+  opacity: number;
+}
+
+/** Simulation cell data. */
+export interface CellData {
+  type: "cell";
+  box: Float32Array; // 3x3 row-major
+  visible: boolean;
+  axesVisible: boolean;
+}
+
+/** Text labels positioned at atom locations. */
+export interface LabelData {
+  type: "label";
+  labels: string[];
+  particleRef: ParticleData;
+}
+
+/** Mesh data (reserved for future use). */
+export interface MeshData {
+  type: "mesh";
+}
+
+/** Union of all pipeline data types. */
+export type PipelineData = ParticleData | BondData | CellData | LabelData | MeshData;
+
+// ─── Port Definitions ─────────────────────────────────────────────────
+
+/** A named port on a node (input or output). */
+export interface PortDefinition {
+  name: string;                    // xyflow Handle id
+  dataType: PipelineDataType;
+  label: string;                   // display label
+}
+
+/** For generic nodes (filter/modify): accepted input types. */
+export type GenericPortAccepts = PipelineDataType[];
+
+// ─── Node Types ───────────────────────────────────────────────────────
+
+/** All pipeline node type identifiers. */
+export type PipelineNodeType =
+  | "data_loader"
+  | "viewport"
+  | "filter"
+  | "modify"
+  | "label_generator";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
-  load_structure: "Load Structure",
-  selection: "Selection",
-  set_atom: "Atom",
-  set_bond_source: "Bond Source",
-  set_bond: "Bond",
-  set_labels: "Labels",
-  set_vectors: "Vectors",
-  set_display: "Display",
-  set_cell_visibility: "Cell Visibility",
+  data_loader: "Data Loader",
+  viewport: "Viewport",
+  filter: "Filter",
+  modify: "Modify",
+  label_generator: "Labels",
 };
 
-// --- Node parameter interfaces ---
+// ─── Port Definitions Per Node Type ───────────────────────────────────
 
-export interface LoadStructureParams {
-  type: "load_structure";
+export interface NodePortConfig {
+  inputs: PortDefinition[];
+  outputs: PortDefinition[];
+}
+
+/** Static port definitions for each node type. */
+export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
+  data_loader: {
+    inputs: [],
+    outputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "bond", dataType: "bond", label: "Bond" },
+      { name: "cell", dataType: "cell", label: "Cell" },
+    ],
+  },
+  viewport: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "bond", dataType: "bond", label: "Bond" },
+      { name: "cell", dataType: "cell", label: "Cell" },
+      { name: "label", dataType: "label", label: "Label" },
+      { name: "mesh", dataType: "mesh", label: "Mesh" },
+    ],
+    outputs: [],
+  },
+  filter: {
+    inputs: [{ name: "in", dataType: "particle", label: "In" }],
+    outputs: [{ name: "out", dataType: "particle", label: "Out" }],
+  },
+  modify: {
+    inputs: [{ name: "in", dataType: "particle", label: "In" }],
+    outputs: [{ name: "out", dataType: "particle", label: "Out" }],
+  },
+  label_generator: {
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "label", dataType: "label", label: "Label" }],
+  },
+};
+
+/**
+ * For filter and modify nodes, the accepted input types.
+ * Their port dataType is dynamically resolved from the connected edge.
+ */
+export const GENERIC_NODE_ACCEPTS: Record<string, PipelineDataType[]> = {
+  filter: ["particle", "bond"],
+  modify: ["particle", "bond"],
+};
+
+// ─── Node Parameters ──────────────────────────────────────────────────
+
+export interface DataLoaderParams {
+  type: "data_loader";
   fileName: string | null;
   bondSource: BondSource;
-  trajectorySource: TrajectorySource;
 }
 
-export interface SelectionParams {
-  type: "selection";
-  query: string;
-}
-
-export interface SetAtomParams {
-  type: "set_atom";
-  scale: number;
-  opacity: number;
-}
-
-export interface SetBondSourceParams {
-  type: "set_bond_source";
-  source: BondSource;
-  vdwScale: number;
-}
-
-export interface SetBondParams {
-  type: "set_bond";
-  scale: number;
-  opacity: number;
-}
-
-export interface SetLabelsParams {
-  type: "set_labels";
-  source: LabelSource;
-  fileName: string | null;
-}
-
-export interface SetVectorsParams {
-  type: "set_vectors";
-  source: VectorSource;
-  scale: number;
-  fileName: string | null;
-}
-
-export interface SetDisplayParams {
-  type: "set_display";
+export interface ViewportParams {
+  type: "viewport";
   perspective: boolean;
   cellAxesVisible: boolean;
 }
 
-export interface SetCellVisibilityParams {
-  type: "set_cell_visibility";
-  cellVisible: boolean;
+export interface FilterParams {
+  type: "filter";
+  query: string;
+}
+
+export interface ModifyParams {
+  type: "modify";
+  scale: number;
+  opacity: number;
+}
+
+export interface LabelGeneratorParams {
+  type: "label_generator";
+  source: "element" | "resname" | "index";
 }
 
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
-  | LoadStructureParams
-  | SelectionParams
-  | SetAtomParams
-  | SetBondSourceParams
-  | SetBondParams
-  | SetLabelsParams
-  | SetVectorsParams
-  | SetDisplayParams
-  | SetCellVisibilityParams;
+  | DataLoaderParams
+  | ViewportParams
+  | FilterParams
+  | ModifyParams
+  | LabelGeneratorParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
   switch (type) {
-    case "load_structure":
-      return { type, fileName: null, bondSource: "structure", trajectorySource: "structure" };
-    case "selection":
-      return { type, query: "" };
-    case "set_atom":
-      return { type, scale: 1.0, opacity: 1.0 };
-    case "set_bond_source":
-      return { type, source: "structure", vdwScale: 0.6 };
-    case "set_bond":
-      return { type, scale: 1.0, opacity: 1.0 };
-    case "set_labels":
-      return { type, source: "none", fileName: null };
-    case "set_vectors":
-      return { type, source: "none", scale: 1.0, fileName: null };
-    case "set_display":
+    case "data_loader":
+      return { type, fileName: null, bondSource: "structure" };
+    case "viewport":
       return { type, perspective: false, cellAxesVisible: true };
-    case "set_cell_visibility":
-      return { type, cellVisible: true };
+    case "filter":
+      return { type, query: "" };
+    case "modify":
+      return { type, scale: 1.0, opacity: 1.0 };
+    case "label_generator":
+      return { type, source: "element" };
   }
 }
 
+// ─── Connection Validation ────────────────────────────────────────────
+
 /**
- * The accumulated visual state produced by executing the pipeline.
- * This is NOT the data itself (Snapshot/Frame), but instructions for the renderer.
+ * Check whether a connection between two ports is valid.
+ * For static ports: source dataType must match target dataType.
+ * For generic ports (filter/modify in): accepts particle or bond.
  */
-export interface RenderState {
-  bondSource: BondSource;
-  trajectorySource: TrajectorySource;
-  vdwScale: number;
-  atomScale: number;
-  atomOpacity: number;
-  bondScale: number;
-  bondOpacity: number;
-  labelSource: LabelSource;
-  vectorSource: VectorSource;
-  vectorScale: number;
-  perspective: boolean;
-  cellVisible: boolean;
-  cellAxesVisible: boolean;
-  bondsVisible: boolean;
-  // Per-atom overrides (null = use global value for all atoms)
-  atomScaleOverrides: Float32Array | null;
-  atomOpacityOverrides: Float32Array | null;
+export function canConnect(
+  sourceNodeType: PipelineNodeType,
+  sourceHandle: string | null,
+  targetNodeType: PipelineNodeType,
+  targetHandle: string | null,
+): boolean {
+  if (!sourceHandle || !targetHandle) return false;
+
+  const sourcePorts = NODE_PORTS[sourceNodeType];
+  const targetPorts = NODE_PORTS[targetNodeType];
+
+  const sourcePort = sourcePorts.outputs.find((p) => p.name === sourceHandle);
+  const targetPort = targetPorts.inputs.find((p) => p.name === targetHandle);
+
+  if (!sourcePort || !targetPort) return false;
+
+  // For generic nodes, check the accepted types list
+  const acceptedTypes = GENERIC_NODE_ACCEPTS[targetNodeType];
+  if (acceptedTypes) {
+    return acceptedTypes.includes(sourcePort.dataType);
+  }
+
+  return sourcePort.dataType === targetPort.dataType;
 }
 
-/** Default render state (matches current defaults in MeganeViewer.tsx). */
-export const DEFAULT_RENDER_STATE: RenderState = {
-  bondSource: "structure",
-  trajectorySource: "structure",
-  vdwScale: 0.6,
-  atomScale: 1.0,
-  atomOpacity: 1.0,
-  bondScale: 1.0,
-  bondOpacity: 1.0,
-  labelSource: "none",
-  vectorSource: "none",
-  vectorScale: 1.0,
-  perspective: false,
-  cellVisible: true,
-  cellAxesVisible: true,
-  bondsVisible: true,
-  atomScaleOverrides: null,
-  atomOpacityOverrides: null,
-};
+/**
+ * Resolve the effective data type for a generic node's input,
+ * based on what is actually connected to it.
+ */
+export function resolveGenericPortType(
+  sourceDataType: PipelineDataType,
+): PipelineDataType {
+  return sourceDataType;
+}
+
+// ─── Viewport State (output of pipeline execution) ────────────────────
 
 /**
- * JSON-serializable pipeline format for LLM generation and import/export.
- *
- * Example:
- * ```json
- * {
- *   "version": 1,
- *   "nodes": [
- *     { "id": "n1", "type": "load_structure", "bondSource": "distance", "position": { "x": 0, "y": 0 } },
- *     { "id": "n2", "type": "set_atom_scale", "scale": 1.5, "position": { "x": 0, "y": 200 } }
- *   ],
- *   "edges": [
- *     { "source": "n1", "target": "n2" }
- *   ]
- * }
- * ```
+ * The collected data for rendering, produced by ViewportNode.
  */
+export interface ViewportState {
+  particles: ParticleData[];
+  bonds: BondData[];
+  cells: CellData[];
+  labels: LabelData[];
+  meshes: MeshData[];
+  perspective: boolean;
+  cellAxesVisible: boolean;
+}
+
+export const DEFAULT_VIEWPORT_STATE: ViewportState = {
+  particles: [],
+  bonds: [],
+  cells: [],
+  labels: [],
+  meshes: [],
+  perspective: false,
+  cellAxesVisible: true,
+};
+
+// ─── Serialization Format ─────────────────────────────────────────────
+
 export interface SerializedPipeline {
-  version: 1;
-  nodes: Array<PipelineNodeParams & { id: string; position: { x: number; y: number }; enabled?: boolean }>;
-  edges: Array<{ source: string; target: string }>;
+  version: 2;
+  nodes: Array<
+    PipelineNodeParams & {
+      id: string;
+      position: { x: number; y: number };
+      enabled?: boolean;
+    }
+  >;
+  edges: Array<{
+    source: string;
+    target: string;
+    sourceHandle: string;
+    targetHandle: string;
+  }>;
 }

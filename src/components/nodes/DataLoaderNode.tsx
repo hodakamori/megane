@@ -1,16 +1,16 @@
 /**
- * Load Structure node.
- * First node in the pipeline — file upload, bond source, trajectory source.
- * Has output handle only (no input).
+ * Data Loader node.
+ * Source node in the pipeline — file upload, bond source selection.
+ * Outputs: particle, bond, cell (via typed handles).
  */
 
 import type { NodeProps, Node } from "@xyflow/react";
 import type { PipelineNodeData } from "../../pipeline/execute";
-import type { LoadStructureParams } from "../../pipeline/types";
+import type { DataLoaderParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
 import { smallBtnStyle, fileNameStyle, TabSelector } from "../ui";
-import type { BondSource, TrajectorySource } from "../../types";
+import type { BondSource } from "../../types";
 import { useRef, useCallback } from "react";
 
 const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf";
@@ -36,9 +36,9 @@ export function setStructureLoadHandler(handler: StructureLoadHandler | null) {
   _onStructureLoad = handler;
 }
 
-export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
+export function DataLoaderNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
-  const params = data.params as LoadStructureParams;
+  const params = data.params as DataLoaderParams;
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -70,7 +70,7 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
   }, []);
 
   return (
-    <NodeShell id={id} nodeType="load_structure" enabled={data.enabled} hasInput={false}>
+    <NodeShell id={id} nodeType="data_loader" enabled={data.enabled}>
       <div onDrop={handleDrop} onDragOver={handleDragOver}>
         {params.fileName ? (
           <div style={fileNameStyle}>{params.fileName}</div>
@@ -107,16 +107,6 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
         ]}
         value={params.bondSource}
         onChange={(v) => updateNodeParams(id, { bondSource: v })}
-      />
-
-      <div style={sectionLabelStyle}>Trajectory</div>
-      <TabSelector<TrajectorySource>
-        options={[
-          { value: "structure", label: "Structure" },
-          { value: "file", label: "File" },
-        ]}
-        value={params.trajectorySource}
-        onChange={(v) => updateNodeParams(id, { trajectorySource: v })}
       />
     </NodeShell>
   );
