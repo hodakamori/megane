@@ -28,7 +28,7 @@ export default defineConfig({
         items: [
           { text: "GitHub", link: "https://github.com/hodakamori/megane" },
           { text: "PyPI", link: "https://pypi.org/project/megane/" },
-          { text: "npm", link: "https://www.npmjs.com/package/megane" },
+          { text: "npm", link: "https://www.npmjs.com/package/megane-viewer" },
         ],
       },
     ],

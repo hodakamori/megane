@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "megane"
-version = "0.1.0"
+version = "0.1.1"
 description = "A fast, beautiful molecular viewer"
 requires-python = ">=3.10"
 license = "MIT"
@@ -53,3 +53,44 @@ include = ["python/megane/static/**", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
+
+[tool.bumpversion]
+current_version = "0.1.1"
+commit = false
+tag = false
+allow_dirty = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "crates/megane-core/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "crates/megane-python/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "crates/megane-wasm/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "python/megane/__init__.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "docs/scripts/prepare-notebooks.py"
+search = 'megane v{current_version}'
+replace = 'megane v{new_version}'

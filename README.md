@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/hodakamori/megane/actions/workflows/ci.yml"><img src="https://github.com/hodakamori/megane/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://pypi.org/project/megane/"><img src="https://img.shields.io/pypi/v/megane" alt="PyPI" /></a>
-  <a href="https://www.npmjs.com/package/megane"><img src="https://img.shields.io/npm/v/megane" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/megane-viewer"><img src="https://img.shields.io/npm/v/megane-viewer" alt="npm" /></a>
   <a href="https://github.com/hodakamori/megane/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
 </p>
 
@@ -16,7 +16,7 @@
   <a href="https://hodakamori.github.io/megane/">Docs</a> &middot;
   <a href="https://hodakamori.github.io/megane/getting-started">Getting Started</a> &middot;
   <a href="https://pypi.org/project/megane/">PyPI</a> &middot;
-  <a href="https://www.npmjs.com/package/megane">npm</a>
+  <a href="https://www.npmjs.com/package/megane-viewer">npm</a>
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@ pip install megane
 ### npm (for React embedding)
 
 ```bash
-npm install megane
+npm install megane-viewer
 ```
 
 ## Quick Start
@@ -75,7 +75,7 @@ megane serve  # upload from browser
 ### React
 
 ```tsx
-import { MeganeViewer, parseStructureFile } from "megane";
+import { MeganeViewer, parseStructureFile } from "megane-viewer";
 
 function App() {
   const [snapshot, setSnapshot] = useState(null);
