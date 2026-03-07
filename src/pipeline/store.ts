@@ -74,8 +74,18 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   onNodesChange: (changes) => {
+    // Prevent viewport nodes from being deleted (via keyboard Delete etc.)
+    const { nodes } = get();
+    const filtered = changes.filter((change) => {
+      if (change.type === "remove") {
+        const node = nodes.find((n) => n.id === change.id);
+        if (node?.type === "viewport") return false;
+      }
+      return true;
+    });
+    if (filtered.length === 0) return;
     set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes),
+      nodes: applyNodeChanges(filtered, state.nodes),
     }));
     get().execute();
   },
