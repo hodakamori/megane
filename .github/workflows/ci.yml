@@ -57,7 +57,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install package
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,trajectory]"
       - run: python -m pytest
 
   build:
