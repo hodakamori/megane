@@ -1,12 +1,9 @@
-<p align="center">
-  <img src="docs/public/logo.png" alt="megane logo" width="80" />
-</p>
+<h1 align="center">
+  <img src="docs/public/logo.png" alt="" width="32" />
+  megane
+</h1>
 
-<h1 align="center">megane</h1>
-
-<p align="center">
-  Desktop-grade molecular visualization. Right in your browser.
-</p>
+<p align="center">Desktop-grade molecular visualization. Right in your browser.</p>
 
 <p align="center">
   <a href="https://github.com/hodakamori/megane/actions/workflows/ci.yml"><img src="https://github.com/hodakamori/megane/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -23,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/hero.png" alt="megane screenshot" width="720" />
+  <img src="docs/public/screenshots/hero.png" alt="megane screenshot" width="640" />
 </p>
 
 ---
