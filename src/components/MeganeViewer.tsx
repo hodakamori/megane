@@ -1,27 +1,30 @@
 /**
  * Main megane viewer React component.
- * Combines Viewport, Sidebar, Timeline, Tooltip, MeasurementPanel, and AppearancePanel.
+ * Combines Viewport, PipelineEditor, Timeline, Tooltip, and MeasurementPanel.
+ * The pipeline store drives all appearance settings via RenderState.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
-import { Sidebar } from "./Sidebar";
-import type { BondConfig, TrajectoryConfig } from "./Sidebar";
-import { AppearancePanel } from "./AppearancePanel";
-import type { LabelConfig, VectorConfig } from "./AppearancePanel";
+import { PipelineEditor } from "./PipelineEditor";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { usePipelineStore } from "../pipeline/store";
+import { applyRenderState } from "../pipeline/apply";
+import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
+import { setLabelFileHandler } from "./nodes/SetLabelsNode";
+import { setVectorFileHandler, setDemoVectorsHandler } from "./nodes/SetVectorsNode";
 import type {
   Snapshot,
   Frame,
   HoverInfo,
   SelectionState,
   Measurement,
-  BondSource,
 } from "../types";
+import type { RenderState } from "../pipeline/types";
 
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
@@ -34,15 +37,12 @@ interface MeganeViewerProps {
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
   onUploadStructure: (file: File) => void;
-  mode: "streaming" | "local";
-  onToggleMode?: () => void;
-  pdbFileName: string | null;
-  bonds: BondConfig;
-  trajectory: TrajectoryConfig;
-  labels: LabelConfig;
-  vectors?: VectorConfig;
-  atomLabels?: string[] | null;
-  atomVectors?: Float32Array | null;
+  onBondSourceChange?: (source: string) => void;
+  onLabelSourceChange?: (source: string) => void;
+  onLoadLabelFile?: (file: File) => void;
+  onVectorSourceChange?: (source: string) => void;
+  onLoadVectorFile?: (file: File) => void;
+  onLoadDemoVectors?: () => void;
   width?: string | number;
   height?: string | number;
 }
@@ -58,74 +58,91 @@ export function MeganeViewer({
   onPlayPause,
   onFpsChange,
   onUploadStructure,
-  mode,
-  onToggleMode,
-  pdbFileName,
-  bonds,
-  trajectory,
-  labels,
-  vectors,
-  atomLabels,
-  atomVectors,
+  onBondSourceChange,
+  onLabelSourceChange,
+  onLoadLabelFile,
+  onVectorSourceChange,
+  onLoadVectorFile,
+  onLoadDemoVectors,
   width = "100%",
   height = "100%",
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
-  const [cellVisible, setCellVisible] = useState(true);
-  const [cellAxesVisible, setCellAxesVisible] = useState(true);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
-  // Auto-collapse panels on narrow viewports (mobile) to prevent
-  // degenerate frustum calculation when insets exceed viewport width
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(isNarrow);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(isNarrow);
-  const [atomScale, setAtomScale] = useState(1.0);
-  const [atomOpacity, setAtomOpacity] = useState(1.0);
-  const [bondScale, setBondScale] = useState(1.0);
-  const [bondOpacity, setBondOpacity] = useState(1.0);
-  const [vdwScale, setVdwScale] = useState(0.6);
-  const [perspective, setPerspective] = useState(false);
-  const [vectorScale, setVectorScale] = useState(1.0);
-  const vdwScaleRef = useRef(0.6);
-  const sidebarCollapsedRef = useRef(isNarrow);
-  const rightPanelCollapsedRef = useRef(isNarrow);
-  useEffect(() => { sidebarCollapsedRef.current = sidebarCollapsed; }, [sidebarCollapsed]);
-  useEffect(() => { rightPanelCollapsedRef.current = rightPanelCollapsed; }, [rightPanelCollapsed]);
+  const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
+  const pipelineCollapsedRef = useRef(isNarrow);
+  const prevRenderStateRef = useRef<RenderState | null>(null);
+
+  useEffect(() => {
+    pipelineCollapsedRef.current = pipelineCollapsed;
+  }, [pipelineCollapsed]);
+
+  // Subscribe to pipeline store's renderState
+  const renderState = usePipelineStore((s) => s.renderState);
+
+  // Wire up node event handlers
+  useEffect(() => {
+    setStructureLoadHandler((file) => onUploadStructure(file));
+    setLabelFileHandler((file) => onLoadLabelFile?.(file));
+    setVectorFileHandler((file) => onLoadVectorFile?.(file));
+    setDemoVectorsHandler(() => onLoadDemoVectors?.());
+    return () => {
+      setStructureLoadHandler(null);
+      setLabelFileHandler(null);
+      setVectorFileHandler(null);
+      setDemoVectorsHandler(null);
+    };
+  }, [onUploadStructure, onLoadLabelFile, onLoadVectorFile, onLoadDemoVectors]);
+
+  // Apply renderState changes to the renderer
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    applyRenderState(renderer, renderState, prevRenderStateRef.current);
+
+    // Notify parent about source changes for data management
+    const prev = prevRenderStateRef.current;
+    if (!prev || renderState.bondSource !== prev.bondSource) {
+      onBondSourceChange?.(renderState.bondSource);
+    }
+    if (!prev || renderState.labelSource !== prev.labelSource) {
+      onLabelSourceChange?.(renderState.labelSource);
+    }
+    if (!prev || renderState.vectorSource !== prev.vectorSource) {
+      onVectorSourceChange?.(renderState.vectorSource);
+    }
+
+    prevRenderStateRef.current = renderState;
+  }, [renderState, onBondSourceChange, onLabelSourceChange, onVectorSourceChange]);
+
+  // Per-frame bond recalculation for distance mode
+  useEffect(() => {
+    if (renderState.bondSource !== "distance") return;
+    if (!snapshot || !frame) return;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    const newBonds = inferBondsVdwJS(
+      frame.positions,
+      snapshot.elements,
+      snapshot.nAtoms,
+      renderState.vdwScale,
+    );
+    renderer.updateBonds(newBonds, null);
+  }, [frame, snapshot, renderState.bondSource, renderState.vdwScale]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
-    // Set initial view insets so fitToView() accounts for overlay panels
     renderer.setViewInsets(
-      sidebarCollapsedRef.current ? 0 : 252,      // 12px gap + 240px sidebar
-      rightPanelCollapsedRef.current ? 0 : 232,   // 12px gap + 220px panel
+      pipelineCollapsedRef.current ? 0 : 492, // 12px gap + 480px pipeline panel
+      0,
     );
-  }, []);
-
-  const handleResetView = useCallback(() => {
-    rendererRef.current?.resetView();
-  }, []);
-
-  const handleToggleCell = useCallback(() => {
-    setCellVisible((prev) => {
-      const next = !prev;
-      rendererRef.current?.setCellVisible(next);
-      return next;
-    });
-  }, []);
-
-  const handleToggleCellAxes = useCallback(() => {
-    setCellAxesVisible((prev) => {
-      const next = !prev;
-      rendererRef.current?.setCellAxesVisible(next);
-      return next;
-    });
-  }, []);
-
-  const handlePerspectiveChange = useCallback((enabled: boolean) => {
-    setPerspective(enabled);
-    rendererRef.current?.setPerspective(enabled);
+    // Apply initial render state
+    applyRenderState(renderer, usePipelineStore.getState().renderState, null);
+    prevRenderStateRef.current = usePipelineStore.getState().renderState;
   }, []);
 
   const handleAtomRightClick = useCallback((atomIndex: number) => {
@@ -147,137 +164,33 @@ export function MeganeViewer({
     if (m) setMeasurement(m);
   }, []);
 
-  const handleToggleSidebar = useCallback(() => {
-    setSidebarCollapsed((prev) => !prev);
+  const handleTogglePipeline = useCallback(() => {
+    setPipelineCollapsed((prev) => !prev);
   }, []);
 
-  const handleToggleRightPanel = useCallback(() => {
-    setRightPanelCollapsed((prev) => !prev);
-  }, []);
-
-  // Update view insets when overlay panels are toggled
+  // Update view insets when pipeline panel is toggled
   useEffect(() => {
     rendererRef.current?.setViewInsets(
-      sidebarCollapsed ? 0 : 252,      // 12px gap + 240px sidebar
-      rightPanelCollapsed ? 0 : 232,   // 12px gap + 220px panel
+      pipelineCollapsed ? 0 : 492,
+      0,
     );
-  }, [sidebarCollapsed, rightPanelCollapsed]);
-
-  const handleAtomScaleChange = useCallback((scale: number) => {
-    setAtomScale(scale);
-    rendererRef.current?.setAtomScale(scale);
-  }, []);
-
-  const handleAtomOpacityChange = useCallback((opacity: number) => {
-    setAtomOpacity(opacity);
-    rendererRef.current?.setAtomOpacity(opacity);
-  }, []);
-
-  const handleBondScaleChange = useCallback((scale: number) => {
-    setBondScale(scale);
-    rendererRef.current?.setBondScale(scale);
-  }, []);
-
-  const handleBondOpacityChange = useCallback((opacity: number) => {
-    setBondOpacity(opacity);
-    rendererRef.current?.setBondOpacity(opacity);
-  }, []);
-
-  const handleVdwScaleChange = useCallback((scale: number) => {
-    setVdwScale(scale);
-    vdwScaleRef.current = scale;
-    // Recalculate bonds immediately with new scale
-    if (bondSourceRef.current !== "distance") return;
-    const renderer = rendererRef.current;
-    if (!renderer || !snapshot) return;
-    const positions = frame?.positions ?? snapshot?.positions;
-    if (!positions) return;
-    const newBonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms, scale);
-    renderer.updateBonds(newBonds, null);
-  }, [snapshot, frame]);
-
-  const handleVectorScaleChange = useCallback((scale: number) => {
-    setVectorScale(scale);
-    rendererRef.current?.setVectorScale(scale);
-  }, []);
-
-  // Toggle bond visibility when bondSource changes to/from "none"
-  useEffect(() => {
-    rendererRef.current?.setBondsVisible(bonds.source !== "none");
-  }, [bonds.source]);
-
-  // Track current bond source for per-frame recalculation
-  const bondSourceRef = useRef<BondSource>(bonds.source);
-  useEffect(() => {
-    bondSourceRef.current = bonds.source;
-  }, [bonds.source]);
-
-  // Per-frame bond recalculation for distance mode
-  useEffect(() => {
-    if (bondSourceRef.current !== "distance") return;
-    if (!snapshot || !frame) return;
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-
-    const newBonds = inferBondsVdwJS(frame.positions, snapshot.elements, snapshot.nAtoms, vdwScaleRef.current);
-    renderer.updateBonds(newBonds, null);
-  }, [frame, snapshot]);
-
-  // Check if snapshot has a non-zero box
-  const hasCell =
-    snapshot?.box != null && snapshot.box.some((v) => v !== 0);
+  }, [pipelineCollapsed]);
 
   return (
     <div style={{ width, height, position: "relative", overflow: "hidden" }}>
       <Viewport
         snapshot={snapshot}
         frame={frame}
-        atomLabels={atomLabels}
-        atomVectors={atomVectors}
+        atomLabels={null}
+        atomVectors={null}
         onRendererReady={handleRendererReady}
         onHover={setHoverInfo}
         onAtomRightClick={handleAtomRightClick}
         onFrameUpdated={handleFrameUpdated}
       />
-      <Sidebar
-        mode={mode}
-        onToggleMode={onToggleMode}
-        structure={{
-          atomCount: snapshot?.nAtoms ?? 0,
-          fileName: pdbFileName,
-        }}
-        bonds={bonds}
-        trajectory={trajectory}
-        onUploadStructure={onUploadStructure}
-        onResetView={handleResetView}
-        hasCell={hasCell}
-        cellVisible={cellVisible}
-        onToggleCell={handleToggleCell}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={handleToggleSidebar}
-      />
-      <AppearancePanel
-        atomScale={atomScale}
-        onAtomScaleChange={handleAtomScaleChange}
-        atomOpacity={atomOpacity}
-        onAtomOpacityChange={handleAtomOpacityChange}
-        bondScale={bondScale}
-        onBondScaleChange={handleBondScaleChange}
-        bondOpacity={bondOpacity}
-        onBondOpacityChange={handleBondOpacityChange}
-        vdwScale={bonds.source === "distance" ? vdwScale : undefined}
-        onVdwScaleChange={bonds.source === "distance" ? handleVdwScaleChange : undefined}
-        labels={labels}
-        vectors={vectors}
-        vectorScale={vectorScale}
-        onVectorScaleChange={handleVectorScaleChange}
-        perspective={perspective}
-        onPerspectiveChange={handlePerspectiveChange}
-        hasCell={hasCell}
-        cellAxesVisible={cellAxesVisible}
-        onToggleCellAxes={handleToggleCellAxes}
-        collapsed={rightPanelCollapsed}
-        onToggleCollapse={handleToggleRightPanel}
+      <PipelineEditor
+        collapsed={pipelineCollapsed}
+        onToggleCollapse={handleTogglePipeline}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline

@@ -5,11 +5,9 @@
  *   - "local": parses structure files in-browser via WASM (no server needed)
  */
 
-import { StrictMode, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { StrictMode, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
-import type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
-import type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
@@ -25,12 +23,8 @@ async function uploadFiles(pdb: File, xtc?: File): Promise<void> {
   await fetch("/api/upload", { method: "POST", body: form });
 }
 
-/** True when the app is embedded inside an iframe (e.g. docs site). */
-const isEmbedded =
-  typeof window !== "undefined" && window.self !== window.top;
-
 function App() {
-  const [mode, setMode] = useState<DataMode>("local");
+  const [mode] = useState<DataMode>("local");
 
   // WebSocket data source (only active in streaming mode)
   const wsUrl =
@@ -50,7 +44,6 @@ function App() {
       const buffer = await resp.arrayBuffer();
       const file = new File([buffer], "caffeine_water_vibration.xtc");
       await local.loadXtc(file);
-      // Load demo vectors so arrows are visible by default
       local.loadDemoVectors();
     })().catch(() => {});
   }, []);
@@ -63,10 +56,6 @@ function App() {
     mode === "streaming" ? ws.currentFrame : local.currentFrame;
   const currentFrameRef =
     mode === "streaming" ? ws.currentFrameRef : local.currentFrameRef;
-
-  // Streaming mode file name tracking (client-side only)
-  const [streamPdbFileName, setStreamPdbFileName] = useState<string | null>(null);
-  const [streamXtcFileName, setStreamXtcFileName] = useState<string | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
@@ -116,8 +105,6 @@ function App() {
       setPlaying(false);
       if (mode === "streaming") {
         uploadFiles(file);
-        setStreamPdbFileName(file.name);
-        setStreamXtcFileName(null);
       } else {
         local.loadFile(file);
       }
@@ -125,84 +112,66 @@ function App() {
     [mode, local.loadFile],
   );
 
-  const handleUploadXtc = useCallback(
-    (xtc: File) => {
-      setPlaying(false);
+  const handleBondSourceChange = useCallback(
+    (source: string) => {
       if (mode === "streaming") {
-        uploadFiles(undefined as unknown as File, xtc);
-        setStreamXtcFileName(xtc.name);
+        ws.setBondSource(source as "structure" | "file" | "distance" | "none");
       } else {
-        local.loadXtc(xtc);
+        local.setBondSource(source as "structure" | "file" | "distance" | "none");
       }
     },
-    [mode, local.loadXtc],
+    [mode, ws.setBondSource, local.setBondSource],
   );
 
-  const handleModeToggle = useCallback(() => {
-    setPlaying(false);
-    setMode((prev) => (prev === "streaming" ? "local" : "streaming"));
-  }, []);
+  const handleLabelSourceChange = useCallback(
+    (source: string) => {
+      if (mode === "streaming") {
+        ws.setLabelSource(source as "none" | "structure" | "file");
+      } else {
+        local.setLabelSource(source as "none" | "structure" | "file");
+      }
+    },
+    [mode, ws.setLabelSource, local.setLabelSource],
+  );
 
-  const pdbFileName = mode === "streaming"
-    ? streamPdbFileName || ws.meta?.pdbName || null
-    : local.pdbFileName;
+  const handleLoadLabelFile = useCallback(
+    (file: File) => {
+      if (mode === "streaming") {
+        ws.loadLabelFile(file);
+      } else {
+        local.loadLabelFile(file);
+      }
+    },
+    [mode, ws.loadLabelFile, local.loadLabelFile],
+  );
 
-  const xtcFileName = mode === "streaming"
-    ? streamXtcFileName || ws.meta?.xtcName || null
-    : local.xtcFileName;
+  const handleVectorSourceChange = useCallback(
+    (source: string) => {
+      if (mode === "streaming") {
+        ws.setVectorSource(source as "none" | "file" | "demo");
+      } else {
+        local.setVectorSource(source as "none" | "file" | "demo");
+      }
+    },
+    [mode, ws.setVectorSource, local.setVectorSource],
+  );
 
-  const bondConfig: BondConfig = useMemo(() => ({
-    source: mode === "streaming" ? ws.bondSource : local.bondSource,
-    onSourceChange: mode === "streaming" ? ws.setBondSource : local.setBondSource,
-    onUploadFile: mode === "streaming" ? ws.loadBondFile : local.loadBondFile,
-    fileName: mode === "streaming" ? ws.bondFileName : local.bondFileName,
-    count: snapshot?.nBonds ?? 0,
-  }), [
-    mode, snapshot?.nBonds,
-    ws.bondSource, ws.setBondSource, ws.loadBondFile, ws.bondFileName,
-    local.bondSource, local.setBondSource, local.loadBondFile, local.bondFileName,
-  ]);
+  const handleLoadVectorFile = useCallback(
+    (file: File) => {
+      if (mode === "streaming") {
+        ws.loadVectorFile(file);
+      } else {
+        local.loadVectorFile(file);
+      }
+    },
+    [mode, ws.loadVectorFile, local.loadVectorFile],
+  );
 
-  const trajectoryConfig: TrajectoryConfig = useMemo(() => ({
-    source: mode === "streaming" ? ws.trajectorySource : local.trajectorySource,
-    onSourceChange: mode === "streaming" ? ws.setTrajectorySource : local.setTrajectorySource,
-    hasStructureFrames: mode === "streaming" ? ws.hasStructureFrames : local.hasStructureFrames,
-    hasFileFrames: mode === "streaming" ? ws.hasFileFrames : local.hasFileFrames,
-    fileName: xtcFileName,
-    totalFrames: meta?.nFrames ?? 0,
-    timestepPs: meta?.timestepPs ?? 0,
-    onUploadXtc: handleUploadXtc,
-  }), [
-    mode, xtcFileName, meta?.nFrames, meta?.timestepPs, handleUploadXtc,
-    ws.trajectorySource, ws.setTrajectorySource, ws.hasStructureFrames, ws.hasFileFrames,
-    local.trajectorySource, local.setTrajectorySource, local.hasStructureFrames, local.hasFileFrames,
-  ]);
-
-  const labelConfig: LabelConfig = useMemo(() => ({
-    source: mode === "streaming" ? ws.labelSource : local.labelSource,
-    onSourceChange: mode === "streaming" ? ws.setLabelSource : local.setLabelSource,
-    onUploadFile: mode === "streaming" ? ws.loadLabelFile : local.loadLabelFile,
-    fileName: mode === "streaming" ? ws.labelFileName : local.labelFileName,
-    hasStructureLabels: mode === "streaming" ? ws.hasStructureLabels : local.hasStructureLabels,
-  }), [
-    mode,
-    ws.labelSource, ws.setLabelSource, ws.loadLabelFile, ws.labelFileName, ws.hasStructureLabels,
-    local.labelSource, local.setLabelSource, local.loadLabelFile, local.labelFileName, local.hasStructureLabels,
-  ]);
-
-  const vectorConfig: VectorConfig = useMemo(() => ({
-    source: mode === "streaming" ? ws.vectorSource : local.vectorSource,
-    onSourceChange: mode === "streaming" ? ws.setVectorSource : local.setVectorSource,
-    onUploadFile: mode === "streaming" ? ws.loadVectorFile : local.loadVectorFile,
-    fileName: mode === "streaming" ? ws.vectorFileName : local.vectorFileName,
-  }), [
-    mode,
-    ws.vectorSource, ws.setVectorSource, ws.loadVectorFile, ws.vectorFileName,
-    local.vectorSource, local.setVectorSource, local.loadVectorFile, local.vectorFileName,
-  ]);
-
-  const atomLabels = mode === "streaming" ? ws.atomLabels : local.atomLabels;
-  const atomVectors = mode === "streaming" ? ws.atomVectors : local.atomVectors;
+  const handleLoadDemoVectors = useCallback(() => {
+    if (mode === "local") {
+      local.loadDemoVectors();
+    }
+  }, [mode, local.loadDemoVectors]);
 
   return (
     <MeganeViewer
@@ -216,15 +185,12 @@ function App() {
       onPlayPause={handlePlayPause}
       onFpsChange={handleFpsChange}
       onUploadStructure={handleUploadStructure}
-      mode={mode}
-      onToggleMode={isEmbedded ? undefined : handleModeToggle}
-      pdbFileName={pdbFileName}
-      bonds={bondConfig}
-      trajectory={trajectoryConfig}
-      labels={labelConfig}
-      vectors={vectorConfig}
-      atomLabels={atomLabels}
-      atomVectors={atomVectors}
+      onBondSourceChange={handleBondSourceChange}
+      onLabelSourceChange={handleLabelSourceChange}
+      onLoadLabelFile={handleLoadLabelFile}
+      onVectorSourceChange={handleVectorSourceChange}
+      onLoadVectorFile={handleLoadVectorFile}
+      onLoadDemoVectors={handleLoadDemoVectors}
     />
   );
 }
