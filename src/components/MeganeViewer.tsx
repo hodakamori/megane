@@ -85,6 +85,14 @@ export function MeganeViewer({
   // Push snapshot to pipeline store for selection queries
   useEffect(() => {
     setSnapshot(snapshot);
+    // Viewport's loadSnapshot (child effect) resets per-atom overrides;
+    // re-apply pipeline viewport state immediately after execution
+    const renderer = rendererRef.current;
+    if (renderer) {
+      const vs = usePipelineStore.getState().viewportState;
+      applyViewportState(renderer, vs, null);
+      prevViewportStateRef.current = vs;
+    }
   }, [snapshot, setSnapshot]);
 
   // Wire up node event handlers
