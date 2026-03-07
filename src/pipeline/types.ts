@@ -17,6 +17,21 @@ export type PipelineNodeType =
   | "set_display"
   | "set_cell_visibility";
 
+/** Selection nodes can only connect to these target node types. */
+export const SELECTION_VALID_TARGETS: ReadonlySet<PipelineNodeType> = new Set([
+  "selection",
+  "set_atom",
+]);
+
+/** Check whether a connection from sourceType to targetType is valid. */
+export function canConnect(sourceType: PipelineNodeType, targetType: PipelineNodeType): boolean {
+  // load_structure has no input
+  if (targetType === "load_structure") return false;
+  // selection output is only meaningful for selection and set_atom
+  if (sourceType === "selection") return SELECTION_VALID_TARGETS.has(targetType);
+  return true;
+}
+
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   load_structure: "Load Structure",
