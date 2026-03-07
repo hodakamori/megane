@@ -8,11 +8,9 @@ import type { BondSource, TrajectorySource, LabelSource, VectorSource } from "..
 /** All possible pipeline node type identifiers. */
 export type PipelineNodeType =
   | "load_structure"
-  | "set_atom_scale"
-  | "set_atom_opacity"
+  | "set_atom"
   | "set_bond_source"
-  | "set_bond_scale"
-  | "set_bond_opacity"
+  | "set_bond"
   | "set_labels"
   | "set_vectors"
   | "set_display"
@@ -21,11 +19,9 @@ export type PipelineNodeType =
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   load_structure: "Load Structure",
-  set_atom_scale: "Atom Scale",
-  set_atom_opacity: "Atom Opacity",
+  set_atom: "Atom",
   set_bond_source: "Bond Source",
-  set_bond_scale: "Bond Scale",
-  set_bond_opacity: "Bond Opacity",
+  set_bond: "Bond",
   set_labels: "Labels",
   set_vectors: "Vectors",
   set_display: "Display",
@@ -41,13 +37,9 @@ export interface LoadStructureParams {
   trajectorySource: TrajectorySource;
 }
 
-export interface SetAtomScaleParams {
-  type: "set_atom_scale";
+export interface SetAtomParams {
+  type: "set_atom";
   scale: number;
-}
-
-export interface SetAtomOpacityParams {
-  type: "set_atom_opacity";
   opacity: number;
 }
 
@@ -57,13 +49,9 @@ export interface SetBondSourceParams {
   vdwScale: number;
 }
 
-export interface SetBondScaleParams {
-  type: "set_bond_scale";
+export interface SetBondParams {
+  type: "set_bond";
   scale: number;
-}
-
-export interface SetBondOpacityParams {
-  type: "set_bond_opacity";
   opacity: number;
 }
 
@@ -94,11 +82,9 @@ export interface SetCellVisibilityParams {
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
-  | SetAtomScaleParams
-  | SetAtomOpacityParams
+  | SetAtomParams
   | SetBondSourceParams
-  | SetBondScaleParams
-  | SetBondOpacityParams
+  | SetBondParams
   | SetLabelsParams
   | SetVectorsParams
   | SetDisplayParams
@@ -109,16 +95,12 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
   switch (type) {
     case "load_structure":
       return { type, fileName: null, bondSource: "structure", trajectorySource: "structure" };
-    case "set_atom_scale":
-      return { type, scale: 1.0 };
-    case "set_atom_opacity":
-      return { type, opacity: 1.0 };
+    case "set_atom":
+      return { type, scale: 1.0, opacity: 1.0 };
     case "set_bond_source":
       return { type, source: "structure", vdwScale: 0.6 };
-    case "set_bond_scale":
-      return { type, scale: 1.0 };
-    case "set_bond_opacity":
-      return { type, opacity: 1.0 };
+    case "set_bond":
+      return { type, scale: 1.0, opacity: 1.0 };
     case "set_labels":
       return { type, source: "none", fileName: null };
     case "set_vectors":

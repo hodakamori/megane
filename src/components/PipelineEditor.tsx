@@ -19,10 +19,8 @@ import type { PipelineNodeType } from "../pipeline/types";
 import { NODE_TYPE_LABELS } from "../pipeline/types";
 import { LoadStructureNode } from "./nodes/LoadStructureNode";
 import {
-  SetAtomScaleNode,
-  SetAtomOpacityNode,
-  SetBondScaleNode,
-  SetBondOpacityNode,
+  SetAtomNode,
+  SetBondNode,
 } from "./nodes/SliderNode";
 import { SetBondSourceNode } from "./nodes/SetBondSourceNode";
 import { SetLabelsNode } from "./nodes/SetLabelsNode";
@@ -32,11 +30,9 @@ import { SetCellVisibilityNode } from "./nodes/SetCellVisibilityNode";
 
 const nodeTypes = {
   load_structure: LoadStructureNode,
-  set_atom_scale: SetAtomScaleNode,
-  set_atom_opacity: SetAtomOpacityNode,
+  set_atom: SetAtomNode,
   set_bond_source: SetBondSourceNode,
-  set_bond_scale: SetBondScaleNode,
-  set_bond_opacity: SetBondOpacityNode,
+  set_bond: SetBondNode,
   set_labels: SetLabelsNode,
   set_vectors: SetVectorsNode,
   set_display: SetDisplayNode,
@@ -44,11 +40,9 @@ const nodeTypes = {
 };
 
 const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
-  "set_atom_scale",
-  "set_atom_opacity",
+  "set_atom",
   "set_bond_source",
-  "set_bond_scale",
-  "set_bond_opacity",
+  "set_bond",
   "set_labels",
   "set_vectors",
   "set_display",

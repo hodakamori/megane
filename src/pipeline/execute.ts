@@ -62,10 +62,8 @@ function applyNode(state: RenderState, params: PipelineNodeParams): RenderState 
         bondSource: params.bondSource,
         trajectorySource: params.trajectorySource,
       };
-    case "set_atom_scale":
-      return { ...state, atomScale: params.scale };
-    case "set_atom_opacity":
-      return { ...state, atomOpacity: params.opacity };
+    case "set_atom":
+      return { ...state, atomScale: params.scale, atomOpacity: params.opacity };
     case "set_bond_source":
       return {
         ...state,
@@ -73,10 +71,8 @@ function applyNode(state: RenderState, params: PipelineNodeParams): RenderState 
         bondsVisible: params.source !== "none",
         vdwScale: params.vdwScale,
       };
-    case "set_bond_scale":
-      return { ...state, bondScale: params.scale };
-    case "set_bond_opacity":
-      return { ...state, bondOpacity: params.opacity };
+    case "set_bond":
+      return { ...state, bondScale: params.scale, bondOpacity: params.opacity };
     case "set_labels":
       return { ...state, labelSource: params.source };
     case "set_vectors":
@@ -99,8 +95,37 @@ function applyNode(state: RenderState, params: PipelineNodeParams): RenderState 
 }
 
 /**
+ * Compute the set of node IDs reachable from any load_structure node via BFS.
+ */
+function reachableFromSources(nodes: Node<PipelineNodeData>[], edges: Edge[]): Set<string> {
+  const adjacency = new Map<string, string[]>();
+  for (const node of nodes) adjacency.set(node.id, []);
+  for (const edge of edges) adjacency.get(edge.source)?.push(edge.target);
+
+  const reachable = new Set<string>();
+  const queue: string[] = [];
+  for (const node of nodes) {
+    if (node.data.params.type === "load_structure") {
+      reachable.add(node.id);
+      queue.push(node.id);
+    }
+  }
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const next of adjacency.get(current) ?? []) {
+      if (!reachable.has(next)) {
+        reachable.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return reachable;
+}
+
+/**
  * Execute the pipeline by topologically sorting the graph
  * and folding node parameters into a RenderState.
+ * Only nodes reachable from load_structure are executed.
  * Disabled nodes are skipped.
  */
 export function executePipeline(
@@ -109,10 +134,12 @@ export function executePipeline(
 ): RenderState {
   const sortedIds = topologicalSort(nodes, edges);
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const reachable = reachableFromSources(nodes, edges);
 
   let state = { ...DEFAULT_RENDER_STATE };
 
   for (const id of sortedIds) {
+    if (!reachable.has(id)) continue;
     const node = nodeMap.get(id);
     if (!node) continue;
     const data = node.data;

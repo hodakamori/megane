@@ -11,11 +11,9 @@ import { defaultParams } from "./types";
 
 const VALID_NODE_TYPES: Set<string> = new Set([
   "load_structure",
-  "set_atom_scale",
-  "set_atom_opacity",
+  "set_atom",
   "set_bond_source",
-  "set_bond_scale",
-  "set_bond_opacity",
+  "set_bond",
   "set_labels",
   "set_vectors",
   "set_display",

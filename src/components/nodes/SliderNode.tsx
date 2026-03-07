@@ -1,6 +1,7 @@
 /**
- * Reusable slider-based node component.
- * Used for atom scale, atom opacity, bond scale, bond opacity, etc.
+ * Reusable slider-based node components.
+ * createSliderNode: single slider (e.g. vector scale)
+ * createDualSliderNode: two sliders for scale + opacity
  */
 
 import type { NodeProps, Node } from "@xyflow/react";
@@ -25,6 +26,13 @@ const valueStyle: React.CSSProperties = {
   color: "#3b82f6",
   minWidth: 36,
   textAlign: "right",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 500,
+  color: "#64748b",
+  marginBottom: 2,
 };
 
 interface SliderNodeConfig {
@@ -63,38 +71,77 @@ export function createSliderNode(config: SliderNodeConfig) {
   };
 }
 
-export const SetAtomScaleNode = createSliderNode({
-  nodeType: "set_atom_scale",
-  paramKey: "scale",
-  min: 0.1,
-  max: 2.0,
-  step: 0.01,
-  format: (v) => v.toFixed(2),
+interface DualSliderConfig {
+  nodeType: PipelineNodeType;
+  scaleMin: number;
+  scaleMax: number;
+  scaleStep: number;
+  scaleFormat: (value: number) => string;
+}
+
+export function createDualSliderNode(config: DualSliderConfig) {
+  return function DualSliderNodeComponent({ id, data }: NodeProps<Node<PipelineNodeData>>) {
+    const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params = data.params as any;
+    const scale = params.scale as number;
+    const opacity = params.opacity as number;
+
+    return (
+      <NodeShell id={id} nodeType={config.nodeType} enabled={data.enabled}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div>
+            <div style={labelStyle}>Scale</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="range"
+                min={config.scaleMin}
+                max={config.scaleMax}
+                step={config.scaleStep}
+                value={scale}
+                onChange={(e) =>
+                  updateNodeParams(id, { scale: parseFloat(e.target.value) })
+                }
+                style={sliderStyle}
+              />
+              <span style={valueStyle}>{config.scaleFormat(scale)}</span>
+            </div>
+          </div>
+          <div>
+            <div style={labelStyle}>Opacity</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={opacity}
+                onChange={(e) =>
+                  updateNodeParams(id, { opacity: parseFloat(e.target.value) })
+                }
+                style={sliderStyle}
+              />
+              <span style={valueStyle}>{`${Math.round(opacity * 100)}%`}</span>
+            </div>
+          </div>
+        </div>
+      </NodeShell>
+    );
+  };
+}
+
+export const SetAtomNode = createDualSliderNode({
+  nodeType: "set_atom",
+  scaleMin: 0.1,
+  scaleMax: 2.0,
+  scaleStep: 0.01,
+  scaleFormat: (v) => v.toFixed(2),
 });
 
-export const SetAtomOpacityNode = createSliderNode({
-  nodeType: "set_atom_opacity",
-  paramKey: "opacity",
-  min: 0,
-  max: 1,
-  step: 0.01,
-  format: (v) => `${Math.round(v * 100)}%`,
-});
-
-export const SetBondScaleNode = createSliderNode({
-  nodeType: "set_bond_scale",
-  paramKey: "scale",
-  min: 0.1,
-  max: 3.0,
-  step: 0.01,
-  format: (v) => v.toFixed(2),
-});
-
-export const SetBondOpacityNode = createSliderNode({
-  nodeType: "set_bond_opacity",
-  paramKey: "opacity",
-  min: 0,
-  max: 1,
-  step: 0.01,
-  format: (v) => `${Math.round(v * 100)}%`,
+export const SetBondNode = createDualSliderNode({
+  nodeType: "set_bond",
+  scaleMin: 0.1,
+  scaleMax: 3.0,
+  scaleStep: 0.01,
+  scaleFormat: (v) => v.toFixed(2),
 });
