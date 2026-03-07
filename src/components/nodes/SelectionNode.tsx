@@ -3,7 +3,7 @@
  * Allows users to filter atoms using Python-like query expressions.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { NodeProps, Node } from "@xyflow/react";
 import type { PipelineNodeData } from "../../pipeline/execute";
 import type { SelectionParams } from "../../pipeline/types";
@@ -49,6 +49,11 @@ export function SelectionNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const params = data.params as SelectionParams;
   const [localQuery, setLocalQuery] = useState(params.query);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync local state when store changes externally (undo/redo, deserialization)
+  useEffect(() => {
+    setLocalQuery(params.query);
+  }, [params.query]);
 
   const handleCommit = useCallback(() => {
     const result = validateQuery(localQuery);
