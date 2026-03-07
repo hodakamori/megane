@@ -13,10 +13,11 @@ import {
   Background,
   BackgroundVariant,
 } from "@xyflow/react";
+import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
 import type { PipelineNodeType } from "../pipeline/types";
-import { NODE_TYPE_LABELS } from "../pipeline/types";
+import { NODE_TYPE_LABELS, canConnect } from "../pipeline/types";
 import { LoadStructureNode } from "./nodes/LoadStructureNode";
 import {
   SetAtomNode,
@@ -131,6 +132,64 @@ function PipelineEditorInner({
   const addNode = usePipelineStore((s) => s.addNode);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+
+  // Connection validation: block invalid connections during drag
+  const isValidConnection = useCallback(
+    (connection: Connection | { source: string; target: string }) => {
+      if (connection.source === connection.target) return false;
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
+      if (!sourceNode?.type || !targetNode?.type) return false;
+      return canConnect(
+        sourceNode.type as PipelineNodeType,
+        targetNode.type as PipelineNodeType,
+      );
+    },
+    [nodes],
+  );
+
+  // Dim incompatible nodes while dragging a connection
+  const styledNodes = useMemo(() => {
+    if (!connectingFrom) return nodes;
+    const sourceNode = nodes.find((n) => n.id === connectingFrom);
+    if (!sourceNode?.type) return nodes;
+    return nodes.map((n) => {
+      const isValid =
+        n.id === connectingFrom ||
+        canConnect(sourceNode.type as PipelineNodeType, n.type as PipelineNodeType);
+      return {
+        ...n,
+        style: { ...n.style, opacity: isValid ? 1 : 0.3, transition: "opacity 0.15s" },
+      };
+    });
+  }, [nodes, connectingFrom]);
+
+  // Color edges: orange for selection source, grey otherwise
+  const styledEdges = useMemo(() => {
+    return edges.map((edge) => {
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      const isSelectionEdge = sourceNode?.type === "selection";
+      return {
+        ...edge,
+        style: {
+          stroke: isSelectionEdge ? "#f59e0b" : "#94a3b8",
+          strokeWidth: 2,
+        },
+      };
+    });
+  }, [edges, nodes]);
+
+  const onConnectStart = useCallback(
+    (_: unknown, params: { nodeId: string | null }) => {
+      setConnectingFrom(params.nodeId);
+    },
+    [],
+  );
+
+  const onConnectEnd = useCallback(() => {
+    setConnectingFrom(null);
+  }, []);
 
   const handleAddNode = useCallback(
     (type: PipelineNodeType) => {
@@ -233,11 +292,14 @@ function PipelineEditorInner({
 
       <div style={{ flex: 1, position: "relative" }}>
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={styledNodes}
+          edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
+          isValidConnection={isValidConnection}
           nodeTypes={memoizedNodeTypes}
           fitView
           fitViewOptions={{ padding: 1.2, maxZoom: 0.65 }}

@@ -9,10 +9,10 @@ import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData } from "./execute";
 import type { Snapshot } from "../types";
 import type { PipelineNodeType, RenderState, SerializedPipeline } from "./types";
-import { defaultParams, DEFAULT_RENDER_STATE } from "./types";
+import { defaultParams, DEFAULT_RENDER_STATE, canConnect } from "./types";
 import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
-import { createDefaultPipeline } from "./defaults";
+import { createDefaultPipeline, createDemoPipeline } from "./defaults";
 
 let nextNodeId = 1;
 
@@ -54,7 +54,9 @@ export interface PipelineStore {
   reset: () => void;
 }
 
-const defaultState = createDefaultPipeline();
+const defaultState = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
+  ? createDemoPipeline()
+  : createDefaultPipeline();
 
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
@@ -87,6 +89,13 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   onConnect: (connection) => {
+    // Validate connection before adding edge
+    const { nodes } = get();
+    const sourceNode = nodes.find((n) => n.id === connection.source);
+    const targetNode = nodes.find((n) => n.id === connection.target);
+    if (!sourceNode?.type || !targetNode?.type) return;
+    if (!canConnect(sourceNode.type as PipelineNodeType, targetNode.type as PipelineNodeType)) return;
+
     set((state) => ({
       edges: addEdge(
         { ...connection, id: `e-${connection.source}-${connection.target}` },

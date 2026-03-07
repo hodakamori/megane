@@ -65,13 +65,26 @@ const bodyStyle: React.CSSProperties = {
   padding: "8px 10px",
 };
 
-const handleStyle: React.CSSProperties = {
+const baseHandleStyle: React.CSSProperties = {
   width: 8,
   height: 8,
-  background: "#3b82f6",
   border: "2px solid white",
   boxShadow: "0 0 2px rgba(0,0,0,0.2)",
 };
+
+function getHandleStyle(
+  nodeType: PipelineNodeType,
+  handleType: "source" | "target",
+): React.CSSProperties {
+  const blue = "#3b82f6";
+  const orange = "#f59e0b";
+  let color = blue;
+  // selection output carries selection context → orange
+  if (nodeType === "selection" && handleType === "source") color = orange;
+  // selection and set_atom inputs accept selection context → orange
+  if ((nodeType === "selection" || nodeType === "set_atom") && handleType === "target") color = orange;
+  return { ...baseHandleStyle, background: color };
+}
 
 export function NodeShell({
   id,
@@ -90,7 +103,7 @@ export function NodeShell({
         <Handle
           type="target"
           position={Position.Top}
-          style={handleStyle}
+          style={getHandleStyle(nodeType, "target")}
         />
       )}
       <div style={headerStyle}>
@@ -120,7 +133,7 @@ export function NodeShell({
         <Handle
           type="source"
           position={Position.Bottom}
-          style={handleStyle}
+          style={getHandleStyle(nodeType, "source")}
         />
       )}
     </div>
