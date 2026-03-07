@@ -1,20 +1,18 @@
 /**
  * Shared node shell for all pipeline nodes.
  * Renders header with title, enable/disable toggle, delete button,
- * and input/output handles.
+ * and typed input/output handles with color-coded indicators.
  */
 
 import { Handle, Position } from "@xyflow/react";
-import type { PipelineNodeType } from "../../pipeline/types";
-import { NODE_TYPE_LABELS } from "../../pipeline/types";
+import type { PipelineNodeType, PortDefinition } from "../../pipeline/types";
+import { NODE_TYPE_LABELS, NODE_PORTS, DATA_TYPE_COLORS } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 
 interface NodeShellProps {
   id: string;
   nodeType: PipelineNodeType;
   enabled: boolean;
-  hasInput?: boolean;
-  hasOutput?: boolean;
   children: React.ReactNode;
 }
 
@@ -72,40 +70,61 @@ const baseHandleStyle: React.CSSProperties = {
   boxShadow: "0 0 2px rgba(0,0,0,0.2)",
 };
 
-function getHandleStyle(
-  nodeType: PipelineNodeType,
-  handleType: "source" | "target",
-): React.CSSProperties {
-  const blue = "#3b82f6";
-  const orange = "#f59e0b";
-  let color = blue;
-  // selection output carries selection context → orange
-  if (nodeType === "selection" && handleType === "source") color = orange;
-  // selection and set_atom inputs accept selection context → orange
-  if ((nodeType === "selection" || nodeType === "set_atom") && handleType === "target") color = orange;
-  return { ...baseHandleStyle, background: color };
+const handleLabelStyle: React.CSSProperties = {
+  position: "absolute",
+  fontSize: 8,
+  color: "#94a3b8",
+  whiteSpace: "nowrap",
+  pointerEvents: "none",
+};
+
+function getHandleColor(port: PortDefinition): string {
+  return DATA_TYPE_COLORS[port.dataType];
 }
 
-export function NodeShell({
-  id,
-  nodeType,
-  enabled,
-  hasInput = true,
-  hasOutput = true,
-  children,
-}: NodeShellProps) {
+/**
+ * Compute handle positions evenly distributed across the node width.
+ * Returns a percentage (0-100) for the `left` CSS property.
+ */
+function getHandlePosition(index: number, total: number): string {
+  if (total === 1) return "50%";
+  const step = 80 / (total - 1); // distribute across 10%-90%
+  return `${10 + step * index}%`;
+}
+
+export function NodeShell({ id, nodeType, enabled, children }: NodeShellProps) {
   const toggleNode = usePipelineStore((s) => s.toggleNode);
   const removeNode = usePipelineStore((s) => s.removeNode);
+  const ports = NODE_PORTS[nodeType];
 
   return (
     <div style={enabled ? nodeStyle : disabledStyle}>
-      {hasInput && (
+      {/* Input handles */}
+      {ports.inputs.map((port, i) => (
         <Handle
+          key={`in-${port.name}`}
           type="target"
           position={Position.Top}
-          style={getHandleStyle(nodeType, "target")}
-        />
-      )}
+          id={port.name}
+          style={{
+            ...baseHandleStyle,
+            background: getHandleColor(port),
+            left: getHandlePosition(i, ports.inputs.length),
+          }}
+        >
+          <span
+            style={{
+              ...handleLabelStyle,
+              top: -14,
+              left: "50%",
+              transform: "translateX(-50%)",
+            }}
+          >
+            {port.label}
+          </span>
+        </Handle>
+      ))}
+
       <div style={headerStyle}>
         <span style={titleStyle}>{NODE_TYPE_LABELS[nodeType]}</span>
         <button
@@ -118,7 +137,7 @@ export function NodeShell({
         >
           {enabled ? "\u25C9" : "\u25CB"}
         </button>
-        {nodeType !== "load_structure" && (
+        {nodeType !== "data_loader" && (
           <button
             onClick={() => removeNode(id)}
             style={iconBtnStyle}
@@ -129,13 +148,32 @@ export function NodeShell({
         )}
       </div>
       <div style={bodyStyle}>{children}</div>
-      {hasOutput && (
+
+      {/* Output handles */}
+      {ports.outputs.map((port, i) => (
         <Handle
+          key={`out-${port.name}`}
           type="source"
           position={Position.Bottom}
-          style={getHandleStyle(nodeType, "source")}
-        />
-      )}
+          id={port.name}
+          style={{
+            ...baseHandleStyle,
+            background: getHandleColor(port),
+            left: getHandlePosition(i, ports.outputs.length),
+          }}
+        >
+          <span
+            style={{
+              ...handleLabelStyle,
+              bottom: -14,
+              left: "50%",
+              transform: "translateX(-50%)",
+            }}
+          >
+            {port.label}
+          </span>
+        </Handle>
+      ))}
     </div>
   );
 }

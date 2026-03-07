@@ -1,7 +1,6 @@
 /**
  * Pipeline serialization / deserialization.
- * Converts between xyflow nodes/edges and the JSON format used for
- * LLM generation and import/export.
+ * Converts between xyflow nodes/edges and the JSON format (version 2).
  */
 
 import type { Node, Edge } from "@xyflow/react";
@@ -10,15 +9,11 @@ import type { SerializedPipeline, PipelineNodeType } from "./types";
 import { defaultParams } from "./types";
 
 const VALID_NODE_TYPES: Set<string> = new Set([
-  "load_structure",
-  "selection",
-  "set_atom",
-  "set_bond_source",
-  "set_bond",
-  "set_labels",
-  "set_vectors",
-  "set_display",
-  "set_cell_visibility",
+  "data_loader",
+  "viewport",
+  "filter",
+  "modify",
+  "label_generator",
 ]);
 
 /**
@@ -29,7 +24,7 @@ export function serializePipeline(
   edges: Edge[],
 ): SerializedPipeline {
   return {
-    version: 1,
+    version: 2,
     nodes: nodes.map((n) => ({
       ...n.data.params,
       id: n.id,
@@ -39,18 +34,19 @@ export function serializePipeline(
     edges: edges.map((e) => ({
       source: e.source,
       target: e.target,
+      sourceHandle: e.sourceHandle ?? "",
+      targetHandle: e.targetHandle ?? "",
     })),
   };
 }
 
 /**
  * Deserialize the portable JSON format into xyflow nodes and edges.
- * Validates node types and fills in missing parameters with defaults.
  */
 export function deserializePipeline(
   json: SerializedPipeline,
 ): { nodes: Node<PipelineNodeData>[]; edges: Edge[] } {
-  if (json.version !== 1) {
+  if (json.version !== 2) {
     throw new Error(`Unsupported pipeline version: ${json.version}`);
   }
 
@@ -60,7 +56,6 @@ export function deserializePipeline(
     }
     const nodeType = serialized.type as PipelineNodeType;
     const defaults = defaultParams(nodeType);
-    // Merge serialized params over defaults (excluding id/position/enabled)
     const { id, position, enabled, ...paramFields } = serialized;
     const params = { ...defaults, ...paramFields, type: nodeType } as typeof defaults;
 
@@ -76,9 +71,11 @@ export function deserializePipeline(
   });
 
   const edges: Edge[] = (json.edges ?? []).map((e, i) => ({
-    id: `e-${e.source}-${e.target}-${i}`,
+    id: `e-${e.source}-${e.sourceHandle}-${e.target}-${e.targetHandle}-${i}`,
     source: e.source,
     target: e.target,
+    sourceHandle: e.sourceHandle || null,
+    targetHandle: e.targetHandle || null,
   }));
 
   return { nodes, edges };
