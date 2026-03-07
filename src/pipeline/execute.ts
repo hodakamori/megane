@@ -337,9 +337,11 @@ function minimumImage(
   box: Float32Array, boxInv: Float32Array,
 ): [number, number, number] {
   // Convert to fractional coordinates
-  let sx = boxInv[0] * dx + boxInv[1] * dy + boxInv[2] * dz;
-  let sy = boxInv[3] * dx + boxInv[4] * dy + boxInv[5] * dz;
-  let sz = boxInv[6] * dx + boxInv[7] * dy + boxInv[8] * dz;
+  // Box is row-major (rows = lattice vectors), so r = box^T * s
+  // Therefore s = box^{-T} * r, i.e. use columns of boxInv
+  let sx = boxInv[0] * dx + boxInv[3] * dy + boxInv[6] * dz;
+  let sy = boxInv[1] * dx + boxInv[4] * dy + boxInv[7] * dz;
+  let sz = boxInv[2] * dx + boxInv[5] * dy + boxInv[8] * dz;
 
   // Wrap to [-0.5, 0.5)
   sx -= Math.round(sx);
