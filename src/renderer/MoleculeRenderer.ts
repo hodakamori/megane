@@ -25,8 +25,6 @@ import { CellAxesRenderer } from "./CellAxesRenderer";
 import { LabelOverlay } from "./LabelOverlay";
 import { ArrowRenderer } from "./ArrowRenderer";
 import { PolyhedronRenderer } from "./PolyhedronRenderer";
-import { SpeckPostProcess } from "./SpeckPostProcess";
-import type { SpeckParams } from "./SpeckPostProcess";
 import type { MeshData } from "../pipeline/types";
 import {
   getElementSymbol,
@@ -52,8 +50,6 @@ export class MoleculeRenderer {
   private labelOverlay: LabelOverlay | null = null;
   private arrowRenderer: ArrowRenderer | null = null;
   private polyhedronRenderer: PolyhedronRenderer | null = null;
-  private speckPostProcess: SpeckPostProcess | null = null;
-  private speckEnabled = true;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
@@ -110,11 +106,6 @@ export class MoleculeRenderer {
     domEl.style.width = "100%";
     domEl.style.height = "100%";
     container.appendChild(domEl);
-
-    // Speck-style post-processing (SSAO + outlines), enabled by default
-    if (this.speckEnabled) {
-      this.speckPostProcess = new SpeckPostProcess(this.renderer);
-    }
 
     // Label overlay (Canvas 2D on top of WebGL)
     this.labelOverlay = new LabelOverlay();
@@ -312,27 +303,6 @@ export class MoleculeRenderer {
     if (this.polyhedronRenderer) {
       this.polyhedronRenderer.clear();
     }
-  }
-
-  /** Enable or disable Speck-style rendering (SSAO + outlines). */
-  setSpeckStyle(enabled: boolean): void {
-    this.speckEnabled = enabled;
-    if (enabled && !this.speckPostProcess && this.renderer) {
-      this.speckPostProcess = new SpeckPostProcess(this.renderer);
-    }
-  }
-
-  /** Check if Speck-style rendering is enabled. */
-  isSpeckStyle(): boolean {
-    return this.speckEnabled;
-  }
-
-  /** Update Speck-style rendering parameters. */
-  setSpeckParams(params: Partial<SpeckParams>): void {
-    if (!this.speckPostProcess && this.renderer) {
-      this.speckPostProcess = new SpeckPostProcess(this.renderer);
-    }
-    this.speckPostProcess?.setParams(params);
   }
 
   /** Set atom radius scale multiplier. */
@@ -1062,11 +1032,7 @@ export class MoleculeRenderer {
 
     this.controls.update();
 
-    if (this.speckEnabled && this.speckPostProcess) {
-      this.speckPostProcess.render(this.scene, this.camera);
-    } else {
-      this.renderer.render(this.scene, this.camera);
-    }
+    this.renderer.render(this.scene, this.camera);
 
     // Use renderer's internal size for all post-render passes.
     // This guarantees the viewport/dimensions match the canvas buffer,
@@ -1112,7 +1078,6 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
-    if (this.speckPostProcess) this.speckPostProcess.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     if (this.dprMediaQuery && this.dprChangeHandler) {
       this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);
