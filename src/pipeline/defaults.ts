@@ -19,6 +19,7 @@ export function createDefaultPipeline(): {
 } {
   return {
     nodes: [
+      // Row 0: Source
       {
         id: "loader-1",
         type: "load_structure",
@@ -33,10 +34,11 @@ export function createDefaultPipeline(): {
           enabled: true,
         },
       },
+      // Row 1: Data loading & filtering
       {
         id: "traj-1",
         type: "load_trajectory",
-        position: { x: 500, y: 0 },
+        position: { x: -50, y: 180 },
         data: {
           params: {
             type: "load_trajectory",
@@ -48,7 +50,7 @@ export function createDefaultPipeline(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 500, y: 180 },
+        position: { x: 150, y: 180 },
         data: {
           params: {
             type: "add_bond",
@@ -60,7 +62,7 @@ export function createDefaultPipeline(): {
       {
         id: "filter-caf",
         type: "filter",
-        position: { x: 50, y: 180 },
+        position: { x: 350, y: 180 },
         data: {
           params: {
             type: "filter",
@@ -72,7 +74,7 @@ export function createDefaultPipeline(): {
       {
         id: "filter-sol",
         type: "filter",
-        position: { x: 250, y: 180 },
+        position: { x: 550, y: 180 },
         data: {
           params: {
             type: "filter",
@@ -81,10 +83,11 @@ export function createDefaultPipeline(): {
           enabled: true,
         },
       },
+      // Row 2: Processing (labels, modify)
       {
         id: "labels-1",
         type: "label_generator",
-        position: { x: -150, y: 340 },
+        position: { x: 250, y: 360 },
         data: {
           params: {
             type: "label_generator",
@@ -96,7 +99,7 @@ export function createDefaultPipeline(): {
       {
         id: "modify-caf",
         type: "modify",
-        position: { x: 50, y: 340 },
+        position: { x: 400, y: 360 },
         data: {
           params: {
             type: "modify",
@@ -109,7 +112,7 @@ export function createDefaultPipeline(): {
       {
         id: "modify-sol",
         type: "modify",
-        position: { x: 250, y: 340 },
+        position: { x: 570, y: 360 },
         data: {
           params: {
             type: "modify",
@@ -119,10 +122,11 @@ export function createDefaultPipeline(): {
           enabled: true,
         },
       },
+      // Row 3: Sink
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 540 },
+        position: { x: 300, y: 540 },
         data: {
           params: {
             type: "viewport",

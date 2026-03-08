@@ -6,7 +6,7 @@
 
 import { Handle, Position } from "@xyflow/react";
 import type { PipelineNodeType, PortDefinition } from "../../pipeline/types";
-import { NODE_TYPE_LABELS, NODE_PORTS, DATA_TYPE_COLORS } from "../../pipeline/types";
+import { NODE_TYPE_LABELS, NODE_PORTS, DATA_TYPE_COLORS, NODE_CATEGORY, NODE_CATEGORY_COLORS } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 
 interface NodeShellProps {
@@ -99,9 +99,15 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
   const toggleNode = usePipelineStore((s) => s.toggleNode);
   const removeNode = usePipelineStore((s) => s.removeNode);
   const ports = NODE_PORTS[nodeType];
+  const categoryColor = NODE_CATEGORY_COLORS[NODE_CATEGORY[nodeType]];
+
+  const containerStyle: React.CSSProperties = {
+    ...(enabled ? nodeStyle : disabledStyle),
+    borderLeft: `3px solid ${categoryColor}`,
+  };
 
   return (
-    <div style={enabled ? nodeStyle : disabledStyle}>
+    <div style={containerStyle}>
       {/* Input handles */}
       {ports.inputs.map((port, i) => {
         const isDisabled = disabledPorts?.has(port.name) ?? false;
@@ -134,16 +140,33 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
 
       <div style={headerStyle}>
         <span style={titleStyle}>{NODE_TYPE_LABELS[nodeType]}</span>
-        <button
+        <div
           onClick={() => toggleNode(id)}
           style={{
-            ...iconBtnStyle,
-            color: enabled ? "#3b82f6" : "#94a3b8",
+            width: 28,
+            height: 14,
+            borderRadius: 7,
+            background: enabled ? "#3b82f6" : "#cbd5e1",
+            position: "relative",
+            cursor: "pointer",
+            transition: "background 0.15s",
+            flexShrink: 0,
           }}
           title={enabled ? "Disable node" : "Enable node"}
         >
-          {enabled ? "\u25C9" : "\u25CB"}
-        </button>
+          <div
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: "white",
+              position: "absolute",
+              top: 2,
+              left: enabled ? 16 : 2,
+              transition: "left 0.15s",
+            }}
+          />
+        </div>
         {nodeType !== "viewport" && (
           <button
             onClick={() => removeNode(id)}

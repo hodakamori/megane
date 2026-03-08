@@ -13,7 +13,7 @@ export interface Snapshot {
 }
 
 /** Bond source mode. */
-export type BondSource = "structure" | "file" | "distance" | "none";
+export type BondSource = "structure" | "file" | "distance";
 
 /** Trajectory source mode. */
 export type TrajectorySource = "structure" | "file";
