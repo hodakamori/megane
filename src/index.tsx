@@ -12,6 +12,7 @@ import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import { usePipelineStore } from "./pipeline/store";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
+import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";
@@ -41,11 +42,16 @@ function App() {
   const setFileFrames = usePipelineStore((s) => s.setFileFrames);
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
 
-  // Load bundled demo PDB on first mount
+  // Load bundled demo PDB + XTC on first mount
   useEffect(() => {
     (async () => {
       await local.loadText(defaultPDB);
       local.loadDemoVectors();
+      // Load demo trajectory
+      const resp = await fetch(defaultXtcUrl);
+      const blob = await resp.blob();
+      const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
+      await local.loadXtc(xtcFile);
     })().catch(() => {});
   }, []);
 
