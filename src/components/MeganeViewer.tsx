@@ -23,7 +23,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
-import type { ViewportState } from "../pipeline/types";
+import type { ViewportState, AddBondParams } from "../pipeline/types";
 
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
