@@ -24,7 +24,7 @@ export interface MeganeLocalState {
   pdbFileName: string | null;
   xtcFileName: string | null;
   loadFile: (pdb: File) => Promise<void>;
-  loadText: (text: string) => Promise<void>;
+  loadText: (text: string, fileName?: string) => Promise<void>;
   loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
   bondSource: BondSource;
@@ -175,10 +175,10 @@ export function useMeganeLocal(): MeganeLocalState {
     setXtcFileName(result.meta ? "PDB models" : null);
   }, [applyResult]);
 
-  const loadText = useCallback(async (text: string) => {
+  const loadText = useCallback(async (text: string, fileName?: string) => {
     const result = await parseStructureText(text);
     applyResult(result);
-    setPdbFileName("caffeine_water.pdb");
+    setPdbFileName(fileName ?? "caffeine_water.pdb");
     setXtcFileName(result.meta ? "PDB models" : null);
   }, [applyResult]);
 

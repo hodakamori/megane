@@ -13,6 +13,7 @@ import { useMeganeLocal } from "./hooks/useMeganeLocal";
 import { usePipelineStore } from "./pipeline/store";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
+import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3.xyz?raw";
 import "./styles/megane.css";
 
 export type DataMode = "streaming" | "local";
@@ -54,6 +55,26 @@ function App() {
       await local.loadXtc(xtcFile);
     })().catch(() => {});
   }, []);
+
+  // Load data when a pipeline template is applied
+  const pendingTemplateId = usePipelineStore((s) => s.pendingTemplateId);
+  const clearPendingTemplate = usePipelineStore((s) => s.clearPendingTemplate);
+
+  useEffect(() => {
+    if (!pendingTemplateId) return;
+    (async () => {
+      if (pendingTemplateId === "molecule") {
+        await local.loadText(defaultPDB, "caffeine_water.pdb");
+        const resp = await fetch(defaultXtcUrl);
+        const blob = await resp.blob();
+        const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
+        await local.loadXtc(xtcFile);
+      } else if (pendingTemplateId === "solid") {
+        await local.loadText(perovskiteXYZ, "perovskite_srtio3.xyz");
+      }
+      clearPendingTemplate();
+    })().catch(() => {});
+  }, [pendingTemplateId]);
 
   // Push structure frames and file frames to the pipeline store
   useEffect(() => {
