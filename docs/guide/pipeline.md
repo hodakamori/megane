@@ -26,8 +26,8 @@ LoadStructure → AddBond → Viewport
 
 Use the **Templates** dropdown to load pre-built pipelines:
 
-- **Molecule** — Caffeine with bonds and trajectory (`LoadStructure → AddBond → Viewport`, plus `LoadTrajectory → Viewport`)
-- **Solid** — Perovskite SrTiO₃ with coordination polyhedra (`LoadStructure → AddBond → Viewport`, plus `PolyhedronGenerator → Viewport`)
+- **Molecule** — Caffeine (`caffeine_water.pdb`) with structure-based bonds and a vibration trajectory (`caffeine_water_vibration.xtc`). Nodes: `LoadStructure → AddBond → Viewport`, `LoadTrajectory → Viewport`.
+- **Solid** — Perovskite SrTiO₃ 3×3×3 supercell with distance-based bonds and TiO₆ coordination polyhedra. Nodes: `LoadStructure → AddBond → Viewport`, `PolyhedronGenerator → Viewport`. Center = Ti (22), Ligand = O (8), max distance = 2.5 Å.
 
 ## Node Reference
 
@@ -43,21 +43,74 @@ Use the **Templates** dropdown to load pre-built pipelines:
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
 | **Add Bond** | Detect bonds from structure or by distance | particle | bond |
-| **Filter** | Select atoms using a query expression | particle | particle |
-| **Modify** | Override scale and opacity for a group of atoms | particle | particle |
+| **Filter** | Select atoms using a query expression | particle, bond | particle, bond |
+| **Modify** | Override scale and opacity for a group of atoms | particle, bond | particle, bond |
+
+::: info Generic Ports
+Filter and Modify accept both **particle** and **bond** inputs. The output type matches the input type automatically.
+:::
 
 ### Overlay
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Labels** | Generate text labels at atom positions | particle | label |
-| **Polyhedra** | Render coordination polyhedra (convex hulls) | particle | mesh |
+| **Label Generator** | Generate text labels at atom positions | particle | label |
+| **Polyhedron Generator** | Render coordination polyhedra (convex hulls) | particle | mesh |
 
 ### Output
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
 | **Viewport** | 3D rendering output | particle, bond, cell, trajectory, label, mesh | — |
+
+## Node Parameters
+
+### Add Bond
+
+| Parameter | Values | Default | Description |
+|-----------|--------|---------|-------------|
+| Bond source | `structure` | — | Read bonds from the structure file (CONECT records in PDB, etc.) |
+| | `distance` | ✓ | Infer bonds from van der Waals radii |
+
+### Filter
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| Query | string | `""` (all) | Selection query expression (see [Filter DSL](#filter-dsl)) |
+
+The input field validates your query in real time — invalid syntax is highlighted in red.
+
+### Modify
+
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| Scale | 0.1 – 2.0 | 1.0 | Atom sphere radius multiplier |
+| Opacity | 0 – 1.0 | 1.0 | Transparency (0 = invisible, 1 = opaque) |
+
+### Label Generator
+
+| Parameter | Values | Default | Description |
+|-----------|--------|---------|-------------|
+| Source | `element` | ✓ | Chemical element symbol (C, O, Fe, ...) |
+| | `resname` | — | Residue name (ALA, HOH, ...) |
+| | `index` | — | Atom index (0, 1, 2, ...) |
+
+### Polyhedron Generator
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| Center elements | number[] | — | Atomic numbers of center atoms (e.g., Ti=22, Si=14) |
+| Ligand elements | number[] | O (8) | Atomic numbers of ligand atoms |
+| Max distance | number | 2.5 Å | Maximum center–ligand distance |
+| Opacity | number | 0.5 | Face transparency (0–1) |
+| Show edges | boolean | off | Display wireframe edges |
+
+### Viewport
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| Perspective | off | Toggle perspective / orthographic projection |
+| Cell axes visible | on | Show simulation cell axes with labels |
 
 ## Data Types
 
@@ -110,21 +163,7 @@ element == "O" or element == "N"       # Oxygen or nitrogen
 mass > 32                              # Atoms heavier than sulfur
 ```
 
-## Polyhedra
-
-The Polyhedron Generator node creates coordination polyhedra — convex hulls around center atoms defined by their neighboring ligand atoms.
-
-**Parameters:**
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| Center elements | Atomic numbers of center atoms (e.g., Si, Ti, Fe) | — |
-| Ligand elements | Atomic numbers of ligand atoms (e.g., O, F, Cl) | O (8) |
-| Max distance | Maximum center–ligand distance (Å) | 2.5 |
-| Opacity | Face transparency (0–1) | 0.5 |
-| Show edges | Display wireframe edges | off |
-
-### Example: TiO₆ Octahedra in SrTiO₃
+## Example: TiO₆ Octahedra in SrTiO₃
 
 1. Load a perovskite structure (`LoadStructure`)
 2. Add a `PolyhedronGenerator` node
