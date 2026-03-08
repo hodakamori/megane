@@ -13,6 +13,7 @@ import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_
 import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
 import { createDefaultPipeline, createDemoPipeline } from "./defaults";
+import { PIPELINE_TEMPLATES } from "./templates";
 
 let nextNodeId = 1;
 
@@ -56,6 +57,11 @@ export interface PipelineStore {
   // Serialization
   serialize: () => SerializedPipeline;
   deserialize: (json: SerializedPipeline) => void;
+
+  // Templates
+  pendingTemplateId: string | null;
+  applyTemplate: (templateId: string) => void;
+  clearPendingTemplate: () => void;
 
   // Reset
   reset: () => void;
@@ -223,6 +229,25 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     const { nodes, edges } = deserializePipeline(json);
     set({ nodes, edges });
     get().execute();
+  },
+
+  pendingTemplateId: null,
+
+  applyTemplate: (templateId) => {
+    const template = PIPELINE_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+    const { nodes, edges } = template.create();
+    set({
+      nodes,
+      edges,
+      viewportState: { ...DEFAULT_VIEWPORT_STATE },
+      pendingTemplateId: templateId,
+    });
+    get().execute();
+  },
+
+  clearPendingTemplate: () => {
+    set({ pendingTemplateId: null });
   },
 
   reset: () => {
