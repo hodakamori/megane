@@ -2,7 +2,7 @@
   "name": "vscode-megane",
   "displayName": "megane - Molecular Viewer",
   "description": "View molecular structure files (PDB, GRO, XYZ, MOL, SDF) with megane",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "hodakamori",
   "license": "MIT",
   "repository": {
