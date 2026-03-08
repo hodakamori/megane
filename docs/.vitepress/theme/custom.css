@@ -1,15 +1,15 @@
 :root {
-  --vp-c-brand-1: #3b82f6;
-  --vp-c-brand-2: #2563eb;
-  --vp-c-brand-3: #1d4ed8;
-  --vp-c-brand-soft: rgba(59, 130, 246, 0.14);
+  --vp-c-brand-1: #0d9488;
+  --vp-c-brand-2: #0f766e;
+  --vp-c-brand-3: #115e59;
+  --vp-c-brand-soft: rgba(13, 148, 136, 0.14);
 }
 
 .dark {
-  --vp-c-brand-1: #60a5fa;
-  --vp-c-brand-2: #3b82f6;
-  --vp-c-brand-3: #2563eb;
-  --vp-c-brand-soft: rgba(96, 165, 250, 0.14);
+  --vp-c-brand-1: #2dd4bf;
+  --vp-c-brand-2: #14b8a6;
+  --vp-c-brand-3: #0d9488;
+  --vp-c-brand-soft: rgba(45, 212, 191, 0.14);
 }
 
 /* ── nbconvert notebook layout ── */
@@ -102,7 +102,7 @@
   font-family: var(--vp-font-family-mono);
   font-size: 0.75rem;
   text-align: right;
-  color: #2563eb;
+  color: #0d9488;
   user-select: none;
   line-height: 1.6;
 }
@@ -288,7 +288,7 @@
 
 /* Dark mode adjustments for notebook layout */
 .dark .nb-container .input_prompt {
-  color: #60a5fa;
+  color: #2dd4bf;
 }
 
 .dark .nb-container .output_area > .prompt {
