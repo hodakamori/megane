@@ -8,51 +8,30 @@
 import { StrictMode, useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
-import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
-import { useMeganeLocal } from "./hooks/useMeganeLocal";
+import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3_3x3x3.xyz?raw";
 import "./styles/megane.css";
 
-export type DataMode = "streaming" | "local";
-
-async function uploadFiles(pdb: File, xtc?: File): Promise<void> {
-  const form = new FormData();
-  form.append("pdb", pdb);
-  if (xtc) form.append("xtc", xtc);
-  await fetch("/api/upload", { method: "POST", body: form });
-}
+import type { DataMode } from "./types";
+export type { DataMode };
 
 function App() {
   const [mode] = useState<DataMode>("local");
-
-  // WebSocket data source (only active in streaming mode)
-  const wsUrl =
-    mode === "streaming"
-      ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`
-      : null;
-  const ws = useMeganeWebSocket(wsUrl);
-
-  // Local data source
-  const local = useMeganeLocal();
-
-  // Pipeline store accessors for trajectory data
-  const setStructureFrames = usePipelineStore((s) => s.setStructureFrames);
-  const setFileFrames = usePipelineStore((s) => s.setFileFrames);
-  const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
+  const ds = useDataSource(mode);
 
   // Load bundled demo PDB + XTC on first mount
   useEffect(() => {
     (async () => {
-      await local.loadText(defaultPDB);
-      local.loadDemoVectors();
+      await ds.local.loadText(defaultPDB);
+      ds.local.loadDemoVectors();
       // Load demo trajectory
       const resp = await fetch(defaultXtcUrl);
       const blob = await resp.blob();
       const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
-      await local.loadXtc(xtcFile);
+      await ds.local.loadXtc(xtcFile);
     })().catch(() => {});
   }, []);
 
@@ -64,13 +43,13 @@ function App() {
     if (!pendingTemplateId) return;
     (async () => {
       if (pendingTemplateId === "molecule") {
-        await local.loadText(defaultPDB, "caffeine_water.pdb");
+        await ds.local.loadText(defaultPDB, "caffeine_water.pdb");
         const resp = await fetch(defaultXtcUrl);
         const blob = await resp.blob();
         const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
-        await local.loadXtc(xtcFile);
+        await ds.local.loadXtc(xtcFile);
       } else if (pendingTemplateId === "solid") {
-        await local.loadText(perovskiteXYZ, "perovskite_srtio3_3x3x3.xyz");
+        await ds.local.loadText(perovskiteXYZ, "perovskite_srtio3_3x3x3.xyz");
       }
       clearPendingTemplate();
     })().catch(() => {});
@@ -78,58 +57,39 @@ function App() {
 
   // Push structure frames and file frames to the pipeline store
   useEffect(() => {
-    if (local.hasStructureFrames) {
-      const snapshot = local.snapshot;
+    if (ds.local.hasStructureFrames) {
+      const snapshot = ds.local.snapshot;
       if (snapshot) {
         // Structure has frames - push to pipeline store
         // The frames/meta are managed internally by useMeganeLocal
         // We need to access them via the trajectory source
       }
     }
-  }, [local.hasStructureFrames, local.snapshot]);
-
-  // Select active data source based on mode
-  const snapshot = mode === "streaming" ? ws.snapshot : local.snapshot;
-  const frame = mode === "streaming" ? ws.frame : local.frame;
-  const meta = mode === "streaming" ? ws.meta : local.meta;
-  const currentFrame =
-    mode === "streaming" ? ws.currentFrame : local.currentFrame;
-  const currentFrameRef =
-    mode === "streaming" ? ws.currentFrameRef : local.currentFrameRef;
+  }, [ds.local.hasStructureFrames, ds.local.snapshot]);
 
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
   const playingRef = useRef(false);
 
-  // Playback loop (works for both modes)
+  // Playback loop
   useEffect(() => {
     playingRef.current = playing;
-    if (!playing || !meta) return;
+    if (!playing || !ds.meta) return;
 
     const interval = setInterval(() => {
       if (!playingRef.current) return;
-      const nextFrame = (currentFrameRef.current + 1) % meta.nFrames;
-
-      if (mode === "streaming" && ws.clientRef.current) {
-        ws.clientRef.current.send({ type: "request_frame", frame: nextFrame });
-      } else if (mode === "local") {
-        local.seekFrame(nextFrame);
-      }
+      const nextFrame = (ds.currentFrameRef.current + 1) % ds.meta!.nFrames;
+      ds.seekFrame(nextFrame);
     }, 1000 / fps);
 
     return () => clearInterval(interval);
-  }, [playing, meta, fps, mode, ws.clientRef, currentFrameRef, local.seekFrame]);
+  }, [playing, ds.meta, fps, ds.currentFrameRef, ds.seekFrame]);
 
   const handleSeek = useCallback(
     (frameIdx: number) => {
-      if (mode === "streaming") {
-        ws.currentFrameRef.current = frameIdx;
-        ws.clientRef.current?.send({ type: "request_frame", frame: frameIdx });
-      } else {
-        local.seekFrame(frameIdx);
-      }
+      ds.seekFrame(frameIdx);
     },
-    [mode, ws.currentFrameRef, ws.clientRef, local.seekFrame],
+    [ds.seekFrame],
   );
 
   const handlePlayPause = useCallback(() => {
@@ -143,92 +103,25 @@ function App() {
   const handleUploadStructure = useCallback(
     (file: File) => {
       setPlaying(false);
-      if (mode === "streaming") {
-        uploadFiles(file);
-      } else {
-        local.loadFile(file);
-      }
+      ds.uploadStructure(file);
     },
-    [mode, local.loadFile],
+    [ds.uploadStructure],
   );
 
   const handleUploadTrajectory = useCallback(
     (file: File) => {
       setPlaying(false);
-      if (mode === "local") {
-        local.loadXtc(file);
-      }
+      ds.uploadTrajectory(file);
     },
-    [mode, local.loadXtc],
+    [ds.uploadTrajectory],
   );
-
-  const handleBondSourceChange = useCallback(
-    (source: string) => {
-      if (mode === "streaming") {
-        ws.setBondSource(source as "structure" | "file" | "distance" | "none");
-      } else {
-        local.setBondSource(source as "structure" | "file" | "distance" | "none");
-      }
-    },
-    [mode, ws.setBondSource, local.setBondSource],
-  );
-
-  const handleLabelSourceChange = useCallback(
-    (source: string) => {
-      if (mode === "streaming") {
-        ws.setLabelSource(source as "none" | "structure" | "file");
-      } else {
-        local.setLabelSource(source as "none" | "structure" | "file");
-      }
-    },
-    [mode, ws.setLabelSource, local.setLabelSource],
-  );
-
-  const handleLoadLabelFile = useCallback(
-    (file: File) => {
-      if (mode === "streaming") {
-        ws.loadLabelFile(file);
-      } else {
-        local.loadLabelFile(file);
-      }
-    },
-    [mode, ws.loadLabelFile, local.loadLabelFile],
-  );
-
-  const handleVectorSourceChange = useCallback(
-    (source: string) => {
-      if (mode === "streaming") {
-        ws.setVectorSource(source as "none" | "file" | "demo");
-      } else {
-        local.setVectorSource(source as "none" | "file" | "demo");
-      }
-    },
-    [mode, ws.setVectorSource, local.setVectorSource],
-  );
-
-  const handleLoadVectorFile = useCallback(
-    (file: File) => {
-      if (mode === "streaming") {
-        ws.loadVectorFile(file);
-      } else {
-        local.loadVectorFile(file);
-      }
-    },
-    [mode, ws.loadVectorFile, local.loadVectorFile],
-  );
-
-  const handleLoadDemoVectors = useCallback(() => {
-    if (mode === "local") {
-      local.loadDemoVectors();
-    }
-  }, [mode, local.loadDemoVectors]);
 
   return (
     <MeganeViewer
-      snapshot={snapshot}
-      frame={frame}
-      currentFrame={currentFrame}
-      totalFrames={meta?.nFrames ?? 0}
+      snapshot={ds.snapshot}
+      frame={ds.frame}
+      currentFrame={ds.currentFrame}
+      totalFrames={ds.meta?.nFrames ?? 0}
       playing={playing}
       fps={fps}
       onSeek={handleSeek}
@@ -236,12 +129,12 @@ function App() {
       onFpsChange={handleFpsChange}
       onUploadStructure={handleUploadStructure}
       onUploadTrajectory={handleUploadTrajectory}
-      onBondSourceChange={handleBondSourceChange}
-      onLabelSourceChange={handleLabelSourceChange}
-      onLoadLabelFile={handleLoadLabelFile}
-      onVectorSourceChange={handleVectorSourceChange}
-      onLoadVectorFile={handleLoadVectorFile}
-      onLoadDemoVectors={handleLoadDemoVectors}
+      onBondSourceChange={ds.setBondSource as (s: string) => void}
+      onLabelSourceChange={ds.setLabelSource as (s: string) => void}
+      onLoadLabelFile={ds.loadLabelFile}
+      onVectorSourceChange={ds.setVectorSource as (s: string) => void}
+      onLoadVectorFile={ds.loadVectorFile}
+      onLoadDemoVectors={ds.loadDemoVectors}
     />
   );
 }

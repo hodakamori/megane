@@ -26,6 +26,7 @@ import {
 } from "../pipeline/types";
 import type { NodeCategory } from "../pipeline/types";
 import { PIPELINE_TEMPLATES } from "../pipeline/templates";
+import { CollapsiblePanel } from "./CollapsiblePanel";
 import { LoadStructureNode } from "./nodes/LoadStructureNode";
 import { LoadTrajectoryNode } from "./nodes/LoadTrajectoryNode";
 import { AddBondNode } from "./nodes/AddBondNode";
@@ -57,32 +58,6 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 600;
 const DEFAULT_WIDTH = 480;
-
-const basePanelStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 12,
-  right: 12,
-  bottom: 60,
-  zIndex: 10,
-  background: "rgba(255, 255, 255, 0.92)",
-  backdropFilter: "blur(16px)",
-  WebkitBackdropFilter: "blur(16px)",
-  borderRadius: 12,
-  boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
-  border: "1px solid rgba(226,232,240,0.6)",
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-};
-
-const headerStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  borderBottom: "1px solid rgba(226,232,240,0.6)",
-  flexShrink: 0,
-};
 
 const addBtnStyle: React.CSSProperties = {
   background: "rgba(59, 130, 246, 0.08)",
@@ -270,155 +245,107 @@ function PipelineEditorInner({
 
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
-  if (collapsed) {
-    return (
-      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}>
-        <button
-          onClick={onToggleCollapse}
-          style={{
-            background: "rgba(255, 255, 255, 0.88)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-            border: "1px solid rgba(226,232,240,0.6)",
-            borderRadius: 10,
-            padding: "8px 12px",
-            cursor: "pointer",
-            boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#1e293b",
-            letterSpacing: "-0.02em",
-          }}
-          title="Open pipeline editor"
-        >
-          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>
-            &#9664;
-          </span>
-          Pipeline
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ ...basePanelStyle, width: panelWidth }}>
-      {/* Resize drag handle */}
-      <div
-        style={resizeHandleStyle}
-        onMouseDown={handleResizeMouseDown}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "rgba(59,130,246,0.15)";
+  const headerExtra = (
+    <>
+      <button
+        onClick={() => {
+          setShowTemplateMenu(!showTemplateMenu);
+          setShowAddMenu(false);
         }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "transparent";
+        style={templateBtnStyle}
+      >
+        Templates
+      </button>
+      {showTemplateMenu && (
+        <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
+          {PIPELINE_TEMPLATES.map((template) => (
+            <button
+              key={template.id}
+              onClick={() => handleApplyTemplate(template.id)}
+              style={{ ...dropdownItemStyle, padding: "8px 14px" }}
+              onMouseEnter={(e) => {
+                (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLElement).style.background = "none";
+              }}
+            >
+              <div style={{ fontWeight: 500 }}>{template.label}</div>
+              <div style={templateItemDescStyle}>{template.description}</div>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => {
+          setShowAddMenu(!showAddMenu);
+          setShowTemplateMenu(false);
         }}
-      />
-      <div style={headerStyle}>
-        <span
-          style={{
-            fontWeight: 600,
-            color: "#1e293b",
-            fontSize: 13,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Pipeline
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
-          <button
-            onClick={() => {
-              setShowTemplateMenu(!showTemplateMenu);
-              setShowAddMenu(false);
-            }}
-            style={templateBtnStyle}
-          >
-            Templates
-          </button>
-          {showTemplateMenu && (
-            <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
-              {PIPELINE_TEMPLATES.map((template) => (
+        style={addBtnStyle}
+      >
+        + Add Node
+      </button>
+      {showAddMenu && (
+        <div style={dropdownStyle}>
+          {ADD_NODE_GROUPS.map((group) => (
+            <div key={group.category}>
+              <div style={groupHeaderStyle}>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: NODE_CATEGORY_COLORS[group.category],
+                    display: "inline-block",
+                    flexShrink: 0,
+                  }}
+                />
+                {group.label}
+              </div>
+              {group.types.map((type) => (
                 <button
-                  key={template.id}
-                  onClick={() => handleApplyTemplate(template.id)}
-                  style={{ ...dropdownItemStyle, padding: "8px 14px" }}
+                  key={type}
+                  onClick={() => handleAddNode(type)}
+                  style={dropdownItemStyle}
                   onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
+                    (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
                   }}
                   onMouseLeave={(e) => {
                     (e.target as HTMLElement).style.background = "none";
                   }}
                 >
-                  <div style={{ fontWeight: 500 }}>{template.label}</div>
-                  <div style={templateItemDescStyle}>{template.description}</div>
+                  {NODE_TYPE_LABELS[type]}
                 </button>
               ))}
             </div>
-          )}
-          <button
-            onClick={() => {
-              setShowAddMenu(!showAddMenu);
-              setShowTemplateMenu(false);
-            }}
-            style={addBtnStyle}
-          >
-            + Add Node
-          </button>
-          {showAddMenu && (
-            <div style={dropdownStyle}>
-              {ADD_NODE_GROUPS.map((group) => (
-                <div key={group.category}>
-                  <div style={groupHeaderStyle}>
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: NODE_CATEGORY_COLORS[group.category],
-                        display: "inline-block",
-                        flexShrink: 0,
-                      }}
-                    />
-                    {group.label}
-                  </div>
-                  {group.types.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => handleAddNode(type)}
-                      style={dropdownItemStyle}
-                      onMouseEnter={(e) => {
-                        (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.target as HTMLElement).style.background = "none";
-                      }}
-                    >
-                      {NODE_TYPE_LABELS[type]}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            onClick={onToggleCollapse}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 13,
-              color: "#94a3b8",
-              padding: "2px 4px",
-            }}
-            title="Collapse panel"
-          >
-            &#9654;
-          </button>
+          ))}
         </div>
-      </div>
+      )}
+    </>
+  );
 
+  const resizeHandle = (
+    <div
+      style={resizeHandleStyle}
+      onMouseDown={handleResizeMouseDown}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.background = "rgba(59,130,246,0.15)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background = "transparent";
+      }}
+    />
+  );
+
+  return (
+    <CollapsiblePanel
+      title="Pipeline"
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+      width={panelWidth}
+      headerExtra={headerExtra}
+      containerExtra={resizeHandle}
+    >
       <div style={{ flex: 1, position: "relative" }}>
         <ReactFlow
           nodes={nodes}
@@ -461,7 +388,7 @@ function PipelineEditorInner({
           />
         </ReactFlow>
       </div>
-    </div>
+    </CollapsiblePanel>
   );
 }
 
