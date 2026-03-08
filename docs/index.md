@@ -59,10 +59,8 @@ One codebase, every environment.
 The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
   </div>
-  <div class="pillar-images">
+  <div class="pillar-images single-col">
     <img src="/screenshots/jupyter.png" alt="megane in Jupyter Notebook" />
-    <img src="/screenshots/browser-trajectory.png" alt="megane in browser" />
-    <img src="/screenshots/vscode.png" alt="megane in VSCode" />
   </div>
 </div>
 
@@ -84,9 +82,8 @@ Wire nodes to build visualization workflows — no code required.
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
 
   </div>
-  <div class="pillar-images">
-    <img src="/screenshots/pipeline-complex.png" alt="Visual Pipeline Editor with complex workflow" />
-    <img src="/screenshots/pipeline-polyhedra.png" alt="Visual Pipeline Editor with polyhedra rendering" />
+  <div class="pillar-images single-col">
+    <img src="/screenshots/pipeline-editor.png" alt="Visual Pipeline Editor" />
   </div>
 </div>
 
