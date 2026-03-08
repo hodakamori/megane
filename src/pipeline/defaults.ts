@@ -7,8 +7,11 @@ import type { PipelineNodeData } from "./execute";
 
 /**
  * Create the default pipeline: caffeine + semi-transparent water solvent.
- * LoadStructure → Filter(caffeine) + Filter(water) → Modify(opacity) → Viewport
- * AddBond → Viewport
+ * LoadStructure → Filter(caffeine) → Modify(scale) → Viewport
+ *              → Filter(water) → Modify(opacity) → Viewport
+ *              → AddBond → Viewport
+ *              → LoadTrajectory → Viewport
+ * Filter(caffeine) → LabelGenerator(element) → Viewport
  */
 export function createDefaultPipeline(): {
   nodes: Node<PipelineNodeData>[];
@@ -26,6 +29,18 @@ export function createDefaultPipeline(): {
             fileName: "caffeine_water.pdb",
             hasTrajectory: false,
             hasCell: true,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "traj-1",
+        type: "load_trajectory",
+        position: { x: 500, y: 0 },
+        data: {
+          params: {
+            type: "load_trajectory",
+            fileName: null,
           },
           enabled: true,
         },
@@ -67,6 +82,31 @@ export function createDefaultPipeline(): {
         },
       },
       {
+        id: "labels-1",
+        type: "label_generator",
+        position: { x: -150, y: 340 },
+        data: {
+          params: {
+            type: "label_generator",
+            source: "element",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "modify-caf",
+        type: "modify",
+        position: { x: 50, y: 340 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 1.3,
+            opacity: 1.0,
+          },
+          enabled: true,
+        },
+      },
+      {
         id: "modify-sol",
         type: "modify",
         position: { x: 250, y: 340 },
@@ -82,7 +122,7 @@ export function createDefaultPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 500 },
+        position: { x: 250, y: 540 },
         data: {
           params: {
             type: "viewport",
@@ -96,12 +136,17 @@ export function createDefaultPipeline(): {
     edges: [
       { id: "e1", source: "loader-1", target: "filter-caf", sourceHandle: "particle", targetHandle: "in" },
       { id: "e2", source: "loader-1", target: "filter-sol", sourceHandle: "particle", targetHandle: "in" },
-      { id: "e3", source: "filter-caf", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e3", source: "filter-caf", target: "modify-caf", sourceHandle: "out", targetHandle: "in" },
       { id: "e4", source: "filter-sol", target: "modify-sol", sourceHandle: "out", targetHandle: "in" },
       { id: "e5", source: "modify-sol", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
       { id: "e6", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
       { id: "e7", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
       { id: "e8", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
+      { id: "e9", source: "loader-1", target: "traj-1", sourceHandle: "particle", targetHandle: "particle" },
+      { id: "e10", source: "traj-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" },
+      { id: "e11", source: "modify-caf", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e12", source: "filter-caf", target: "labels-1", sourceHandle: "out", targetHandle: "particle" },
+      { id: "e13", source: "labels-1", target: "viewport-1", sourceHandle: "label", targetHandle: "label" },
     ],
   };
 }
