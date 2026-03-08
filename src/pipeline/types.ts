@@ -115,6 +115,31 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   polyhedron_generator: "Polyhedra",
 };
 
+// ─── Node Categories ──────────────────────────────────────────────────
+
+/** Categories for visual grouping and color-coding. */
+export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay" | "viewport";
+
+export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
+  load_structure: "data_load",
+  load_trajectory: "data_load",
+  add_bond: "bond",
+  filter: "filter",
+  modify: "modify",
+  label_generator: "overlay",
+  polyhedron_generator: "overlay",
+  viewport: "viewport",
+};
+
+export const NODE_CATEGORY_COLORS: Record<NodeCategory, string> = {
+  data_load: "#3b82f6",  // blue
+  bond: "#f59e0b",       // amber
+  filter: "#10b981",     // green
+  modify: "#8b5cf6",     // purple
+  overlay: "#ec4899",    // pink
+  viewport: "#64748b",   // slate
+};
+
 // ─── Port Definitions Per Node Type ───────────────────────────────────
 
 export interface NodePortConfig {

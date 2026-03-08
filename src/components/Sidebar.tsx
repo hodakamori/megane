@@ -271,11 +271,9 @@ export function Sidebar({
               )}
             </DropZone>
           )}
-          {bonds.source !== "none" && (
-            <div style={statsStyle}>
-              {bonds.count.toLocaleString()} bonds
-            </div>
-          )}
+          <div style={statsStyle}>
+            {bonds.count.toLocaleString()} bonds
+          </div>
         </div>
 
         {/* Trajectory Section */}

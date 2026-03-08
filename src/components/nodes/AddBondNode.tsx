@@ -33,7 +33,6 @@ export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         options={[
           { value: "structure", label: "File" },
           { value: "distance", label: "VDW" },
-          { value: "none", label: "None" },
         ]}
         value={params.bondSource}
         onChange={(v) => updateNodeParams(id, { bondSource: v })}

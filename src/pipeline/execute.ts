@@ -189,8 +189,6 @@ function executeAddBond(
 
   const snapshot = particleData.source;
 
-  if (params.bondSource === "none") return outputs;
-
   if (params.bondSource === "structure") {
     // Use bonds from the original structure file
     if (snapshot.nFileBonds > 0) {

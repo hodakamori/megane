@@ -3,7 +3,7 @@
  * Typed data-flow pipeline with color-coded handles per data type.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -16,7 +16,15 @@ import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
 import type { PipelineNodeType } from "../pipeline/types";
-import { NODE_TYPE_LABELS, canConnect, DATA_TYPE_COLORS, NODE_PORTS } from "../pipeline/types";
+import {
+  NODE_TYPE_LABELS,
+  canConnect,
+  DATA_TYPE_COLORS,
+  NODE_PORTS,
+  NODE_CATEGORY_COLORS,
+  NODE_CATEGORY,
+} from "../pipeline/types";
+import type { NodeCategory } from "../pipeline/types";
 import { LoadStructureNode } from "./nodes/LoadStructureNode";
 import { LoadTrajectoryNode } from "./nodes/LoadTrajectoryNode";
 import { AddBondNode } from "./nodes/AddBondNode";
@@ -37,22 +45,23 @@ const nodeTypes = {
   polyhedron_generator: PolyhedronGeneratorNode,
 };
 
-const ADDABLE_NODE_TYPES: PipelineNodeType[] = [
-  "load_structure",
-  "load_trajectory",
-  "add_bond",
-  "filter",
-  "modify",
-  "label_generator",
-  "polyhedron_generator",
+const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
+  { category: "data_load", label: "Data Load", types: ["load_structure", "load_trajectory"] },
+  { category: "bond", label: "Bond", types: ["add_bond"] },
+  { category: "filter", label: "Filter", types: ["filter"] },
+  { category: "modify", label: "Modify", types: ["modify"] },
+  { category: "overlay", label: "Overlay", types: ["label_generator", "polyhedron_generator"] },
 ];
 
-const panelStyle: React.CSSProperties = {
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 600;
+const DEFAULT_WIDTH = 480;
+
+const basePanelStyle: React.CSSProperties = {
   position: "absolute",
   top: 12,
-  left: 12,
+  right: 12,
   bottom: 60,
-  width: 480,
   zIndex: 10,
   background: "rgba(255, 255, 255, 0.92)",
   backdropFilter: "blur(16px)",
@@ -95,7 +104,7 @@ const dropdownStyle: React.CSSProperties = {
   borderRadius: 8,
   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
   zIndex: 100,
-  minWidth: 160,
+  minWidth: 180,
   padding: "4px 0",
 };
 
@@ -104,11 +113,34 @@ const dropdownItemStyle: React.CSSProperties = {
   width: "100%",
   background: "none",
   border: "none",
-  padding: "6px 14px",
+  padding: "6px 14px 6px 20px",
   cursor: "pointer",
   fontSize: 12,
   color: "#334155",
   textAlign: "left",
+};
+
+const groupHeaderStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  color: "#94a3b8",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  padding: "6px 14px 2px",
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+};
+
+const resizeHandleStyle: React.CSSProperties = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  bottom: 0,
+  width: 5,
+  cursor: "col-resize",
+  zIndex: 20,
+  background: "transparent",
 };
 
 /**
@@ -126,9 +158,11 @@ function getEdgeColor(sourceNodeType: string | undefined, sourceHandle: string |
 function PipelineEditorInner({
   collapsed,
   onToggleCollapse,
+  onWidthChange,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onWidthChange?: (width: number) => void;
 }) {
   const nodes = usePipelineStore((s) => s.nodes);
   const edges = usePipelineStore((s) => s.edges);
@@ -138,6 +172,32 @@ function PipelineEditorInner({
   const addNode = usePipelineStore((s) => s.addNode);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  // Resize drag handling
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startWidth: panelWidth };
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      // Panel is on the right: dragging left increases width
+      const newWidth = dragRef.current.startWidth - (ev.clientX - dragRef.current.startX);
+      const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
+      setPanelWidth(clamped);
+      onWidthChange?.(clamped);
+    };
+
+    const handleMouseUp = () => {
+      dragRef.current = null;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [panelWidth, onWidthChange]);
 
   // Connection validation using typed port matching
   const isValidConnection = useCallback(
@@ -184,7 +244,7 @@ function PipelineEditorInner({
 
   if (collapsed) {
     return (
-      <div style={{ position: "absolute", top: 12, left: 12, zIndex: 10 }}>
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}>
         <button
           onClick={onToggleCollapse}
           style={{
@@ -207,7 +267,7 @@ function PipelineEditorInner({
           title="Open pipeline editor"
         >
           <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>
-            &#9654;
+            &#9664;
           </span>
           Pipeline
         </button>
@@ -216,7 +276,18 @@ function PipelineEditorInner({
   }
 
   return (
-    <div style={panelStyle}>
+    <div style={{ ...basePanelStyle, width: panelWidth }}>
+      {/* Resize drag handle */}
+      <div
+        style={resizeHandleStyle}
+        onMouseDown={handleResizeMouseDown}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "rgba(59,130,246,0.15)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "transparent";
+        }}
+      />
       <div style={headerStyle}>
         <span
           style={{
@@ -237,20 +308,37 @@ function PipelineEditorInner({
           </button>
           {showAddMenu && (
             <div style={dropdownStyle}>
-              {ADDABLE_NODE_TYPES.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => handleAddNode(type)}
-                  style={dropdownItemStyle}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.background = "none";
-                  }}
-                >
-                  {NODE_TYPE_LABELS[type]}
-                </button>
+              {ADD_NODE_GROUPS.map((group) => (
+                <div key={group.category}>
+                  <div style={groupHeaderStyle}>
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: NODE_CATEGORY_COLORS[group.category],
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
+                    {group.label}
+                  </div>
+                  {group.types.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => handleAddNode(type)}
+                      style={dropdownItemStyle}
+                      onMouseEnter={(e) => {
+                        (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.target as HTMLElement).style.background = "none";
+                      }}
+                    >
+                      {NODE_TYPE_LABELS[type]}
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           )}
@@ -266,7 +354,7 @@ function PipelineEditorInner({
             }}
             title="Collapse panel"
           >
-            &#9664;
+            &#9654;
           </button>
         </div>
       </div>
@@ -297,6 +385,8 @@ function PipelineEditorInner({
               background: "rgba(255,255,255,0.8)",
               border: "1px solid #e2e8f0",
               borderRadius: 6,
+              width: 100,
+              height: 70,
             }}
             nodeColor="#3b82f6"
             maskColor="rgba(59,130,246,0.05)"
@@ -318,15 +408,18 @@ function PipelineEditorInner({
 export function PipelineEditor({
   collapsed,
   onToggleCollapse,
+  onWidthChange,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onWidthChange?: (width: number) => void;
 }) {
   return (
     <ReactFlowProvider>
       <PipelineEditorInner
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
+        onWidthChange={onWidthChange}
       />
     </ReactFlowProvider>
   );

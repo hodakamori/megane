@@ -75,6 +75,7 @@ export function MeganeViewer({
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
   const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
   const pipelineCollapsedRef = useRef(isNarrow);
+  const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
 
   useEffect(() => {
@@ -157,8 +158,8 @@ export function MeganeViewer({
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
     renderer.setViewInsets(
-      pipelineCollapsedRef.current ? 0 : 492,
       0,
+      pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12,
     );
     applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
     prevViewportStateRef.current = usePipelineStore.getState().viewportState;
@@ -187,10 +188,17 @@ export function MeganeViewer({
     setPipelineCollapsed((prev) => !prev);
   }, []);
 
+  const handlePipelineWidthChange = useCallback((w: number) => {
+    pipelineWidthRef.current = w;
+    if (!pipelineCollapsedRef.current) {
+      rendererRef.current?.setViewInsets(0, w + 12);
+    }
+  }, []);
+
   useEffect(() => {
     rendererRef.current?.setViewInsets(
-      pipelineCollapsed ? 0 : 492,
       0,
+      pipelineCollapsed ? 0 : pipelineWidthRef.current + 12,
     );
   }, [pipelineCollapsed]);
 
@@ -209,6 +217,7 @@ export function MeganeViewer({
       <PipelineEditor
         collapsed={pipelineCollapsed}
         onToggleCollapse={handleTogglePipeline}
+        onWidthChange={handlePipelineWidthChange}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline
