@@ -1,0 +1,54 @@
+name: Publish to VS Code Marketplace
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and publish VS Code extension
+    runs-on: ubuntu-latest
+    environment: vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Build WASM
+        run: npm run build:wasm
+
+      - name: Install vscode-megane dependencies
+        run: cd vscode-megane && npm ci
+
+      - name: Set version from tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cd vscode-megane
+          npm version "$VERSION" --no-git-tag-version
+
+      - name: Build extension
+        run: cd vscode-megane && npm run build
+
+      - name: Package VSIX
+        run: cd vscode-megane && npx vsce package
+
+      - name: Publish to VS Code Marketplace
+        run: cd vscode-megane && npx vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
