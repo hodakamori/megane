@@ -63,6 +63,10 @@ class MolecularViewer(anywidget.AnyWidget):
     # Measurement result (JS → Python)
     _measurement_json = traitlets.Unicode("").tag(sync=True)
 
+    # Pipeline
+    pipeline = traitlets.Bool(False).tag(sync=True)
+    _pipeline_json = traitlets.Unicode("").tag(sync=True)
+
     # Internal (not synced)
     _structure = None
     _trajectory = None
@@ -182,6 +186,23 @@ class MolecularViewer(anywidget.AnyWidget):
             self._event_handlers[event_name] = [
                 h for h in handlers if h is not callback
             ]
+
+    def load_pipeline(self, config: dict | str) -> None:
+        """Load a pipeline configuration.
+
+        Args:
+            config: Pipeline configuration as a dict or JSON string.
+        """
+        if isinstance(config, dict):
+            config = json.dumps(config)
+        self._pipeline_json = config
+
+    @property
+    def pipeline_config(self) -> dict | None:
+        """Current pipeline configuration, or None if not set."""
+        if not self._pipeline_json:
+            return None
+        return json.loads(self._pipeline_json)
 
     def _fire_event(self, event_name: str, data) -> None:
         """Invoke all registered callbacks for an event."""
