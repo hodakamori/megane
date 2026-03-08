@@ -89,11 +89,18 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     model.save_changes();
   }
 
+  function handlePipelineChange(json: string) {
+    model.set("_pipeline_json", json);
+    model.save_changes();
+  }
+
   function renderApp() {
     if (!root || disposed) return;
     const frameIndex = (model.get("frame_index") as number) || 0;
     const totalFrames = (model.get("total_frames") as number) || 0;
     const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
+    const pipelineEnabled = (model.get("pipeline") as boolean) || false;
+    const pipelineJson = (model.get("_pipeline_json") as string) || "";
 
     root.render(
       createElement(WidgetViewer, {
@@ -104,6 +111,9 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         onSeek: handleSeek,
         selectedAtoms: selectedAtoms,
         onMeasurementChange: handleMeasurementChange,
+        pipeline: pipelineEnabled,
+        pipelineJson: pipelineJson,
+        onPipelineChange: handlePipelineChange,
       }),
     );
   }
@@ -148,6 +158,14 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   });
 
   model.on("change:selected_atoms", () => {
+    renderApp();
+  });
+
+  model.on("change:pipeline", () => {
+    renderApp();
+  });
+
+  model.on("change:_pipeline_json", () => {
     renderApp();
   });
 
