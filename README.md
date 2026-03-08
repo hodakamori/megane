@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/hero.png" alt="megane screenshot" width="640" />
+  <img src="docs/public/screenshots/pipeline-complex.png" alt="megane screenshot" width="640" />
 </p>
 
 ---
@@ -35,19 +35,11 @@
 
 ### Scale
 
-<p align="center">
-  <img src="docs/public/screenshots/browser-trajectory.png" alt="megane rendering 1M+ atoms in the browser" width="640" />
-</p>
-
 megane renders over **1 million atoms at 60fps** in the browser. Small systems get high-quality InstancedMesh spheres and cylinders; large systems automatically switch to GPU-accelerated billboard impostors. No desktop app, no plugin — just a browser tab.
 
 Trajectory streaming works over WebSocket via a binary protocol. Load an XTC file and scrub through thousands of frames in real time, without reading everything into memory.
 
 ### Anywhere
-
-<table>
-<tr>
-<td width="50%">
 
 One codebase, every environment.
 
@@ -60,20 +52,7 @@ One codebase, every environment.
 
 The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
-</td>
-<td width="50%">
-  <img src="docs/public/screenshots/jupyter.png" alt="megane in Jupyter Notebook" width="100%" />
-  <img src="docs/public/screenshots/browser-trajectory.png" alt="megane in browser" width="49%" />
-  <img src="docs/public/screenshots/vscode.png" alt="megane in VSCode" width="49%" />
-</td>
-</tr>
-</table>
-
 ### Visual Pipelines
-
-<table>
-<tr>
-<td width="50%">
 
 Wire nodes to build visualization workflows — no code required.
 
@@ -82,14 +61,6 @@ Wire nodes to build visualization workflows — no code required.
 **6 typed data channels** — particle, bond, cell, label, mesh, trajectory — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
-
-</td>
-<td width="50%">
-  <img src="docs/public/screenshots/pipeline-complex.png" alt="Visual Pipeline Editor with complex workflow" width="100%" />
-  <img src="docs/public/screenshots/pipeline-polyhedra.png" alt="Visual Pipeline Editor with polyhedra rendering" width="100%" />
-</td>
-</tr>
-</table>
 
 ### Integrate
 
