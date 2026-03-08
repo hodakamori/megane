@@ -25,6 +25,7 @@ import {
   NODE_CATEGORY,
 } from "../pipeline/types";
 import type { NodeCategory } from "../pipeline/types";
+import { PIPELINE_TEMPLATES } from "../pipeline/templates";
 import { LoadStructureNode } from "./nodes/LoadStructureNode";
 import { LoadTrajectoryNode } from "./nodes/LoadTrajectoryNode";
 import { AddBondNode } from "./nodes/AddBondNode";
@@ -132,6 +133,23 @@ const groupHeaderStyle: React.CSSProperties = {
   gap: 6,
 };
 
+const templateBtnStyle: React.CSSProperties = {
+  background: "rgba(139, 92, 246, 0.08)",
+  border: "1px solid rgba(139, 92, 246, 0.25)",
+  borderRadius: 6,
+  padding: "4px 12px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#8b5cf6",
+};
+
+const templateItemDescStyle: React.CSSProperties = {
+  fontSize: 10,
+  color: "#94a3b8",
+  marginTop: 1,
+};
+
 const resizeHandleStyle: React.CSSProperties = {
   position: "absolute",
   left: 0,
@@ -170,8 +188,10 @@ function PipelineEditorInner({
   const onEdgesChange = usePipelineStore((s) => s.onEdgesChange);
   const onConnect = usePipelineStore((s) => s.onConnect);
   const addNode = usePipelineStore((s) => s.addNode);
+  const applyTemplate = usePipelineStore((s) => s.applyTemplate);
 
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
@@ -240,6 +260,14 @@ function PipelineEditorInner({
     [addNode],
   );
 
+  const handleApplyTemplate = useCallback(
+    (templateId: string) => {
+      applyTemplate(templateId);
+      setShowTemplateMenu(false);
+    },
+    [applyTemplate],
+  );
+
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
   if (collapsed) {
@@ -301,7 +329,39 @@ function PipelineEditorInner({
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
           <button
-            onClick={() => setShowAddMenu(!showAddMenu)}
+            onClick={() => {
+              setShowTemplateMenu(!showTemplateMenu);
+              setShowAddMenu(false);
+            }}
+            style={templateBtnStyle}
+          >
+            Templates
+          </button>
+          {showTemplateMenu && (
+            <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
+              {PIPELINE_TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => handleApplyTemplate(template.id)}
+                  style={{ ...dropdownItemStyle, padding: "8px 14px" }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLElement).style.background = "none";
+                  }}
+                >
+                  <div style={{ fontWeight: 500 }}>{template.label}</div>
+                  <div style={templateItemDescStyle}>{template.description}</div>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setShowAddMenu(!showAddMenu);
+              setShowTemplateMenu(false);
+            }}
             style={addBtnStyle}
           >
             + Add Node
