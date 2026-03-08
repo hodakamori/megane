@@ -28,7 +28,8 @@ async function ensureInit(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       const wasm = await import("../../crates/megane-wasm/pkg");
-      await wasm.default();
+      const wasmUrl = (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ as string | undefined;
+      await wasm.default(wasmUrl);
       wasmParseXtc = wasm.parse_xtc_file;
     })();
   }
