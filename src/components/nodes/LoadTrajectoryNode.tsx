@@ -65,7 +65,7 @@ export function LoadTrajectoryNode({ id, data }: NodeProps<Node<PipelineNodeData
         {params.fileName ? (
           <div style={fileNameStyle}>{params.fileName}</div>
         ) : (
-          <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>
+          <div style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}>
             No trajectory loaded
           </div>
         )}

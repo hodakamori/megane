@@ -13,12 +13,12 @@ import { TabSelector } from "../ui";
 import type { BondSource } from "../../types";
 
 const sectionLabelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 17,
   fontWeight: 600,
   color: "#94a3b8",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
-  marginBottom: 4,
+  marginBottom: 7,
   marginTop: 0,
 };
 

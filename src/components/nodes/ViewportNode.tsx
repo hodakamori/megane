@@ -14,9 +14,9 @@ const toggleRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  fontSize: 11,
+  fontSize: 19,
   color: "#475569",
-  padding: "2px 0",
+  padding: "3px 0",
 };
 
 const toggleStyle: React.CSSProperties = {
@@ -30,7 +30,7 @@ export function ViewportNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
 
   return (
     <NodeShell id={id} nodeType="viewport" enabled={data.enabled}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         <label style={toggleRowStyle}>
           Perspective
           <input

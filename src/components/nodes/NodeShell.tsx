@@ -22,11 +22,11 @@ const nodeStyle: React.CSSProperties = {
   background: "rgba(255, 255, 255, 0.95)",
   backdropFilter: "blur(8px)",
   border: "1px solid #e2e8f0",
-  borderRadius: 8,
-  minWidth: 200,
-  maxWidth: 240,
-  fontSize: 12,
-  boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+  borderRadius: 14,
+  minWidth: 340,
+  maxWidth: 420,
+  fontSize: 20,
+  boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
 };
 
 const disabledStyle: React.CSSProperties = {
@@ -38,14 +38,14 @@ const headerStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "6px 10px",
+  padding: "10px 17px",
   borderBottom: "1px solid #e2e8f0",
-  gap: 6,
+  gap: 10,
 };
 
 const titleStyle: React.CSSProperties = {
   fontWeight: 600,
-  fontSize: 11,
+  fontSize: 19,
   color: "#1e293b",
   letterSpacing: "-0.02em",
   flex: 1,
@@ -55,26 +55,26 @@ const iconBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
   cursor: "pointer",
-  fontSize: 11,
+  fontSize: 19,
   color: "#94a3b8",
-  padding: "2px 4px",
+  padding: "3px 7px",
   lineHeight: 1,
 };
 
 const bodyStyle: React.CSSProperties = {
-  padding: "8px 10px",
+  padding: "14px 17px",
 };
 
 const baseHandleStyle: React.CSSProperties = {
-  width: 8,
-  height: 8,
-  border: "2px solid white",
-  boxShadow: "0 0 2px rgba(0,0,0,0.2)",
+  width: 14,
+  height: 14,
+  border: "3px solid white",
+  boxShadow: "0 0 3px rgba(0,0,0,0.2)",
 };
 
 const handleLabelStyle: React.CSSProperties = {
   position: "absolute",
-  fontSize: 8,
+  fontSize: 14,
   color: "#94a3b8",
   whiteSpace: "nowrap",
   pointerEvents: "none",
@@ -103,7 +103,7 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
 
   const containerStyle: React.CSSProperties = {
     ...(enabled ? nodeStyle : disabledStyle),
-    borderLeft: `3px solid ${categoryColor}`,
+    borderLeft: `5px solid ${categoryColor}`,
   };
 
   return (
@@ -126,7 +126,7 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
             <span
               style={{
                 ...handleLabelStyle,
-                top: -14,
+                top: -22,
                 left: "50%",
                 transform: "translateX(-50%)",
                 color: isDisabled ? "#cbd5e1" : "#94a3b8",
@@ -143,9 +143,9 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
         <div
           onClick={() => toggleNode(id)}
           style={{
-            width: 28,
-            height: 14,
-            borderRadius: 7,
+            width: 48,
+            height: 24,
+            borderRadius: 12,
             background: enabled ? "#3b82f6" : "#cbd5e1",
             position: "relative",
             cursor: "pointer",
@@ -156,13 +156,13 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
         >
           <div
             style={{
-              width: 10,
-              height: 10,
+              width: 18,
+              height: 18,
               borderRadius: "50%",
               background: "white",
               position: "absolute",
-              top: 2,
-              left: enabled ? 16 : 2,
+              top: 3,
+              left: enabled ? 27 : 3,
               transition: "left 0.15s",
             }}
           />
@@ -197,7 +197,7 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
             <span
               style={{
                 ...handleLabelStyle,
-                bottom: -14,
+                bottom: -22,
                 left: "50%",
                 transform: "translateX(-50%)",
                 color: isDisabled ? "#cbd5e1" : "#94a3b8",
