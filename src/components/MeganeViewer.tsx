@@ -23,7 +23,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
-import type { ViewportState, AddBondParams } from "../pipeline/types";
+import type { ViewportState } from "../pipeline/types";
 
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
@@ -77,7 +77,6 @@ export function MeganeViewer({
   const pipelineCollapsedRef = useRef(isNarrow);
   const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
-  const prevBondSourceRef = useRef<string | null>(null);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
@@ -122,24 +121,8 @@ export function MeganeViewer({
     const renderer = rendererRef.current;
     if (!renderer) return;
     applyViewportState(renderer, viewportState, prevViewportStateRef.current);
-
-    // Notify parent about bond source changes from AddBond params
-    // Only call when the bond source actually changes to avoid infinite loops
-    const nodes = usePipelineStore.getState().nodes;
-    const bondNode = nodes.find((n) => n.type === "add_bond");
-    if (bondNode) {
-      const params = bondNode.data.params;
-      if (params.type === "add_bond") {
-        const newBondSource = (params as AddBondParams).bondSource;
-        if (newBondSource !== prevBondSourceRef.current) {
-          prevBondSourceRef.current = newBondSource;
-          onBondSourceChange?.(newBondSource);
-        }
-      }
-    }
-
     prevViewportStateRef.current = viewportState;
-  }, [viewportState, onBondSourceChange]);
+  }, [viewportState]);
 
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
