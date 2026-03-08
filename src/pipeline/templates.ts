@@ -28,7 +28,7 @@ function createMoleculeTemplate(): {
       {
         id: "loader-1",
         type: "load_structure",
-        position: { x: 250, y: 0 },
+        position: { x: 425, y: 0 },
         data: {
           params: {
             type: "load_structure",
@@ -42,7 +42,7 @@ function createMoleculeTemplate(): {
       {
         id: "traj-1",
         type: "load_trajectory",
-        position: { x: 50, y: 180 },
+        position: { x: 85, y: 310 },
         data: {
           params: {
             type: "load_trajectory",
@@ -54,7 +54,7 @@ function createMoleculeTemplate(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 250, y: 180 },
+        position: { x: 425, y: 310 },
         data: {
           params: {
             type: "add_bond",
@@ -66,7 +66,7 @@ function createMoleculeTemplate(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 360 },
+        position: { x: 425, y: 615 },
         data: {
           params: {
             type: "viewport",
@@ -102,7 +102,7 @@ function createSolidTemplate(): {
       {
         id: "loader-1",
         type: "load_structure",
-        position: { x: 250, y: 0 },
+        position: { x: 425, y: 0 },
         data: {
           params: {
             type: "load_structure",
@@ -116,7 +116,7 @@ function createSolidTemplate(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 100, y: 180 },
+        position: { x: 170, y: 310 },
         data: {
           params: {
             type: "add_bond",
@@ -128,7 +128,7 @@ function createSolidTemplate(): {
       {
         id: "polyhedron-1",
         type: "polyhedron_generator",
-        position: { x: 400, y: 180 },
+        position: { x: 680, y: 310 },
         data: {
           params: {
             type: "polyhedron_generator",
@@ -144,7 +144,7 @@ function createSolidTemplate(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 360 },
+        position: { x: 425, y: 615 },
         data: {
           params: {
             type: "viewport",

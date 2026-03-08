@@ -157,7 +157,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     const newNode: Node<PipelineNodeData> = {
       id,
       type,
-      position: position ?? { x: 250, y: get().nodes.length * 200 + 50 },
+      position: position ?? { x: 425, y: get().nodes.length * 340 + 50 },
       data: {
         params: defaultParams(type),
         enabled: true,

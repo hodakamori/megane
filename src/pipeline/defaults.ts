@@ -23,7 +23,7 @@ export function createDefaultPipeline(): {
       {
         id: "loader-1",
         type: "load_structure",
-        position: { x: 250, y: 0 },
+        position: { x: 425, y: 0 },
         data: {
           params: {
             type: "load_structure",
@@ -38,7 +38,7 @@ export function createDefaultPipeline(): {
       {
         id: "traj-1",
         type: "load_trajectory",
-        position: { x: -50, y: 180 },
+        position: { x: -85, y: 310 },
         data: {
           params: {
             type: "load_trajectory",
@@ -50,7 +50,7 @@ export function createDefaultPipeline(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 150, y: 180 },
+        position: { x: 255, y: 310 },
         data: {
           params: {
             type: "add_bond",
@@ -62,7 +62,7 @@ export function createDefaultPipeline(): {
       {
         id: "filter-caf",
         type: "filter",
-        position: { x: 350, y: 180 },
+        position: { x: 595, y: 310 },
         data: {
           params: {
             type: "filter",
@@ -74,7 +74,7 @@ export function createDefaultPipeline(): {
       {
         id: "filter-sol",
         type: "filter",
-        position: { x: 550, y: 180 },
+        position: { x: 935, y: 310 },
         data: {
           params: {
             type: "filter",
@@ -87,7 +87,7 @@ export function createDefaultPipeline(): {
       {
         id: "labels-1",
         type: "label_generator",
-        position: { x: 250, y: 360 },
+        position: { x: 425, y: 615 },
         data: {
           params: {
             type: "label_generator",
@@ -99,7 +99,7 @@ export function createDefaultPipeline(): {
       {
         id: "modify-caf",
         type: "modify",
-        position: { x: 400, y: 360 },
+        position: { x: 680, y: 615 },
         data: {
           params: {
             type: "modify",
@@ -112,7 +112,7 @@ export function createDefaultPipeline(): {
       {
         id: "modify-sol",
         type: "modify",
-        position: { x: 570, y: 360 },
+        position: { x: 970, y: 615 },
         data: {
           params: {
             type: "modify",
@@ -126,7 +126,7 @@ export function createDefaultPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 300, y: 540 },
+        position: { x: 510, y: 920 },
         data: {
           params: {
             type: "viewport",
@@ -167,7 +167,7 @@ export function createDemoPipeline(): {
       {
         id: "loader-1",
         type: "load_structure",
-        position: { x: 250, y: 0 },
+        position: { x: 425, y: 0 },
         data: {
           params: {
             type: "load_structure",
@@ -181,7 +181,7 @@ export function createDemoPipeline(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 250, y: 150 },
+        position: { x: 425, y: 255 },
         data: {
           params: {
             type: "add_bond",
@@ -193,7 +193,7 @@ export function createDemoPipeline(): {
       {
         id: "filter-1",
         type: "filter",
-        position: { x: 50, y: 250 },
+        position: { x: 85, y: 425 },
         data: {
           params: {
             type: "filter",
@@ -205,7 +205,7 @@ export function createDemoPipeline(): {
       {
         id: "modify-1",
         type: "modify",
-        position: { x: 50, y: 450 },
+        position: { x: 85, y: 765 },
         data: {
           params: {
             type: "modify",
@@ -218,7 +218,7 @@ export function createDemoPipeline(): {
       {
         id: "filter-2",
         type: "filter",
-        position: { x: 450, y: 250 },
+        position: { x: 765, y: 425 },
         data: {
           params: {
             type: "filter",
@@ -230,7 +230,7 @@ export function createDemoPipeline(): {
       {
         id: "modify-2",
         type: "modify",
-        position: { x: 450, y: 450 },
+        position: { x: 765, y: 765 },
         data: {
           params: {
             type: "modify",
@@ -243,7 +243,7 @@ export function createDemoPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 250, y: 700 },
+        position: { x: 425, y: 1190 },
         data: {
           params: {
             type: "viewport",
