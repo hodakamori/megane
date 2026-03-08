@@ -44,11 +44,8 @@ Trajectory streaming works over WebSocket via a binary protocol. Load an XTC fil
 
 ## Anywhere
 
-<div class="screenshot-gallery">
-  <img src="/screenshots/jupyter.png" alt="megane in Jupyter Notebook" />
-  <img src="/screenshots/browser-trajectory.png" alt="megane in browser with trajectory" />
-  <img src="/screenshots/vscode.png" alt="megane in VSCode" />
-</div>
+<div class="pillar-two-col">
+  <div class="pillar-text">
 
 One codebase, every environment.
 
@@ -61,16 +58,22 @@ One codebase, every environment.
 
 The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
+  </div>
+  <div class="pillar-images">
+    <img src="/screenshots/jupyter.png" alt="megane in Jupyter Notebook" />
+    <img src="/screenshots/browser-trajectory.png" alt="megane in browser" />
+    <img src="/screenshots/vscode.png" alt="megane in VSCode" />
+  </div>
+</div>
+
 </div>
 
 <div class="pillar-section">
 
 ## Visual Pipelines
 
-<div class="screenshot-gallery">
-  <img src="/screenshots/pipeline-complex.png" alt="Visual Pipeline Editor with complex workflow" />
-  <img src="/screenshots/pipeline-polyhedra.png" alt="Visual Pipeline Editor with polyhedra rendering" />
-</div>
+<div class="pillar-two-col">
+  <div class="pillar-text">
 
 Wire nodes to build visualization workflows — no code required.
 
@@ -79,6 +82,13 @@ Wire nodes to build visualization workflows — no code required.
 **6 typed data channels** — particle, bond, cell, label, mesh, trajectory — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
+
+  </div>
+  <div class="pillar-images">
+    <img src="/screenshots/pipeline-complex.png" alt="Visual Pipeline Editor with complex workflow" />
+    <img src="/screenshots/pipeline-polyhedra.png" alt="Visual Pipeline Editor with polyhedra rendering" />
+  </div>
+</div>
 
 </div>
 
