@@ -381,6 +381,15 @@ function executeLabelGenerator(
       labels = [];
   }
 
+  // If particle data has filtered indices, only keep labels for those atoms
+  if (particleData.indices !== null) {
+    const filtered = new Array<string>(snapshot.nAtoms).fill("");
+    for (const idx of particleData.indices) {
+      filtered[idx] = labels[idx];
+    }
+    labels = filtered;
+  }
+
   const labelData: LabelData = {
     type: "label",
     labels,
