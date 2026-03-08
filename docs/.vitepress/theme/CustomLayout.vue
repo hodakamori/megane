@@ -13,7 +13,16 @@ const { Layout } = DefaultTheme;
     </template>
     <template #home-hero-image>
       <div class="hero-viewer-wrapper">
-        <FullViewerDemo height="600px" />
+        <div class="hero-viewer-desktop">
+          <FullViewerDemo height="600px" />
+        </div>
+        <div class="hero-viewer-mobile">
+          <div class="mobile-demo-card">
+            <div class="mobile-demo-icon">&#x1F9EA;</div>
+            <p class="mobile-demo-text">Interactive 3D molecular viewer</p>
+            <a href="/megane/demo" class="mobile-demo-button">Try Demo</a>
+          </div>
+        </div>
       </div>
     </template>
   </Layout>
@@ -75,12 +84,58 @@ const { Layout } = DefaultTheme;
   overflow: hidden;
 }
 
+/* Desktop: show viewer, hide mobile card */
+.hero-viewer-desktop {
+  display: block;
+}
+.hero-viewer-mobile {
+  display: none;
+}
+
 /*
- * Mobile: hide viewer to avoid overlap with hero text.
+ * Mobile: hide viewer, show demo card instead.
  */
 @media (max-width: 959px) {
-  .VPHero .image {
+  .hero-viewer-desktop {
     display: none;
+  }
+  .hero-viewer-mobile {
+    display: block;
+  }
+
+  .mobile-demo-card {
+    text-align: center;
+    padding: 32px 24px;
+    border-radius: 12px;
+    background: var(--vp-c-bg-soft);
+    border: 1px solid var(--vp-c-divider);
+  }
+
+  .mobile-demo-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+  }
+
+  .mobile-demo-text {
+    color: var(--vp-c-text-2);
+    margin-bottom: 16px;
+    font-size: 0.95rem;
+  }
+
+  .mobile-demo-button {
+    display: inline-block;
+    padding: 8px 24px;
+    border-radius: 20px;
+    background: var(--vp-c-brand-1);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+
+  .mobile-demo-button:hover {
+    background: var(--vp-c-brand-2);
   }
 }
 </style>

@@ -51,6 +51,62 @@ Select 2–4 atoms to measure distances, angles, or dihedral angles.
 | 3 | Angle (°) |
 | 4 | Dihedral angle (°) |
 
+## API Reference
+
+### Constructor
+
+```python
+import megane
+
+viewer = megane.MolecularViewer()
+```
+
+No required arguments. Inherits from `anywidget.AnyWidget`.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `load(pdb_path, xtc=None)` | Load a PDB structure, optionally with an XTC trajectory |
+| `on_event(name, callback=None)` | Register an event callback. Use as `@viewer.on_event("name")` decorator or `viewer.on_event("name", fn)` |
+| `off_event(name, callback=None)` | Remove a specific callback, or all callbacks for the event if `callback` is `None` |
+
+### Properties
+
+| Property | Type | Read/Write | Description |
+|----------|------|------------|-------------|
+| `frame_index` | `int` | R/W | Current trajectory frame (0-based). Setting this fires `frame_change` |
+| `total_frames` | `int` | R | Total number of frames in the loaded trajectory |
+| `selected_atoms` | `list[int]` | R/W | Indices of selected atoms. Setting this fires `selection_change` |
+| `measurement` | `dict \| None` | R | Current measurement result, or `None` if fewer than 2 atoms selected |
+
+The `measurement` dict contains: `type` (`"distance"`, `"angle"`, or `"dihedral"`), `value` (float), `label` (formatted string like `"120.5°"`), and `atoms` (list of indices).
+
+### Events
+
+| Event | Trigger | Payload |
+|-------|---------|---------|
+| `frame_change` | `frame_index` changes | `{"frame_index": int}` |
+| `selection_change` | `selected_atoms` changes | `{"atoms": list[int]}` |
+| `measurement` | Measurement computed or cleared | `{"type": str, "value": float, "label": str, "atoms": list[int]}` or `None` |
+
+```python
+@viewer.on_event("frame_change")
+def on_frame(data):
+    print(f"Frame {data['frame_index']}")
+
+@viewer.on_event("selection_change")
+def on_sel(data):
+    print(f"Selected: {data['atoms']}")
+
+@viewer.on_event("measurement")
+def on_meas(data):
+    if data:
+        print(f"{data['type']}: {data['label']}")
+```
+
+See [Integrations](/guide/integrations) for Plotly integration and advanced event patterns.
+
 ## Troubleshooting
 
 ### VS Code: "Failed to load model class 'AnyModel' from module 'anywidget'"

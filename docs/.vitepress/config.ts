@@ -3,7 +3,7 @@ import path from "path";
 
 export default defineConfig({
   title: "megane",
-  description: "A fast, beautiful molecular viewer",
+  description: "Spectacles for atomistic data",
   base: "/megane/",
 
   head: [["link", { rel: "icon", href: "/megane/logo.png" }]],
@@ -21,7 +21,7 @@ export default defineConfig({
 
     nav: [
       { text: "Guide", link: "/getting-started" },
-      { text: "Examples", link: "/guide/jupyter" },
+      { text: "Demo", link: "/demo" },
       { text: "API", link: "/api/" },
       {
         text: "Links",
@@ -35,18 +35,31 @@ export default defineConfig({
 
     sidebar: [
       {
-        text: "Introduction",
+        text: "Getting Started",
         items: [
           { text: "Getting Started", link: "/getting-started" },
           { text: "Configuration", link: "/configuration" },
         ],
       },
       {
-        text: "Examples",
+        text: "Pipeline",
+        items: [
+          { text: "Pipeline Guide", link: "/guide/pipeline" },
+        ],
+      },
+      {
+        text: "Guides",
         items: [
           { text: "Jupyter Widget", link: "/guide/jupyter" },
           { text: "CLI Server", link: "/guide/cli" },
           { text: "Web / React", link: "/guide/web" },
+          { text: "Integrations", link: "/guide/integrations" },
+        ],
+      },
+      {
+        text: "Demo",
+        items: [
+          { text: "Live Demo", link: "/demo" },
         ],
       },
       {

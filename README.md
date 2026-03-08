@@ -3,7 +3,8 @@
   megane
 </h1>
 
-<p align="center">Desktop-grade molecular visualization. Right in your browser.</p>
+<p align="center">Spectacles for atomistic data.</p>
+<p align="center"><em>1M+ atoms at 60fps. Visual pipelines. Jupyter, browser, React, VSCode.</em></p>
 
 <p align="center">
   <a href="https://github.com/hodakamori/megane/actions/workflows/ci.yml"><img src="https://github.com/hodakamori/megane/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -27,12 +28,10 @@
 
 ## Features
 
-- **1M+ atoms at 60fps** — Billboard impostor rendering with WebGL handles massive protein complexes in real time
-- **Jupyter, CLI, React** — Use as a Jupyter widget, serve from the command line, or embed the React component in your own app
-- **Rust + WASM** — PDB, GRO, XYZ, MOL, and XTC parsers in Rust, shared between Python (PyO3) and browser (WASM)
-- **Trajectory streaming** — Stream XTC trajectories over WebSocket in real time, scrub through thousands of frames
-- **Atom selection & measurement** — Select 2–4 atoms to measure distances, angles, or dihedral angles
-- **Adaptive rendering** — High-quality InstancedMesh for small systems, auto-switches to Billboard Impostor for large systems
+- **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
+- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, and XTC parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes. 8 node types (load, bond, filter, modify, labels, polyhedra, viewport) with 6 typed data channels (particle, bond, cell, label, mesh, trajectory) flowing through color-coded edges.
+- **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
 ## Installation
 
