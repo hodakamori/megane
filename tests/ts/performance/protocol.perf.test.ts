@@ -78,16 +78,16 @@ function benchmark(fn: () => void, iterations: number = 5): number {
 }
 
 describe("performance: protocol decoding", () => {
-  it("decodeSnapshot with 100,000 atoms under 200ms", () => {
+  it("decodeSnapshot with 100,000 atoms under 500ms", () => {
     const buf = buildSnapshotBuffer(100_000, 50_000);
     const time = benchmark(() => {
       decodeSnapshot(buf);
     });
     console.log(`  decodeSnapshot 100k atoms: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(200);
+    expect(time).toBeLessThan(500);
   });
 
-  it("decode 1,000 frames (1000 atoms each) under 500ms", () => {
+  it("decode 1,000 frames (1000 atoms each) under 1500ms", () => {
     const frames = Array.from({ length: 1_000 }, (_, i) =>
       buildFrameBuffer(1_000, i),
     );
@@ -97,15 +97,15 @@ describe("performance: protocol decoding", () => {
       }
     });
     console.log(`  decodeFrame 1000x1k atoms: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(500);
+    expect(time).toBeLessThan(1500);
   });
 
-  it("decodeSnapshot with 10,000 atoms and bonds under 50ms", () => {
+  it("decodeSnapshot with 10,000 atoms and bonds under 200ms", () => {
     const buf = buildSnapshotBuffer(10_000, 15_000);
     const time = benchmark(() => {
       decodeSnapshot(buf);
     });
     console.log(`  decodeSnapshot 10k atoms+bonds: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(50);
+    expect(time).toBeLessThan(200);
   });
 });

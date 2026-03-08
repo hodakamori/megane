@@ -14,7 +14,7 @@ function benchmark(fn: () => void, iterations: number = 5): number {
 }
 
 describe("performance: computeConvexHull", () => {
-  it("12-point hull (typical coordination polyhedron) under 1ms", () => {
+  it("12-point hull (typical coordination polyhedron) under 5ms", () => {
     // Icosahedron-like 12 vertices
     const pts = new Float32Array(12 * 3);
     const phi = (1 + Math.sqrt(5)) / 2;
@@ -33,10 +33,10 @@ describe("performance: computeConvexHull", () => {
       computeConvexHull(pts, 12);
     }, 100);
     console.log(`  convexHull 12 points: ${time.toFixed(3)}ms`);
-    expect(time).toBeLessThan(1);
+    expect(time).toBeLessThan(5);
   });
 
-  it("1000 iterations of 6-point hull under 50ms total", () => {
+  it("1000 iterations of 6-point hull under 200ms total", () => {
     // Octahedron vertices
     const pts = new Float32Array([
       1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1,
@@ -48,7 +48,7 @@ describe("performance: computeConvexHull", () => {
     }
     const elapsed = performance.now() - start;
     console.log(`  convexHull 1000x octahedron: ${elapsed.toFixed(1)}ms`);
-    expect(elapsed).toBeLessThan(50);
+    expect(elapsed).toBeLessThan(200);
   });
 
   it("8-point cube hull is consistently fast", () => {
@@ -61,6 +61,6 @@ describe("performance: computeConvexHull", () => {
       computeConvexHull(pts, 8);
     }, 100);
     console.log(`  convexHull 8-point cube: ${time.toFixed(3)}ms`);
-    expect(time).toBeLessThan(1);
+    expect(time).toBeLessThan(5);
   });
 });

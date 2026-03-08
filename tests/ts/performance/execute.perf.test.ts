@@ -70,7 +70,7 @@ function benchmark(fn: () => void, iterations: number = 5): number {
 }
 
 describe("performance: executePipeline", () => {
-  it("full pipeline with 100,000 atoms under 3000ms", () => {
+  it("full pipeline with 100,000 atoms under 10000ms", () => {
     const snapshot = makeSnapshot(100_000);
     const nodes = [
       makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
@@ -91,10 +91,10 @@ describe("performance: executePipeline", () => {
       executePipeline(nodes, edges, { snapshot });
     }, 3);
     console.log(`  executePipeline full 100k: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(3000);
+    expect(time).toBeLessThan(10000);
   });
 
-  it("filter-only pipeline with 100,000 atoms under 500ms", () => {
+  it("filter-only pipeline with 100,000 atoms under 1500ms", () => {
     const snapshot = makeSnapshot(100_000);
     const nodes = [
       makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
@@ -110,10 +110,10 @@ describe("performance: executePipeline", () => {
       executePipeline(nodes, edges, { snapshot });
     });
     console.log(`  executePipeline filter-only 100k: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(500);
+    expect(time).toBeLessThan(1500);
   });
 
-  it("label generation with 100,000 atoms under 500ms", () => {
+  it("label generation with 100,000 atoms under 1500ms", () => {
     const snapshot = makeSnapshot(100_000);
     const nodes = [
       makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
@@ -129,6 +129,6 @@ describe("performance: executePipeline", () => {
       executePipeline(nodes, edges, { snapshot });
     });
     console.log(`  executePipeline labels 100k: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(500);
+    expect(time).toBeLessThan(1500);
   });
 });

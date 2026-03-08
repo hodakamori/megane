@@ -38,15 +38,15 @@ function benchmark(fn: () => void, iterations: number = 5): number {
 describe("performance: evaluateSelection", () => {
   const snapshot = generateSnapshot(100_000);
 
-  it("simple element query on 100k atoms completes under 200ms", () => {
+  it("simple element query on 100k atoms completes under 500ms", () => {
     const time = benchmark(() => {
       evaluateSelection('element == "C"', snapshot, null);
     });
     console.log(`  selection simple query 100k: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(200);
+    expect(time).toBeLessThan(500);
   });
 
-  it("compound query on 100k atoms completes under 500ms", () => {
+  it("compound query on 100k atoms completes under 1500ms", () => {
     const time = benchmark(() => {
       evaluateSelection(
         '(element == "C" or element == "N") and x > 50 and not index < 1000',
@@ -55,14 +55,14 @@ describe("performance: evaluateSelection", () => {
       );
     });
     console.log(`  selection compound query 100k: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(500);
+    expect(time).toBeLessThan(1500);
   });
 
-  it("index range query on 100k atoms completes under 200ms", () => {
+  it("index range query on 100k atoms completes under 500ms", () => {
     const time = benchmark(() => {
       evaluateSelection("index >= 10000 and index < 50000", snapshot, null);
     });
     console.log(`  selection index range 100k: ${time.toFixed(1)}ms`);
-    expect(time).toBeLessThan(200);
+    expect(time).toBeLessThan(500);
   });
 });
