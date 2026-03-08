@@ -7,7 +7,8 @@ import type { PipelineNodeData } from "./execute";
 
 /**
  * Create the default pipeline: caffeine + semi-transparent water solvent.
- * DataLoader → Filter(caffeine) + Filter(water) → Modify(opacity) → Viewport
+ * LoadStructure → Filter(caffeine) + Filter(water) → Modify(opacity) → Viewport
+ * AddBond → Viewport
  */
 export function createDefaultPipeline(): {
   nodes: Node<PipelineNodeData>[];
@@ -17,12 +18,25 @@ export function createDefaultPipeline(): {
     nodes: [
       {
         id: "loader-1",
-        type: "data_loader",
+        type: "load_structure",
         position: { x: 250, y: 0 },
         data: {
           params: {
-            type: "data_loader",
+            type: "load_structure",
             fileName: "caffeine_water.pdb",
+            hasTrajectory: false,
+            hasCell: true,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "addbond-1",
+        type: "add_bond",
+        position: { x: 500, y: 180 },
+        data: {
+          params: {
+            type: "add_bond",
             bondSource: "structure",
           },
           enabled: true,
@@ -43,7 +57,7 @@ export function createDefaultPipeline(): {
       {
         id: "filter-sol",
         type: "filter",
-        position: { x: 450, y: 180 },
+        position: { x: 250, y: 180 },
         data: {
           params: {
             type: "filter",
@@ -55,7 +69,7 @@ export function createDefaultPipeline(): {
       {
         id: "modify-sol",
         type: "modify",
-        position: { x: 450, y: 340 },
+        position: { x: 250, y: 340 },
         data: {
           params: {
             type: "modify",
@@ -85,8 +99,9 @@ export function createDefaultPipeline(): {
       { id: "e3", source: "filter-caf", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
       { id: "e4", source: "filter-sol", target: "modify-sol", sourceHandle: "out", targetHandle: "in" },
       { id: "e5", source: "modify-sol", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e6", source: "loader-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e7", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
+      { id: "e6", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
+      { id: "e7", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
+      { id: "e8", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
     ],
   };
 }
@@ -102,12 +117,25 @@ export function createDemoPipeline(): {
     nodes: [
       {
         id: "loader-1",
-        type: "data_loader",
+        type: "load_structure",
         position: { x: 250, y: 0 },
         data: {
           params: {
-            type: "data_loader",
+            type: "load_structure",
             fileName: "protein.pdb",
+            hasTrajectory: false,
+            hasCell: false,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "addbond-1",
+        type: "add_bond",
+        position: { x: 250, y: 150 },
+        data: {
+          params: {
+            type: "add_bond",
             bondSource: "structure",
           },
           enabled: true,
@@ -184,8 +212,8 @@ export function createDemoPipeline(): {
       { id: "e4", source: "filter-2", target: "modify-2", sourceHandle: "out", targetHandle: "in" },
       { id: "e5", source: "modify-1", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
       { id: "e6", source: "modify-2", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e7", source: "loader-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e8", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
+      { id: "e7", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
+      { id: "e8", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
     ],
   };
 }

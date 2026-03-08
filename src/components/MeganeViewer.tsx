@@ -14,7 +14,8 @@ import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
-import { setStructureLoadHandler } from "./nodes/DataLoaderNode";
+import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
+import { setTrajectoryLoadHandler } from "./nodes/LoadTrajectoryNode";
 import type {
   Snapshot,
   Frame,
@@ -22,7 +23,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
-import type { ViewportState } from "../pipeline/types";
+import type { ViewportState, AddBondParams } from "../pipeline/types";
 
 interface MeganeViewerProps {
   snapshot: Snapshot | null;
@@ -35,6 +36,7 @@ interface MeganeViewerProps {
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
   onUploadStructure: (file: File) => void;
+  onUploadTrajectory?: (file: File) => void;
   onBondSourceChange?: (source: string) => void;
   onLabelSourceChange?: (source: string) => void;
   onLoadLabelFile?: (file: File) => void;
@@ -56,6 +58,7 @@ export function MeganeViewer({
   onPlayPause,
   onFpsChange,
   onUploadStructure,
+  onUploadTrajectory,
   onBondSourceChange,
   onLabelSourceChange,
   onLoadLabelFile,
@@ -103,19 +106,28 @@ export function MeganeViewer({
     };
   }, [onUploadStructure]);
 
+  useEffect(() => {
+    if (onUploadTrajectory) {
+      setTrajectoryLoadHandler((file) => onUploadTrajectory(file));
+    }
+    return () => {
+      setTrajectoryLoadHandler(null);
+    };
+  }, [onUploadTrajectory]);
+
   // Apply viewportState changes to the renderer
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
     applyViewportState(renderer, viewportState, prevViewportStateRef.current);
 
-    // Notify parent about bond source changes from DataLoader params
+    // Notify parent about bond source changes from AddBond params
     const nodes = usePipelineStore.getState().nodes;
-    const loaderNode = nodes.find((n) => n.type === "data_loader");
-    if (loaderNode) {
-      const params = loaderNode.data.params;
-      if (params.type === "data_loader") {
-        onBondSourceChange?.(params.bondSource);
+    const bondNode = nodes.find((n) => n.type === "add_bond");
+    if (bondNode) {
+      const params = bondNode.data.params;
+      if (params.type === "add_bond") {
+        onBondSourceChange?.((params as AddBondParams).bondSource);
       }
     }
 
@@ -125,10 +137,10 @@ export function MeganeViewer({
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
     const nodes = usePipelineStore.getState().nodes;
-    const loaderNode = nodes.find((n) => n.type === "data_loader");
-    if (!loaderNode) return;
-    const params = loaderNode.data.params;
-    if (params.type !== "data_loader" || params.bondSource !== "distance") return;
+    const bondNode = nodes.find((n) => n.type === "add_bond");
+    if (!bondNode) return;
+    const params = bondNode.data.params;
+    if (params.type !== "add_bond" || (params as AddBondParams).bondSource !== "distance") return;
     if (!snapshot || !frame) return;
     const renderer = rendererRef.current;
     if (!renderer) return;

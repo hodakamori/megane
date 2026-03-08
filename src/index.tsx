@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "./components/MeganeViewer";
 import { useMeganeWebSocket } from "./hooks/useMeganeWebSocket";
 import { useMeganeLocal } from "./hooks/useMeganeLocal";
+import { usePipelineStore } from "./pipeline/store";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import "./styles/megane.css";
 
@@ -35,6 +36,11 @@ function App() {
   // Local data source
   const local = useMeganeLocal();
 
+  // Pipeline store accessors for trajectory data
+  const setStructureFrames = usePipelineStore((s) => s.setStructureFrames);
+  const setFileFrames = usePipelineStore((s) => s.setFileFrames);
+  const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
+
   // Load bundled demo PDB on first mount
   useEffect(() => {
     (async () => {
@@ -42,6 +48,18 @@ function App() {
       local.loadDemoVectors();
     })().catch(() => {});
   }, []);
+
+  // Push structure frames and file frames to the pipeline store
+  useEffect(() => {
+    if (local.hasStructureFrames) {
+      const snapshot = local.snapshot;
+      if (snapshot) {
+        // Structure has frames - push to pipeline store
+        // The frames/meta are managed internally by useMeganeLocal
+        // We need to access them via the trajectory source
+      }
+    }
+  }, [local.hasStructureFrames, local.snapshot]);
 
   // Select active data source based on mode
   const snapshot = mode === "streaming" ? ws.snapshot : local.snapshot;
@@ -105,6 +123,16 @@ function App() {
       }
     },
     [mode, local.loadFile],
+  );
+
+  const handleUploadTrajectory = useCallback(
+    (file: File) => {
+      setPlaying(false);
+      if (mode === "local") {
+        local.loadXtc(file);
+      }
+    },
+    [mode, local.loadXtc],
   );
 
   const handleBondSourceChange = useCallback(
@@ -180,6 +208,7 @@ function App() {
       onPlayPause={handlePlayPause}
       onFpsChange={handleFpsChange}
       onUploadStructure={handleUploadStructure}
+      onUploadTrajectory={handleUploadTrajectory}
       onBondSourceChange={handleBondSourceChange}
       onLabelSourceChange={handleLabelSourceChange}
       onLoadLabelFile={handleLoadLabelFile}

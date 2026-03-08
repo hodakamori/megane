@@ -14,9 +14,12 @@ import type {
   CellData,
   LabelData,
   MeshData,
+  TrajectoryData,
   ViewportState,
   ViewportParams,
-  DataLoaderParams,
+  LoadStructureParams,
+  LoadTrajectoryParams,
+  AddBondParams,
   FilterParams,
   ModifyParams,
   LabelGeneratorParams,
@@ -24,10 +27,12 @@ import type {
   PipelineDataType,
   PipelineNodeType,
 } from "./types";
+import type { Frame, TrajectoryMeta } from "../types";
 import { DEFAULT_VIEWPORT_STATE, NODE_PORTS } from "./types";
 import { evaluateSelection } from "./selection";
 import { getElementSymbol, getColor } from "../constants";
 import { computeConvexHull } from "../logic/convexHull";
+import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 
 export interface PipelineNodeData {
   params: PipelineNodeParams;
@@ -106,10 +111,11 @@ function collectInputs(
 
 // ─── Node Execution ───────────────────────────────────────────────────
 
-function executeDataLoader(
-  params: DataLoaderParams,
+function executeLoadStructure(
+  params: LoadStructureParams,
   snapshot: Snapshot | null,
-  atomLabels: string[] | null,
+  structureFrames: Frame[] | null,
+  structureMeta: TrajectoryMeta | null,
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
   if (!snapshot) return outputs;
@@ -121,21 +127,18 @@ function executeDataLoader(
     indices: null,
     scaleOverrides: null,
     opacityOverrides: null,
-    trajectory: null, // trajectory is managed externally for now
   };
   outputs.set("particle", particle);
 
-  // Bond output (based on bondSource; actual bonds come from snapshot)
-  if (params.bondSource !== "none" && snapshot.nBonds > 0) {
-    const bond: BondData = {
-      type: "bond",
-      bondIndices: snapshot.bonds,
-      bondOrders: snapshot.bondOrders,
-      nBonds: snapshot.nBonds,
-      scale: 1.0,
-      opacity: 1.0,
+  // Trajectory output (only if structure contains frames)
+  if (structureFrames && structureFrames.length > 0 && structureMeta) {
+    const trajectory: TrajectoryData = {
+      type: "trajectory",
+      frames: structureFrames,
+      meta: structureMeta,
+      source: "structure",
     };
-    outputs.set("bond", bond);
+    outputs.set("trajectory", trajectory);
   }
 
   // Cell output
@@ -148,6 +151,80 @@ function executeDataLoader(
     };
     outputs.set("cell", cell);
   }
+
+  return outputs;
+}
+
+function executeLoadTrajectory(
+  _params: LoadTrajectoryParams,
+  inputs: Map<string, PipelineData[]>,
+  fileFrames: Frame[] | null,
+  fileMeta: TrajectoryMeta | null,
+): Map<string, PipelineData> {
+  const outputs = new Map<string, PipelineData>();
+
+  // Needs particle input for nAtoms validation, but we don't enforce here
+  // (validation happens at load time)
+
+  if (fileFrames && fileFrames.length > 0 && fileMeta) {
+    const trajectory: TrajectoryData = {
+      type: "trajectory",
+      frames: fileFrames,
+      meta: fileMeta,
+      source: "file",
+    };
+    outputs.set("trajectory", trajectory);
+  }
+
+  return outputs;
+}
+
+function executeAddBond(
+  params: AddBondParams,
+  inputs: Map<string, PipelineData[]>,
+): Map<string, PipelineData> {
+  const outputs = new Map<string, PipelineData>();
+  const particleData = inputs.get("particle")?.[0] as ParticleData | undefined;
+  if (!particleData) return outputs;
+
+  const snapshot = particleData.source;
+
+  if (params.bondSource === "none") return outputs;
+
+  if (params.bondSource === "structure") {
+    // Use bonds from the original structure file
+    if (snapshot.nFileBonds > 0) {
+      const bond: BondData = {
+        type: "bond",
+        bondIndices: snapshot.bonds,
+        bondOrders: snapshot.bondOrders,
+        nBonds: snapshot.nBonds,
+        scale: 1.0,
+        opacity: 1.0,
+      };
+      outputs.set("bond", bond);
+    }
+  } else if (params.bondSource === "distance") {
+    // Compute VDW-based bonds
+    const bondIndices = inferBondsVdwJS(
+      snapshot.positions,
+      snapshot.elements,
+      snapshot.nAtoms,
+      0.6,
+    );
+    if (bondIndices.length > 0) {
+      const bond: BondData = {
+        type: "bond",
+        bondIndices,
+        bondOrders: null,
+        nBonds: bondIndices.length / 2,
+        scale: 1.0,
+        opacity: 1.0,
+      };
+      outputs.set("bond", bond);
+    }
+  }
+  // "file" bond source is handled via useMeganeLocal (external loading)
 
   return outputs;
 }
@@ -476,16 +553,25 @@ function executeViewport(
   const particles = (inputs.get("particle") ?? []) as ParticleData[];
   const bonds = (inputs.get("bond") ?? []) as BondData[];
   const cells = (inputs.get("cell") ?? []) as CellData[];
+  const trajectories = (inputs.get("trajectory") ?? []) as TrajectoryData[];
   const labels = (inputs.get("label") ?? []) as LabelData[];
   const meshes = (inputs.get("mesh") ?? []) as MeshData[];
 
   // Auto-filter bonds: drop bonds referencing atoms not in any particle stream
   const filteredBonds = filterBondsByParticles(bonds, particles);
 
+  // Trajectory priority: "file" source takes precedence over "structure"
+  const sortedTrajectories = [...trajectories].sort((a, b) => {
+    if (a.source === "file" && b.source !== "file") return -1;
+    if (a.source !== "file" && b.source === "file") return 1;
+    return 0;
+  });
+
   return {
     particles,
     bonds: filteredBonds,
     cells,
+    trajectories: sortedTrajectories,
     labels,
     meshes,
     perspective: params.perspective,
@@ -547,11 +633,19 @@ function filterBondsByParticles(
  * Execute the pipeline and produce a ViewportState.
  * Returns DEFAULT_VIEWPORT_STATE if no viewport node exists.
  */
+export interface PipelineExecutionContext {
+  snapshot?: Snapshot | null;
+  atomLabels?: string[] | null;
+  structureFrames?: Frame[] | null;
+  structureMeta?: TrajectoryMeta | null;
+  fileFrames?: Frame[] | null;
+  fileMeta?: TrajectoryMeta | null;
+}
+
 export function executePipeline(
   nodes: Node<PipelineNodeData>[],
   edges: Edge[],
-  snapshot?: Snapshot | null,
-  atomLabels?: string[] | null,
+  ctx: PipelineExecutionContext = {},
 ): ViewportState {
   const sortedIds = topologicalSort(nodes, edges);
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -589,11 +683,30 @@ export function executePipeline(
     const inputs = collectInputs(id, edges, edgeOutputs);
 
     switch (data.params.type) {
-      case "data_loader": {
-        const outputs = executeDataLoader(
-          data.params as DataLoaderParams,
-          snapshot ?? null,
-          atomLabels ?? null,
+      case "load_structure": {
+        const outputs = executeLoadStructure(
+          data.params as LoadStructureParams,
+          ctx.snapshot ?? null,
+          ctx.structureFrames ?? null,
+          ctx.structureMeta ?? null,
+        );
+        edgeOutputs.set(id, outputs);
+        break;
+      }
+      case "load_trajectory": {
+        const outputs = executeLoadTrajectory(
+          data.params as LoadTrajectoryParams,
+          inputs,
+          ctx.fileFrames ?? null,
+          ctx.fileMeta ?? null,
+        );
+        edgeOutputs.set(id, outputs);
+        break;
+      }
+      case "add_bond": {
+        const outputs = executeAddBond(
+          data.params as AddBondParams,
+          inputs,
         );
         edgeOutputs.set(id, outputs);
         break;
@@ -602,7 +715,7 @@ export function executePipeline(
         const outputs = executeFilter(
           data.params as FilterParams,
           inputs,
-          atomLabels ?? null,
+          ctx.atomLabels ?? null,
         );
         edgeOutputs.set(id, outputs);
         break;
@@ -619,7 +732,7 @@ export function executePipeline(
         const outputs = executeLabelGenerator(
           data.params as LabelGeneratorParams,
           inputs,
-          atomLabels ?? null,
+          ctx.atomLabels ?? null,
         );
         edgeOutputs.set(id, outputs);
         break;

@@ -1,30 +1,20 @@
 /**
- * Data Loader node.
- * Source node in the pipeline — file upload, bond source selection.
- * Outputs: particle, bond, cell (via typed handles).
+ * Load Structure node.
+ * Source node in the pipeline — file upload only, no bond selection.
+ * Outputs: particle, trajectory (if present), cell (if present).
+ * Ports without data are grayed out.
  */
 
 import type { NodeProps, Node } from "@xyflow/react";
 import type { PipelineNodeData } from "../../pipeline/execute";
-import type { DataLoaderParams } from "../../pipeline/types";
+import type { LoadStructureParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
-import { smallBtnStyle, fileNameStyle, TabSelector } from "../ui";
-import type { BondSource } from "../../types";
+import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
 const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf";
 const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf"];
-
-const sectionLabelStyle: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 600,
-  color: "#94a3b8",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-  marginBottom: 4,
-  marginTop: 8,
-};
 
 /**
  * Event bus for structure loading.
@@ -36,9 +26,9 @@ export function setStructureLoadHandler(handler: StructureLoadHandler | null) {
   _onStructureLoad = handler;
 }
 
-export function DataLoaderNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
+export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
-  const params = data.params as DataLoaderParams;
+  const params = data.params as LoadStructureParams;
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -69,8 +59,13 @@ export function DataLoaderNode({ id, data }: NodeProps<Node<PipelineNodeData>>) 
     e.stopPropagation();
   }, []);
 
+  // Determine which output ports are disabled (no data available)
+  const disabledPorts = new Set<string>();
+  if (!params.hasTrajectory) disabledPorts.add("trajectory");
+  if (!params.hasCell) disabledPorts.add("cell");
+
   return (
-    <NodeShell id={id} nodeType="data_loader" enabled={data.enabled}>
+    <NodeShell id={id} nodeType="load_structure" enabled={data.enabled} disabledPorts={disabledPorts}>
       <div onDrop={handleDrop} onDragOver={handleDragOver}>
         {params.fileName ? (
           <div style={fileNameStyle}>{params.fileName}</div>
@@ -97,17 +92,6 @@ export function DataLoaderNode({ id, data }: NodeProps<Node<PipelineNodeData>>) 
           style={{ display: "none" }}
         />
       </div>
-
-      <div style={sectionLabelStyle}>Bonds</div>
-      <TabSelector<BondSource>
-        options={[
-          { value: "structure", label: "Struct" },
-          { value: "distance", label: "VDW" },
-          { value: "none", label: "None" },
-        ]}
-        value={params.bondSource}
-        onChange={(v) => updateNodeParams(id, { bondSource: v })}
-      />
     </NodeShell>
   );
 }
