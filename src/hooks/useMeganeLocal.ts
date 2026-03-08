@@ -138,7 +138,7 @@ export function useMeganeLocal(): MeganeLocalState {
   }, [applyResult]);
 
   const loadText = useCallback(async (text: string, fileName?: string) => {
-    const result = await parseStructureText(text);
+    const result = await parseStructureText(text, fileName);
     applyResult(result);
     setPdbFileName(fileName ?? "caffeine_water.pdb");
     setXtcFileName(result.meta ? "PDB models" : null);

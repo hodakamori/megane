@@ -106,7 +106,7 @@ function createSolidTemplate(): {
         data: {
           params: {
             type: "load_structure",
-            fileName: "perovskite_srtio3.xyz",
+            fileName: "perovskite_srtio3_3x3x3.xyz",
             hasTrajectory: false,
             hasCell: true,
           },

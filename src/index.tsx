@@ -12,7 +12,7 @@ import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
-import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3.xyz?raw";
+import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3_3x3x3.xyz?raw";
 import "./styles/megane.css";
 
 import type { DataMode } from "./types";
@@ -49,7 +49,7 @@ function App() {
         const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
         await ds.local.loadXtc(xtcFile);
       } else if (pendingTemplateId === "solid") {
-        await ds.local.loadText(perovskiteXYZ, "perovskite_srtio3.xyz");
+        await ds.local.loadText(perovskiteXYZ, "perovskite_srtio3_3x3x3.xyz");
       }
       clearPendingTemplate();
     })().catch(() => {});
