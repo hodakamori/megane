@@ -401,7 +401,7 @@ import type {
   HoverInfo,           // Atom/bond hover information
   SelectionState,      // Current atom selection
   Measurement,         // Distance/angle/dihedral result
-  BondSource,          // "structure" | "file" | "distance"
+  BondSource,          // "structure" | "file" | "distance" | "none"
   BondConfig,          // Bond panel configuration
   TrajectoryConfig,    // Trajectory panel configuration
   LabelConfig,         // Label panel configuration

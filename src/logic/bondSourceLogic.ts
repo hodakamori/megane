@@ -36,6 +36,7 @@ export async function computeBondsForSource(
 ): Promise<Snapshot | null> {
   const base = refs.baseSnapshot;
   if (!base) return null;
+  if (source === "none") return null;
   switch (source) {
     case "structure":
       return base;
