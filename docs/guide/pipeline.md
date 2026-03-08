@@ -134,6 +134,18 @@ The Polyhedron Generator node creates coordination polyhedra — convex hulls ar
 
 Or use the **Solid** template which sets this up automatically.
 
+## Example: Make Solvent Translucent
+
+Use Filter + Modify nodes to fade out water molecules while keeping the protein fully visible.
+
+1. Add a `LoadStructure` node and load your PDB file
+2. Add a `Filter` node with query: `resname == "HOH"`
+3. Add a `Modify` node and set opacity to 0.2, scale to 0.5
+4. Connect: `LoadStructure.particle → Filter.particle → Modify.particle → Viewport.particle`
+5. Connect the original `LoadStructure.particle → Viewport.particle` as well (for the protein)
+
+The viewport renders both streams — the protein at full opacity, and the water as translucent small spheres.
+
 ## Serialization
 
 Pipelines serialize to JSON and can be saved, loaded, and version-controlled. The serialization format includes node types, parameters, positions, and edge connections.

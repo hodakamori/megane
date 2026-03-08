@@ -27,7 +27,7 @@ features:
   - title: "\U0001F9E9 Visual Pipeline Editor"
     details: Build visualization workflows by wiring nodes — filter atoms, adjust styles, generate labels, render coordination polyhedra. No code required. Typed data flows through color-coded edges.
   - title: "\U0001F517 Embed & Integrate"
-    details: Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. Connect via ipywidgets events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
+    details: Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to frame_change, selection_change, and measurement events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 ---
 
 <div class="pillar-section">

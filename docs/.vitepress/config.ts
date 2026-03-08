@@ -57,6 +57,12 @@ export default defineConfig({
         ],
       },
       {
+        text: "Demo",
+        items: [
+          { text: "Live Demo", link: "/demo" },
+        ],
+      },
+      {
         text: "API Reference",
         items: [
           { text: "Overview", link: "/api/" },
