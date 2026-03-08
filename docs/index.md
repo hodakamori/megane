@@ -44,6 +44,12 @@ Trajectory streaming works over WebSocket via a binary protocol. Load an XTC fil
 
 ## Anywhere
 
+<div class="screenshot-gallery">
+  <img src="/screenshots/jupyter.png" alt="megane in Jupyter Notebook" />
+  <img src="/screenshots/browser-trajectory.png" alt="megane in browser with trajectory" />
+  <img src="/screenshots/vscode.png" alt="megane in VSCode" />
+</div>
+
 One codebase, every environment.
 
 | Environment | How | Install |
@@ -60,6 +66,11 @@ The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and comp
 <div class="pillar-section">
 
 ## Visual Pipelines
+
+<div class="screenshot-gallery">
+  <img src="/screenshots/pipeline-complex.png" alt="Visual Pipeline Editor with complex workflow" />
+  <img src="/screenshots/pipeline-polyhedra.png" alt="Visual Pipeline Editor with polyhedra rendering" />
+</div>
 
 Wire nodes to build visualization workflows — no code required.
 

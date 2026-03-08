@@ -35,11 +35,20 @@
 
 ### Scale
 
+<p align="center">
+  <img src="docs/public/screenshots/browser-trajectory.png" alt="megane rendering 1M+ atoms in the browser" width="640" />
+</p>
+
 megane renders over **1 million atoms at 60fps** in the browser. Small systems get high-quality InstancedMesh spheres and cylinders; large systems automatically switch to GPU-accelerated billboard impostors. No desktop app, no plugin — just a browser tab.
 
 Trajectory streaming works over WebSocket via a binary protocol. Load an XTC file and scrub through thousands of frames in real time, without reading everything into memory.
 
 ### Anywhere
+
+<p align="center">
+  <img src="docs/public/screenshots/jupyter.png" alt="megane in Jupyter Notebook" width="320" />
+  <img src="docs/public/screenshots/vscode.png" alt="megane in VSCode" width="320" />
+</p>
 
 One codebase, every environment.
 
@@ -53,6 +62,11 @@ One codebase, every environment.
 The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
+
+<p align="center">
+  <img src="docs/public/screenshots/pipeline-complex.png" alt="Visual Pipeline Editor with complex workflow" width="320" />
+  <img src="docs/public/screenshots/pipeline-polyhedra.png" alt="Visual Pipeline Editor with polyhedra rendering" width="320" />
+</p>
 
 Wire nodes to build visualization workflows — no code required.
 

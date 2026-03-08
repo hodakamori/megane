@@ -12,6 +12,34 @@
   --vp-c-brand-soft: rgba(45, 212, 191, 0.14);
 }
 
+/* ── Screenshot gallery ── */
+
+.screenshot-gallery {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+.screenshot-gallery img {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  max-width: 320px;
+  width: 100%;
+  height: auto;
+}
+
+.dark .screenshot-gallery img {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 640px) {
+  .screenshot-gallery img {
+    max-width: 100%;
+  }
+}
+
 /* ── nbconvert notebook layout ── */
 
 .nb-container {
