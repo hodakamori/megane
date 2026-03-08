@@ -40,7 +40,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           cd vscode-megane
-          npm version "$VERSION" --no-git-tag-version
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Build extension
         run: cd vscode-megane && npm run build
