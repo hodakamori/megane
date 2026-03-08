@@ -1,0 +1,71 @@
+{
+  "name": "vscode-megane",
+  "displayName": "megane - Molecular Viewer",
+  "description": "View molecular structure files (PDB, GRO, XYZ, MOL, SDF) with megane",
+  "version": "0.1.0",
+  "publisher": "hodakamori",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hodakamori/megane.git"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Visualization"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "megane.structureViewer",
+        "displayName": "megane Molecular Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.pdb"
+          },
+          {
+            "filenamePattern": "*.gro"
+          },
+          {
+            "filenamePattern": "*.xyz"
+          },
+          {
+            "filenamePattern": "*.mol"
+          },
+          {
+            "filenamePattern": "*.sdf"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "scripts": {
+    "build:webview": "vite build --config vite.webview.config.ts",
+    "build:extension": "tsc -p tsconfig.json",
+    "build": "npm run build:webview && npm run build:extension",
+    "watch": "tsc -p tsconfig.json --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/vscode": "^1.80.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.172.0",
+    "zustand": "^5.0.0"
+  }
+}
