@@ -28,7 +28,7 @@ export interface BondSourceRefs {
 
 /**
  * Compute the snapshot for a given bond source.
- * Returns the new snapshot, or null if no change is needed (e.g. "none").
+ * Returns the new snapshot, or null if no base snapshot is available.
  */
 export async function computeBondsForSource(
   source: BondSource,
@@ -36,8 +36,6 @@ export async function computeBondsForSource(
 ): Promise<Snapshot | null> {
   const base = refs.baseSnapshot;
   if (!base) return null;
-  if (source === "none") return null;
-
   switch (source) {
     case "structure":
       return base;

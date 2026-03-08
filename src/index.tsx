@@ -144,9 +144,9 @@ function App() {
   const handleBondSourceChange = useCallback(
     (source: string) => {
       if (mode === "streaming") {
-        ws.setBondSource(source as "structure" | "file" | "distance" | "none");
+        ws.setBondSource(source as "structure" | "file" | "distance");
       } else {
-        local.setBondSource(source as "structure" | "file" | "distance" | "none");
+        local.setBondSource(source as "structure" | "file" | "distance");
       }
     },
     [mode, ws.setBondSource, local.setBondSource],
