@@ -12,6 +12,9 @@ export interface Snapshot {
   box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
 }
 
+/** Data mode for the application. */
+export type DataMode = "streaming" | "local";
+
 /** Bond source mode. */
 export type BondSource = "structure" | "file" | "distance" | "none";
 

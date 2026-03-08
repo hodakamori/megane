@@ -18,6 +18,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
+// (HoverInfo/Measurement used via return types; keep imports for type compatibility)
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
@@ -27,14 +28,18 @@ import { ArrowRenderer } from "./ArrowRenderer";
 import { PolyhedronRenderer } from "./PolyhedronRenderer";
 import type { MeshData } from "../pipeline/types";
 import {
-  getElementSymbol,
   getRadius,
   BALL_STICK_ATOM_SCALE,
-  BOND_ORDER_NAMES,
 } from "../constants";
-
-// Temporary vector for screen-space projection (avoids allocation per atom)
-const _projVec = new THREE.Vector4();
+import { pickAtPixel } from "./Picking";
+import { computeMeasurement } from "./Selection";
+import {
+  computeViewBounds,
+  fitCameraToView,
+  applyFrustumInsets,
+  createSwitchedCamera,
+  type ViewExtent,
+} from "./CameraManager";
 
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
@@ -53,9 +58,7 @@ export class MoleculeRenderer {
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
-  private lastExtent = 1;
-  private lastExtentX = 1;
-  private lastExtentY = 1;
+  private lastExtent: ViewExtent = { maxExtent: 1, extentX: 1, extentY: 1 };
   private currentPositions: Float32Array | null = null;
   /** Axes-inset drag state */
   private axesDragging = false;
@@ -469,94 +472,10 @@ export class MoleculeRenderer {
 
   /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
-    const { positions, nAtoms } = snapshot;
-
-    // Compute centroid (center of mass assuming equal weights)
-    let sumX = 0, sumY = 0, sumZ = 0;
-    for (let i = 0; i < nAtoms; i++) {
-      sumX += positions[i * 3];
-      sumY += positions[i * 3 + 1];
-      sumZ += positions[i * 3 + 2];
-    }
-
-    let cx: number, cy: number, cz: number;
-
-    // Determine bounding box for zoom fitting
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-
-    const hasBox = snapshot.box && snapshot.box.some((v) => v !== 0);
-
-    if (hasBox) {
-      const box = snapshot.box!;
-      // Cell center = (va + vb + vc) / 2
-      cx = (box[0] + box[3] + box[6]) / 2;
-      cy = (box[1] + box[4] + box[7]) / 2;
-      cz = (box[2] + box[5] + box[8]) / 2;
-
-      // Compute bounding box from all 8 cell vertices
-      const va = [box[0], box[1], box[2]];
-      const vb = [box[3], box[4], box[5]];
-      const vc = [box[6], box[7], box[8]];
-      for (let ia = 0; ia <= 1; ia++) {
-        for (let ib = 0; ib <= 1; ib++) {
-          for (let ic = 0; ic <= 1; ic++) {
-            const vx = ia * va[0] + ib * vb[0] + ic * vc[0];
-            const vy = ia * va[1] + ib * vb[1] + ic * vc[1];
-            const vz = ia * va[2] + ib * vb[2] + ic * vc[2];
-            minX = Math.min(minX, vx);
-            minY = Math.min(minY, vy);
-            minZ = Math.min(minZ, vz);
-            maxX = Math.max(maxX, vx);
-            maxY = Math.max(maxY, vy);
-            maxZ = Math.max(maxZ, vz);
-          }
-        }
-      }
-    } else {
-      // No cell box: use atom centroid as center
-      cx = nAtoms > 0 ? sumX / nAtoms : 0;
-      cy = nAtoms > 0 ? sumY / nAtoms : 0;
-      cz = nAtoms > 0 ? sumZ / nAtoms : 0;
-
-      // Bounding box from atom positions
-      for (let i = 0; i < nAtoms; i++) {
-        const x = positions[i * 3];
-        const y = positions[i * 3 + 1];
-        const z = positions[i * 3 + 2];
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        minZ = Math.min(minZ, z);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-        maxZ = Math.max(maxZ, z);
-      }
-    }
-
-    const extentX = maxX - minX;
-    const extentY = maxY - minY;
-    const extentZ = maxZ - minZ;
-    const maxExtent = Math.max(extentX, extentY, extentZ);
-    this.lastExtent = maxExtent;
-    this.lastExtentX = extentX;
-    this.lastExtentY = extentY;
-
-    this.controls.target.set(cx, cy, cz);
-
-    const distance = Math.max(maxExtent * 1.2, 0.1);
-    this.camera.position.set(cx, cy - distance, cz);
-
+    this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot);
     if (this.camera instanceof THREE.OrthographicCamera) {
-      this.camera.near = -distance * 10;
-      this.camera.far = distance * 10;
-      this.camera.zoom = 1;
-      this.applyFrustumInsets();
-    } else {
-      this.camera.near = distance * 0.01;
-      this.camera.far = distance * 10;
-      this.camera.updateProjectionMatrix();
+      this.doApplyFrustumInsets();
     }
-    this.controls.update();
   }
 
   /** Reset view to fit all atoms. */
@@ -576,56 +495,21 @@ export class MoleculeRenderer {
   setViewInsets(left: number, right: number): void {
     this.viewInsetLeft = left;
     this.viewInsetRight = right;
-    this.applyFrustumInsets();
+    this.doApplyFrustumInsets();
   }
 
-  /**
-   * Recalculate the orthographic frustum so the model fits within the
-   * visible area (accounting for overlay insets) and appears centered
-   * in that visible area.
-   */
-  private applyFrustumInsets(): void {
+  /** Recalculate the orthographic frustum accounting for overlay insets. */
+  private doApplyFrustumInsets(): void {
     if (!(this.camera instanceof THREE.OrthographicCamera)) return;
     if (!this.container) return;
-
-    const W = this.container.clientWidth;
-    const H = this.container.clientHeight;
-    if (W === 0 || H === 0) return;
-
-    const leftInset = this.viewInsetLeft;
-    const rightInset = this.viewInsetRight;
-
-    // Effective visible width — guarantee at least 30% of container width
-    // (or 100px) to prevent degenerate frustum on narrow viewports
-    const minVisible = Math.max(W * 0.3, 100);
-    const effectiveWidth = Math.max(W - leftInset - rightInset, minVisible);
-    const effectiveAspect = effectiveWidth / H;
-
-    // Size the frustum so the model fits within the visible area
-    const padding = 1.2;
-    const halfH =
-      Math.max(this.lastExtentY / 2, this.lastExtentX / (2 * effectiveAspect)) *
-      padding;
-    const frustumHeight = Math.max(halfH * 2, 0.1);
-
-    // The frustum must cover the full container (full aspect)
-    const fullAspect = W / H;
-    const halfW = (frustumHeight * fullAspect) / 2;
-
-    // Start with symmetric frustum for full container
-    this.camera.left = -halfW;
-    this.camera.right = halfW;
-    this.camera.top = frustumHeight / 2;
-    this.camera.bottom = -frustumHeight / 2;
-
-    // Offset so the model center maps to the center of the visible area.
-    // visible center is (leftInset - rightInset)/2 pixels right of container center.
-    const frustumWidth = 2 * halfW;
-    const shift = ((leftInset - rightInset) / (2 * W)) * frustumWidth;
-    this.camera.left -= shift;
-    this.camera.right -= shift;
-
-    this.camera.updateProjectionMatrix();
+    applyFrustumInsets(
+      this.camera,
+      this.container.clientWidth,
+      this.container.clientHeight,
+      this.viewInsetLeft,
+      this.viewInsetRight,
+      this.lastExtent,
+    );
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -634,29 +518,11 @@ export class MoleculeRenderer {
     this.perspectiveMode = enabled;
     if (!this.container) return;
 
-    // Save camera state
-    const pos = this.camera.position.clone();
     const target = this.controls.target.clone();
-    const up = this.camera.up.clone();
-
-    // Create new camera
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    const aspect = w / h;
-
-    if (enabled) {
-      this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 10000);
-    } else {
-      const frustumSize = 50;
-      this.camera = new THREE.OrthographicCamera(
-        -frustumSize * aspect / 2, frustumSize * aspect / 2,
-        frustumSize / 2, -frustumSize / 2,
-        0.1, 10000,
-      );
-    }
-
-    this.camera.position.copy(pos);
-    this.camera.up.copy(up);
+    const newCamera = createSwitchedCamera(
+      this.camera, enabled,
+      this.container.clientWidth, this.container.clientHeight,
+    );
 
     // Recreate controls with new camera
     const oldDamping = this.controls.enableDamping;
@@ -664,6 +530,7 @@ export class MoleculeRenderer {
     const oldRotateSpeed = this.controls.rotateSpeed;
     const oldZoomSpeed = this.controls.zoomSpeed;
     this.controls.dispose();
+    this.camera = newCamera;
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = oldDamping;
     this.controls.dampingFactor = oldDampingFactor;
@@ -672,7 +539,6 @@ export class MoleculeRenderer {
     this.controls.target.copy(target);
     this.controls.update();
 
-    // Re-fit to view with new camera type
     if (this.snapshot) {
       this.fitToView(this.snapshot);
     }
@@ -696,130 +562,14 @@ export class MoleculeRenderer {
 
   // ---- Raycasting ----
 
-  /** Project a 3D point to screen coordinates. Returns {sx, sy, depth} in pixels. */
-  private projectToScreen(
-    x: number, y: number, z: number,
-    w: number, h: number,
-  ): { sx: number; sy: number; depth: number } {
-    _projVec.set(x, y, z, 1);
-    _projVec.applyMatrix4(this.camera.matrixWorldInverse);
-    const depth = -_projVec.z; // camera-space depth (positive = in front)
-    _projVec.applyMatrix4(this.camera.projectionMatrix);
-    // NDC to pixels
-    const sx = ((_projVec.x / _projVec.w) * 0.5 + 0.5) * w;
-    const sy = ((-_projVec.y / _projVec.w) * 0.5 + 0.5) * h;
-    return { sx, sy, depth };
-  }
-
-  /** Estimate the screen-space radius (in pixels) of a sphere at the given depth. */
-  private screenRadius(worldRadius: number, depth: number, h: number): number {
-    if (this.camera instanceof THREE.OrthographicCamera) {
-      // Orthographic: size is independent of depth
-      const frustumHeight = (this.camera.top - this.camera.bottom) / this.camera.zoom;
-      const pxPerUnit = h / frustumHeight;
-      return worldRadius * pxPerUnit;
-    }
-    const fovRad = (this.camera.fov * Math.PI) / 180;
-    const pxPerUnit = h / (2 * depth * Math.tan(fovRad / 2));
-    return worldRadius * pxPerUnit;
-  }
-
   /** Perform a pick at the given screen coordinates using CPU screen-space projection. */
   raycastAtPixel(clientX: number, clientY: number): HoverInfo {
     if (!this.container || !this.snapshot) return null;
-
-    const rect = this.container.getBoundingClientRect();
-    const mx = clientX - rect.left; // mouse in pixels relative to container
-    const my = clientY - rect.top;
-    const w = rect.width;
-    const h = rect.height;
-
-    const pos = this.getCurrentPositions();
-    const elements = this.snapshot.elements;
-    const nAtoms = this.snapshot.nAtoms;
-
-    // --- Atom picking ---
-    let bestAtomIdx = -1;
-    let bestAtomDepth = Infinity;
-
-    for (let i = 0; i < nAtoms; i++) {
-      const { sx, sy, depth } = this.projectToScreen(
-        pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], w, h,
-      );
-      if (depth <= 0) continue; // behind camera
-
-      const worldR = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE * this.atomScale;
-      const screenR = this.screenRadius(worldR, depth, h);
-      const dx = mx - sx;
-      const dy = my - sy;
-      const distSq = dx * dx + dy * dy;
-
-      if (distSq <= screenR * screenR && depth < bestAtomDepth) {
-        bestAtomIdx = i;
-        bestAtomDepth = depth;
-      }
-    }
-
-    if (bestAtomIdx >= 0) {
-      const idx = bestAtomIdx;
-      const atomicNum = elements[idx];
-      return {
-        kind: "atom",
-        atomIndex: idx,
-        elementSymbol: getElementSymbol(atomicNum),
-        atomicNumber: atomicNum,
-        position: [pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2]],
-        screenX: clientX,
-        screenY: clientY,
-      };
-    }
-
-    // --- Bond picking ---
-    const BOND_PICK_THRESHOLD_PX = 8;
-    const bonds = this.snapshot.bonds;
-    const nBonds = this.snapshot.nBonds;
-    const bondOrders = this.snapshot.bondOrders;
-    let bestBondIdx = -1;
-    let bestBondDepth = Infinity;
-
-    for (let b = 0; b < nBonds; b++) {
-      const ai = bonds[b * 2];
-      const bi = bonds[b * 2 + 1];
-      // midpoint
-      const midX = (pos[ai * 3] + pos[bi * 3]) * 0.5;
-      const midY = (pos[ai * 3 + 1] + pos[bi * 3 + 1]) * 0.5;
-      const midZ = (pos[ai * 3 + 2] + pos[bi * 3 + 2]) * 0.5;
-      const { sx, sy, depth } = this.projectToScreen(midX, midY, midZ, w, h);
-      if (depth <= 0) continue;
-      const dx = mx - sx;
-      const dy = my - sy;
-      const distSq = dx * dx + dy * dy;
-      if (distSq <= BOND_PICK_THRESHOLD_PX * BOND_PICK_THRESHOLD_PX && depth < bestBondDepth) {
-        bestBondIdx = b;
-        bestBondDepth = depth;
-      }
-    }
-
-    if (bestBondIdx >= 0) {
-      const ai = bonds[bestBondIdx * 2];
-      const bi = bonds[bestBondIdx * 2 + 1];
-      const dxw = pos[bi * 3] - pos[ai * 3];
-      const dyw = pos[bi * 3 + 1] - pos[ai * 3 + 1];
-      const dzw = pos[bi * 3 + 2] - pos[ai * 3 + 2];
-      const bondLength = Math.sqrt(dxw * dxw + dyw * dyw + dzw * dzw);
-      const bondOrder = bondOrders ? bondOrders[bestBondIdx] : 1;
-      return {
-        kind: "bond",
-        atomA: ai,
-        atomB: bi,
-        bondOrder,
-        bondLength,
-        screenX: clientX,
-        screenY: clientY,
-      };
-    }
-
-    return null;
+    return pickAtPixel(
+      this.camera, this.container, this.snapshot,
+      this.getCurrentPositions(), this.atomScale,
+      clientX, clientY,
+    );
   }
 
   // ---- Selection & Measurement ----
@@ -855,58 +605,7 @@ export class MoleculeRenderer {
   /** Compute the current geometric measurement based on selected atoms. */
   getMeasurement(): Measurement | null {
     if (!this.snapshot || this.selectedAtoms.length < 2) return null;
-    const pos = this.getCurrentPositions();
-    const atoms = this.selectedAtoms;
-
-    if (atoms.length === 2) {
-      const d = this.computeDistance(pos, atoms[0], atoms[1]);
-      return { atoms: [...atoms], type: "distance", value: d, label: `${d.toFixed(3)} \u00c5` };
-    }
-    if (atoms.length === 3) {
-      const a = this.computeAngle(pos, atoms[0], atoms[1], atoms[2]);
-      return { atoms: [...atoms], type: "angle", value: a, label: `${a.toFixed(1)}\u00b0` };
-    }
-    if (atoms.length === 4) {
-      const d = this.computeDihedral(pos, atoms[0], atoms[1], atoms[2], atoms[3]);
-      return { atoms: [...atoms], type: "dihedral", value: d, label: `${d.toFixed(1)}\u00b0` };
-    }
-    return null;
-  }
-
-  private computeDistance(pos: Float32Array, a: number, b: number): number {
-    const dx = pos[b * 3] - pos[a * 3];
-    const dy = pos[b * 3 + 1] - pos[a * 3 + 1];
-    const dz = pos[b * 3 + 2] - pos[a * 3 + 2];
-    return Math.sqrt(dx * dx + dy * dy + dz * dz);
-  }
-
-  private computeAngle(pos: Float32Array, a: number, b: number, c: number): number {
-    const bax = pos[a * 3] - pos[b * 3];
-    const bay = pos[a * 3 + 1] - pos[b * 3 + 1];
-    const baz = pos[a * 3 + 2] - pos[b * 3 + 2];
-    const bcx = pos[c * 3] - pos[b * 3];
-    const bcy = pos[c * 3 + 1] - pos[b * 3 + 1];
-    const bcz = pos[c * 3 + 2] - pos[b * 3 + 2];
-    const dot = bax * bcx + bay * bcy + baz * bcz;
-    const magBA = Math.sqrt(bax * bax + bay * bay + baz * baz);
-    const magBC = Math.sqrt(bcx * bcx + bcy * bcy + bcz * bcz);
-    return Math.acos(Math.max(-1, Math.min(1, dot / (magBA * magBC)))) * (180 / Math.PI);
-  }
-
-  private computeDihedral(
-    pos: Float32Array, a: number, b: number, c: number, d: number,
-  ): number {
-    const b1x = pos[b * 3] - pos[a * 3], b1y = pos[b * 3 + 1] - pos[a * 3 + 1], b1z = pos[b * 3 + 2] - pos[a * 3 + 2];
-    const b2x = pos[c * 3] - pos[b * 3], b2y = pos[c * 3 + 1] - pos[b * 3 + 1], b2z = pos[c * 3 + 2] - pos[b * 3 + 2];
-    const b3x = pos[d * 3] - pos[c * 3], b3y = pos[d * 3 + 1] - pos[c * 3 + 1], b3z = pos[d * 3 + 2] - pos[c * 3 + 2];
-    const n1x = b1y * b2z - b1z * b2y, n1y = b1z * b2x - b1x * b2z, n1z = b1x * b2y - b1y * b2x;
-    const n2x = b2y * b3z - b2z * b3y, n2y = b2z * b3x - b2x * b3z, n2z = b2x * b3y - b2y * b3x;
-    const b2len = Math.sqrt(b2x * b2x + b2y * b2y + b2z * b2z);
-    const ub2x = b2x / b2len, ub2y = b2y / b2len, ub2z = b2z / b2len;
-    const m1x = n1y * ub2z - n1z * ub2y, m1y = n1z * ub2x - n1x * ub2z, m1z = n1x * ub2y - n1y * ub2x;
-    const x = n1x * n2x + n1y * n2y + n1z * n2z;
-    const y = m1x * n2x + m1y * n2y + m1z * n2z;
-    return Math.atan2(y, x) * (180 / Math.PI);
+    return computeMeasurement(this.getCurrentPositions(), this.selectedAtoms);
   }
 
   private updateSelectionVisuals(): void {
@@ -1001,7 +700,7 @@ export class MoleculeRenderer {
       // Recalculate full frustum accounting for overlay insets so the view
       // stays correct when the container aspect ratio changes.
       // camera.zoom is left untouched so the user's zoom level is preserved.
-      this.applyFrustumInsets();
+      this.doApplyFrustumInsets();
     } else {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();

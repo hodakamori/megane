@@ -13,11 +13,11 @@ import { MeasurementPanel } from "./MeasurementPanel";
 import { TabSelector } from "./ui";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { useAtomSelection } from "../hooks/useAtomSelection";
 import type {
   Snapshot,
   Frame,
   HoverInfo,
-  SelectionState,
   Measurement,
   BondSource,
   LabelSource,
@@ -45,8 +45,6 @@ export function WidgetViewer({
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
-  const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
-  const [measurement, setMeasurement] = useState<Measurement | null>(null);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true);
   const [atomScale, setAtomScale] = useState(1.0);
   const [atomOpacity, setAtomOpacity] = useState(1.0);
@@ -61,6 +59,16 @@ export function WidgetViewer({
   const bondSourceRef = useRef<BondSource>("structure");
   const [vdwScale, setVdwScale] = useState(0.6);
   const vdwScaleRef = useRef(0.6);
+
+  // Shared atom selection & measurement
+  const {
+    selection,
+    measurement,
+    handleAtomRightClick,
+    handleClearSelection,
+    handleFrameUpdated,
+    setExternalSelection,
+  } = useAtomSelection(rendererRef, onMeasurementChange);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -83,11 +91,9 @@ export function WidgetViewer({
       renderer.setBondsVisible(true);
 
       if (source === "structure") {
-        // Restore original bonds from snapshot
         renderer.updateBonds(snapshot.bonds, snapshot.bondOrders);
         setBondCount(snapshot.nBonds);
       } else if (source === "distance") {
-        // Compute distance bonds from current positions
         const positions = frame?.positions ?? snapshot.positions;
         const bonds = inferBondsVdwJS(positions, snapshot.elements, snapshot.nAtoms, vdwScaleRef.current);
         renderer.updateBonds(bonds, null);
@@ -120,33 +126,6 @@ export function WidgetViewer({
     rendererRef.current?.resetView();
   }, []);
 
-  const onMeasurementChangeRef = useRef(onMeasurementChange);
-  onMeasurementChangeRef.current = onMeasurementChange;
-
-  const updateMeasurement = useCallback((m: Measurement | null) => {
-    setMeasurement(m);
-    onMeasurementChangeRef.current?.(m);
-  }, []);
-
-  const handleAtomRightClick = useCallback((atomIndex: number) => {
-    if (!rendererRef.current) return;
-    const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
-    setSelection(newSelection);
-    updateMeasurement(rendererRef.current.getMeasurement());
-  }, [updateMeasurement]);
-
-  const handleClearSelection = useCallback(() => {
-    rendererRef.current?.clearSelection();
-    setSelection({ atoms: [] });
-    updateMeasurement(null);
-  }, [updateMeasurement]);
-
-  const handleFrameUpdated = useCallback(() => {
-    if (!rendererRef.current) return;
-    const m = rendererRef.current.getMeasurement();
-    updateMeasurement(m);
-  }, [updateMeasurement]);
-
   // Apply external atom selection
   const prevExternalAtomsRef = useRef<string>("");
   useEffect(() => {
@@ -154,17 +133,8 @@ export function WidgetViewer({
     const key = JSON.stringify(externalSelectedAtoms);
     if (key === prevExternalAtomsRef.current) return;
     prevExternalAtomsRef.current = key;
-
-    if (externalSelectedAtoms.length === 0) {
-      rendererRef.current.clearSelection();
-      setSelection({ atoms: [] });
-      updateMeasurement(null);
-    } else {
-      const newSelection = rendererRef.current.setSelection(externalSelectedAtoms);
-      setSelection(newSelection);
-      updateMeasurement(rendererRef.current.getMeasurement());
-    }
-  }, [externalSelectedAtoms, updateMeasurement]);
+    setExternalSelection(externalSelectedAtoms);
+  }, [externalSelectedAtoms, setExternalSelection]);
 
   const handleAtomScaleChange = useCallback((scale: number) => {
     setAtomScale(scale);
@@ -189,7 +159,6 @@ export function WidgetViewer({
   const handleVdwScaleChange = useCallback((scale: number) => {
     setVdwScale(scale);
     vdwScaleRef.current = scale;
-    // Recalculate bonds immediately with new scale
     if (bondSourceRef.current !== "distance") return;
     const renderer = rendererRef.current;
     if (!renderer || !snapshot) return;
@@ -215,16 +184,14 @@ export function WidgetViewer({
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
       if (prev) {
-        // Stop
         if (playIntervalRef.current) {
           clearInterval(playIntervalRef.current);
           playIntervalRef.current = null;
         }
         return false;
       } else {
-        // Start
         playIntervalRef.current = setInterval(() => {
-          onSeek(-1); // signal "next frame" - handled by widget.ts
+          onSeek(-1);
         }, 1000 / fps);
         return true;
       }
@@ -247,7 +214,6 @@ export function WidgetViewer({
   const handleSeek = useCallback(
     (frame: number) => {
       if (playing) {
-        // Stop playback when user manually seeks
         setPlaying(false);
         if (playIntervalRef.current) {
           clearInterval(playIntervalRef.current);
@@ -262,7 +228,6 @@ export function WidgetViewer({
   const hasCell =
     snapshot?.box != null && snapshot.box.some((v) => v !== 0);
 
-  // Dummy label config (no label switching in widget for now)
   const labelConfig = {
     source: "none" as LabelSource,
     onSourceChange: () => {},

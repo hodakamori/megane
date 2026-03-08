@@ -14,14 +14,13 @@ import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
+import { useAtomSelection } from "../hooks/useAtomSelection";
 import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
 import { setTrajectoryLoadHandler } from "./nodes/LoadTrajectoryNode";
 import type {
   Snapshot,
   Frame,
   HoverInfo,
-  SelectionState,
-  Measurement,
 } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
@@ -70,13 +69,20 @@ export function MeganeViewer({
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
-  const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
-  const [measurement, setMeasurement] = useState<Measurement | null>(null);
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
   const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
   const pipelineCollapsedRef = useRef(isNarrow);
   const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+
+  // Shared atom selection & measurement
+  const {
+    selection,
+    measurement,
+    handleAtomRightClick,
+    handleClearSelection,
+    handleFrameUpdated,
+  } = useAtomSelection(rendererRef);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
@@ -152,25 +158,6 @@ export function MeganeViewer({
     );
     applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
     prevViewportStateRef.current = usePipelineStore.getState().viewportState;
-  }, []);
-
-  const handleAtomRightClick = useCallback((atomIndex: number) => {
-    if (!rendererRef.current) return;
-    const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
-    setSelection(newSelection);
-    setMeasurement(rendererRef.current.getMeasurement());
-  }, []);
-
-  const handleClearSelection = useCallback(() => {
-    rendererRef.current?.clearSelection();
-    setSelection({ atoms: [] });
-    setMeasurement(null);
-  }, []);
-
-  const handleFrameUpdated = useCallback(() => {
-    if (!rendererRef.current) return;
-    const m = rendererRef.current.getMeasurement();
-    if (m) setMeasurement(m);
   }, []);
 
   const handleTogglePipeline = useCallback(() => {
