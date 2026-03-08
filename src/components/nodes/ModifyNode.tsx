@@ -11,27 +11,27 @@ import { NodeShell } from "./NodeShell";
 
 const sliderStyle: React.CSSProperties = {
   width: "100%",
-  height: 4,
+  height: 7,
   cursor: "pointer",
   appearance: "none",
   WebkitAppearance: "none",
-  borderRadius: 2,
+  borderRadius: 3,
   outline: "none",
 };
 
 const valueStyle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 19,
   fontWeight: 500,
   color: "#3b82f6",
-  minWidth: 36,
+  minWidth: 50,
   textAlign: "right",
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 17,
   fontWeight: 500,
   color: "#64748b",
-  marginBottom: 2,
+  marginBottom: 3,
 };
 
 export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
@@ -40,7 +40,7 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
 
   return (
     <NodeShell id={id} nodeType="modify" enabled={data.enabled}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div>
           <div style={labelStyle}>Scale</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

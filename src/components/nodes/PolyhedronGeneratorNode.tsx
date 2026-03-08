@@ -37,30 +37,30 @@ const LIGAND_ELEMENTS: { z: number; sym: string }[] = [
 ];
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 17,
   fontWeight: 500,
   color: "#64748b",
-  marginBottom: 2,
+  marginBottom: 3,
 };
 
 const chipContainerStyle: React.CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
-  gap: 3,
-  marginBottom: 6,
+  gap: 5,
+  marginBottom: 10,
 };
 
 const chipBase: React.CSSProperties = {
   border: "1px solid #e2e8f0",
-  borderRadius: 4,
-  padding: "2px 6px",
+  borderRadius: 7,
+  padding: "3px 10px",
   cursor: "pointer",
-  fontSize: 10,
+  fontSize: 17,
   fontWeight: 500,
   background: "none",
   color: "#94a3b8",
   transition: "all 0.15s",
-  lineHeight: "16px",
+  lineHeight: "27px",
 };
 
 const chipActive: React.CSSProperties = {
@@ -72,19 +72,19 @@ const chipActive: React.CSSProperties = {
 
 const sliderStyle: React.CSSProperties = {
   width: "100%",
-  height: 4,
+  height: 7,
   cursor: "pointer",
   appearance: "none",
   WebkitAppearance: "none",
-  borderRadius: 2,
+  borderRadius: 3,
   outline: "none",
 };
 
 const valueStyle: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 19,
   fontWeight: 500,
   color: "#3b82f6",
-  minWidth: 36,
+  minWidth: 50,
   textAlign: "right",
 };
 
@@ -92,9 +92,9 @@ const toggleRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  fontSize: 11,
+  fontSize: 19,
   color: "#475569",
-  padding: "2px 0",
+  padding: "3px 0",
 };
 
 const toggleStyle: React.CSSProperties = {

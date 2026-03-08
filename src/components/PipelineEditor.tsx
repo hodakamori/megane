@@ -362,7 +362,7 @@ function PipelineEditorInner({
           defaultEdgeOptions={{
             type: "bezier",
             animated: true,
-            style: { stroke: "#94a3b8", strokeWidth: 2 },
+            style: { stroke: "#94a3b8", strokeWidth: 3 },
           }}
           proOptions={{ hideAttribution: true }}
         >
