@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/hero.png" alt="megane screenshot" width="640" />
+  <img src="docs/public/screenshots/pipeline-complex.png" alt="megane screenshot" width="640" />
 </p>
 
 ---

@@ -44,6 +44,9 @@ Trajectory streaming works over WebSocket via a binary protocol. Load an XTC fil
 
 ## Anywhere
 
+<div class="pillar-two-col">
+  <div class="pillar-text">
+
 One codebase, every environment.
 
 | Environment | How | Install |
@@ -55,11 +58,20 @@ One codebase, every environment.
 
 The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
+  </div>
+  <div class="pillar-images single-col">
+    <img src="/screenshots/jupyter.png" alt="megane in Jupyter Notebook" />
+  </div>
+</div>
+
 </div>
 
 <div class="pillar-section">
 
 ## Visual Pipelines
+
+<div class="pillar-two-col">
+  <div class="pillar-text">
 
 Wire nodes to build visualization workflows — no code required.
 
@@ -68,6 +80,12 @@ Wire nodes to build visualization workflows — no code required.
 **6 typed data channels** — particle, bond, cell, label, mesh, trajectory — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
+
+  </div>
+  <div class="pillar-images single-col">
+    <img src="/screenshots/pipeline-editor.png" alt="Visual Pipeline Editor" />
+  </div>
+</div>
 
 </div>
 
