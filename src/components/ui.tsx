@@ -16,10 +16,10 @@ export const sectionLabelStyle: React.CSSProperties = {
 export const smallBtnStyle: React.CSSProperties = {
   background: "none",
   border: "1px solid #e2e8f0",
-  borderRadius: 5,
-  padding: "2px 10px",
+  borderRadius: 8,
+  padding: "3px 17px",
   cursor: "pointer",
-  fontSize: 11,
+  fontSize: 19,
   fontWeight: 500,
   color: "#64748b",
   transition: "all 0.15s",
@@ -33,7 +33,7 @@ export const activeBtnStyle: React.CSSProperties = {
 };
 
 export const fileNameStyle: React.CSSProperties = {
-  fontSize: 13,
+  fontSize: 22,
   fontWeight: 600,
   color: "#1e293b",
   wordBreak: "break-all",
@@ -107,7 +107,7 @@ export function DropZone({
       {children}
       <button
         onClick={() => inputRef.current?.click()}
-        style={{ ...smallBtnStyle, marginTop: 6 }}
+        style={{ ...smallBtnStyle, marginTop: 10 }}
       >
         {label}
       </button>
@@ -138,10 +138,10 @@ export function TabSelector<T extends string>({
     <div
       style={{
         display: "flex",
-        borderRadius: 6,
+        borderRadius: 10,
         overflow: "hidden",
         border: "1px solid #e2e8f0",
-        marginBottom: 6,
+        marginBottom: 10,
       }}
     >
       {options.map((opt, idx) => {
@@ -156,9 +156,9 @@ export function TabSelector<T extends string>({
               background: isActive ? "rgba(59,130,246,0.08)" : "none",
               border: "none",
               borderRight: idx < options.length - 1 ? "1px solid #e2e8f0" : "none",
-              padding: "4px 0",
+              padding: "7px 0",
               cursor: isActive || isDisabled ? "default" : "pointer",
-              fontSize: 11,
+              fontSize: 19,
               fontWeight: 500,
               color: isDisabled ? "#cbd5e1" : isActive ? "#3b82f6" : "#94a3b8",
               transition: "all 0.15s",

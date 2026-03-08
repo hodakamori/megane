@@ -15,11 +15,11 @@ import { NodeShell } from "./NodeShell";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: "4px 6px",
-  fontSize: 11,
+  padding: "7px 10px",
+  fontSize: 19,
   fontFamily: "monospace",
   border: "1px solid #e2e8f0",
-  borderRadius: 4,
+  borderRadius: 7,
   outline: "none",
   background: "#f8fafc",
   color: "#1e293b",
@@ -33,16 +33,16 @@ const inputErrorStyle: React.CSSProperties = {
 };
 
 const errorStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 17,
   color: "#ef4444",
-  marginTop: 4,
+  marginTop: 7,
   lineHeight: 1.3,
 };
 
 const hintStyle: React.CSSProperties = {
-  fontSize: 9,
+  fontSize: 15,
   color: "#94a3b8",
-  marginTop: 4,
+  marginTop: 7,
   lineHeight: 1.3,
 };
 
