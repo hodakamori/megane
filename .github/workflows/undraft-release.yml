@@ -1,0 +1,84 @@
+name: Undraft Release
+
+on:
+  workflow_run:
+    workflows:
+      - "Publish to npm"
+      - "Publish to PyPI"
+      - "Publish to VS Code Marketplace"
+    types:
+      - completed
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  undraft:
+    name: Undraft release if all publishes succeeded
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all publish workflows
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.payload.workflow_run.head_branch;
+            if (!tag || !tag.startsWith('v')) {
+              core.info(`Not a version tag (${tag}), skipping.`);
+              return;
+            }
+
+            const requiredWorkflows = [
+              'Publish to npm',
+              'Publish to PyPI',
+              'Publish to VS Code Marketplace',
+            ];
+
+            // Get recent workflow runs for this tag
+            const { data: { workflow_runs: runs } } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: context.payload.workflow_run.head_sha,
+              per_page: 20,
+            });
+
+            const results = {};
+            for (const run of runs) {
+              if (requiredWorkflows.includes(run.name)) {
+                results[run.name] = run.conclusion;
+              }
+            }
+
+            core.info(`Workflow results: ${JSON.stringify(results)}`);
+
+            // Check all required workflows have completed successfully
+            for (const name of requiredWorkflows) {
+              if (results[name] !== 'success') {
+                core.info(`"${name}" is not successful yet (${results[name] || 'not found'}). Skipping undraft.`);
+                return;
+              }
+            }
+
+            core.info(`All publish workflows succeeded. Undrafting release for tag ${tag}.`);
+
+            // Find the draft release for this tag
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 10,
+            });
+
+            const draft = releases.data.find(r => r.tag_name === tag && r.draft);
+            if (!draft) {
+              core.warning(`No draft release found for tag ${tag}.`);
+              return;
+            }
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: draft.id,
+              draft: false,
+            });
+
+            core.info(`Release "${draft.name}" has been published.`);
