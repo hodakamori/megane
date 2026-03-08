@@ -84,11 +84,14 @@ function getParserForExtension(ext: string): ParseFn {
 }
 
 /**
- * Parse structure text (PDB format) using the WASM parser.
+ * Parse structure text using the WASM parser.
+ * If fileName is provided, auto-detects format from extension; otherwise defaults to PDB.
  */
-export async function parseStructureText(text: string): Promise<StructureParseResult> {
+export async function parseStructureText(text: string, fileName?: string): Promise<StructureParseResult> {
   await ensureInit();
-  return parseWithFn(wasmModule!.parse_pdb, text);
+  const ext = fileName?.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb";
+  const parseFn = getParserForExtension(ext);
+  return parseWithFn(parseFn, text);
 }
 
 /**
