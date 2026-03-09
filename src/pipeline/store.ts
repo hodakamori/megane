@@ -73,9 +73,10 @@ export interface PipelineStore {
   reset: () => void;
 }
 
-const defaultState = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
+const rawDefault = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
   ? createDemoPipeline()
   : createDefaultPipeline();
+const defaultState = getLayoutedElements(rawDefault.nodes, rawDefault.edges);
 
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
@@ -256,7 +257,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   applyTemplate: (templateId) => {
     const template = PIPELINE_TEMPLATES.find((t) => t.id === templateId);
     if (!template) return;
-    const { nodes, edges } = template.create();
+    const raw = template.create();
+    const { nodes, edges } = getLayoutedElements(raw.nodes, raw.edges);
     set({
       nodes,
       edges,
