@@ -14,6 +14,7 @@ import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
 import { createDefaultPipeline, createDemoPipeline } from "./defaults";
 import { PIPELINE_TEMPLATES } from "./templates";
+import { getLayoutedElements } from "./layout";
 
 let nextNodeId = 1;
 
@@ -65,13 +66,17 @@ export interface PipelineStore {
   applyTemplate: (templateId: string) => void;
   clearPendingTemplate: () => void;
 
+  // Layout
+  autoLayout: () => void;
+
   // Reset
   reset: () => void;
 }
 
-const defaultState = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
+const rawDefault = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
   ? createDemoPipeline()
   : createDefaultPipeline();
+const defaultState = getLayoutedElements(rawDefault.nodes, rawDefault.edges);
 
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
@@ -161,10 +166,18 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
 
   addNode: (type, position) => {
     const id = generateNodeId();
+    let fallbackPosition = { x: 425, y: 50 };
+    if (!position) {
+      const currentNodes = get().nodes;
+      if (currentNodes.length > 0) {
+        const maxY = Math.max(...currentNodes.map((n) => n.position.y));
+        fallbackPosition = { x: 425, y: maxY + 200 };
+      }
+    }
     const newNode: Node<PipelineNodeData> = {
       id,
       type,
-      position: position ?? { x: 425, y: get().nodes.length * 340 + 50 },
+      position: position ?? fallbackPosition,
       data: {
         params: defaultParams(type),
         enabled: true,
@@ -244,7 +257,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   applyTemplate: (templateId) => {
     const template = PIPELINE_TEMPLATES.find((t) => t.id === templateId);
     if (!template) return;
-    const { nodes, edges } = template.create();
+    const raw = template.create();
+    const { nodes, edges } = getLayoutedElements(raw.nodes, raw.edges);
     set({
       nodes,
       edges,
@@ -256,6 +270,12 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
 
   clearPendingTemplate: () => {
     set({ pendingTemplateId: null });
+  },
+
+  autoLayout: () => {
+    const { nodes, edges } = get();
+    const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges);
+    set({ nodes: layoutedNodes });
   },
 
   reset: () => {

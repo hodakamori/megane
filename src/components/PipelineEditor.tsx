@@ -11,6 +11,7 @@ import {
   Controls,
   Background,
   BackgroundVariant,
+  useReactFlow,
 } from "@xyflow/react";
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -112,6 +113,17 @@ const groupHeaderStyle: React.CSSProperties = {
   gap: 6,
 };
 
+const layoutBtnStyle: React.CSSProperties = {
+  background: "rgba(16, 185, 129, 0.08)",
+  border: "1px solid rgba(16, 185, 129, 0.25)",
+  borderRadius: 6,
+  padding: "4px 12px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#10b981",
+};
+
 const templateBtnStyle: React.CSSProperties = {
   background: "rgba(139, 92, 246, 0.08)",
   border: "1px solid rgba(139, 92, 246, 0.25)",
@@ -168,11 +180,15 @@ function PipelineEditorInner({
   const onConnect = usePipelineStore((s) => s.onConnect);
   const addNode = usePipelineStore((s) => s.addNode);
   const applyTemplate = usePipelineStore((s) => s.applyTemplate);
+  const autoLayout = usePipelineStore((s) => s.autoLayout);
+  const { fitView } = useReactFlow();
 
+  const { screenToFlowPosition } = useReactFlow();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const flowContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Resize drag handling
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -233,10 +249,21 @@ function PipelineEditorInner({
 
   const handleAddNode = useCallback(
     (type: PipelineNodeType) => {
-      addNode(type);
+      // Place the new node at the center of the current viewport
+      const container = flowContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const centerPosition = screenToFlowPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+        addNode(type, centerPosition);
+      } else {
+        addNode(type);
+      }
       setShowAddMenu(false);
     },
-    [addNode],
+    [addNode, screenToFlowPosition],
   );
 
   const handleApplyTemplate = useCallback(
@@ -247,10 +274,20 @@ function PipelineEditorInner({
     [applyTemplate],
   );
 
+  const handleAutoLayout = useCallback(() => {
+    autoLayout();
+    window.requestAnimationFrame(() => {
+      fitView({ padding: 0.1, maxZoom: 1.95, duration: 300 });
+    });
+  }, [autoLayout, fitView]);
+
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
   const headerExtra = (
     <>
+      <button onClick={handleAutoLayout} style={layoutBtnStyle}>
+        Auto Layout
+      </button>
       <button
         onClick={() => {
           setShowTemplateMenu(!showTemplateMenu);
@@ -350,7 +387,7 @@ function PipelineEditorInner({
       headerExtra={headerExtra}
       containerExtra={resizeHandle}
     >
-      <div style={{ flex: 1, position: "relative" }}>
+      <div ref={flowContainerRef} style={{ flex: 1, position: "relative" }}>
         <ReactFlow
           nodes={nodes}
           edges={styledEdges}
