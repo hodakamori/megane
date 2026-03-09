@@ -14,6 +14,7 @@ import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
 import { createDefaultPipeline, createDemoPipeline } from "./defaults";
 import { PIPELINE_TEMPLATES } from "./templates";
+import { getLayoutedElements } from "./layout";
 
 let nextNodeId = 1;
 
@@ -64,6 +65,9 @@ export interface PipelineStore {
   pendingTemplateId: string | null;
   applyTemplate: (templateId: string) => void;
   clearPendingTemplate: () => void;
+
+  // Layout
+  autoLayout: () => void;
 
   // Reset
   reset: () => void;
@@ -264,6 +268,12 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
 
   clearPendingTemplate: () => {
     set({ pendingTemplateId: null });
+  },
+
+  autoLayout: () => {
+    const { nodes, edges } = get();
+    const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges);
+    set({ nodes: layoutedNodes });
   },
 
   reset: () => {
