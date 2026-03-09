@@ -168,6 +168,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
           <div style={labelStyle}>Max distance</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
+              className="nodrag"
               type="range"
               min={1.0}
               max={5.0}
@@ -185,6 +186,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
           <div style={labelStyle}>Opacity</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
+              className="nodrag"
               type="range"
               min={0}
               max={1}
@@ -222,6 +224,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
               <div style={labelStyle}>Edge width</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
+                  className="nodrag"
                   type="range"
                   min={1}
                   max={10}
