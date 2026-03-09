@@ -11,6 +11,7 @@ import {
   Controls,
   Background,
   BackgroundVariant,
+  useReactFlow,
 } from "@xyflow/react";
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -169,10 +170,12 @@ function PipelineEditorInner({
   const addNode = usePipelineStore((s) => s.addNode);
   const applyTemplate = usePipelineStore((s) => s.applyTemplate);
 
+  const { screenToFlowPosition } = useReactFlow();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const flowContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Resize drag handling
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
@@ -233,10 +236,21 @@ function PipelineEditorInner({
 
   const handleAddNode = useCallback(
     (type: PipelineNodeType) => {
-      addNode(type);
+      // Place the new node at the center of the current viewport
+      const container = flowContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const centerPosition = screenToFlowPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+        addNode(type, centerPosition);
+      } else {
+        addNode(type);
+      }
       setShowAddMenu(false);
     },
-    [addNode],
+    [addNode, screenToFlowPosition],
   );
 
   const handleApplyTemplate = useCallback(
@@ -350,7 +364,7 @@ function PipelineEditorInner({
       headerExtra={headerExtra}
       containerExtra={resizeHandle}
     >
-      <div style={{ flex: 1, position: "relative" }}>
+      <div ref={flowContainerRef} style={{ flex: 1, position: "relative" }}>
         <ReactFlow
           nodes={nodes}
           edges={styledEdges}
