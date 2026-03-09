@@ -39,6 +39,7 @@ export function VectorOverlayNode({ id, data }: NodeProps<Node<PipelineNodeData>
       <div style={labelStyle}>Scale</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <input
+          className="nodrag"
           type="range"
           min={0.1}
           max={5.0}
