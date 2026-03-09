@@ -5,12 +5,16 @@
  */
 
 import * as THREE from "three";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import type { MeshData } from "../pipeline/types";
 
 export class PolyhedronRenderer {
   readonly group: THREE.Group;
   private faceMesh: THREE.Mesh | null = null;
-  private edgeLines: THREE.LineSegments | null = null;
+  private edgeLines: LineSegments2 | null = null;
+  private edgeMaterial: LineMaterial | null = null;
 
   constructor() {
     this.group = new THREE.Group();
@@ -51,18 +55,30 @@ export class PolyhedronRenderer {
     this.faceMesh.renderOrder = 1;
     this.group.add(this.faceMesh);
 
-    // Edge wireframe
+    // Edge wireframe (fat lines via LineSegments2)
     if (data.showEdges && data.edgePositions && data.edgePositions.length > 0) {
-      const edgeGeo = new THREE.BufferGeometry();
-      edgeGeo.setAttribute("position", new THREE.BufferAttribute(data.edgePositions, 3));
-      const edgeMat = new THREE.LineBasicMaterial({
-        color: 0x333333,
-        opacity: 0.7,
+      const edgeGeo = new LineSegmentsGeometry();
+      edgeGeo.setPositions(data.edgePositions);
+
+      const edgeMat = new LineMaterial({
+        color: new THREE.Color(data.edgeColor).getHex(),
+        linewidth: data.edgeWidth,
         transparent: true,
+        opacity: 0.9,
+        depthTest: true,
       });
-      this.edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
+      this.edgeMaterial = edgeMat;
+
+      this.edgeLines = new LineSegments2(edgeGeo, edgeMat);
       this.edgeLines.renderOrder = 2;
       this.group.add(this.edgeLines);
+    }
+  }
+
+  /** Update the resolution uniform required by LineMaterial. */
+  updateResolution(width: number, height: number): void {
+    if (this.edgeMaterial) {
+      this.edgeMaterial.resolution.set(width, height);
     }
   }
 
@@ -78,6 +94,7 @@ export class PolyhedronRenderer {
       (this.edgeLines.material as THREE.Material).dispose();
       this.group.remove(this.edgeLines);
       this.edgeLines = null;
+      this.edgeMaterial = null;
     }
   }
 
