@@ -4,12 +4,12 @@
  * Nodes declare typed input/output ports; only matching types can connect.
  */
 
-import type { Snapshot, Frame, TrajectoryMeta, BondSource } from "../types";
+import type { Snapshot, Frame, TrajectoryMeta, BondSource, VectorFrame } from "../types";
 
 // ─── Pipeline Data Types ──────────────────────────────────────────────
 
 /** The possible data types flowing through pipeline edges. */
-export type PipelineDataType = "particle" | "bond" | "cell" | "label" | "mesh" | "trajectory";
+export type PipelineDataType = "particle" | "bond" | "cell" | "label" | "mesh" | "trajectory" | "vector";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -19,6 +19,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   label: "#8b5cf6",    // violet
   mesh: "#6b7280",     // gray
   trajectory: "#ec4899", // pink
+  vector: "#ef4444",     // red
 };
 
 /** Particle data flowing through the pipeline. */
@@ -65,6 +66,8 @@ export interface MeshData {
   opacity: number;
   showEdges: boolean;
   edgePositions: Float32Array | null; // line segment pairs for wireframe
+  edgeColor: string;                // edge color as hex string (e.g. "#dddddd")
+  edgeWidth: number;                // edge line width in pixels
 }
 
 /** Trajectory data flowing through the pipeline. */
@@ -75,8 +78,16 @@ export interface TrajectoryData {
   source: "structure" | "file";
 }
 
+/** Per-atom vector data (e.g. forces) flowing through the pipeline. */
+export interface VectorData {
+  type: "vector";
+  frames: VectorFrame[];
+  nAtoms: number;
+  scale: number;
+}
+
 /** Union of all pipeline data types. */
-export type PipelineData = ParticleData | BondData | CellData | LabelData | MeshData | TrajectoryData;
+export type PipelineData = ParticleData | BondData | CellData | LabelData | MeshData | TrajectoryData | VectorData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -96,23 +107,27 @@ export type GenericPortAccepts = PipelineDataType[];
 export type PipelineNodeType =
   | "load_structure"
   | "load_trajectory"
+  | "load_vector"
   | "add_bond"
   | "viewport"
   | "filter"
   | "modify"
   | "label_generator"
-  | "polyhedron_generator";
+  | "polyhedron_generator"
+  | "vector_overlay";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   load_structure: "Load Structure",
   load_trajectory: "Load Trajectory",
+  load_vector: "Load Vector",
   add_bond: "Add Bond",
   viewport: "Viewport",
   filter: "Filter",
   modify: "Modify",
   label_generator: "Labels",
   polyhedron_generator: "Polyhedra",
+  vector_overlay: "Vectors",
 };
 
 // ─── Node Categories ──────────────────────────────────────────────────
@@ -123,11 +138,13 @@ export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay
 export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   load_structure: "data_load",
   load_trajectory: "data_load",
+  load_vector: "data_load",
   add_bond: "bond",
   filter: "filter",
   modify: "modify",
   label_generator: "overlay",
   polyhedron_generator: "overlay",
+  vector_overlay: "overlay",
   viewport: "viewport",
 };
 
@@ -165,6 +182,12 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
       { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
     ],
   },
+  load_vector: {
+    inputs: [],
+    outputs: [
+      { name: "vector", dataType: "vector", label: "Vector" },
+    ],
+  },
   add_bond: {
     inputs: [
       { name: "particle", dataType: "particle", label: "Particle" },
@@ -181,6 +204,7 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
       { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
       { name: "label", dataType: "label", label: "Label" },
       { name: "mesh", dataType: "mesh", label: "Mesh" },
+      { name: "vector", dataType: "vector", label: "Vector" },
     ],
     outputs: [],
   },
@@ -199,6 +223,10 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   polyhedron_generator: {
     inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
     outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
+  },
+  vector_overlay: {
+    inputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
+    outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
   },
 };
 
@@ -253,6 +281,16 @@ export interface LabelGeneratorParams {
   source: "element" | "resname" | "index";
 }
 
+export interface LoadVectorParams {
+  type: "load_vector";
+  fileName: string | null;
+}
+
+export interface VectorOverlayParams {
+  type: "vector_overlay";
+  scale: number;
+}
+
 export interface PolyhedronGeneratorParams {
   type: "polyhedron_generator";
   centerElements: number[];      // atomic numbers of center atoms
@@ -260,18 +298,22 @@ export interface PolyhedronGeneratorParams {
   maxDistance: number;            // max bond distance in Angstroms
   opacity: number;               // face opacity 0-1
   showEdges: boolean;            // wireframe edges
+  edgeColor: string;             // edge color as hex string
+  edgeWidth: number;             // edge line width in pixels
 }
 
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
   | LoadTrajectoryParams
+  | LoadVectorParams
   | AddBondParams
   | ViewportParams
   | FilterParams
   | ModifyParams
   | LabelGeneratorParams
-  | PolyhedronGeneratorParams;
+  | PolyhedronGeneratorParams
+  | VectorOverlayParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -279,6 +321,8 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "load_structure":
       return { type, fileName: null, hasTrajectory: false, hasCell: false };
     case "load_trajectory":
+      return { type, fileName: null };
+    case "load_vector":
       return { type, fileName: null };
     case "add_bond":
       return { type, bondSource: "distance" };
@@ -298,7 +342,11 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         maxDistance: 2.5,
         opacity: 0.5,
         showEdges: false,
+        edgeColor: "#dddddd",
+        edgeWidth: 3,
       };
+    case "vector_overlay":
+      return { type, scale: 1.0 };
   }
 }
 
@@ -356,6 +404,7 @@ export interface ViewportState {
   trajectories: TrajectoryData[];
   labels: LabelData[];
   meshes: MeshData[];
+  vectors: VectorData[];
   perspective: boolean;
   cellAxesVisible: boolean;
 }
@@ -367,6 +416,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   trajectories: [],
   labels: [],
   meshes: [],
+  vectors: [],
   perspective: false,
   cellAxesVisible: true,
 };

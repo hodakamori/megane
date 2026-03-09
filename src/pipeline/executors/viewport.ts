@@ -5,6 +5,7 @@ import type {
   TrajectoryData,
   LabelData,
   MeshData,
+  VectorData,
   ViewportParams,
   ViewportState,
   PipelineData,
@@ -20,6 +21,7 @@ export function executeViewport(
   const trajectories = (inputs.get("trajectory") ?? []) as TrajectoryData[];
   const labels = (inputs.get("label") ?? []) as LabelData[];
   const meshes = (inputs.get("mesh") ?? []) as MeshData[];
+  const vectors = (inputs.get("vector") ?? []) as VectorData[];
 
   const filteredBonds = filterBondsByParticles(bonds, particles);
 
@@ -36,6 +38,7 @@ export function executeViewport(
     trajectories: sortedTrajectories,
     labels,
     meshes,
+    vectors,
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
   };
