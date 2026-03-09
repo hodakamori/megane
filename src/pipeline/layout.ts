@@ -18,7 +18,7 @@ export function getLayoutedElements<T extends Node>(
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   g.setGraph({
     rankdir: "TB",
-    nodesep: 80,
+    nodesep: 30,
     ranksep: 120,
     marginx: 40,
     marginy: 40,
