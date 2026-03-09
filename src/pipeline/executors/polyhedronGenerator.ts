@@ -142,6 +142,8 @@ export function executePolyhedronGenerator(
     opacity: params.opacity,
     showEdges: params.showEdges,
     edgePositions: params.showEdges ? new Float32Array(allEdgePositions) : null,
+    edgeColor: params.edgeColor,
+    edgeWidth: params.edgeWidth,
   };
 
   outputs.set("mesh", meshData);
