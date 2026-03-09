@@ -137,6 +137,8 @@ function createSolidTemplate(): {
             maxDistance: 2.5,
             opacity: 0.5,
             showEdges: false,
+            edgeColor: "#dddddd",
+            edgeWidth: 3,
           },
           enabled: true,
         },
