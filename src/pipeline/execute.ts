@@ -13,14 +13,16 @@ import type {
   ViewportParams,
   LoadStructureParams,
   LoadTrajectoryParams,
+  LoadVectorParams,
   AddBondParams,
   FilterParams,
   ModifyParams,
   LabelGeneratorParams,
   PolyhedronGeneratorParams,
+  VectorOverlayParams,
   PipelineNodeType,
 } from "./types";
-import type { Frame, TrajectoryMeta } from "../types";
+import type { Frame, TrajectoryMeta, VectorFrame } from "../types";
 import { DEFAULT_VIEWPORT_STATE, NODE_PORTS } from "./types";
 import { topologicalSort, collectInputs, type EdgeOutputs } from "./graph";
 import { executeLoadStructure } from "./executors/loadStructure";
@@ -30,6 +32,8 @@ import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
 import { executeLabelGenerator } from "./executors/labelGenerator";
 import { executePolyhedronGenerator } from "./executors/polyhedronGenerator";
+import { executeLoadVector } from "./executors/loadVector";
+import { executeVectorOverlay } from "./executors/vectorOverlay";
 import { executeViewport } from "./executors/viewport";
 
 export interface PipelineNodeData {
@@ -51,6 +55,7 @@ export interface PipelineExecutionContext {
   structureMeta?: TrajectoryMeta | null;
   fileFrames?: Frame[] | null;
   fileMeta?: TrajectoryMeta | null;
+  fileVectors?: VectorFrame[] | null;
 }
 
 export function executePipeline(
@@ -103,6 +108,14 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         break;
       }
+      case "load_vector": {
+        const outputs = executeLoadVector(
+          data.params as LoadVectorParams,
+          ctx.fileVectors ?? null,
+        );
+        edgeOutputs.set(id, outputs);
+        break;
+      }
       case "load_trajectory": {
         const outputs = executeLoadTrajectory(
           data.params as LoadTrajectoryParams,
@@ -150,6 +163,14 @@ export function executePipeline(
       case "polyhedron_generator": {
         const outputs = executePolyhedronGenerator(
           data.params as PolyhedronGeneratorParams,
+          inputs,
+        );
+        edgeOutputs.set(id, outputs);
+        break;
+      }
+      case "vector_overlay": {
+        const outputs = executeVectorOverlay(
+          data.params as VectorOverlayParams,
           inputs,
         );
         edgeOutputs.set(id, outputs);
