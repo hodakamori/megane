@@ -59,6 +59,7 @@ function createMoleculeTemplate(): {
           params: {
             type: "add_bond",
             bondSource: "structure",
+            suppressPbcBonds: false,
           },
           enabled: true,
         },
@@ -121,6 +122,7 @@ function createSolidTemplate(): {
           params: {
             type: "add_bond",
             bondSource: "distance",
+            suppressPbcBonds: false,
           },
           enabled: true,
         },
