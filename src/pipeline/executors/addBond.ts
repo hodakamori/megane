@@ -5,12 +5,12 @@ import type {
   AddBondParams,
 } from "../types";
 import { inferBondsVdwJS } from "../../parsers/inferBondsJS";
-import { invert3x3 } from "./mathUtils";
 
 /**
  * Filter out bonds that cross periodic boundary conditions.
- * A bond crosses PBC if any fractional-coordinate component of the
- * displacement exceeds 0.5 in absolute value.
+ * Uses raw Cartesian distance: if the distance between two bonded atoms
+ * exceeds half the shortest cell vector length, the bond spans the cell
+ * and is suppressed. No filtering when box is unavailable.
  */
 function filterPbcBonds(
   bondIndices: Uint32Array,
@@ -22,10 +22,12 @@ function filterPbcBonds(
     return { bondIndices, bondOrders, nBonds: bondIndices.length / 2 };
   }
 
-  const boxInv = invert3x3(box);
-  if (!boxInv) {
-    return { bondIndices, bondOrders, nBonds: bondIndices.length / 2 };
-  }
+  // Compute cell vector lengths, threshold = half the shortest
+  const lenA = Math.sqrt(box[0] * box[0] + box[1] * box[1] + box[2] * box[2]);
+  const lenB = Math.sqrt(box[3] * box[3] + box[4] * box[4] + box[5] * box[5]);
+  const lenC = Math.sqrt(box[6] * box[6] + box[7] * box[7] + box[8] * box[8]);
+  const half = Math.min(lenA, lenB, lenC) / 2;
+  const thresholdSq = half * half;
 
   const nBondsIn = bondIndices.length / 2;
   const filteredIndices = new Uint32Array(bondIndices.length);
@@ -38,16 +40,9 @@ function filterPbcBonds(
     const dx = positions[j * 3] - positions[i * 3];
     const dy = positions[j * 3 + 1] - positions[i * 3 + 1];
     const dz = positions[j * 3 + 2] - positions[i * 3 + 2];
+    const distSq = dx * dx + dy * dy + dz * dz;
 
-    // Convert to fractional coordinates
-    const sx = boxInv[0] * dx + boxInv[3] * dy + boxInv[6] * dz;
-    const sy = boxInv[1] * dx + boxInv[4] * dy + boxInv[7] * dz;
-    const sz = boxInv[2] * dx + boxInv[5] * dy + boxInv[8] * dz;
-
-    // Skip bonds that cross PBC (fractional displacement > 0.5)
-    if (Math.abs(sx) > 0.5 || Math.abs(sy) > 0.5 || Math.abs(sz) > 0.5) {
-      continue;
-    }
+    if (distSq > thresholdSq) continue;
 
     filteredIndices[count * 2] = i;
     filteredIndices[count * 2 + 1] = j;
