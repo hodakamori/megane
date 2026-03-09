@@ -166,10 +166,18 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
 
   addNode: (type, position) => {
     const id = generateNodeId();
+    let fallbackPosition = { x: 425, y: 50 };
+    if (!position) {
+      const currentNodes = get().nodes;
+      if (currentNodes.length > 0) {
+        const maxY = Math.max(...currentNodes.map((n) => n.position.y));
+        fallbackPosition = { x: 425, y: maxY + 200 };
+      }
+    }
     const newNode: Node<PipelineNodeData> = {
       id,
       type,
-      position: position ?? { x: 425, y: get().nodes.length * 340 + 50 },
+      position: position ?? fallbackPosition,
       data: {
         params: defaultParams(type),
         enabled: true,
