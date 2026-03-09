@@ -731,6 +731,14 @@ export class MoleculeRenderer {
 
     this.controls.update();
 
+    // Sync LineMaterial resolution for polyhedron fat edges
+    if (this.polyhedronRenderer && this.container) {
+      this.polyhedronRenderer.updateResolution(
+        this.container.clientWidth,
+        this.container.clientHeight,
+      );
+    }
+
     this.renderer.render(this.scene, this.camera);
 
     // Use renderer's internal size for all post-render passes.

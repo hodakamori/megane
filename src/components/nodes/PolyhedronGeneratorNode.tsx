@@ -207,6 +207,36 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
             style={toggleStyle}
           />
         </label>
+        {params.showEdges && (
+          <>
+            <div>
+              <div style={labelStyle}>Edge color</div>
+              <input
+                type="color"
+                value={params.edgeColor}
+                onChange={(e) => updateNodeParams(id, { edgeColor: e.target.value })}
+                style={{ width: "100%", height: 28, cursor: "pointer", border: "1px solid #e2e8f0", borderRadius: 4 }}
+              />
+            </div>
+            <div>
+              <div style={labelStyle}>Edge width</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                  value={params.edgeWidth}
+                  onChange={(e) =>
+                    updateNodeParams(id, { edgeWidth: parseFloat(e.target.value) })
+                  }
+                  style={sliderStyle}
+                />
+                <span style={valueStyle}>{params.edgeWidth.toFixed(1)}</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </NodeShell>
   );

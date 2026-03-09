@@ -66,6 +66,8 @@ export interface MeshData {
   opacity: number;
   showEdges: boolean;
   edgePositions: Float32Array | null; // line segment pairs for wireframe
+  edgeColor: string;                // edge color as hex string (e.g. "#dddddd")
+  edgeWidth: number;                // edge line width in pixels
 }
 
 /** Trajectory data flowing through the pipeline. */
@@ -296,6 +298,8 @@ export interface PolyhedronGeneratorParams {
   maxDistance: number;            // max bond distance in Angstroms
   opacity: number;               // face opacity 0-1
   showEdges: boolean;            // wireframe edges
+  edgeColor: string;             // edge color as hex string
+  edgeWidth: number;             // edge line width in pixels
 }
 
 /** Discriminated union of all node parameter types. */
@@ -338,6 +342,8 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         maxDistance: 2.5,
         opacity: 0.5,
         showEdges: false,
+        edgeColor: "#dddddd",
+        edgeWidth: 3,
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
