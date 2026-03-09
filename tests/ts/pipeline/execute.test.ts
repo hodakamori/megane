@@ -285,6 +285,52 @@ describe("executePipeline", () => {
       expect(result.bonds[0].nBonds).toBe(1);
     });
 
+    it("suppressPbcBonds filters bonds crossing the cell", () => {
+      // Water molecule where one H is wrapped to the opposite side of a 4 Å box
+      // O at (0.5, 2, 2), H1 at (1.4, 2, 2) (normal), H2 at (3.6, 2, 2) (wrapped)
+      // O-H1 distance = 0.9 Å (keep), O-H2 distance = 3.1 Å > 4/2 = 2.0 Å (suppress)
+      const wrappedWater = makeSnapshot({
+        nAtoms: 3,
+        positions: [0.5, 2, 2, 1.4, 2, 2, 3.6, 2, 2],
+        elements: [8, 1, 1],
+        bonds: [0, 1, 0, 2],
+        bondOrders: [1, 1],
+        box: [4, 0, 0, 0, 4, 0, 0, 0, 4],
+      });
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
+        makeNode("ab", "add_bond", { bondSource: "structure", suppressPbcBonds: true }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "ab", "particle"),
+        makeEdge("ab", "bond", "vp", "bond"),
+      ];
+
+      const result = executePipeline(nodes, edges, { snapshot: wrappedWater });
+      expect(result.bonds).toHaveLength(1);
+      expect(result.bonds[0].nBonds).toBe(1);
+      // The remaining bond should be O-H1 (indices 0,1)
+      expect(result.bonds[0].bondIndices[0]).toBe(0);
+      expect(result.bonds[0].bondIndices[1]).toBe(1);
+    });
+
+    it("suppressPbcBonds keeps all bonds when no box", () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("ab", "add_bond", { bondSource: "structure", suppressPbcBonds: true }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "ab", "particle"),
+        makeEdge("ab", "bond", "vp", "bond"),
+      ];
+
+      const result = executePipeline(nodes, edges, { snapshot: waterSnapshot });
+      expect(result.bonds).toHaveLength(1);
+      expect(result.bonds[0].nBonds).toBe(2);
+    });
+
     it("returns no bonds for 'none' source", () => {
       const nodes = [
         makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
