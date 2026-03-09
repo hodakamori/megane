@@ -7,7 +7,7 @@ import { create } from "zustand";
 import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData, PipelineExecutionContext } from "./execute";
-import type { Snapshot, Frame, TrajectoryMeta } from "../types";
+import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
 import type { PipelineNodeType, ViewportState, SerializedPipeline } from "./types";
 import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
 import { executePipeline } from "./execute";
@@ -34,11 +34,13 @@ export interface PipelineStore {
   structureMeta: TrajectoryMeta | null;
   fileFrames: Frame[] | null;
   fileMeta: TrajectoryMeta | null;
+  fileVectors: VectorFrame[] | null;
 
   setSnapshot: (s: Snapshot | null) => void;
   setAtomLabels: (labels: string[] | null) => void;
   setStructureFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
+  setFileVectors: (vectors: VectorFrame[] | null) => void;
 
   // xyflow change handlers
   onNodesChange: OnNodesChange<Node<PipelineNodeData>>;
@@ -81,6 +83,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   structureMeta: null,
   fileFrames: null,
   fileMeta: null,
+  fileVectors: null,
 
   setSnapshot: (s) => {
     set({ snapshot: s });
@@ -96,6 +99,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
   setFileFrames: (frames, meta) => {
     set({ fileFrames: frames, fileMeta: meta });
+    get().execute();
+  },
+  setFileVectors: (vectors) => {
+    set({ fileVectors: vectors });
     get().execute();
   },
 
@@ -207,7 +214,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   execute: () => {
-    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta } = get();
+    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors } = get();
     const ctx: PipelineExecutionContext = {
       snapshot,
       atomLabels,
@@ -215,6 +222,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       structureMeta,
       fileFrames,
       fileMeta,
+      fileVectors,
     };
     const viewportState = executePipeline(nodes, edges, ctx);
     set({ viewportState });

@@ -3,8 +3,9 @@
  * Translates the typed data streams into renderer calls.
  */
 
-import type { ViewportState, ParticleData, BondData, CellData, LabelData, MeshData } from "./types";
+import type { ViewportState, ParticleData, BondData, CellData, LabelData, MeshData, VectorData } from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
+import { getVectorsForFrame } from "../logic/vectorSourceLogic";
 
 /**
  * Apply the current ViewportState to the renderer.
@@ -55,6 +56,9 @@ export function applyViewportState(
 
   // ─── Meshes (polyhedra) ───────────────────────────────────
   applyMeshes(renderer, current.meshes, previous?.meshes ?? null);
+
+  // ─── Vectors (arrows) ──────────────────────────────────────
+  applyVectors(renderer, current.vectors, previous?.vectors ?? null);
 
   // ─── Bonds visibility ──────────────────────────────────────
   const bondsVisible = current.bonds.length > 0;
@@ -166,4 +170,35 @@ function applyMeshes(
   } else if (prevMeshes && prevMeshes.length > 0) {
     renderer.clearPolyhedra();
   }
+}
+
+function applyVectors(
+  renderer: MoleculeRenderer,
+  vectors: VectorData[],
+  prevVectors: VectorData[] | null,
+): void {
+  if (vectors.length > 0) {
+    const vd = vectors[0];
+    const frameVectors = getVectorsForFrame({ fileVectors: vd.frames }, 0);
+    renderer.setVectors(frameVectors);
+    renderer.setVectorScale(vd.scale);
+  } else if (prevVectors && prevVectors.length > 0) {
+    renderer.setVectors(null);
+  }
+}
+
+/**
+ * Update vector arrows for the given frame index.
+ * Called on each frame change when vector data is in the viewport state.
+ */
+export function applyVectorsForFrame(
+  renderer: MoleculeRenderer,
+  vectors: VectorData[],
+  frameIndex: number,
+): void {
+  if (vectors.length === 0) return;
+  const vd = vectors[0];
+  const frameVectors = getVectorsForFrame({ fileVectors: vd.frames }, frameIndex);
+  renderer.setVectors(frameVectors);
+  renderer.setVectorScale(vd.scale);
 }

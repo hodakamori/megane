@@ -13,10 +13,12 @@ import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { usePipelineStore } from "../pipeline/store";
-import { applyViewportState } from "../pipeline/apply";
+import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
 import { setTrajectoryLoadHandler } from "./nodes/LoadTrajectoryNode";
+import { setVectorLoadHandler } from "./nodes/LoadVectorNode";
+import { loadVectorFileData } from "../logic/vectorSourceLogic";
 import type {
   Snapshot,
   Frame,
@@ -122,6 +124,21 @@ export function MeganeViewer({
     };
   }, [onUploadTrajectory]);
 
+  // Wire up vector load handler
+  const setFileVectors = usePipelineStore((s) => s.setFileVectors);
+  useEffect(() => {
+    setVectorLoadHandler((file) => {
+      const nAtoms = snapshot?.nAtoms ?? 0;
+      if (nAtoms === 0) return;
+      loadVectorFileData(file, nAtoms).then(({ vectors }) => {
+        setFileVectors(vectors);
+      });
+    });
+    return () => {
+      setVectorLoadHandler(null);
+    };
+  }, [snapshot, setFileVectors]);
+
   // Apply viewportState changes to the renderer
   useEffect(() => {
     const renderer = rendererRef.current;
@@ -149,6 +166,16 @@ export function MeganeViewer({
     );
     renderer.updateBonds(newBonds, null);
   }, [frame, snapshot]);
+
+  // Per-frame vector update
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    const vs = usePipelineStore.getState().viewportState;
+    if (vs.vectors.length > 0) {
+      applyVectorsForFrame(renderer, vs.vectors, currentFrame);
+    }
+  }, [currentFrame]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;

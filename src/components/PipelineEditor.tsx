@@ -35,24 +35,28 @@ import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
 import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
+import { LoadVectorNode } from "./nodes/LoadVectorNode";
+import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 
 const nodeTypes = {
   load_structure: LoadStructureNode,
   load_trajectory: LoadTrajectoryNode,
+  load_vector: LoadVectorNode,
   add_bond: AddBondNode,
   viewport: ViewportNode,
   filter: FilterNode,
   modify: ModifyNode,
   label_generator: LabelGeneratorNode,
   polyhedron_generator: PolyhedronGeneratorNode,
+  vector_overlay: VectorOverlayNode,
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
-  { category: "data_load", label: "Data Load", types: ["load_structure", "load_trajectory"] },
+  { category: "data_load", label: "Data Load", types: ["load_structure", "load_trajectory", "load_vector"] },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },
   { category: "modify", label: "Modify", types: ["modify"] },
-  { category: "overlay", label: "Overlay", types: ["label_generator", "polyhedron_generator"] },
+  { category: "overlay", label: "Overlay", types: ["label_generator", "polyhedron_generator", "vector_overlay"] },
 ];
 
 const MIN_WIDTH = 320;

@@ -11,12 +11,14 @@ import { defaultParams } from "./types";
 const VALID_NODE_TYPES: Set<string> = new Set([
   "load_structure",
   "load_trajectory",
+  "load_vector",
   "add_bond",
   "viewport",
   "filter",
   "modify",
   "label_generator",
   "polyhedron_generator",
+  "vector_overlay",
 ]);
 
 /**
