@@ -164,20 +164,17 @@ export function MeganeViewer({
       snapshot.elements,
       snapshot.nAtoms,
       0.6,
+      snapshot.box,
     );
 
-    if ((params as AddBondParams).suppressPbcBonds) {
-      const result = processPbcBonds(
-        newBonds, null, frame.positions,
-        snapshot.elements, snapshot.nAtoms, snapshot.box,
-      );
-      renderer.updateBondsExt(
-        result.bondIndices, result.bondOrders,
-        result.positions, result.elements, result.nAtoms,
-      );
-    } else {
-      renderer.updateBonds(newBonds, null);
-    }
+    const result = processPbcBonds(
+      newBonds, null, frame.positions,
+      snapshot.elements, snapshot.nAtoms, snapshot.box,
+    );
+    renderer.updateBondsExt(
+      result.bondIndices, result.bondOrders,
+      result.positions, result.elements, result.nAtoms,
+    );
   }, [frame, snapshot]);
 
   // Per-frame vector update
