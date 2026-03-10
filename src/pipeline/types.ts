@@ -39,6 +39,10 @@ export interface BondData {
   nBonds: number;
   scale: number;
   opacity: number;
+  // Extended data for PBC half-bonds (ghost atoms appended)
+  positions: Float32Array | null;  // null = use particle positions
+  elements: Uint8Array | null;     // null = use particle elements
+  nAtoms: number;                  // total atoms including ghosts (0 = use particle nAtoms)
 }
 
 /** Simulation cell data. */

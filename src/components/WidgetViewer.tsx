@@ -12,6 +12,7 @@ import { PipelineEditor } from "./PipelineEditor";
 import { Timeline } from "./Timeline";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
@@ -106,7 +107,19 @@ function WidgetViewerPipeline({
       snapshot.nAtoms,
       0.6,
     );
-    renderer.updateBonds(newBonds, null);
+
+    if ((params as AddBondParams).suppressPbcBonds) {
+      const result = processPbcBonds(
+        newBonds, null, frame.positions,
+        snapshot.elements, snapshot.nAtoms, snapshot.box,
+      );
+      renderer.updateBondsExt(
+        result.bondIndices, result.bondOrders,
+        result.positions, result.elements, result.nAtoms,
+      );
+    } else {
+      renderer.updateBonds(newBonds, null);
+    }
   }, [frame, snapshot]);
 
   // Apply pipeline JSON from Python

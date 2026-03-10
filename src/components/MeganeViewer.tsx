@@ -12,6 +12,7 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
@@ -164,7 +165,19 @@ export function MeganeViewer({
       snapshot.nAtoms,
       0.6,
     );
-    renderer.updateBonds(newBonds, null);
+
+    if ((params as AddBondParams).suppressPbcBonds) {
+      const result = processPbcBonds(
+        newBonds, null, frame.positions,
+        snapshot.elements, snapshot.nAtoms, snapshot.box,
+      );
+      renderer.updateBondsExt(
+        result.bondIndices, result.bondOrders,
+        result.positions, result.elements, result.nAtoms,
+      );
+    } else {
+      renderer.updateBonds(newBonds, null);
+    }
   }, [frame, snapshot]);
 
   // Per-frame vector update

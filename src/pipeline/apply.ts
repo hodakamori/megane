@@ -140,6 +140,14 @@ function applyBondSettings(
   const bond = bonds[0];
   const prevBond = prevBonds?.[0];
 
+  // Update bond topology when bond indices change (PBC filtering, etc.)
+  if (!prevBond || bond.bondIndices !== prevBond.bondIndices) {
+    renderer.updateBondsExt(
+      bond.bondIndices, bond.bondOrders,
+      bond.positions, bond.elements, bond.nAtoms,
+    );
+  }
+
   if (!prevBond || bond.scale !== prevBond.scale) {
     renderer.setBondScale(bond.scale);
   }
