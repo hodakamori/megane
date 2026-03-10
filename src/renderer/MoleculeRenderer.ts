@@ -182,14 +182,13 @@ export class MoleculeRenderer {
     }
 
     this.atomRenderer!.loadSnapshot(snapshot);
-    this.bondRenderer!.loadSnapshot(snapshot);
+    // Bond loading is handled exclusively by the pipeline via updateBondsExt/updateBonds
+    // (called from applyViewportState). This avoids race conditions between
+    // Viewport's loadSnapshot and MeganeViewer's applyViewportState effects.
 
     // Re-apply stored scale after loading snapshot data
     if (this.atomScale !== 1.0 && this.atomRenderer!.setScale) {
       this.atomRenderer!.setScale(this.atomScale, snapshot);
-    }
-    if (this.bondScale !== 1.0 && this.bondRenderer!.setScale) {
-      this.bondRenderer!.setScale(this.bondScale, snapshot);
     }
 
     // Update label overlay
