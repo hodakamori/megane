@@ -261,7 +261,6 @@ export interface LoadTrajectoryParams {
 export interface AddBondParams {
   type: "add_bond";
   bondSource: BondSource;
-  suppressPbcBonds: boolean;
 }
 
 export interface ViewportParams {
@@ -330,7 +329,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "load_vector":
       return { type, fileName: null };
     case "add_bond":
-      return { type, bondSource: "distance", suppressPbcBonds: false };
+      return { type, bondSource: "distance" };
     case "viewport":
       return { type, perspective: false, cellAxesVisible: true };
     case "filter":

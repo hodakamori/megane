@@ -285,10 +285,10 @@ describe("executePipeline", () => {
       expect(result.bonds[0].nBonds).toBe(1);
     });
 
-    it("suppressPbcBonds filters bonds crossing the cell", () => {
+    it("processes PBC bonds with ghost atoms", () => {
       // Water molecule where one H is wrapped to the opposite side of a 4 Å box
       // O at (0.5, 2, 2), H1 at (1.4, 2, 2) (normal), H2 at (3.6, 2, 2) (wrapped)
-      // O-H1 distance = 0.9 Å (keep), O-H2 distance = 3.1 Å > 4/2 = 2.0 Å (suppress)
+      // O-H1 distance = 0.9 Å (keep), O-H2 distance = 3.1 Å > 4/2 = 2.0 Å (PBC bond)
       const wrappedWater = makeSnapshot({
         nAtoms: 3,
         positions: [0.5, 2, 2, 1.4, 2, 2, 3.6, 2, 2],
@@ -299,7 +299,7 @@ describe("executePipeline", () => {
       });
       const nodes = [
         makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
-        makeNode("ab", "add_bond", { bondSource: "structure", suppressPbcBonds: true }),
+        makeNode("ab", "add_bond", { bondSource: "structure" }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
       const edges = [
@@ -335,10 +335,10 @@ describe("executePipeline", () => {
       expect(bond.positions![4 * 3]).toBeCloseTo(4.5, 1);   // ghost_O x
     });
 
-    it("suppressPbcBonds keeps all bonds when no box", () => {
+    it("PBC processing keeps all bonds when no box", () => {
       const nodes = [
         makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
-        makeNode("ab", "add_bond", { bondSource: "structure", suppressPbcBonds: true }),
+        makeNode("ab", "add_bond", { bondSource: "structure" }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
       const edges = [
@@ -349,6 +349,39 @@ describe("executePipeline", () => {
       const result = executePipeline(nodes, edges, { snapshot: waterSnapshot });
       expect(result.bonds).toHaveLength(1);
       expect(result.bonds[0].nBonds).toBe(2);
+    });
+
+    it("distance-based bond detection finds bonds across PBC boundaries", () => {
+      // Two H atoms at opposite edges of a 3 Å box
+      // H1 at (0.1, 1.5, 1.5), H2 at (2.9, 1.5, 1.5)
+      // Cartesian distance = 2.8 Å (too far for H-H bond)
+      // PBC minimum-image distance = 0.2 Å... too close (< MIN_BOND_DIST=0.4)
+      // Let's use: H1 at (0.2, 1.5, 1.5), H2 at (2.5, 1.5, 1.5) in a 3 Å box
+      // Cartesian distance = 2.3 Å, PBC min-image distance = 0.7 Å
+      // VDW_RADII[H] = 1.2, threshold = (1.2+1.2)*0.6 = 1.44 Å
+      // 0.7 < 1.44 so bond should be found via PBC
+      const pbcAtoms = makeSnapshot({
+        nAtoms: 2,
+        positions: [0.2, 1.5, 1.5, 2.5, 1.5, 1.5],
+        elements: [1, 1],
+        bonds: [],
+        bondOrders: [],
+        box: [3, 0, 0, 0, 3, 0, 0, 0, 3],
+      });
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
+        makeNode("ab", "add_bond", { bondSource: "distance" }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "ab", "particle"),
+        makeEdge("ab", "bond", "vp", "bond"),
+      ];
+
+      const result = executePipeline(nodes, edges, { snapshot: pbcAtoms });
+      expect(result.bonds).toHaveLength(1);
+      // Bond should be found (PBC minimum-image distance ~0.7 Å < 1.44 Å threshold)
+      expect(result.bonds[0].nBonds).toBeGreaterThanOrEqual(1);
     });
 
     it("returns no bonds for 'none' source", () => {

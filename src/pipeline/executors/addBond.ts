@@ -186,18 +186,16 @@ export function executeAddBond(
       let extElements: Uint8Array | null = null;
       let extNAtoms = 0;
 
-      if (params.suppressPbcBonds) {
-        const result = processPbcBonds(
-          bondIndices, bondOrders, snapshot.positions,
-          snapshot.elements, snapshot.nAtoms, snapshot.box,
-        );
-        bondIndices = result.bondIndices;
-        bondOrders = result.bondOrders;
-        nBonds = result.nBonds;
-        extPositions = result.positions;
-        extElements = result.elements;
-        extNAtoms = result.nAtoms;
-      }
+      const result = processPbcBonds(
+        bondIndices, bondOrders, snapshot.positions,
+        snapshot.elements, snapshot.nAtoms, snapshot.box,
+      );
+      bondIndices = result.bondIndices;
+      bondOrders = result.bondOrders;
+      nBonds = result.nBonds;
+      extPositions = result.positions;
+      extElements = result.elements;
+      extNAtoms = result.nAtoms;
 
       if (nBonds > 0) {
         const bond: BondData = {
@@ -220,6 +218,7 @@ export function executeAddBond(
       snapshot.elements,
       snapshot.nAtoms,
       0.6,
+      snapshot.box,
     );
 
     if (bondIndices.length > 0) {
@@ -228,17 +227,15 @@ export function executeAddBond(
       let extElements: Uint8Array | null = null;
       let extNAtoms = 0;
 
-      if (params.suppressPbcBonds) {
-        const result = processPbcBonds(
-          bondIndices, null, snapshot.positions,
-          snapshot.elements, snapshot.nAtoms, snapshot.box,
-        );
-        bondIndices = result.bondIndices;
-        nBonds = result.nBonds;
-        extPositions = result.positions;
-        extElements = result.elements;
-        extNAtoms = result.nAtoms;
-      }
+      const result = processPbcBonds(
+        bondIndices, null, snapshot.positions,
+        snapshot.elements, snapshot.nAtoms, snapshot.box,
+      );
+      bondIndices = result.bondIndices;
+      nBonds = result.nBonds;
+      extPositions = result.positions;
+      extElements = result.elements;
+      extNAtoms = result.nAtoms;
 
       if (nBonds > 0) {
         const bond: BondData = {

@@ -55,7 +55,6 @@ export function createDefaultPipeline(): {
           params: {
             type: "add_bond",
             bondSource: "structure",
-            suppressPbcBonds: false,
           },
           enabled: true,
         },
@@ -187,7 +186,6 @@ export function createDemoPipeline(): {
           params: {
             type: "add_bond",
             bondSource: "structure",
-            suppressPbcBonds: false,
           },
           enabled: true,
         },

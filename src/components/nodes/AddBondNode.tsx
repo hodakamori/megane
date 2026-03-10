@@ -22,21 +22,6 @@ const sectionLabelStyle: React.CSSProperties = {
   marginTop: 0,
 };
 
-const toggleRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  fontSize: 19,
-  color: "#475569",
-  padding: "3px 0",
-  marginTop: 8,
-};
-
-const toggleStyle: React.CSSProperties = {
-  cursor: "pointer",
-  accentColor: "#3b82f6",
-};
-
 export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
   const params = data.params as AddBondParams;
@@ -52,15 +37,6 @@ export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         value={params.bondSource}
         onChange={(v) => updateNodeParams(id, { bondSource: v })}
       />
-      <label style={toggleRowStyle}>
-        Wrap PBC bonds
-        <input
-          type="checkbox"
-          checked={params.suppressPbcBonds}
-          onChange={(e) => updateNodeParams(id, { suppressPbcBonds: e.target.checked })}
-          style={toggleStyle}
-        />
-      </label>
     </NodeShell>
   );
 }
