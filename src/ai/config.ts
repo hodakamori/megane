@@ -34,7 +34,7 @@ function loadConfig(): AIConfig {
       return {
         provider: parsed.provider ?? "anthropic",
         model: parsed.model ?? "claude-sonnet-4-20250514",
-        apiKey: parsed.apiKey ?? "",
+        apiKey: "",
       };
     }
   } catch {
@@ -44,7 +44,13 @@ function loadConfig(): AIConfig {
 }
 
 function saveConfig(config: AIConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      provider: config.provider,
+      model: config.model,
+    }),
+  );
 }
 
 interface AIConfigStore extends AIConfig {
