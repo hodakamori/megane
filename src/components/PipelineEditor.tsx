@@ -38,6 +38,7 @@ import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
+import { PipelineChatBox } from "./PipelineChatBox";
 
 const nodeTypes = {
   load_structure: LoadStructureNode,
@@ -387,7 +388,7 @@ function PipelineEditorInner({
       headerExtra={headerExtra}
       containerExtra={resizeHandle}
     >
-      <div ref={flowContainerRef} style={{ flex: 1, position: "relative" }}>
+      <div ref={flowContainerRef} style={{ flex: 1, position: "relative", minHeight: 0 }}>
         <ReactFlow
           nodes={nodes}
           edges={styledEdges}
@@ -429,6 +430,13 @@ function PipelineEditorInner({
           />
         </ReactFlow>
       </div>
+      <PipelineChatBox
+        onPipelineApplied={() => {
+          window.requestAnimationFrame(() => {
+            fitView({ padding: 0.1, maxZoom: 1.95, duration: 300 });
+          });
+        }}
+      />
     </CollapsiblePanel>
   );
 }
