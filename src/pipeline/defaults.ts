@@ -156,8 +156,10 @@ export function createDefaultPipeline(): {
 }
 
 /**
- * Create an empty pipeline with only a Viewport node.
+ * Create a basic pipeline with LoadStructure → AddBond → Viewport.
  * Used as the default in the VSCode extension where files are loaded externally.
+ * The LoadStructure node reads from the pipeline store's snapshot (set by the
+ * webview after parsing), so the molecule renders with bonds automatically.
  */
 export function createEmptyPipeline(): {
   nodes: Node<PipelineNodeData>[];
@@ -166,9 +168,35 @@ export function createEmptyPipeline(): {
   return {
     nodes: [
       {
+        id: "loader-1",
+        type: "load_structure",
+        position: { x: 425, y: 0 },
+        data: {
+          params: {
+            type: "load_structure",
+            fileName: "",
+            hasTrajectory: false,
+            hasCell: false,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "addbond-1",
+        type: "add_bond",
+        position: { x: 425, y: 255 },
+        data: {
+          params: {
+            type: "add_bond",
+            bondSource: "structure",
+          },
+          enabled: true,
+        },
+      },
+      {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 425, y: 50 },
+        position: { x: 425, y: 510 },
         data: {
           params: {
             type: "viewport",
@@ -179,7 +207,12 @@ export function createEmptyPipeline(): {
         },
       },
     ],
-    edges: [],
+    edges: [
+      { id: "e1", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
+      { id: "e2", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
+      { id: "e3", source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+      { id: "e4", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
+    ],
   };
 }
 

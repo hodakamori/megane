@@ -8,6 +8,7 @@ import { StrictMode, useState, useEffect, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
+import { usePipelineStore } from "../../src/pipeline/store";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -24,7 +25,15 @@ function App() {
         const { content, filename } = message;
         // Create a File object so parseStructureFile can detect format from extension
         const file = new File([content], filename, { type: "text/plain" });
-        local.loadFile(file).then(() => setLoaded(true));
+        local.loadFile(file).then(() => {
+          setLoaded(true);
+          // Update the LoadStructure node's fileName for display
+          const { nodes, updateNodeParams } = usePipelineStore.getState();
+          const loaderNode = nodes.find((n) => n.type === "load_structure");
+          if (loaderNode) {
+            updateNodeParams(loaderNode.id, { fileName: filename });
+          }
+        });
       }
     };
 
