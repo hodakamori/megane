@@ -309,10 +309,30 @@ describe("executePipeline", () => {
 
       const result = executePipeline(nodes, edges, { snapshot: wrappedWater });
       expect(result.bonds).toHaveLength(1);
-      expect(result.bonds[0].nBonds).toBe(1);
-      // The remaining bond should be O-H1 (indices 0,1)
-      expect(result.bonds[0].bondIndices[0]).toBe(0);
-      expect(result.bonds[0].bondIndices[1]).toBe(1);
+      const bond = result.bonds[0];
+      // 1 normal bond (O-H1) + 2 half-bonds for PBC bond (O-H2)
+      expect(bond.nBonds).toBe(3);
+      // First bond: O-H1 (normal, indices 0,1)
+      expect(bond.bondIndices[0]).toBe(0);
+      expect(bond.bondIndices[1]).toBe(1);
+      // Second bond: O → ghost_H2 (index 3, first ghost atom)
+      expect(bond.bondIndices[2]).toBe(0);
+      expect(bond.bondIndices[3]).toBe(3);
+      // Third bond: H2 → ghost_O (index 4, second ghost atom)
+      expect(bond.bondIndices[4]).toBe(2);
+      expect(bond.bondIndices[5]).toBe(4);
+      // Extended positions/elements include ghost atoms
+      expect(bond.positions).not.toBeNull();
+      expect(bond.elements).not.toBeNull();
+      expect(bond.nAtoms).toBe(5); // 3 original + 2 ghosts
+      // Ghost_H2 should be near O (minimum-image of H2 near O)
+      // O at (0.5, 2, 2), H2 at (3.6, 2, 2), min-image displacement = -0.4-0.5 = -0.9? No...
+      // dx = 3.6 - 0.5 = 3.1, fractional = 3.1/4 = 0.775, wrapped = 0.775 - 1 = -0.225
+      // dxMin = -0.225 * 4 = -0.9, ghost_H2 = 0.5 + (-0.9) = -0.4
+      expect(bond.positions![3 * 3]).toBeCloseTo(-0.4, 1);  // ghost_H2 x
+      expect(bond.positions![3 * 3 + 1]).toBeCloseTo(2, 1); // ghost_H2 y
+      // ghost_O = H2 - dMin = 3.6 - (-0.9) = 4.5
+      expect(bond.positions![4 * 3]).toBeCloseTo(4.5, 1);   // ghost_O x
     });
 
     it("suppressPbcBonds keeps all bonds when no box", () => {

@@ -53,7 +53,7 @@ export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         onChange={(v) => updateNodeParams(id, { bondSource: v })}
       />
       <label style={toggleRowStyle}>
-        Suppress PBC bonds
+        Wrap PBC bonds
         <input
           type="checkbox"
           checked={params.suppressPbcBonds}

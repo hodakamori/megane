@@ -277,6 +277,36 @@ export class MoleculeRenderer {
     }
   }
 
+  /**
+   * Replace bond data with optional extended positions/elements (PBC ghost atoms).
+   * When positions/elements are provided, they include ghost atoms appended to
+   * the original arrays, and bond indices may reference those ghost atoms.
+   */
+  updateBondsExt(
+    bonds: Uint32Array,
+    bondOrders: Uint8Array | null,
+    positions: Float32Array | null,
+    elements: Uint8Array | null,
+    nAtoms: number,
+  ): void {
+    if (!this.snapshot || !this.bondRenderer) return;
+    const pos = positions ?? this.currentPositions ?? this.snapshot.positions;
+    const elems = elements ?? this.snapshot.elements;
+    const atomCount = nAtoms || this.snapshot.nAtoms;
+    this.bondRenderer.loadSnapshot({
+      ...this.snapshot,
+      nAtoms: atomCount,
+      nBonds: bonds.length / 2,
+      bonds,
+      bondOrders,
+      positions: pos,
+      elements: elems,
+    });
+    if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
+      this.bondRenderer.setScale(this.bondScale, this.snapshot);
+    }
+  }
+
   /** Set per-atom labels for overlay display. */
   setLabels(labels: string[] | null): void {
     this.labelOverlay?.setLabels(labels);
