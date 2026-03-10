@@ -5,4 +5,4 @@ from megane.parsers.xtc import load_trajectory
 from megane.widget import MolecularViewer
 
 __all__ = ["load_pdb", "load_trajectory", "MolecularViewer"]
-__version__ = "0.2.0"
+__version__ = "0.3.0"

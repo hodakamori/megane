@@ -1,6 +1,6 @@
 [package]
 name = "megane-wasm"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 
 [package.metadata.wasm-pack.profile.release]
