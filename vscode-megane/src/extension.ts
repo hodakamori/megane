@@ -96,6 +96,7 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
   <div id="root"></div>
   <script nonce="${nonce}">
     window.__MEGANE_WASM_URL__ = "${wasmUri}";
+    window.__MEGANE_CONTEXT__ = "vscode";
   </script>
   <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
 </body>
