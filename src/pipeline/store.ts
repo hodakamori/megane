@@ -12,7 +12,7 @@ import type { PipelineNodeType, ViewportState, SerializedPipeline } from "./type
 import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
 import { executePipeline } from "./execute";
 import { serializePipeline, deserializePipeline } from "./serialize";
-import { createDefaultPipeline, createDemoPipeline } from "./defaults";
+import { createDefaultPipeline, createDemoPipeline, createEmptyPipeline } from "./defaults";
 import { PIPELINE_TEMPLATES } from "./templates";
 import { getLayoutedElements } from "./layout";
 
@@ -73,9 +73,14 @@ export interface PipelineStore {
   reset: () => void;
 }
 
-const rawDefault = new URLSearchParams(globalThis.location?.search ?? "").has("demo")
-  ? createDemoPipeline()
-  : createDefaultPipeline();
+function getInitialPipeline() {
+  const search = new URLSearchParams(globalThis.location?.search ?? "");
+  if (search.has("demo")) return createDemoPipeline();
+  if ((globalThis as any).__MEGANE_CONTEXT__ === "vscode") return createEmptyPipeline();
+  return createDefaultPipeline();
+}
+
+const rawDefault = getInitialPipeline();
 const defaultState = getLayoutedElements(rawDefault.nodes, rawDefault.edges);
 
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
@@ -279,7 +284,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   reset: () => {
-    const def = createDefaultPipeline();
+    const def = getInitialPipeline();
     set({
       nodes: def.nodes,
       edges: def.edges,

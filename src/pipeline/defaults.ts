@@ -156,6 +156,34 @@ export function createDefaultPipeline(): {
 }
 
 /**
+ * Create an empty pipeline with only a Viewport node.
+ * Used as the default in the VSCode extension where files are loaded externally.
+ */
+export function createEmptyPipeline(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 425, y: 50 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [],
+  };
+}
+
+/**
  * Create a demo pipeline showcasing filter and modify nodes.
  */
 export function createDemoPipeline(): {
