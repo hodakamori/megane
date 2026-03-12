@@ -63,11 +63,11 @@ dependencies = [
 
 [[package]]
 name = "megane-core"
-version = "0.3.1"
+version = "0.3.2"
 
 [[package]]
 name = "megane-python"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "megane-core",
  "numpy",
@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "megane-wasm"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "js-sys",
  "megane-core",
