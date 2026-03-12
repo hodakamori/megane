@@ -1,7 +1,7 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use megane_core::{bonds, cif, gro, mol, parser, top, xtc, xyz};
+use megane_core::{bonds, cif, gro, lammps_data, mol, parser, top, xtc, xyz};
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
@@ -229,6 +229,13 @@ pub fn parse_cif(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult::from_parsed(data))
 }
 
+/// Parse a LAMMPS data file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_lammps_data(text: &str) -> Result<ParseResult, JsError> {
+    let data = lammps_data::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
 /// Infer bonds using VDW radii (threshold = vdw_sum * 0.6).
 /// Returns flat Uint32Array [a0, b0, a1, b1, ...].
 #[wasm_bindgen]
@@ -266,6 +273,7 @@ pub fn extract_labels(text: &str, format: &str) -> String {
     let result = match format {
         "gro" => gro::parse(text),
         "xyz" => xyz::parse(text),
+        "lammps_data" => lammps_data::parse(text),
         _ => parser::parse(text),
     };
     match result {
