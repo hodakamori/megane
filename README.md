@@ -106,6 +106,8 @@ viewer.frame_index = 50
 
 ### CLI
 
+> **Note:** Running from source requires building the frontend first. See [Development Setup](#setup) for details.
+
 ```bash
 megane serve protein.pdb
 megane serve protein.pdb --xtc trajectory.xtc
@@ -164,6 +166,15 @@ uv sync --extra dev
 # Node.js
 npm install
 npm run build
+```
+
+### Running `megane serve`
+
+After setup, build and install the package, then start the server:
+
+```bash
+maturin develop --release
+megane serve protein.pdb
 ```
 
 ### Development Mode
