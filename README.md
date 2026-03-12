@@ -104,6 +104,22 @@ viewer.load("protein.pdb", xtc="trajectory.xtc")
 viewer.frame_index = 50
 ```
 
+### CLI (Docker)
+
+```bash
+docker build -t megane .
+docker run --rm -p 8080:8080 megane
+```
+
+Open http://localhost:8080 in your browser.
+
+To view your own files, mount them into the container:
+
+```bash
+docker run --rm -p 8080:8080 -v ./mydata:/data megane \
+  megane serve /data/protein.pdb --port 8080 --no-browser
+```
+
 ### React
 
 ```tsx
