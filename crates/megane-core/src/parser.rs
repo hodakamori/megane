@@ -142,7 +142,7 @@ fn parse_cryst1(line: &str) -> Option<[f32; 9]> {
 }
 
 /// Convert crystallographic cell parameters to a 3x3 matrix (row-major).
-fn cell_params_to_matrix(a: f32, b: f32, c: f32, alpha: f32, beta: f32, gamma: f32) -> [f32; 9] {
+pub fn cell_params_to_matrix(a: f32, b: f32, c: f32, alpha: f32, beta: f32, gamma: f32) -> [f32; 9] {
     let to_rad = std::f32::consts::PI / 180.0;
     let alpha_r = alpha * to_rad;
     let beta_r = beta * to_rad;

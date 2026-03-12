@@ -1,7 +1,7 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use megane_core::{bonds, gro, mol, parser, top, xtc, xyz};
+use megane_core::{bonds, cif, gro, mol, parser, top, xtc, xyz};
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
@@ -219,6 +219,13 @@ pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_mol(text: &str) -> Result<ParseResult, JsError> {
     let data = mol::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a CIF file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_cif(text: &str) -> Result<ParseResult, JsError> {
+    let data = cif::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 
