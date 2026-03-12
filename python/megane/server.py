@@ -38,14 +38,35 @@ class ServerState:
 _state = ServerState()
 
 
-def configure(pdb_path: str, xtc_path: str | None = None) -> None:
+def configure(
+    pdb_path: str,
+    xtc_path: str | None = None,
+    traj_path: str | None = None,
+) -> None:
     """Configure the server with a molecular structure to serve."""
+    _state.xtc_path = xtc_path
+    _state.trajectory = None
+
+    if traj_path is not None:
+        from megane.parsers.traj import load_traj
+
+        structure, traj = load_traj(traj_path)
+        _state.structure = structure
+        _state.snapshot_bytes = encode_snapshot(structure)
+        _state.pdb_path = traj_path
+        _state.trajectory = traj
+        logger.info(
+            "Loaded .traj: %d frames, %d atoms, %d bonds",
+            traj.n_frames,
+            traj.n_atoms,
+            len(structure.bonds),
+        )
+        return
+
     structure = load_pdb(pdb_path)
     _state.structure = structure
     _state.snapshot_bytes = encode_snapshot(structure)
     _state.pdb_path = pdb_path
-    _state.xtc_path = xtc_path
-    _state.trajectory = None
 
     if xtc_path:
         from megane.parsers.xtc import load_trajectory

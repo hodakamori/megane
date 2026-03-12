@@ -40,6 +40,7 @@ Repository = "https://github.com/hodakamori/megane"
 Issues = "https://github.com/hodakamori/megane/issues"
 
 [project.optional-dependencies]
+traj = ["ase>=3.22"]
 dev = ["pytest>=7.0", "httpx>=0.24"]
 
 [project.scripts]
