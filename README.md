@@ -104,12 +104,20 @@ viewer.load("protein.pdb", xtc="trajectory.xtc")
 viewer.frame_index = 50
 ```
 
-### CLI
+### CLI (Docker)
 
 ```bash
-megane serve protein.pdb
-megane serve protein.pdb --xtc trajectory.xtc
-megane serve  # upload from browser
+docker build -t megane .
+docker run --rm -p 8080:8080 megane
+```
+
+Open http://localhost:8080 in your browser.
+
+To view your own files, mount them into the container:
+
+```bash
+docker run --rm -p 8080:8080 -v ./mydata:/data megane \
+  megane serve /data/protein.pdb --port 8080 --no-browser
 ```
 
 ### React
@@ -146,6 +154,7 @@ function App() {
 - Python 3.10+
 - Node.js 18+
 - Rust (for building the parser)
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) (for building WASM bindings)
 - [uv](https://docs.astral.sh/uv/)
 
 ### Setup
@@ -154,12 +163,24 @@ function App() {
 git clone https://github.com/hodakamori/megane.git
 cd megane
 
+# Install wasm-pack (if not already installed)
+cargo install wasm-pack
+
 # Python
 uv sync --extra dev
 
 # Node.js
 npm install
 npm run build
+```
+
+### Running `megane serve`
+
+After setup, build and install the package, then start the server:
+
+```bash
+maturin develop --release
+megane serve protein.pdb
 ```
 
 ### Development Mode

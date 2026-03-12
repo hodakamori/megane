@@ -186,3 +186,16 @@ else:
         "Build the frontend with 'npm run build' first.",
         _static_dir,
     )
+
+    @app.get("/{path:path}")
+    async def _fallback(path: str):
+        from fastapi.responses import HTMLResponse
+
+        return HTMLResponse(
+            "<h1>megane</h1>"
+            "<p>The web UI is not available.</p>"
+            "<p>Build the frontend first:</p>"
+            "<pre>npm run build</pre>"
+            "<p>Then restart <code>megane serve</code>.</p>",
+            status_code=200,
+        )
