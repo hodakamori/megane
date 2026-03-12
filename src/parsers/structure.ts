@@ -1,7 +1,7 @@
 /**
  * WASM-based structure parser wrapper.
  * Loads the Rust WASM module and converts results to megane Snapshot/Frame types.
- * Supports PDB, GRO, XYZ, and MOL/SDF formats.
+ * Supports PDB, GRO, XYZ, MOL/SDF, CIF, and LAMMPS data formats.
  */
 
 import type { Snapshot, Frame, TrajectoryMeta } from "../types";
@@ -41,6 +41,7 @@ interface WasmModule {
   parse_xyz: ParseFn;
   parse_mol: ParseFn;
   parse_cif: ParseFn;
+  parse_lammps_data: ParseFn;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
@@ -60,6 +61,7 @@ async function ensureInit(): Promise<void> {
         parse_xyz: wasm.parse_xyz,
         parse_mol: wasm.parse_mol,
         parse_cif: wasm.parse_cif,
+        parse_lammps_data: wasm.parse_lammps_data,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_pdb_bonds: wasm.parse_pdb_bonds,
@@ -82,6 +84,9 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_mol;
     case ".cif":
       return wasmModule!.parse_cif;
+    case ".data":
+    case ".lammps":
+      return wasmModule!.parse_lammps_data;
     default:
       return wasmModule!.parse_pdb;
   }
@@ -194,7 +199,7 @@ export async function extractLabelsFromFile(
     labels = text.split("\n").map((l) => l.trim());
   } else {
     await ensureInit();
-    const format = ext === ".gro" ? "gro" : ext === ".xyz" ? "xyz" : "pdb";
+    const format = ext === ".gro" ? "gro" : ext === ".xyz" ? "xyz" : ext === ".data" || ext === ".lammps" ? "lammps_data" : "pdb";
     const raw = wasmModule!.extract_labels(text, format);
     labels = raw ? raw.split("\n") : [];
   }
