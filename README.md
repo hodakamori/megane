@@ -146,6 +146,7 @@ function App() {
 - Python 3.10+
 - Node.js 18+
 - Rust (for building the parser)
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) (for building WASM bindings)
 - [uv](https://docs.astral.sh/uv/)
 
 ### Setup
@@ -153,6 +154,9 @@ function App() {
 ```bash
 git clone https://github.com/hodakamori/megane.git
 cd megane
+
+# Install wasm-pack (if not already installed)
+cargo install wasm-pack
 
 # Python
 uv sync --extra dev
