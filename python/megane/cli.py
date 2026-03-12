@@ -21,6 +21,7 @@ def main() -> None:
         help="Path to PDB file (optional; can upload from browser)",
     )
     parser.add_argument("--xtc", help="Path to XTC trajectory file")
+    parser.add_argument("--traj", help="Path to ASE .traj trajectory file")
     parser.add_argument("--port", type=int, default=8765, help="Server port")
     parser.add_argument(
         "--no-browser", action="store_true", help="Don't open browser"
@@ -38,7 +39,9 @@ def main() -> None:
     if args.command == "serve":
         from megane.server import app, configure
 
-        if args.pdb:
+        if args.traj:
+            configure("", traj_path=args.traj)
+        elif args.pdb:
             configure(args.pdb, args.xtc)
         else:
             logging.info(

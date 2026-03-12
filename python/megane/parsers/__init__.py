@@ -1,4 +1,5 @@
 from megane.parsers.pdb import load_pdb
+from megane.parsers.traj import load_traj
 from megane.parsers.xtc import load_trajectory
 
-__all__ = ["load_pdb", "load_trajectory"]
+__all__ = ["load_pdb", "load_traj", "load_trajectory"]

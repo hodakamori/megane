@@ -75,13 +75,31 @@ class MolecularViewer(anywidget.AnyWidget):
         super().__init__(*args, **kwargs)
         self._event_handlers: dict[str, list[Callable]] = defaultdict(list)
 
-    def load(self, pdb_path: str, xtc: str | None = None) -> None:
+    def load(
+        self,
+        pdb_path: str,
+        xtc: str | None = None,
+        traj: str | None = None,
+    ) -> None:
         """Load a molecular structure, optionally with a trajectory.
 
         Args:
             pdb_path: Path to PDB file.
             xtc: Optional path to XTC trajectory file.
+            traj: Optional path to ASE .traj file.  When provided,
+                *pdb_path* is ignored and both structure and trajectory
+                are read from the .traj file.
         """
+        if traj is not None:
+            from megane.parsers.traj import load_traj
+
+            structure, trajectory = load_traj(traj)
+            self._structure = structure
+            self._snapshot_data = encode_snapshot(structure)
+            self._trajectory = trajectory
+            self.total_frames = trajectory.n_frames
+            return
+
         structure = load_pdb(pdb_path)
         self._structure = structure
         self._snapshot_data = encode_snapshot(structure)
