@@ -43,27 +43,25 @@ viewer.load("protein.pdb", xtc="trajectory.xtc")
 viewer.frame_index = 50  # Jump to frame 50
 ```
 
-### CLI Server
+### CLI Server (Docker)
 
-Start a local viewer server:
-
-```bash
-megane serve protein.pdb --port 8765
-```
-
-With a trajectory:
+The easiest way to run `megane serve` locally is with Docker:
 
 ```bash
-megane serve protein.pdb --xtc trajectory.xtc
+docker build -t megane .
+docker run --rm -p 8080:8080 megane
 ```
 
-This opens a browser window with the interactive viewer at `http://localhost:8765`.
+Open http://localhost:8080 in your browser.
 
-You can also start the server without a file and upload from the browser:
+To view your own files, mount them into the container:
 
 ```bash
-megane serve
+docker run --rm -p 8080:8080 -v ./mydata:/data megane \
+  megane serve /data/protein.pdb --port 8080 --no-browser
 ```
+
+For running from source, see the [CLI Guide](/guide/cli).
 
 ### React Component
 

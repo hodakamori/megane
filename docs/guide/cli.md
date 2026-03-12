@@ -2,6 +2,50 @@
 
 megane includes a command-line tool to serve molecular structures in a local web viewer.
 
+## Quick Start with Docker
+
+```bash
+docker build -t megane .
+docker run --rm -p 8080:8080 megane
+```
+
+Open http://localhost:8080 in your browser.
+
+To view your own files, mount them into the container:
+
+```bash
+docker run --rm -p 8080:8080 -v ./mydata:/data megane \
+  megane serve /data/protein.pdb --port 8080 --no-browser
+```
+
+## Running from Source
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- Rust
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
+- [uv](https://docs.astral.sh/uv/)
+
+### Build and Run
+
+```bash
+# Install wasm-pack (if not already installed)
+cargo install wasm-pack
+
+# Install dependencies and build frontend
+uv sync --extra dev
+npm install
+npm run build
+
+# Install the package
+maturin develop --release
+
+# Start the server
+megane serve protein.pdb
+```
+
 ## Usage
 
 ```bash
