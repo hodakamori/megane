@@ -41,6 +41,10 @@ export function executeViewport(
     vectors,
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
+    toneMappingExposure: params.toneMappingExposure,
+    ssaoKernelRadius: params.ssaoKernelRadius,
+    bloomStrength: params.bloomStrength,
+    bloomThreshold: params.bloomThreshold,
   };
 }
 

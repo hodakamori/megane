@@ -267,6 +267,14 @@ export interface ViewportParams {
   type: "viewport";
   perspective: boolean;
   cellAxesVisible: boolean;
+  /** Tone mapping exposure (0.1–3.0, default 1.0). */
+  toneMappingExposure: number;
+  /** SSAO kernel radius (0–2, default 0.5). */
+  ssaoKernelRadius: number;
+  /** Bloom strength (0–1, default 0.15). */
+  bloomStrength: number;
+  /** Bloom threshold (0–1, default 0.85). Higher = only brightest areas bloom. */
+  bloomThreshold: number;
 }
 
 export interface FilterParams {
@@ -331,7 +339,15 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "add_bond":
       return { type, bondSource: "distance" };
     case "viewport":
-      return { type, perspective: false, cellAxesVisible: true };
+      return {
+        type,
+        perspective: false,
+        cellAxesVisible: true,
+        toneMappingExposure: 1.0,
+        ssaoKernelRadius: 0.5,
+        bloomStrength: 0.15,
+        bloomThreshold: 0.85,
+      };
     case "filter":
       return { type, query: "" };
     case "modify":
@@ -411,6 +427,10 @@ export interface ViewportState {
   vectors: VectorData[];
   perspective: boolean;
   cellAxesVisible: boolean;
+  toneMappingExposure: number;
+  ssaoKernelRadius: number;
+  bloomStrength: number;
+  bloomThreshold: number;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -423,6 +443,10 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   vectors: [],
   perspective: false,
   cellAxesVisible: true,
+  toneMappingExposure: 1.0,
+  ssaoKernelRadius: 0.5,
+  bloomStrength: 0.15,
+  bloomThreshold: 0.85,
 };
 
 // ─── Serialization Format ─────────────────────────────────────────────

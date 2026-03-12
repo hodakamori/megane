@@ -51,6 +51,20 @@ export function applyViewportState(
     renderer.setCellAxesVisible(current.cellAxesVisible);
   }
 
+  // ─── Rendering settings (tone mapping, SSAO, bloom) ───────
+  if (!previous || current.toneMappingExposure !== previous.toneMappingExposure) {
+    renderer.setToneMappingExposure(current.toneMappingExposure);
+  }
+  if (!previous || current.ssaoKernelRadius !== previous.ssaoKernelRadius) {
+    renderer.setSSAOKernelRadius(current.ssaoKernelRadius);
+  }
+  if (!previous || current.bloomStrength !== previous.bloomStrength) {
+    renderer.setBloomStrength(current.bloomStrength);
+  }
+  if (!previous || current.bloomThreshold !== previous.bloomThreshold) {
+    renderer.setBloomThreshold(current.bloomThreshold);
+  }
+
   // ─── Labels ────────────────────────────────────────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);
 

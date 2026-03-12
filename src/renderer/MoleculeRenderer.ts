@@ -409,6 +409,26 @@ export class MoleculeRenderer {
     this.atomRenderer?.clearOverrides?.();
   }
 
+  /** Set tone mapping exposure. */
+  setToneMappingExposure(exposure: number): void {
+    this.renderer.toneMappingExposure = exposure;
+  }
+
+  /** Set SSAO kernel radius. */
+  setSSAOKernelRadius(radius: number): void {
+    this.ssaoPass.kernelRadius = radius;
+  }
+
+  /** Set bloom strength. */
+  setBloomStrength(strength: number): void {
+    this.bloomPass.strength = strength;
+  }
+
+  /** Set bloom threshold. */
+  setBloomThreshold(threshold: number): void {
+    this.bloomPass.threshold = threshold;
+  }
+
   /** Set bond radius scale multiplier. */
   setBondScale(scale: number): void {
     this.bondScale = scale;
