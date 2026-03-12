@@ -83,33 +83,62 @@ export const atomFragmentShader = /* glsl */ `precision highp float;
     float ndcDepth = clipPos.z / clipPos.w;
     gl_FragDepth = ndcDepth * 0.5 + 0.5;
 
-    // Hemisphere ambient: sky blue on top, warm brown on bottom
-    vec3 skyColor = vec3(0.87, 0.92, 1.0);
-    vec3 groundColor = vec3(0.6, 0.47, 0.27);
+    // ── Improved PBR-like lighting ──────────────────────────
+
+    // IBL-approximated environment: warm sky gradient with cool ground bounce
+    vec3 skyColor   = vec3(0.92, 0.95, 1.0);
+    vec3 horizColor = vec3(0.85, 0.82, 0.78);
+    vec3 groundColor = vec3(0.55, 0.50, 0.45);
     float hemiMix = normal.y * 0.5 + 0.5;
-    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.35;
+    // Smooth 3-stop gradient for richer ambient
+    vec3 ambient = mix(groundColor, horizColor, smoothstep(0.0, 0.5, hemiMix));
+    ambient = mix(ambient, skyColor, smoothstep(0.3, 1.0, hemiMix));
+    ambient *= 0.45;
 
-    // Dual-light diffuse
-    vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
-    vec3 lightDir2 = normalize(vec3(-0.3, 0.3, 0.8));
-    float diffuse1 = max(dot(normal, lightDir1), 0.0);
-    float diffuse2 = max(dot(normal, lightDir2), 0.0);
-    float diffuse = diffuse1 * 0.55 + diffuse2 * 0.2;
+    // 3-point light setup (key / fill / rim)
+    vec3 keyDir  = normalize(vec3(0.5, 0.5, 1.0));
+    vec3 fillDir = normalize(vec3(-0.4, 0.3, 0.7));
+    vec3 rimDir  = normalize(vec3(0.0, -0.5, -0.8));
+    float keyDiffuse  = max(dot(normal, keyDir), 0.0);
+    float fillDiffuse = max(dot(normal, fillDir), 0.0);
+    float rimDiffuse  = max(dot(normal, rimDir), 0.0);
 
-    // Specular (Blinn-Phong)
+    // Wrap lighting for softer shadow transitions (subsurface-scatter approx)
+    float wrapKey  = max((dot(normal, keyDir)  + 0.3) / 1.3, 0.0);
+    float wrapFill = max((dot(normal, fillDir) + 0.3) / 1.3, 0.0);
+    float diffuse = wrapKey * 0.55 + wrapFill * 0.2 + rimDiffuse * 0.08;
+
+    // GGX-approximate specular (roughness ~0.3)
     vec3 viewDir = vec3(0.0, 0.0, 1.0);
-    vec3 halfDir = normalize(lightDir1 + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
+    vec3 halfDir = normalize(keyDir + viewDir);
+    float NoH = max(dot(normal, halfDir), 0.0);
+    float roughness = 0.3;
+    float a2 = roughness * roughness;
+    float denom = NoH * NoH * (a2 - 1.0) + 1.0;
+    float D = a2 / (3.14159 * denom * denom);
+    float spec = D * 0.25;
 
-    // Fresnel rim
-    float fresnel = pow(1.0 - z, 3.0) * 0.15;
+    // Secondary specular (fill light, broader)
+    vec3 halfDir2 = normalize(fillDir + viewDir);
+    float NoH2 = max(dot(normal, halfDir2), 0.0);
+    float roughness2 = 0.5;
+    float a2b = roughness2 * roughness2;
+    float denom2 = NoH2 * NoH2 * (a2b - 1.0) + 1.0;
+    float D2 = a2b / (3.14159 * denom2 * denom2);
+    float spec2 = D2 * 0.08;
 
-    // Edge darkening
-    float edgeFactor = mix(0.7, 1.0, z);
+    // Fresnel (Schlick approximation) — reflective rim
+    float NoV = max(dot(normal, viewDir), 0.0);
+    float fresnel = pow(1.0 - NoV, 5.0) * 0.25;
 
+    // Subtle edge darkening for contact shadow illusion
+    float edgeFactor = mix(0.78, 1.0, smoothstep(0.0, 0.4, z));
+
+    // Compose final color
     vec3 color = vColor * (ambient + diffuse) * edgeFactor
-               + vec3(1.0) * spec * 0.3
-               + vec3(0.15) * fresnel;
+               + vec3(1.0) * (spec + spec2)
+               + vec3(0.9, 0.93, 1.0) * fresnel;
+
     float finalOpacity = uOpacity;
     if (uUsePerAtomOverrides == 1) {
       finalOpacity *= vOpacityOverride;
@@ -212,30 +241,44 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     float nz = sqrt(max(0.0, 1.0 - nx * nx));
     vec3 normal = vec3(nx, 0.0, nz);
 
-    // Hemisphere ambient
-    vec3 skyColor = vec3(0.87, 0.92, 1.0);
-    vec3 groundColor = vec3(0.6, 0.47, 0.27);
+    // ── Improved PBR-like lighting (matched to atom shader) ──
+
+    // IBL-approximated environment gradient
+    vec3 skyColor   = vec3(0.92, 0.95, 1.0);
+    vec3 horizColor = vec3(0.85, 0.82, 0.78);
+    vec3 groundColor = vec3(0.55, 0.50, 0.45);
     float hemiMix = normal.y * 0.5 + 0.5;
-    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.35;
+    vec3 ambient = mix(groundColor, horizColor, smoothstep(0.0, 0.5, hemiMix));
+    ambient = mix(ambient, skyColor, smoothstep(0.3, 1.0, hemiMix));
+    ambient *= 0.42;
 
-    // Dual-light diffuse
-    vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
-    vec3 lightDir2 = normalize(vec3(-0.3, 0.3, 0.8));
-    float diffuse1 = max(dot(normal, lightDir1), 0.0);
-    float diffuse2 = max(dot(normal, lightDir2), 0.0);
-    float diffuse = diffuse1 * 0.55 + diffuse2 * 0.2;
+    // 3-point light diffuse with wrap lighting
+    vec3 keyDir  = normalize(vec3(0.5, 0.5, 1.0));
+    vec3 fillDir = normalize(vec3(-0.4, 0.3, 0.7));
+    float wrapKey  = max((dot(normal, keyDir)  + 0.3) / 1.3, 0.0);
+    float wrapFill = max((dot(normal, fillDir) + 0.3) / 1.3, 0.0);
+    float diffuse = wrapKey * 0.55 + wrapFill * 0.2;
 
-    // Specular
+    // GGX-approximate specular (slightly rougher than atoms)
     vec3 viewDir = vec3(0.0, 0.0, 1.0);
-    vec3 halfDir = normalize(lightDir1 + viewDir);
-    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
+    vec3 halfDir = normalize(keyDir + viewDir);
+    float NoH = max(dot(normal, halfDir), 0.0);
+    float roughness = 0.35;
+    float a2 = roughness * roughness;
+    float denom = NoH * NoH * (a2 - 1.0) + 1.0;
+    float D = a2 / (3.14159 * denom * denom);
+    float spec = D * 0.2;
 
-    // Fresnel rim
-    float fresnel = pow(1.0 - nz, 3.0) * 0.1;
+    // Fresnel rim (Schlick)
+    float NoV = max(dot(normal, viewDir), 0.0);
+    float fresnel = pow(1.0 - NoV, 5.0) * 0.15;
 
-    vec3 color = vColor * (ambient + diffuse)
-               + vec3(1.0) * spec * 0.2
-               + vec3(0.1) * fresnel;
+    // Edge darkening
+    float edgeFactor = mix(0.8, 1.0, smoothstep(0.0, 0.4, nz));
+
+    vec3 color = vColor * (ambient + diffuse) * edgeFactor
+               + vec3(1.0) * spec
+               + vec3(0.9, 0.93, 1.0) * fresnel;
     fragColor = vec4(color, uOpacity);
   }
 `;

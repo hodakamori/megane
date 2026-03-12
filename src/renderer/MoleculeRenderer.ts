@@ -9,6 +9,12 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import type {
   Snapshot,
   Frame,
@@ -44,6 +50,9 @@ import {
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
   private renderer!: THREE.WebGLRenderer;
+  private composer!: EffectComposer;
+  private ssaoPass!: SSAOPass;
+  private bloomPass!: UnrealBloomPass;
   private scene!: THREE.Scene;
   private camera!: THREE.OrthographicCamera | THREE.PerspectiveCamera;
   private controls!: OrbitControls;
@@ -97,6 +106,9 @@ export class MoleculeRenderer {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight, false);
     this.renderer.setClearColor(0xffffff, 1);
+    // Tone mapping – ACES Filmic gives cinematic contrast from HDR values
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     // Position both canvases identically within the container
     // to prevent sub-pixel layout drift at non-100% browser zoom.
     // Use CSS 100% sizing instead of explicit pixel values so the canvas
@@ -159,6 +171,37 @@ export class MoleculeRenderer {
 
     // Selection overlay group
     this.scene.add(this.selectionGroup);
+
+    // ── Post-processing pipeline ─────────────────────────────
+    this.composer = new EffectComposer(this.renderer);
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+
+    // SSAO — subtle ambient occlusion for depth at crevices/contacts
+    this.ssaoPass = new SSAOPass(
+      this.scene,
+      this.camera,
+      container.clientWidth,
+      container.clientHeight,
+    );
+    this.ssaoPass.kernelRadius = 0.5;
+    this.ssaoPass.minDistance = 0.001;
+    this.ssaoPass.maxDistance = 0.1;
+    (this.ssaoPass.output as number) = SSAOPass.OUTPUT.Default;
+    this.composer.addPass(this.ssaoPass);
+
+    // Bloom — soft glow on bright areas (specular highlights)
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.15,  // strength — subtle, not overwhelming
+      0.4,   // radius
+      0.85,  // threshold — only the brightest specular highlights bloom
+    );
+    this.composer.addPass(this.bloomPass);
+
+    // Output pass — applies tone mapping + color space conversion
+    const outputPass = new OutputPass();
+    this.composer.addPass(outputPass);
 
     // Resize observer
     const resizeObserver = new ResizeObserver(() => this.onResize());
@@ -568,6 +611,11 @@ export class MoleculeRenderer {
     this.controls.target.copy(target);
     this.controls.update();
 
+    // Update post-processing passes with the new camera
+    const renderPass = this.composer.passes[0] as RenderPass;
+    renderPass.camera = this.camera;
+    this.ssaoPass.camera = this.camera;
+
     if (this.snapshot) {
       this.fitToView(this.snapshot);
     }
@@ -735,6 +783,9 @@ export class MoleculeRenderer {
       this.camera.updateProjectionMatrix();
     }
     this.renderer.setSize(w, h, false);
+    this.composer.setSize(w, h);
+    this.ssaoPass.setSize(w, h);
+    this.bloomPass.setSize(w, h);
     this.labelOverlay?.resize(w, h, dpr);
   }
 
@@ -768,7 +819,8 @@ export class MoleculeRenderer {
       );
     }
 
-    this.renderer.render(this.scene, this.camera);
+    // Render through the post-processing pipeline (SSAO + Bloom + Output)
+    this.composer.render();
 
     // Use renderer's internal size for all post-render passes.
     // This guarantees the viewport/dimensions match the canvas buffer,
@@ -819,6 +871,7 @@ export class MoleculeRenderer {
       this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);
     }
     this.controls.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {
       this.container.removeChild(this.renderer.domElement);
