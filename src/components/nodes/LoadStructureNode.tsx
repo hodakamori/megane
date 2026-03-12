@@ -20,7 +20,7 @@ const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf"];
  * Event bus for structure loading.
  * MeganeViewer listens for these events to trigger actual file parsing.
  */
-export type StructureLoadHandler = (file: File) => void;
+export type StructureLoadHandler = (nodeId: string, file: File) => void;
 let _onStructureLoad: StructureLoadHandler | null = null;
 export function setStructureLoadHandler(handler: StructureLoadHandler | null) {
   _onStructureLoad = handler;
@@ -36,7 +36,7 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
       const lower = file.name.toLowerCase();
       if (!STRUCTURE_EXTS.some((ext) => lower.endsWith(ext))) return;
       updateNodeParams(id, { fileName: file.name });
-      _onStructureLoad?.(file);
+      _onStructureLoad?.(id, file);
     },
     [id, updateNodeParams],
   );

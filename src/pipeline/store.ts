@@ -6,7 +6,7 @@
 import { create } from "zustand";
 import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
-import type { PipelineNodeData, PipelineExecutionContext } from "./execute";
+import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } from "./execute";
 import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
 import type { PipelineNodeType, ViewportState, SerializedPipeline } from "./types";
 import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
@@ -37,11 +37,16 @@ export interface PipelineStore {
   fileMeta: TrajectoryMeta | null;
   fileVectors: VectorFrame[] | null;
 
+  // Per-node snapshot storage (keyed by load_structure node ID)
+  nodeSnapshots: Record<string, NodeSnapshotData>;
+
   setSnapshot: (s: Snapshot | null) => void;
   setAtomLabels: (labels: string[] | null) => void;
   setStructureFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileVectors: (vectors: VectorFrame[] | null) => void;
+  setNodeSnapshot: (nodeId: string, data: NodeSnapshotData) => void;
+  removeNodeSnapshot: (nodeId: string) => void;
 
   // xyflow change handlers
   onNodesChange: OnNodesChange<Node<PipelineNodeData>>;
@@ -94,6 +99,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   fileFrames: null,
   fileMeta: null,
   fileVectors: null,
+  nodeSnapshots: {},
 
   setSnapshot: (s) => {
     set({ snapshot: s });
@@ -113,6 +119,21 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
   setFileVectors: (vectors) => {
     set({ fileVectors: vectors });
+    get().execute();
+  },
+
+  setNodeSnapshot: (nodeId, data) => {
+    set((state) => ({
+      nodeSnapshots: { ...state.nodeSnapshots, [nodeId]: data },
+    }));
+    get().execute();
+  },
+
+  removeNodeSnapshot: (nodeId) => {
+    set((state) => {
+      const { [nodeId]: _, ...rest } = state.nodeSnapshots;
+      return { nodeSnapshots: rest };
+    });
     get().execute();
   },
 
@@ -195,10 +216,14 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   removeNode: (id) => {
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== id),
-      edges: state.edges.filter((e) => e.source !== id && e.target !== id),
-    }));
+    set((state) => {
+      const { [id]: _, ...restSnapshots } = state.nodeSnapshots;
+      return {
+        nodes: state.nodes.filter((n) => n.id !== id),
+        edges: state.edges.filter((e) => e.source !== id && e.target !== id),
+        nodeSnapshots: restSnapshots,
+      };
+    });
     get().execute();
   },
 
@@ -232,7 +257,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   execute: () => {
-    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors } = get();
+    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors, nodeSnapshots } = get();
     const ctx: PipelineExecutionContext = {
       snapshot,
       atomLabels,
@@ -241,6 +266,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       fileFrames,
       fileMeta,
       fileVectors,
+      nodeSnapshots,
     };
     const viewportState = executePipeline(nodes, edges, ctx);
     set({ viewportState });

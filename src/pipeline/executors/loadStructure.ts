@@ -12,6 +12,7 @@ export function executeLoadStructure(
   snapshot: Snapshot | null,
   structureFrames: Frame[] | null,
   structureMeta: TrajectoryMeta | null,
+  sourceNodeId: string,
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
   if (!snapshot) return outputs;
@@ -19,6 +20,7 @@ export function executeLoadStructure(
   const particle: ParticleData = {
     type: "particle",
     source: snapshot,
+    sourceNodeId,
     indices: null,
     scaleOverrides: null,
     opacityOverrides: null,
@@ -38,6 +40,7 @@ export function executeLoadStructure(
   if (snapshot.box) {
     const cell: CellData = {
       type: "cell",
+      sourceNodeId,
       box: snapshot.box,
       visible: true,
       axesVisible: true,

@@ -48,6 +48,14 @@ export interface PipelineNodeData {
  * Execute the pipeline and produce a ViewportState.
  * Returns DEFAULT_VIEWPORT_STATE if no viewport node exists.
  */
+/** Per-node snapshot data stored for each load_structure node. */
+export interface NodeSnapshotData {
+  snapshot: Snapshot;
+  frames: Frame[] | null;
+  meta: TrajectoryMeta | null;
+  labels: string[] | null;
+}
+
 export interface PipelineExecutionContext {
   snapshot?: Snapshot | null;
   atomLabels?: string[] | null;
@@ -56,6 +64,8 @@ export interface PipelineExecutionContext {
   fileFrames?: Frame[] | null;
   fileMeta?: TrajectoryMeta | null;
   fileVectors?: VectorFrame[] | null;
+  /** Per-node snapshots keyed by load_structure node ID. */
+  nodeSnapshots?: Record<string, NodeSnapshotData>;
 }
 
 export function executePipeline(
@@ -99,11 +109,17 @@ export function executePipeline(
 
     switch (data.params.type) {
       case "load_structure": {
+        // Per-node snapshot takes priority; fall back to global snapshot for backward compat
+        const nodeData = ctx.nodeSnapshots?.[id];
+        const snapshot = nodeData?.snapshot ?? ctx.snapshot ?? null;
+        const frames = nodeData?.frames ?? ctx.structureFrames ?? null;
+        const meta = nodeData?.meta ?? ctx.structureMeta ?? null;
         const outputs = executeLoadStructure(
           data.params as LoadStructureParams,
-          ctx.snapshot ?? null,
-          ctx.structureFrames ?? null,
-          ctx.structureMeta ?? null,
+          snapshot,
+          frames,
+          meta,
+          id,
         );
         edgeOutputs.set(id, outputs);
         break;

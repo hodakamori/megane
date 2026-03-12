@@ -200,6 +200,7 @@ export function executeAddBond(
       if (nBonds > 0) {
         const bond: BondData = {
           type: "bond",
+          sourceNodeId: particleData.sourceNodeId,
           bondIndices,
           bondOrders,
           nBonds,
@@ -240,6 +241,7 @@ export function executeAddBond(
       if (nBonds > 0) {
         const bond: BondData = {
           type: "bond",
+          sourceNodeId: particleData.sourceNodeId,
           bondIndices,
           bondOrders: null,
           nBonds,
