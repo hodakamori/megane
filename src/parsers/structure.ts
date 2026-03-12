@@ -40,6 +40,7 @@ interface WasmModule {
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
   parse_mol: ParseFn;
+  parse_cif: ParseFn;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
@@ -58,6 +59,7 @@ async function ensureInit(): Promise<void> {
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
         parse_mol: wasm.parse_mol,
+        parse_cif: wasm.parse_cif,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_pdb_bonds: wasm.parse_pdb_bonds,
@@ -78,6 +80,8 @@ function getParserForExtension(ext: string): ParseFn {
     case ".mol":
     case ".sdf":
       return wasmModule!.parse_mol;
+    case ".cif":
+      return wasmModule!.parse_cif;
     default:
       return wasmModule!.parse_pdb;
   }
