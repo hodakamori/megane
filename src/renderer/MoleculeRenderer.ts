@@ -26,6 +26,7 @@ import { CellAxesRenderer } from "./CellAxesRenderer";
 import { LabelOverlay } from "./LabelOverlay";
 import { ArrowRenderer } from "./ArrowRenderer";
 import { PolyhedronRenderer } from "./PolyhedronRenderer";
+import { StructureLayer } from "./StructureLayer";
 import type { MeshData } from "../pipeline/types";
 import {
   getRadius,
@@ -76,6 +77,9 @@ export class MoleculeRenderer {
   private lastContainerW = 0;
   private lastContainerH = 0;
   private lastDpr = 1;
+
+  /** Structure layers for multi-structure overlay rendering. */
+  private layers = new Map<string, StructureLayer>();
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -335,6 +339,65 @@ export class MoleculeRenderer {
     if (this.polyhedronRenderer) {
       this.polyhedronRenderer.clear();
     }
+  }
+
+  // ── Structure Layer Management ─────────────────────────────────
+
+  /** Get or create a structure layer for a given node ID. */
+  getOrCreateLayer(layerId: string): StructureLayer {
+    let layer = this.layers.get(layerId);
+    if (!layer) {
+      layer = new StructureLayer(layerId, this.scene);
+      this.layers.set(layerId, layer);
+    }
+    return layer;
+  }
+
+  /** Get an existing structure layer (or undefined). */
+  getLayer(layerId: string): StructureLayer | undefined {
+    return this.layers.get(layerId);
+  }
+
+  /** Remove a structure layer and dispose its resources. */
+  removeLayer(layerId: string): void {
+    const layer = this.layers.get(layerId);
+    if (layer) {
+      layer.dispose();
+      this.layers.delete(layerId);
+    }
+  }
+
+  /** Get all current layer IDs. */
+  getLayerIds(): string[] {
+    return Array.from(this.layers.keys());
+  }
+
+  /** Remove layers not in the given set of active IDs. */
+  removeInactiveLayers(activeIds: Set<string>): void {
+    for (const [id, layer] of this.layers) {
+      if (!activeIds.has(id)) {
+        layer.dispose();
+        this.layers.delete(id);
+      }
+    }
+  }
+
+  /**
+   * Fit camera to show all structures (from all layers + primary snapshot).
+   * Call after loading snapshots into layers.
+   */
+  fitToViewAll(): void {
+    // Collect all snapshots from layers
+    const snapshots: Snapshot[] = [];
+    if (this.snapshot) snapshots.push(this.snapshot);
+    for (const layer of this.layers.values()) {
+      if (layer.snapshot) snapshots.push(layer.snapshot);
+    }
+    if (snapshots.length === 0) return;
+
+    // Use the first snapshot for fitToView (simple approach)
+    // TODO: merge bounding boxes from all snapshots for true fit
+    this.fitToView(snapshots[0]);
   }
 
   /** Set atom radius scale multiplier. */
@@ -815,6 +878,11 @@ export class MoleculeRenderer {
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
+    // Dispose all structure layers
+    for (const layer of this.layers.values()) {
+      layer.dispose();
+    }
+    this.layers.clear();
     if (this.dprMediaQuery && this.dprChangeHandler) {
       this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);
     }

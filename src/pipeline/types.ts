@@ -26,6 +26,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
 export interface ParticleData {
   type: "particle";
   source: Snapshot;
+  sourceNodeId: string;                  // load_structure node that produced this
   indices: Uint32Array | null;           // null = all atoms
   scaleOverrides: Float32Array | null;
   opacityOverrides: Float32Array | null;
@@ -34,6 +35,7 @@ export interface ParticleData {
 /** Bond data flowing through the pipeline. */
 export interface BondData {
   type: "bond";
+  sourceNodeId: string;              // load_structure node that produced the particles
   bondIndices: Uint32Array;  // pairs: [a0,b0, a1,b1, ...]
   bondOrders: Uint8Array | null;
   nBonds: number;
@@ -48,6 +50,7 @@ export interface BondData {
 /** Simulation cell data. */
 export interface CellData {
   type: "cell";
+  sourceNodeId: string;              // load_structure node that produced this
   box: Float32Array; // 3x3 row-major
   visible: boolean;
   axesVisible: boolean;

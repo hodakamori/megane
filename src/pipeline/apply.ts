@@ -1,6 +1,12 @@
 /**
  * Applies a ViewportState to a MoleculeRenderer instance.
  * Translates the typed data streams into renderer calls.
+ *
+ * Supports multi-structure overlay: particles/bonds/cells from different
+ * load_structure nodes are routed to separate StructureLayers in the renderer.
+ * The "primary" structure (first particle source, matching the Viewport's
+ * snapshot prop) uses the renderer's built-in atom/bond renderers.
+ * Additional structures use StructureLayer instances.
  */
 
 import type { ViewportState, ParticleData, BondData, CellData, LabelData, MeshData, VectorData } from "./types";
@@ -15,35 +21,106 @@ export function applyViewportState(
   renderer: MoleculeRenderer,
   current: ViewportState,
   previous: ViewportState | null,
+  primaryNodeId?: string | null,
 ): void {
-  // ─── Atom visibility (hide when no viewport node produces data) ──
-  const hasParticles = current.particles.length > 0;
-  const hadParticles = (previous?.particles.length ?? 0) > 0;
+  // ─── Determine which node IDs are primary vs layer ─────────
+  const currentNodeIds = collectSourceNodeIds(current);
+  const resolvedPrimaryId = primaryNodeId ?? currentNodeIds[0] ?? null;
+
+  // Group data by source node
+  const primaryParticles = current.particles.filter((p) => p.sourceNodeId === resolvedPrimaryId);
+  const layerParticles = current.particles.filter((p) => p.sourceNodeId !== resolvedPrimaryId);
+  const primaryBonds = current.bonds.filter((b) => b.sourceNodeId === resolvedPrimaryId);
+  const layerBonds = current.bonds.filter((b) => b.sourceNodeId !== resolvedPrimaryId);
+  const primaryCells = current.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId);
+  const layerCells = current.cells.filter((c) => c.sourceNodeId !== resolvedPrimaryId);
+
+  // Previous state grouping
+  const prevPrimaryParticles = previous?.particles.filter((p) => p.sourceNodeId === resolvedPrimaryId) ?? null;
+  const prevPrimaryBonds = previous?.bonds.filter((b) => b.sourceNodeId === resolvedPrimaryId) ?? null;
+
+  // ─── Primary structure: use renderer's built-in renderers ──
+  const hasParticles = primaryParticles.length > 0;
+  const hadParticles = (prevPrimaryParticles?.length ?? 0) > 0;
   if (!previous || hasParticles !== hadParticles) {
     renderer.setAtomsVisible(hasParticles);
   }
 
-  // ─── Atom scale/opacity from particle data ─────────────────
-  applyParticleOverrides(renderer, current.particles, previous?.particles ?? null);
+  applyParticleOverrides(renderer, primaryParticles, prevPrimaryParticles);
+  applyBondSettings(renderer, primaryBonds, prevPrimaryBonds);
 
-  // ─── Bond scale/opacity ────────────────────────────────────
-  applyBondSettings(renderer, current.bonds, previous?.bonds ?? null);
-
-  // ─── Cell visibility ───────────────────────────────────────
-  const hasCells = current.cells.length > 0;
-  const hadCells = (previous?.cells.length ?? 0) > 0;
-  const cellVisible = hasCells && current.cells.some((c) => c.visible);
-  const prevCellVisible = hadCells && (previous?.cells.some((c) => c.visible) ?? false);
+  // Primary cell visibility
+  const hasCells = primaryCells.length > 0;
+  const hadCells = (previous ? previous.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId).length : 0) > 0;
+  const cellVisible = hasCells && primaryCells.some((c) => c.visible);
+  const prevCellVisible = hadCells && (previous?.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId).some((c) => c.visible) ?? false);
   if (!previous || cellVisible !== prevCellVisible) {
     renderer.setCellVisible(cellVisible);
   }
 
-  const cellAxesVisible = hasCells && current.cells.some((c) => c.axesVisible);
-  if (!previous || cellAxesVisible !== (previous.cellAxesVisible ?? true)) {
+  const cellAxesVisible = hasCells && primaryCells.some((c) => c.axesVisible);
+  if (!previous || cellAxesVisible !== (previous?.cellAxesVisible ?? true)) {
     renderer.setCellAxesVisible(cellAxesVisible);
   }
 
-  // ─── Display settings ──────────────────────────────────────
+  // Primary bonds visibility
+  const bondsVisible = primaryBonds.length > 0;
+  const prevBondsVisible = (prevPrimaryBonds?.length ?? 0) > 0;
+  if (!previous || bondsVisible !== prevBondsVisible) {
+    renderer.setBondsVisible(bondsVisible);
+  }
+
+  // ─── Layer structures: use StructureLayer instances ────────
+  const activeLayerIds = new Set<string>();
+
+  // Group layer particles by sourceNodeId
+  const layerParticlesByNode = groupBy(layerParticles, (p) => p.sourceNodeId);
+  const layerBondsByNode = groupBy(layerBonds, (b) => b.sourceNodeId);
+  const layerCellsByNode = groupBy(layerCells, (c) => c.sourceNodeId);
+
+  for (const [nodeId, particles] of layerParticlesByNode) {
+    activeLayerIds.add(nodeId);
+    const layer = renderer.getOrCreateLayer(nodeId);
+
+    // Load snapshot if the layer doesn't have one yet, or if it changed
+    const firstParticle = particles[0];
+    if (firstParticle && layer.snapshot !== firstParticle.source) {
+      layer.loadSnapshot(firstParticle.source);
+    }
+
+    // Apply overrides
+    applyLayerParticleOverrides(layer, particles);
+
+    // Apply bonds for this layer
+    const bonds = layerBondsByNode.get(nodeId);
+    if (bonds && bonds.length > 0) {
+      const bond = bonds[0];
+      layer.updateBondsExt(
+        bond.bondIndices, bond.bondOrders,
+        bond.positions, bond.elements, bond.nAtoms,
+      );
+      layer.setBondScale(bond.scale);
+      layer.setBondOpacity(bond.opacity);
+      layer.setBondsVisible(true);
+    } else {
+      layer.setBondsVisible(false);
+    }
+
+    // Apply cells for this layer
+    const cells = layerCellsByNode.get(nodeId);
+    if (cells && cells.length > 0) {
+      layer.setCellVisible(cells.some((c) => c.visible));
+    } else {
+      layer.setCellVisible(false);
+    }
+
+    layer.setAtomsVisible(true);
+  }
+
+  // Remove layers that no longer have particles
+  renderer.removeInactiveLayers(activeLayerIds);
+
+  // ─── Display settings (global) ─────────────────────────────
   if (!previous || current.perspective !== previous.perspective) {
     renderer.setPerspective(current.perspective);
   }
@@ -51,21 +128,38 @@ export function applyViewportState(
     renderer.setCellAxesVisible(current.cellAxesVisible);
   }
 
-  // ─── Labels ────────────────────────────────────────────────
+  // ─── Labels (primary structure only for now) ───────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);
 
-  // ─── Meshes (polyhedra) ───────────────────────────────────
+  // ─── Meshes (polyhedra) ────────────────────────────────────
   applyMeshes(renderer, current.meshes, previous?.meshes ?? null);
 
-  // ─── Vectors (arrows) ──────────────────────────────────────
+  // ─── Vectors (arrows, primary structure only for now) ──────
   applyVectors(renderer, current.vectors, previous?.vectors ?? null);
+}
 
-  // ─── Bonds visibility ──────────────────────────────────────
-  const bondsVisible = current.bonds.length > 0;
-  const prevBondsVisible = (previous?.bonds.length ?? 0) > 0;
-  if (!previous || bondsVisible !== prevBondsVisible) {
-    renderer.setBondsVisible(bondsVisible);
+/** Collect unique source node IDs from all data in a ViewportState. */
+function collectSourceNodeIds(state: ViewportState): string[] {
+  const ids = new Set<string>();
+  for (const p of state.particles) ids.add(p.sourceNodeId);
+  for (const b of state.bonds) ids.add(b.sourceNodeId);
+  for (const c of state.cells) ids.add(c.sourceNodeId);
+  return Array.from(ids);
+}
+
+/** Group items by a key function. */
+function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyFn(item);
+    let list = map.get(key);
+    if (!list) {
+      list = [];
+      map.set(key, list);
+    }
+    list.push(item);
   }
+  return map;
 }
 
 function applyParticleOverrides(
@@ -82,8 +176,7 @@ function applyParticleOverrides(
     return;
   }
 
-  // Merge overrides from all particle streams
-  // (for now, take the first particle with overrides or the first particle)
+  // Merge overrides from all particle streams for the primary structure
   let mergedScale: Float32Array | null = null;
   let mergedOpacity: Float32Array | null = null;
 
@@ -92,7 +185,6 @@ function applyParticleOverrides(
       if (!mergedScale) {
         mergedScale = new Float32Array(p.scaleOverrides);
       } else {
-        // Merge: overwrite values where the new override differs
         for (let i = 0; i < mergedScale.length; i++) {
           if (p.scaleOverrides[i] !== 1.0) {
             mergedScale[i] = p.scaleOverrides[i];
@@ -129,6 +221,55 @@ function applyParticleOverrides(
   }
 }
 
+/** Apply overrides to a StructureLayer. */
+function applyLayerParticleOverrides(
+  layer: { setAtomScale: (s: number) => void; setAtomOpacity: (o: number) => void; setAtomScaleOverrides: (o: Float32Array) => void; setAtomOpacityOverrides: (o: Float32Array) => void; clearAtomOverrides: () => void },
+  particles: ParticleData[],
+): void {
+  let mergedScale: Float32Array | null = null;
+  let mergedOpacity: Float32Array | null = null;
+
+  for (const p of particles) {
+    if (p.scaleOverrides) {
+      if (!mergedScale) {
+        mergedScale = new Float32Array(p.scaleOverrides);
+      } else {
+        for (let i = 0; i < mergedScale.length; i++) {
+          if (p.scaleOverrides[i] !== 1.0) {
+            mergedScale[i] = p.scaleOverrides[i];
+          }
+        }
+      }
+    }
+    if (p.opacityOverrides) {
+      if (!mergedOpacity) {
+        mergedOpacity = new Float32Array(p.opacityOverrides);
+      } else {
+        for (let i = 0; i < mergedOpacity.length; i++) {
+          if (p.opacityOverrides[i] !== 1.0) {
+            mergedOpacity[i] = p.opacityOverrides[i];
+          }
+        }
+      }
+    }
+  }
+
+  if (mergedScale) {
+    layer.setAtomScale(1.0);
+    layer.setAtomScaleOverrides(mergedScale);
+  } else {
+    layer.clearAtomOverrides();
+    layer.setAtomScale(1.0);
+  }
+
+  if (mergedOpacity) {
+    layer.setAtomOpacity(1.0);
+    layer.setAtomOpacityOverrides(mergedOpacity);
+  } else {
+    layer.setAtomOpacity(1.0);
+  }
+}
+
 function applyBondSettings(
   renderer: MoleculeRenderer,
   bonds: BondData[],
@@ -136,11 +277,9 @@ function applyBondSettings(
 ): void {
   if (bonds.length === 0) return;
 
-  // Use the first bond stream's settings (merge is possible in future)
   const bond = bonds[0];
   const prevBond = prevBonds?.[0];
 
-  // Update bond topology when bond indices change (PBC filtering, etc.)
   if (!prevBond || bond.bondIndices !== prevBond.bondIndices) {
     renderer.updateBondsExt(
       bond.bondIndices, bond.bondOrders,
