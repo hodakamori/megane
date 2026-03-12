@@ -89,11 +89,19 @@ fn parse_mol(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     Ok(PyStructure::from_parsed(py, data))
 }
 
+/// Parse a LAMMPS data file text and return structured data.
+#[pyfunction]
+fn parse_lammps_data(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::lammps_data::parse(text).map_err(|e| PyValueError::new_err(e))?;
+    Ok(PyStructure::from_parsed(py, data))
+}
+
 #[pymodule]
 fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
     m.add_function(wrap_pyfunction!(parse_gro, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;
     Ok(())
 }
