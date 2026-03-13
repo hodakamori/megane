@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all clean preview preview-screenshot preview-video preview-clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -43,6 +43,26 @@ test-e2e-snapshot:
 
 # Run all tests (Python + TypeScript + Rust + E2E)
 test-all: test test-ts test-rust test-e2e test-e2e-snapshot
+
+# Run TypeScript tests with coverage
+coverage-ts:
+	npx vitest run --coverage
+
+# Run Python tests with coverage
+coverage:
+	python -m pytest --cov=megane --cov-report=term-missing --cov-report=html:coverage/python
+
+# Run Rust tests with coverage (requires cargo-tarpaulin)
+coverage-rust:
+	cargo tarpaulin -p megane-core --out Html --output-dir coverage/rust
+
+# Run all coverage reports
+coverage-all: coverage coverage-ts coverage-rust
+	@echo ""
+	@echo "Coverage reports generated:"
+	@echo "  Python:     coverage/python/index.html"
+	@echo "  TypeScript: coverage/ts/index.html"
+	@echo "  Rust:       coverage/rust/tarpaulin-report.html"
 
 # Dev preview: capture screenshots + video for mobile dev review
 preview:

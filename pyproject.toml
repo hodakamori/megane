@@ -41,7 +41,7 @@ Issues = "https://github.com/hodakamori/megane/issues"
 
 [project.optional-dependencies]
 traj = ["ase>=3.22"]
-dev = ["pytest>=7.0", "httpx>=0.24"]
+dev = ["pytest>=7.0", "httpx>=0.24", "pytest-cov>=4.0"]
 
 [project.scripts]
 megane = "megane.cli:main"
@@ -55,6 +55,15 @@ include = ["python/megane/static/**", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
+addopts = "--cov=megane --cov-report=term-missing --cov-report=html:coverage/python --cov-report=json:coverage/python/coverage.json"
+
+[tool.coverage.run]
+source = ["megane"]
+omit = ["megane/static/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
 
 [tool.bumpversion]
 current_version = "0.3.2"

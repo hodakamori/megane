@@ -23,3 +23,4 @@ docs/api/typescript/
 docs/notebooks/
 docs/public/notebooks/
 dev-preview/videos/tmp-*/
+coverage/
