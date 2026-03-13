@@ -98,6 +98,8 @@ export function MeganeViewer({
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
   const setNodeSnapshot = usePipelineStore((s) => s.setNodeSnapshot);
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
+  const setNodeParseError = usePipelineStore((s) => s.setNodeParseError);
+  const clearNodeParseError = usePipelineStore((s) => s.clearNodeParseError);
 
   // Track the "primary" load_structure node (the first one, for backward compat)
   const primaryNodeIdRef = useRef<string | null>(null);
@@ -125,6 +127,7 @@ export function MeganeViewer({
     setStructureLoadHandler((nodeId, file) => {
       // Parse file and store per-node snapshot
       parseStructureFile(file).then((result) => {
+        clearNodeParseError(nodeId);
         const data: NodeSnapshotData = {
           snapshot: result.snapshot,
           frames: result.frames.length > 0 ? result.frames : null,
@@ -137,6 +140,9 @@ export function MeganeViewer({
           hasTrajectory: result.frames.length > 0,
           hasCell: !!result.snapshot.box,
         });
+      }).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        setNodeParseError(nodeId, `Failed to parse file: ${message}`);
       });
       // For the primary node, also trigger legacy load path for trajectory/label compat
       if (nodeId === primaryNodeIdRef.current) {
@@ -146,7 +152,7 @@ export function MeganeViewer({
     return () => {
       setStructureLoadHandler(null);
     };
-  }, [onUploadStructure, setNodeSnapshot, updateNodeParams]);
+  }, [onUploadStructure, setNodeSnapshot, updateNodeParams, setNodeParseError, clearNodeParseError]);
 
   useEffect(() => {
     if (onUploadTrajectory) {
