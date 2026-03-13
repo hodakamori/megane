@@ -34,6 +34,7 @@ interface WasmParseResult {
 }
 
 type ParseFn = (text: string) => WasmParseResult;
+type BinaryParseFn = (data: Uint8Array) => WasmParseResult;
 
 interface WasmModule {
   parse_pdb: ParseFn;
@@ -42,6 +43,7 @@ interface WasmModule {
   parse_mol: ParseFn;
   parse_cif: ParseFn;
   parse_lammps_data: ParseFn;
+  parse_traj: BinaryParseFn;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
@@ -62,6 +64,7 @@ async function ensureInit(): Promise<void> {
         parse_mol: wasm.parse_mol,
         parse_cif: wasm.parse_cif,
         parse_lammps_data: wasm.parse_lammps_data,
+        parse_traj: wasm.parse_traj,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_pdb_bonds: wasm.parse_pdb_bonds,
@@ -111,8 +114,17 @@ export async function parseStructureText(text: string, fileName?: string): Promi
 export async function parseStructureFile(file: File): Promise<StructureParseResult> {
   await ensureInit();
 
-  const text = await file.text();
   const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb";
+
+  // .traj files are binary (ULM format) — parse as Uint8Array
+  if (ext === ".traj") {
+    const buffer = await file.arrayBuffer();
+    const data = new Uint8Array(buffer);
+    const result = wasmModule!.parse_traj(data);
+    return parseWithFn(() => result, "");
+  }
+
+  const text = await file.text();
   const parseFn = getParserForExtension(ext);
   return parseWithFn(parseFn, text);
 }

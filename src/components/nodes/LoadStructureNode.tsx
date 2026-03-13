@@ -13,8 +13,8 @@ import { NodeShell } from "./NodeShell";
 import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
-const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf";
-const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf"];
+const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.traj";
+const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf", ".traj"];
 
 /**
  * Event bus for structure loading.

@@ -1,7 +1,7 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use megane_core::{bonds, cif, gro, lammps_data, mol, parser, top, xtc, xyz};
+use megane_core::{bonds, cif, gro, lammps_data, mol, parser, top, traj, xtc, xyz};
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
@@ -280,6 +280,13 @@ pub fn extract_labels(text: &str, format: &str) -> String {
         Ok(data) => data.atom_labels.map(|l| l.join("\n")).unwrap_or_default(),
         Err(_) => String::new(),
     }
+}
+
+/// Parse an ASE .traj file (ULM binary format) and return structured data.
+#[wasm_bindgen]
+pub fn parse_traj(data: &[u8]) -> Result<ParseResult, JsError> {
+    let parsed = traj::parse_traj(data).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(parsed))
 }
 
 /// Extract only CONECT bonds from a PDB file text.
