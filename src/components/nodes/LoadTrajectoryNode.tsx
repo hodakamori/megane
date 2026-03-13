@@ -13,8 +13,8 @@ import { NodeShell } from "./NodeShell";
 import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
-const TRAJECTORY_ACCEPT = ".xtc";
-const TRAJECTORY_EXTS = [".xtc"];
+const TRAJECTORY_ACCEPT = ".xtc,.lammpstrj,.dump";
+const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump"];
 
 /**
  * Event bus for trajectory loading.

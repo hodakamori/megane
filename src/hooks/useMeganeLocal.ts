@@ -7,7 +7,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { parseStructureFile, parseStructureText } from "../parsers/structure";
-import { parseXTCFile } from "../parsers/xtc";
+import { parseXTCFile, parseLammpstrjFile } from "../parsers/xtc";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
@@ -148,7 +148,10 @@ export function useMeganeLocal(): MeganeLocalState {
     if (!baseSnapshotRef.current) {
       throw new Error("Load a structure before loading a trajectory");
     }
-    const { frames, meta: xtcMeta } = await parseXTCFile(
+    const ext = xtc.name.toLowerCase();
+    const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
+    const parseFn = isLammpstrj ? parseLammpstrjFile : parseXTCFile;
+    const { frames, meta: xtcMeta } = await parseFn(
       xtc,
       baseSnapshotRef.current.nAtoms,
     );
