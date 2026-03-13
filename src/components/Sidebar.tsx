@@ -49,8 +49,8 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf";
-const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf"];
+const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.traj";
+const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf", ".traj"];
 const BOND_FILE_ACCEPT = ".pdb,.top";
 const BOND_FILE_EXTS = [".pdb", ".top"];
 
