@@ -81,6 +81,8 @@ const handleLabelStyle: React.CSSProperties = {
   pointerEvents: "none",
 };
 
+const EMPTY_ERRORS: NodeError[] = [];
+
 const errorIndicatorStyle: React.CSSProperties = {
   position: "relative",
   display: "inline-flex",
@@ -176,7 +178,7 @@ function getHandlePosition(index: number, total: number): string {
 export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: NodeShellProps) {
   const toggleNode = usePipelineStore((s) => s.toggleNode);
   const removeNode = usePipelineStore((s) => s.removeNode);
-  const errors = usePipelineStore((s) => s.nodeErrors[id] ?? []);
+  const errors = usePipelineStore((s) => s.nodeErrors[id] ?? EMPTY_ERRORS);
   const ports = NODE_PORTS[nodeType];
   const categoryColor = NODE_CATEGORY_COLORS[NODE_CATEGORY[nodeType]];
 

@@ -102,12 +102,12 @@ export function MeganeViewer({
   const clearNodeParseError = usePipelineStore((s) => s.clearNodeParseError);
 
   // Track the "primary" load_structure node (the first one, for backward compat)
+  const pipelineNodes = usePipelineStore((s) => s.nodes);
   const primaryNodeIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const nodes = usePipelineStore.getState().nodes;
-    const primary = nodes.find((n) => n.type === "load_structure");
+    const primary = pipelineNodes.find((n) => n.type === "load_structure");
     primaryNodeIdRef.current = primary?.id ?? null;
-  });
+  }, [pipelineNodes]);
 
   // Push snapshot to pipeline store for selection queries
   useEffect(() => {
