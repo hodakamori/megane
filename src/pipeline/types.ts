@@ -428,6 +428,15 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   cellAxesVisible: true,
 };
 
+// ─── Node Errors ──────────────────────────────────────────────────────
+
+export type NodeErrorSeverity = "error" | "warning";
+
+export interface NodeError {
+  message: string;
+  severity: NodeErrorSeverity;
+}
+
 // ─── Serialization Format ─────────────────────────────────────────────
 
 export interface SerializedPipeline {

@@ -1,11 +1,12 @@
 /**
  * Shared node shell for all pipeline nodes.
  * Renders header with title, enable/disable toggle, delete button,
- * and typed input/output handles with color-coded indicators.
+ * error indicator with tooltip, and typed input/output handles.
  */
 
+import { useState } from "react";
 import { Handle, Position } from "@xyflow/react";
-import type { PipelineNodeType, PortDefinition } from "../../pipeline/types";
+import type { PipelineNodeType, PortDefinition, NodeError } from "../../pipeline/types";
 import { NODE_TYPE_LABELS, NODE_PORTS, DATA_TYPE_COLORS, NODE_CATEGORY, NODE_CATEGORY_COLORS } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 
@@ -80,6 +81,83 @@ const handleLabelStyle: React.CSSProperties = {
   pointerEvents: "none",
 };
 
+const errorIndicatorStyle: React.CSSProperties = {
+  position: "relative",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 22,
+  height: 22,
+  borderRadius: "50%",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "default",
+  flexShrink: 0,
+  lineHeight: 1,
+};
+
+const tooltipStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 8px)",
+  right: 0,
+  background: "white",
+  border: "1px solid #e2e8f0",
+  borderRadius: 8,
+  boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+  padding: "8px 12px",
+  zIndex: 1000,
+  minWidth: 200,
+  maxWidth: 300,
+  fontSize: 13,
+  lineHeight: 1.4,
+  color: "#334155",
+  pointerEvents: "none",
+};
+
+function ErrorIndicator({ errors }: { errors: NodeError[] }) {
+  const [hovered, setHovered] = useState(false);
+  const hasError = errors.some((e) => e.severity === "error");
+  const color = hasError ? "#ef4444" : "#f59e0b";
+  const bgColor = hasError ? "rgba(239, 68, 68, 0.12)" : "rgba(245, 158, 11, 0.12)";
+
+  return (
+    <div
+      style={{ ...errorIndicatorStyle, background: bgColor, color }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      !
+      {hovered && (
+        <div style={tooltipStyle}>
+          {errors.map((err, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 6,
+                marginBottom: i < errors.length - 1 ? 4 : 0,
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: err.severity === "error" ? "#ef4444" : "#f59e0b",
+                  flexShrink: 0,
+                  marginTop: 5,
+                }}
+              />
+              <span>{err.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getHandleColor(port: PortDefinition, disabled?: boolean): string {
   if (disabled) return "#cbd5e1"; // slate-300 gray
   return DATA_TYPE_COLORS[port.dataType];
@@ -98,12 +176,19 @@ function getHandlePosition(index: number, total: number): string {
 export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: NodeShellProps) {
   const toggleNode = usePipelineStore((s) => s.toggleNode);
   const removeNode = usePipelineStore((s) => s.removeNode);
+  const errors = usePipelineStore((s) => s.nodeErrors[id] ?? []);
   const ports = NODE_PORTS[nodeType];
   const categoryColor = NODE_CATEGORY_COLORS[NODE_CATEGORY[nodeType]];
+
+  const hasError = errors.some((e) => e.severity === "error");
+  const hasWarning = errors.length > 0 && !hasError;
+  const borderColor = hasError ? "#ef4444" : hasWarning ? "#f59e0b" : "#e2e8f0";
 
   const containerStyle: React.CSSProperties = {
     ...(enabled ? nodeStyle : disabledStyle),
     borderLeft: `5px solid ${categoryColor}`,
+    borderColor,
+    borderLeftColor: categoryColor,
   };
 
   return (
@@ -140,6 +225,7 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
 
       <div style={headerStyle}>
         <span style={titleStyle}>{NODE_TYPE_LABELS[nodeType]}</span>
+        {errors.length > 0 && <ErrorIndicator errors={errors} />}
         <div
           onClick={() => toggleNode(id)}
           style={{

@@ -8,9 +8,10 @@ import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyfl
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } from "./execute";
 import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
-import type { PipelineNodeType, ViewportState, SerializedPipeline } from "./types";
+import type { PipelineNodeType, ViewportState, SerializedPipeline, NodeError } from "./types";
 import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
 import { executePipeline } from "./execute";
+import { validatePipeline } from "./validate";
 import { serializePipeline, deserializePipeline } from "./serialize";
 import { createDefaultPipeline, createDemoPipeline, createEmptyPipeline } from "./defaults";
 import { PIPELINE_TEMPLATES } from "./templates";
@@ -27,6 +28,7 @@ export interface PipelineStore {
   nodes: Node<PipelineNodeData>[];
   edges: Edge[];
   viewportState: ViewportState;
+  nodeErrors: Record<string, NodeError[]>;
 
   // Molecular data for pipeline execution context
   snapshot: Snapshot | null;
@@ -92,6 +94,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
   edges: defaultState.edges,
   viewportState: { ...DEFAULT_VIEWPORT_STATE },
+  nodeErrors: {},
   snapshot: null,
   atomLabels: null,
   structureFrames: null,
@@ -268,8 +271,22 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       fileVectors,
       nodeSnapshots,
     };
-    const viewportState = executePipeline(nodes, edges, ctx);
-    set({ viewportState });
+
+    // Run validation and execution
+    const validationErrors = validatePipeline(nodes, edges);
+    const { viewportState, nodeErrors: executionErrors } = executePipeline(nodes, edges, ctx);
+
+    // Merge validation and execution errors
+    const merged: Record<string, NodeError[]> = {};
+    for (const [id, errs] of validationErrors) {
+      merged[id] = [...errs];
+    }
+    for (const [id, errs] of executionErrors) {
+      if (!merged[id]) merged[id] = [];
+      merged[id].push(...errs);
+    }
+
+    set({ viewportState, nodeErrors: merged });
   },
 
   serialize: () => {

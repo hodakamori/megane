@@ -21,6 +21,8 @@ import type {
   PolyhedronGeneratorParams,
   VectorOverlayParams,
   PipelineNodeType,
+  NodeError,
+  ParticleData,
 } from "./types";
 import type { Frame, TrajectoryMeta, VectorFrame } from "../types";
 import { DEFAULT_VIEWPORT_STATE, NODE_PORTS } from "./types";
@@ -68,14 +70,25 @@ export interface PipelineExecutionContext {
   nodeSnapshots?: Record<string, NodeSnapshotData>;
 }
 
+export interface PipelineExecutionResult {
+  viewportState: ViewportState;
+  nodeErrors: Map<string, NodeError[]>;
+}
+
 export function executePipeline(
   nodes: Node<PipelineNodeData>[],
   edges: Edge[],
   ctx: PipelineExecutionContext = {},
-): ViewportState {
+): PipelineExecutionResult {
   const sortedIds = topologicalSort(nodes, edges);
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const edgeOutputs: EdgeOutputs = new Map();
+  const nodeErrors = new Map<string, NodeError[]>();
+
+  const addError = (nodeId: string, error: NodeError) => {
+    if (!nodeErrors.has(nodeId)) nodeErrors.set(nodeId, []);
+    nodeErrors.get(nodeId)!.push(error);
+  };
 
   let viewportState: ViewportState = { ...DEFAULT_VIEWPORT_STATE };
 
@@ -122,6 +135,9 @@ export function executePipeline(
           id,
         );
         edgeOutputs.set(id, outputs);
+        if (!snapshot) {
+          addError(id, { message: "No structure data available", severity: "warning" });
+        }
         break;
       }
       case "load_vector": {
@@ -148,6 +164,11 @@ export function executePipeline(
           inputs,
         );
         edgeOutputs.set(id, outputs);
+        if (inputs.get("particle")?.length && !outputs.has("bond")) {
+          addError(id, { message: "No bonds found", severity: "warning" });
+        } else if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
         break;
       }
       case "filter": {
@@ -157,6 +178,15 @@ export function executePipeline(
           ctx.atomLabels ?? null,
         );
         edgeOutputs.set(id, outputs);
+        const outData = outputs.get("out");
+        if (!inputs.get("in")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (outData && outData.type === "particle") {
+          const particle = outData as ParticleData;
+          if (particle.indices !== null && particle.indices.length === 0) {
+            addError(id, { message: "Filter returned 0 atoms", severity: "warning" });
+          }
+        }
         break;
       }
       case "modify": {
@@ -165,6 +195,9 @@ export function executePipeline(
           inputs,
         );
         edgeOutputs.set(id, outputs);
+        if (!inputs.get("in")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
         break;
       }
       case "label_generator": {
@@ -174,6 +207,9 @@ export function executePipeline(
           ctx.atomLabels ?? null,
         );
         edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
         break;
       }
       case "polyhedron_generator": {
@@ -182,6 +218,11 @@ export function executePipeline(
           inputs,
         );
         edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (!outputs.has("mesh")) {
+          addError(id, { message: "No polyhedra matched the criteria", severity: "warning" });
+        }
         break;
       }
       case "vector_overlay": {
@@ -190,6 +231,9 @@ export function executePipeline(
           inputs,
         );
         edgeOutputs.set(id, outputs);
+        if (!inputs.get("vector")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
         break;
       }
       case "viewport": {
@@ -202,5 +246,5 @@ export function executePipeline(
     }
   }
 
-  return viewportState;
+  return { viewportState, nodeErrors };
 }
