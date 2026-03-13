@@ -293,7 +293,7 @@ export function Sidebar({
             }
           />
           {trajectory.source === "file" && (
-            <DropZone accept=".xtc" exts={[".xtc"]} onFile={trajectory.onUploadXtc} label="Load XTC...">
+            <DropZone accept=".xtc,.lammpstrj,.dump" exts={[".xtc", ".lammpstrj", ".dump"]} onFile={trajectory.onUploadXtc} label="Load trajectory...">
               {trajectory.fileName ? (
                 <>
                   <div style={fileNameStyle}>{trajectory.fileName}</div>

@@ -1,7 +1,7 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use megane_core::{bonds, cif, gro, lammps_data, mol, parser, top, traj, xtc, xyz};
+use megane_core::{bonds, cif, gro, lammps_data, lammpstrj, mol, parser, top, traj, xtc, xyz};
 
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
@@ -280,6 +280,32 @@ pub fn extract_labels(text: &str, format: &str) -> String {
         Ok(data) => data.atom_labels.map(|l| l.join("\n")).unwrap_or_default(),
         Err(_) => String::new(),
     }
+}
+
+/// Parse a LAMMPS dump trajectory (.lammpstrj) and return frame data.
+#[wasm_bindgen]
+pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
+    let data = lammpstrj::parse_lammpstrj(text).map_err(|e| JsError::new(&e))?;
+
+    let has_box = data.box_matrix.is_some();
+    let box_matrix = match data.box_matrix {
+        Some(m) => m.to_vec(),
+        None => Vec::new(),
+    };
+
+    let mut frame_data: Vec<f32> = Vec::new();
+    for frame in &data.frame_positions {
+        frame_data.extend_from_slice(frame);
+    }
+
+    Ok(XtcParseResult {
+        n_atoms: data.n_atoms as u32,
+        n_frames: data.n_frames as u32,
+        timestep_ps: data.timestep_ps,
+        has_box,
+        box_matrix,
+        frame_data,
+    })
 }
 
 /// Parse an ASE .traj file (ULM binary format) and return structured data.

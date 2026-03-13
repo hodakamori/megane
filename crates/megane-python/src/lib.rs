@@ -96,6 +96,51 @@ fn parse_lammps_data(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     Ok(PyStructure::from_parsed(py, data))
 }
 
+/// Parsed LAMMPS dump trajectory data exposed to Python.
+#[pyclass]
+struct PyLammpstrjData {
+    #[pyo3(get)]
+    n_atoms: usize,
+    #[pyo3(get)]
+    n_frames: usize,
+    #[pyo3(get)]
+    timestep_ps: f32,
+    #[pyo3(get)]
+    box_matrix: Py<PyArray2<f32>>,
+    #[pyo3(get)]
+    frame_positions: Py<PyArray2<f32>>,
+}
+
+/// Parse a LAMMPS dump trajectory text and return frame data.
+#[pyfunction]
+fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyLammpstrjData> {
+    let data = megane_core::lammpstrj::parse_lammpstrj(text)
+        .map_err(|e| PyValueError::new_err(e))?;
+
+    let box_vec = match data.box_matrix {
+        Some(m) => m.to_vec(),
+        None => vec![0.0f32; 9],
+    };
+    let box_array = Array2::from_shape_vec((3, 3), box_vec).expect("box reshape");
+
+    // Flatten all frames into (n_frames, n_atoms * 3)
+    let stride = data.n_atoms * 3;
+    let mut flat: Vec<f32> = Vec::with_capacity(data.n_frames * stride);
+    for frame in &data.frame_positions {
+        flat.extend_from_slice(frame);
+    }
+    let frame_array = Array2::from_shape_vec((data.n_frames, stride), flat)
+        .expect("frame_positions reshape");
+
+    Ok(PyLammpstrjData {
+        n_atoms: data.n_atoms,
+        n_frames: data.n_frames,
+        timestep_ps: data.timestep_ps,
+        box_matrix: box_array.into_pyarray(py).into(),
+        frame_positions: frame_array.into_pyarray(py).into(),
+    })
+}
+
 #[pymodule]
 fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
@@ -103,5 +148,6 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_lammpstrj, m)?)?;
     Ok(())
 }
