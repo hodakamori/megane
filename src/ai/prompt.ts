@@ -189,5 +189,7 @@ User request: "Show a molecule with bonds and trajectory"
 - Set \`fileName\` to \`null\` (the user loads files separately).
 - For typical molecular visualization: load_structure → add_bond → viewport (plus particle and cell connections to viewport).
 - For filtered views: add filter nodes between load_structure and viewport.
-- For modified appearance: add modify nodes to change scale/opacity.`;
+- For modified appearance: add modify nodes to change scale/opacity.
+- You have access to pipeline skill tools. Use them to retrieve base templates and domain knowledge when relevant, then customize the result for the user's specific request.
+- If no skill matches the request, generate the pipeline from scratch using the schema above.`;
 }
