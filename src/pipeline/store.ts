@@ -41,6 +41,7 @@ export interface PipelineStore {
 
   // Per-node snapshot storage (keyed by load_structure node ID)
   nodeSnapshots: Record<string, NodeSnapshotData>;
+  nodeParseErrors: Record<string, string>;
 
   setSnapshot: (s: Snapshot | null) => void;
   setAtomLabels: (labels: string[] | null) => void;
@@ -49,6 +50,8 @@ export interface PipelineStore {
   setFileVectors: (vectors: VectorFrame[] | null) => void;
   setNodeSnapshot: (nodeId: string, data: NodeSnapshotData) => void;
   removeNodeSnapshot: (nodeId: string) => void;
+  setNodeParseError: (nodeId: string, message: string) => void;
+  clearNodeParseError: (nodeId: string) => void;
 
   // xyflow change handlers
   onNodesChange: OnNodesChange<Node<PipelineNodeData>>;
@@ -103,6 +106,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   fileMeta: null,
   fileVectors: null,
   nodeSnapshots: {},
+  nodeParseErrors: {},
 
   setSnapshot: (s) => {
     set({ snapshot: s });
@@ -135,9 +139,24 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   removeNodeSnapshot: (nodeId) => {
     set((state) => {
       const { [nodeId]: _, ...rest } = state.nodeSnapshots;
-      return { nodeSnapshots: rest };
+      const { [nodeId]: __, ...restErrors } = state.nodeParseErrors;
+      return { nodeSnapshots: rest, nodeParseErrors: restErrors };
     });
     get().execute();
+  },
+
+  setNodeParseError: (nodeId, message) => {
+    set((state) => ({
+      nodeParseErrors: { ...state.nodeParseErrors, [nodeId]: message },
+    }));
+    get().execute();
+  },
+
+  clearNodeParseError: (nodeId) => {
+    set((state) => {
+      const { [nodeId]: _, ...rest } = state.nodeParseErrors;
+      return { nodeParseErrors: rest };
+    });
   },
 
   onNodesChange: (changes) => {
@@ -221,10 +240,12 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   removeNode: (id) => {
     set((state) => {
       const { [id]: _, ...restSnapshots } = state.nodeSnapshots;
+      const { [id]: __, ...restParseErrors } = state.nodeParseErrors;
       return {
         nodes: state.nodes.filter((n) => n.id !== id),
         edges: state.edges.filter((e) => e.source !== id && e.target !== id),
         nodeSnapshots: restSnapshots,
+        nodeParseErrors: restParseErrors,
       };
     });
     get().execute();
@@ -260,7 +281,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   execute: () => {
-    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors, nodeSnapshots } = get();
+    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors, nodeSnapshots, nodeParseErrors } = get();
     const ctx: PipelineExecutionContext = {
       snapshot,
       atomLabels,
@@ -276,7 +297,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     const validationErrors = validatePipeline(nodes, edges);
     const { viewportState, nodeErrors: executionErrors } = executePipeline(nodes, edges, ctx);
 
-    // Merge validation and execution errors
+    // Merge validation, execution, and parse errors
     const merged: Record<string, NodeError[]> = {};
     for (const [id, errs] of validationErrors) {
       merged[id] = [...errs];
@@ -284,6 +305,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     for (const [id, errs] of executionErrors) {
       if (!merged[id]) merged[id] = [];
       merged[id].push(...errs);
+    }
+    for (const [id, message] of Object.entries(nodeParseErrors)) {
+      if (!merged[id]) merged[id] = [];
+      merged[id].push({ message, severity: "error" });
     }
 
     set({ viewportState, nodeErrors: merged });
