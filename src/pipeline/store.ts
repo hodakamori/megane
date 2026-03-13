@@ -173,7 +173,11 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     set((state) => ({
       nodes: applyNodeChanges(filtered, state.nodes),
     }));
-    get().execute();
+    // Only re-execute pipeline for structural changes (node removal),
+    // not for position/dimension/selection changes which don't affect pipeline logic.
+    if (filtered.some((c) => c.type === "remove")) {
+      get().execute();
+    }
   },
 
   onEdgesChange: (changes) => {
