@@ -32,8 +32,8 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, and XTC parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
-- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes. 8 node types (load, bond, filter, modify, labels, polyhedra, viewport) with 6 typed data channels (particle, bond, cell, label, mesh, trajectory) flowing through color-coded edges.
+- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 8 node types with 6 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
 ### Scale
@@ -51,9 +51,9 @@ One codebase, every environment.
 | **Jupyter** | anywidget inline viewer | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VSCode** | Custom editor for .pdb, .gro, .xyz | Extension |
+| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf | Extension |
 
-The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
 
@@ -149,6 +149,10 @@ function App() {
 | XYZ | `.xyz` | Cartesian coordinate format |
 | MOL/SDF | `.mol`, `.sdf` | MDL Molfile (V2000) |
 | XTC | `.xtc` | GROMACS compressed trajectory |
+| CIF | `.cif` | Crystallographic Information File |
+| LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
+| ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
+| LAMMPS dump | `.lammpstrj` | LAMMPS dump trajectory |
 
 ## Development
 
@@ -211,7 +215,7 @@ make test-all              # All tests
 src/                     TypeScript frontend
   renderer/              Three.js rendering (impostor, mesh, shaders)
   protocol/              Binary protocol decoder + web workers
-  parsers/               WASM-based file parsers (PDB, GRO, XYZ, MOL, XTC)
+  parsers/               WASM-based file parsers (PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, .traj)
   logic/                 Bond / label / vector source logic
   components/            React UI components
   hooks/                 Custom React hooks

@@ -8,6 +8,16 @@ A pipeline is a directed graph of **nodes** connected by **edges**. Data flows f
 
 Each edge carries a specific **data type** — particle, bond, cell, label, mesh, or trajectory — and only matching types can connect.
 
+When a node encounters an error — for example, a parse failure in LoadStructure — an error icon appears on the node with a tooltip showing the details.
+
+## AI Pipeline Generator
+
+Describe the visualization you want in natural language, and megane builds the node graph for you. Open the AI chat panel from the pipeline editor toolbar and type a prompt like:
+
+> Load protein.pdb with bonds and make water translucent
+
+The generator creates the appropriate LoadStructure, AddBond, Filter, Modify, and Viewport nodes, wires them together, and places them in the editor. You can then adjust parameters or add more nodes manually.
+
 ## Getting Started
 
 The simplest pipeline loads a structure and displays it:
@@ -35,7 +45,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL) | — | particle, trajectory, cell |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, CIF, LAMMPS, .traj) | — | particle, trajectory, cell |
 | **Load Trajectory** | Load an XTC trajectory file | particle | trajectory |
 
 ### Processing
