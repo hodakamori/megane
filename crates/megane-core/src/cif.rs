@@ -2,7 +2,6 @@
 ///
 /// Parses cell parameters (_cell_length_a/b/c, _cell_angle_alpha/beta/gamma)
 /// and atom sites (_atom_site loop) with fractional or Cartesian coordinates.
-
 use std::collections::HashSet;
 
 use crate::bonds;
@@ -86,10 +85,7 @@ fn fract_to_cart(fx: f32, fy: f32, fz: f32, matrix: &[f32; 9]) -> (f32, f32, f32
 /// type_symbol may contain charge like "Fe2+" or "O2-"; label may be "Na1", "O2".
 fn element_from_symbol(s: &str) -> u8 {
     // Strip charge suffixes like "2+", "3-", "+", "-"
-    let cleaned: String = s
-        .chars()
-        .take_while(|c| c.is_alphabetic())
-        .collect();
+    let cleaned: String = s.chars().take_while(|c| c.is_alphabetic()).collect();
     if cleaned.is_empty() {
         return 0;
     }
@@ -191,7 +187,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
             while i < lines.len() {
                 let t = lines[i].trim();
                 // Stop at empty line, another loop_, data_ block, or tag
-                if t.is_empty() || t.starts_with("loop_") || t.starts_with("data_") || t.starts_with('#') {
+                if t.is_empty()
+                    || t.starts_with("loop_")
+                    || t.starts_with("data_")
+                    || t.starts_with('#')
+                {
                     break;
                 }
                 // Also stop if line starts with _ (new tag outside loop)
@@ -384,8 +384,8 @@ H1 H 1.5 2.5 3.5
 "#;
         let result = parse(cif).expect("parse failed");
         assert_eq!(result.n_atoms, 2);
-        assert_eq!(result.elements[0], 8);  // O
-        assert_eq!(result.elements[1], 1);  // H
+        assert_eq!(result.elements[0], 8); // O
+        assert_eq!(result.elements[1], 1); // H
         assert!((result.positions[0] - 1.0).abs() < 1e-5);
         assert!((result.positions[1] - 2.0).abs() < 1e-5);
         assert!((result.positions[2] - 3.0).abs() < 1e-5);
@@ -400,9 +400,10 @@ H1 H 1.5 2.5 3.5
 
     #[test]
     fn test_parse_cif_fixture() {
-        let text = std::fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/nacl.cif"),
-        )
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/nacl.cif"
+        ))
         .expect("read fixture");
         let result = parse(&text).expect("parse failed");
         assert_eq!(result.n_atoms, 8);

@@ -58,7 +58,7 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
 
   const handleCommit = useCallback(() => {
     const result = validateQuery(localQuery);
-    setError(result.valid ? null : result.error ?? "Invalid query");
+    setError(result.valid ? null : (result.error ?? "Invalid query"));
     updateNodeParams(id, { query: localQuery });
   }, [id, localQuery, updateNodeParams]);
 
@@ -82,11 +82,7 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         style={error ? inputErrorStyle : inputStyle}
       />
       {error && <div style={errorStyle}>{error}</div>}
-      {!error && !localQuery && (
-        <div style={hintStyle}>
-          element, index, x, y, z, resname, mass
-        </div>
-      )}
+      {!error && !localQuery && <div style={hintStyle}>element, index, x, y, z, resname, mass</div>}
     </NodeShell>
   );
 }

@@ -47,10 +47,7 @@ export function executeViewport(
 /**
  * Drop bonds whose atoms are not present in any connected particle stream.
  */
-function filterBondsByParticles(
-  bonds: BondData[],
-  particles: ParticleData[],
-): BondData[] {
+function filterBondsByParticles(bonds: BondData[], particles: ParticleData[]): BondData[] {
   if (bonds.length === 0 || particles.length === 0) return bonds;
 
   let allIndices: Set<number> | null = null;

@@ -47,8 +47,12 @@ export function inferBondsVdwJS(
     nz = Math.max(1, Math.floor(lz / CELL_SIZE));
   } else {
     // Compute bounding box
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
     for (let i = 0; i < nAtoms; i++) {
       const x = positions[i * 3];
       const y = positions[i * 3 + 1];
@@ -91,7 +95,9 @@ export function inferBondsVdwJS(
     }
   } else {
     // Original bounding-box assignment
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
     for (let i = 0; i < nAtoms; i++) {
       if (positions[i * 3] < minX) minX = positions[i * 3];
       if (positions[i * 3 + 1] < minY) minY = positions[i * 3 + 1];
@@ -107,10 +113,19 @@ export function inferBondsVdwJS(
 
   // Half-shell neighbor offsets (13 neighbors + self)
   const offsets: [number, number, number][] = [
-    [0, 0, 1], [0, 1, -1], [0, 1, 0], [0, 1, 1],
-    [1, -1, -1], [1, -1, 0], [1, -1, 1],
-    [1, 0, -1], [1, 0, 0], [1, 0, 1],
-    [1, 1, -1], [1, 1, 0], [1, 1, 1],
+    [0, 0, 1],
+    [0, 1, -1],
+    [0, 1, 0],
+    [0, 1, 1],
+    [1, -1, -1],
+    [1, -1, 0],
+    [1, -1, 1],
+    [1, 0, -1],
+    [1, 0, 0],
+    [1, 0, 1],
+    [1, 1, -1],
+    [1, 1, 0],
+    [1, 1, 1],
   ];
 
   const minDistSq = MIN_BOND_DIST * MIN_BOND_DIST;

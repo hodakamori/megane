@@ -9,7 +9,15 @@
  * Additional structures use StructureLayer instances.
  */
 
-import type { ViewportState, ParticleData, BondData, CellData, LabelData, MeshData, VectorData } from "./types";
+import type {
+  ViewportState,
+  ParticleData,
+  BondData,
+  CellData,
+  LabelData,
+  MeshData,
+  VectorData,
+} from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { getVectorsForFrame } from "../logic/vectorSourceLogic";
 
@@ -36,8 +44,10 @@ export function applyViewportState(
   const layerCells = current.cells.filter((c) => c.sourceNodeId !== resolvedPrimaryId);
 
   // Previous state grouping
-  const prevPrimaryParticles = previous?.particles.filter((p) => p.sourceNodeId === resolvedPrimaryId) ?? null;
-  const prevPrimaryBonds = previous?.bonds.filter((b) => b.sourceNodeId === resolvedPrimaryId) ?? null;
+  const prevPrimaryParticles =
+    previous?.particles.filter((p) => p.sourceNodeId === resolvedPrimaryId) ?? null;
+  const prevPrimaryBonds =
+    previous?.bonds.filter((b) => b.sourceNodeId === resolvedPrimaryId) ?? null;
 
   // ─── Primary structure: use renderer's built-in renderers ──
   const hasParticles = primaryParticles.length > 0;
@@ -51,9 +61,13 @@ export function applyViewportState(
 
   // Primary cell visibility
   const hasCells = primaryCells.length > 0;
-  const hadCells = (previous ? previous.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId).length : 0) > 0;
+  const hadCells =
+    (previous ? previous.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId).length : 0) > 0;
   const cellVisible = hasCells && primaryCells.some((c) => c.visible);
-  const prevCellVisible = hadCells && (previous?.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId).some((c) => c.visible) ?? false);
+  const prevCellVisible =
+    hadCells &&
+    (previous?.cells.filter((c) => c.sourceNodeId === resolvedPrimaryId).some((c) => c.visible) ??
+      false);
   if (!previous || cellVisible !== prevCellVisible) {
     renderer.setCellVisible(cellVisible);
   }
@@ -96,8 +110,11 @@ export function applyViewportState(
     if (bonds && bonds.length > 0) {
       const bond = bonds[0];
       layer.updateBondsExt(
-        bond.bondIndices, bond.bondOrders,
-        bond.positions, bond.elements, bond.nAtoms,
+        bond.bondIndices,
+        bond.bondOrders,
+        bond.positions,
+        bond.elements,
+        bond.nAtoms,
       );
       layer.setBondScale(bond.scale);
       layer.setBondOpacity(bond.opacity);
@@ -223,7 +240,13 @@ function applyParticleOverrides(
 
 /** Apply overrides to a StructureLayer. */
 function applyLayerParticleOverrides(
-  layer: { setAtomScale: (s: number) => void; setAtomOpacity: (o: number) => void; setAtomScaleOverrides: (o: Float32Array) => void; setAtomOpacityOverrides: (o: Float32Array) => void; clearAtomOverrides: () => void },
+  layer: {
+    setAtomScale: (s: number) => void;
+    setAtomOpacity: (o: number) => void;
+    setAtomScaleOverrides: (o: Float32Array) => void;
+    setAtomOpacityOverrides: (o: Float32Array) => void;
+    clearAtomOverrides: () => void;
+  },
   particles: ParticleData[],
 ): void {
   let mergedScale: Float32Array | null = null;
@@ -282,8 +305,11 @@ function applyBondSettings(
 
   if (!prevBond || bond.bondIndices !== prevBond.bondIndices) {
     renderer.updateBondsExt(
-      bond.bondIndices, bond.bondOrders,
-      bond.positions, bond.elements, bond.nAtoms,
+      bond.bondIndices,
+      bond.bondOrders,
+      bond.positions,
+      bond.elements,
+      bond.nAtoms,
     );
   }
 

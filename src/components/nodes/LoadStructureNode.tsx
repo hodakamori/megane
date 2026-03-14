@@ -14,7 +14,17 @@ import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
 const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.cif,.data,.lammps,.traj";
-const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf", ".cif", ".data", ".lammps", ".traj"];
+const STRUCTURE_EXTS = [
+  ".pdb",
+  ".gro",
+  ".xyz",
+  ".mol",
+  ".sdf",
+  ".cif",
+  ".data",
+  ".lammps",
+  ".traj",
+];
 
 /**
  * Event bus for structure loading.
@@ -65,7 +75,12 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
   if (!params.hasCell) disabledPorts.add("cell");
 
   return (
-    <NodeShell id={id} nodeType="load_structure" enabled={data.enabled} disabledPorts={disabledPorts}>
+    <NodeShell
+      id={id}
+      nodeType="load_structure"
+      enabled={data.enabled}
+      disabledPorts={disabledPorts}
+    >
       <div onDrop={handleDrop} onDragOver={handleDragOver}>
         {params.fileName ? (
           <div style={fileNameStyle}>{params.fileName}</div>

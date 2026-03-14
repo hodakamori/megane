@@ -10,7 +10,13 @@ import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } fro
 import type { NodeStreamingData } from "./executors/streaming";
 import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
 import type { PipelineNodeType, ViewportState, SerializedPipeline, NodeError } from "./types";
-import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
+import {
+  defaultParams,
+  DEFAULT_VIEWPORT_STATE,
+  canConnect,
+  NODE_PORTS,
+  GENERIC_NODE_ACCEPTS,
+} from "./types";
 import { executePipeline } from "./execute";
 import { validatePipeline } from "./validate";
 import { serializePipeline, deserializePipeline } from "./serialize";
@@ -309,7 +315,20 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   execute: () => {
-    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors, nodeSnapshots, nodeParseErrors, nodeStreamingData } = get();
+    const {
+      nodes,
+      edges,
+      snapshot,
+      atomLabels,
+      structureFrames,
+      structureMeta,
+      fileFrames,
+      fileMeta,
+      fileVectors,
+      nodeSnapshots,
+      nodeParseErrors,
+      nodeStreamingData,
+    } = get();
     const ctx: PipelineExecutionContext = {
       snapshot,
       atomLabels,

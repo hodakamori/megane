@@ -5,7 +5,7 @@
 ///
 /// Supports coordinate columns: x/y/z (unscaled), xs/ys/zs (scaled),
 /// xu/yu/zu (unwrapped). Atoms are sorted by id within each frame.
-
+///
 /// Parsed LAMMPS dump trajectory data.
 pub struct LammpstrjData {
     pub n_atoms: usize,
@@ -45,23 +45,22 @@ fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
         return Err("Invalid ITEM: ATOMS header".to_string());
     };
 
-    let find = |name: &str| -> Option<usize> {
-        col_names.iter().position(|&c| c == name)
-    };
+    let find = |name: &str| -> Option<usize> { col_names.iter().position(|&c| c == name) };
 
     let id_col = find("id").ok_or("Missing 'id' column in ATOMS header")?;
 
     // Try unscaled first, then scaled, then unwrapped
-    let (x_col, y_col, z_col, coord_type) =
-        if let (Some(x), Some(y), Some(z)) = (find("x"), find("y"), find("z")) {
-            (x, y, z, CoordType::Unscaled)
-        } else if let (Some(x), Some(y), Some(z)) = (find("xs"), find("ys"), find("zs")) {
-            (x, y, z, CoordType::Scaled)
-        } else if let (Some(x), Some(y), Some(z)) = (find("xu"), find("yu"), find("zu")) {
-            (x, y, z, CoordType::Unwrapped)
-        } else {
-            return Err("Cannot find x/y/z, xs/ys/zs, or xu/yu/zu columns in ATOMS header".to_string());
-        };
+    let (x_col, y_col, z_col, coord_type) = if let (Some(x), Some(y), Some(z)) =
+        (find("x"), find("y"), find("z"))
+    {
+        (x, y, z, CoordType::Unscaled)
+    } else if let (Some(x), Some(y), Some(z)) = (find("xs"), find("ys"), find("zs")) {
+        (x, y, z, CoordType::Scaled)
+    } else if let (Some(x), Some(y), Some(z)) = (find("xu"), find("yu"), find("zu")) {
+        (x, y, z, CoordType::Unwrapped)
+    } else {
+        return Err("Cannot find x/y/z, xs/ys/zs, or xu/yu/zu columns in ATOMS header".to_string());
+    };
 
     Ok(ColumnLayout {
         id_col,
@@ -156,14 +155,20 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
                 .collect();
             if is_triclinic {
                 if parts.len() < 3 {
-                    return Err(format!("Expected 3 values for triclinic box at line {}", i + 1));
+                    return Err(format!(
+                        "Expected 3 values for triclinic box at line {}",
+                        i + 1
+                    ));
                 }
                 lo[dim] = parts[0];
                 hi[dim] = parts[1];
                 tilt[dim] = parts[2];
             } else {
                 if parts.len() < 2 {
-                    return Err(format!("Expected 2 values for box bounds at line {}", i + 1));
+                    return Err(format!(
+                        "Expected 2 values for box bounds at line {}",
+                        i + 1
+                    ));
                 }
                 lo[dim] = parts[0];
                 hi[dim] = parts[1];
@@ -190,20 +195,12 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
                 let lx = xhi - xlo;
                 let ly = yhi - ylo;
                 let lz = zhi - zlo;
-                box_matrix = Some([
-                    lx, 0.0, 0.0,
-                    xy, ly,  0.0,
-                    xz, yz,  lz,
-                ]);
+                box_matrix = Some([lx, 0.0, 0.0, xy, ly, 0.0, xz, yz, lz]);
             } else {
                 let lx = (hi[0] - lo[0]) as f32;
                 let ly = (hi[1] - lo[1]) as f32;
                 let lz = (hi[2] - lo[2]) as f32;
-                box_matrix = Some([
-                    lx, 0.0, 0.0,
-                    0.0, ly, 0.0,
-                    0.0, 0.0, lz,
-                ]);
+                box_matrix = Some([lx, 0.0, 0.0, 0.0, ly, 0.0, 0.0, 0.0, lz]);
             }
         }
 

@@ -139,12 +139,7 @@ export class CellAxesRenderer {
   /**
    * Move the inset by a delta (CSS pixels), clamped to container bounds.
    */
-  moveBy(
-    dx: number,
-    dy: number,
-    containerWidth: number,
-    containerHeight: number,
-  ): void {
+  moveBy(dx: number, dy: number, containerWidth: number, containerHeight: number): void {
     // dx/dy are in screen coords (right = +x, down = +y)
     // posX/posY are in WebGL coords (right = +x, up = +y)
     this.posX += dx;
@@ -175,9 +170,7 @@ export class CellAxesRenderer {
 
     // Sync camera rotation with main camera
     this.axesCamera.quaternion.copy(mainCamera.quaternion);
-    this.axesCamera.position
-      .set(0, 0, 3)
-      .applyQuaternion(mainCamera.quaternion);
+    this.axesCamera.position.set(0, 0, 3).applyQuaternion(mainCamera.quaternion);
 
     // Compute responsive inset size
     const minDim = Math.min(containerWidth, containerHeight);

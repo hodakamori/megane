@@ -1,9 +1,5 @@
 import type { Frame, TrajectoryMeta } from "../../types";
-import type {
-  PipelineData,
-  TrajectoryData,
-  LoadTrajectoryParams,
-} from "../types";
+import type { PipelineData, TrajectoryData, LoadTrajectoryParams } from "../types";
 import { MemoryFrameProvider } from "../types";
 
 export function executeLoadTrajectory(

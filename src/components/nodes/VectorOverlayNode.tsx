@@ -45,9 +45,7 @@ export function VectorOverlayNode({ id, data }: NodeProps<Node<PipelineNodeData>
           max={5.0}
           step={0.1}
           value={params.scale}
-          onChange={(e) =>
-            updateNodeParams(id, { scale: parseFloat(e.target.value) })
-          }
+          onChange={(e) => updateNodeParams(id, { scale: parseFloat(e.target.value) })}
           style={sliderStyle}
         />
         <span style={valueStyle}>{params.scale.toFixed(1)}</span>

@@ -104,9 +104,7 @@ export function CollapsiblePanel({
           style={collapsedButtonStyle}
           title={`Open ${title.toLowerCase()}`}
         >
-          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>
-            &#9664;
-          </span>
+          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>&#9664;</span>
           {title}
         </button>
       </div>
@@ -120,11 +118,7 @@ export function CollapsiblePanel({
         <span style={panelTitleStyle}>{title}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
           {headerExtra}
-          <button
-            onClick={onToggleCollapse}
-            style={collapseButtonStyle}
-            title="Collapse panel"
-          >
+          <button onClick={onToggleCollapse} style={collapseButtonStyle} title="Collapse panel">
             &#9654;
           </button>
         </div>

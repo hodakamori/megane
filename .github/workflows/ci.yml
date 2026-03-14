@@ -20,6 +20,17 @@ jobs:
       - run: uvx ruff format --check python/
       - run: uvx ty check python/
 
+  lint-rust:
+    name: Rust lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+
   test-rust:
     name: Rust tests
     runs-on: ubuntu-latest
@@ -44,6 +55,8 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build:wasm
+      - run: npm run format:check
+      - run: npm run lint
       - run: npm test
 
   test-python:

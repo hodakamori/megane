@@ -1,7 +1,6 @@
 /// PDB text parser.
 ///
 /// Handles ATOM/HETATM, CRYST1, CONECT, and MODEL/ENDMDL records.
-
 use std::collections::{HashMap, HashSet};
 
 /// Parsed atom data from a single ATOM/HETATM line.
@@ -28,23 +27,86 @@ pub struct ParsedStructure {
 /// Element symbol → atomic number lookup.
 pub fn symbol_to_atomic_num(sym: &str) -> u8 {
     match sym {
-        "H" => 1, "He" => 2,
-        "Li" => 3, "Be" => 4, "B" => 5, "C" => 6, "N" => 7, "O" => 8, "F" => 9, "Ne" => 10,
-        "Na" => 11, "Mg" => 12, "Al" => 13, "Si" => 14, "P" => 15, "S" => 16, "Cl" => 17, "Ar" => 18,
-        "K" => 19, "Ca" => 20,
-        "Sc" => 21, "Ti" => 22, "V" => 23, "Cr" => 24, "Mn" => 25,
-        "Fe" => 26, "Co" => 27, "Ni" => 28, "Cu" => 29, "Zn" => 30,
-        "Ga" => 31, "Ge" => 32, "As" => 33, "Se" => 34, "Br" => 35, "Kr" => 36,
-        "Rb" => 37, "Sr" => 38, "Y" => 39, "Zr" => 40,
-        "Mo" => 42, "Ru" => 44, "Rh" => 45, "Pd" => 46, "Ag" => 47, "Cd" => 48,
-        "In" => 49, "Sn" => 50, "Sb" => 51, "Te" => 52, "I" => 53, "Xe" => 54,
-        "Cs" => 55, "Ba" => 56, "La" => 57,
-        "Ce" => 58, "Nd" => 60, "Sm" => 62, "Eu" => 63, "Gd" => 64,
-        "Tb" => 65, "Dy" => 66, "Ho" => 67, "Er" => 68, "Yb" => 70, "Lu" => 71,
-        "Hf" => 72, "Ta" => 73, "W" => 74, "Re" => 75, "Os" => 76,
-        "Ir" => 77, "Pt" => 78, "Au" => 79, "Hg" => 80,
-        "Tl" => 81, "Pb" => 82, "Bi" => 83,
-        "Th" => 90, "U" => 92,
+        "H" => 1,
+        "He" => 2,
+        "Li" => 3,
+        "Be" => 4,
+        "B" => 5,
+        "C" => 6,
+        "N" => 7,
+        "O" => 8,
+        "F" => 9,
+        "Ne" => 10,
+        "Na" => 11,
+        "Mg" => 12,
+        "Al" => 13,
+        "Si" => 14,
+        "P" => 15,
+        "S" => 16,
+        "Cl" => 17,
+        "Ar" => 18,
+        "K" => 19,
+        "Ca" => 20,
+        "Sc" => 21,
+        "Ti" => 22,
+        "V" => 23,
+        "Cr" => 24,
+        "Mn" => 25,
+        "Fe" => 26,
+        "Co" => 27,
+        "Ni" => 28,
+        "Cu" => 29,
+        "Zn" => 30,
+        "Ga" => 31,
+        "Ge" => 32,
+        "As" => 33,
+        "Se" => 34,
+        "Br" => 35,
+        "Kr" => 36,
+        "Rb" => 37,
+        "Sr" => 38,
+        "Y" => 39,
+        "Zr" => 40,
+        "Mo" => 42,
+        "Ru" => 44,
+        "Rh" => 45,
+        "Pd" => 46,
+        "Ag" => 47,
+        "Cd" => 48,
+        "In" => 49,
+        "Sn" => 50,
+        "Sb" => 51,
+        "Te" => 52,
+        "I" => 53,
+        "Xe" => 54,
+        "Cs" => 55,
+        "Ba" => 56,
+        "La" => 57,
+        "Ce" => 58,
+        "Nd" => 60,
+        "Sm" => 62,
+        "Eu" => 63,
+        "Gd" => 64,
+        "Tb" => 65,
+        "Dy" => 66,
+        "Ho" => 67,
+        "Er" => 68,
+        "Yb" => 70,
+        "Lu" => 71,
+        "Hf" => 72,
+        "Ta" => 73,
+        "W" => 74,
+        "Re" => 75,
+        "Os" => 76,
+        "Ir" => 77,
+        "Pt" => 78,
+        "Au" => 79,
+        "Hg" => 80,
+        "Tl" => 81,
+        "Pb" => 82,
+        "Bi" => 83,
+        "Th" => 90,
+        "U" => 92,
         _ => 0,
     }
 }
@@ -142,7 +204,14 @@ fn parse_cryst1(line: &str) -> Option<[f32; 9]> {
 }
 
 /// Convert crystallographic cell parameters to a 3x3 matrix (row-major).
-pub fn cell_params_to_matrix(a: f32, b: f32, c: f32, alpha: f32, beta: f32, gamma: f32) -> [f32; 9] {
+pub fn cell_params_to_matrix(
+    a: f32,
+    b: f32,
+    c: f32,
+    alpha: f32,
+    beta: f32,
+    gamma: f32,
+) -> [f32; 9] {
     let to_rad = std::f32::consts::PI / 180.0;
     let alpha_r = alpha * to_rad;
     let beta_r = beta * to_rad;
@@ -158,9 +227,15 @@ pub fn cell_params_to_matrix(a: f32, b: f32, c: f32, alpha: f32, beta: f32, gamm
     let cz = (c * c - cx * cx - cy * cy).max(0.0).sqrt();
 
     [
-        a,        0.0,      0.0,      // va
-        b * cos_g, b * sin_g, 0.0,    // vb
-        cx,       cy,        cz,      // vc
+        a,
+        0.0,
+        0.0, // va
+        b * cos_g,
+        b * sin_g,
+        0.0, // vb
+        cx,
+        cy,
+        cz, // vc
     ]
 }
 
@@ -218,7 +293,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut model_count: usize = 0;
 
     for line in text.lines() {
-        let record = if line.len() >= 6 { line[..6].trim_end() } else { line.trim_end() };
+        let record = if line.len() >= 6 {
+            line[..6].trim_end()
+        } else {
+            line.trim_end()
+        };
 
         match record {
             "MODEL" => {
@@ -245,8 +324,16 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         serial_to_index.insert(serial, current_model.len());
                     }
                     // Extract residue label: resName (cols 17-20) + resSeq (cols 22-26)
-                    let res_name = if line.len() >= 20 { line[17..20].trim() } else { "" };
-                    let res_seq = if line.len() >= 26 { line[22..26].trim() } else { "" };
+                    let res_name = if line.len() >= 20 {
+                        line[17..20].trim()
+                    } else {
+                        ""
+                    };
+                    let res_seq = if line.len() >= 26 {
+                        line[22..26].trim()
+                    } else {
+                        ""
+                    };
                     current_labels.push(format!("{}{}", res_name, res_seq));
                     current_model.push(atom);
                 }
@@ -365,9 +452,9 @@ mod tests {
         let pdb = "CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 21          4\nATOM      1  N   THR A   1      17.047  14.099   3.625  1.00 13.79           N  \nATOM      2  CA  THR A   1      16.967  12.784   4.338  1.00 10.80           C  \nATOM      3  C   THR A   1      15.685  12.755   5.133  1.00  9.19           C  \nEND\n";
         let result = parse(pdb).expect("parse failed");
         assert_eq!(result.n_atoms, 3);
-        assert_eq!(result.elements[0], 7);  // N
-        assert_eq!(result.elements[1], 6);  // C
-        assert_eq!(result.elements[2], 6);  // C
+        assert_eq!(result.elements[0], 7); // N
+        assert_eq!(result.elements[1], 6); // C
+        assert_eq!(result.elements[2], 6); // C
         assert!((result.positions[0] - 17.047).abs() < 0.01);
         assert!((result.positions[1] - 14.099).abs() < 0.01);
         assert!(result.box_matrix.is_some());
@@ -400,15 +487,17 @@ mod tests {
 
     #[test]
     fn test_parse_1crn_fixture() {
-        let text = std::fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/1crn.pdb")
-        ).expect("read fixture");
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/1crn.pdb"
+        ))
+        .expect("read fixture");
         let result = parse(&text).expect("parse failed");
         assert_eq!(result.n_atoms, 327);
         assert!(!result.bonds.is_empty());
-        assert!(result.elements.contains(&6));  // C
-        assert!(result.elements.contains(&7));  // N
-        assert!(result.elements.contains(&8));  // O
+        assert!(result.elements.contains(&6)); // C
+        assert!(result.elements.contains(&7)); // N
+        assert!(result.elements.contains(&8)); // O
         assert!(result.elements.contains(&16)); // S
     }
 }

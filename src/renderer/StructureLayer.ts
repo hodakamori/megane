@@ -74,11 +74,7 @@ export class StructureLayer {
     }
     this.currentPositions.set(frame.positions);
     this.atomRenderer.updatePositions(frame.positions);
-    this.bondRenderer.updatePositions(
-      frame.positions,
-      this.snapshot.bonds,
-      this.snapshot.nBonds,
-    );
+    this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
   }
 
   updateBondsExt(

@@ -145,10 +145,7 @@ export function executePipeline(
         break;
       }
       case "load_vector": {
-        const outputs = executeLoadVector(
-          data.params as LoadVectorParams,
-          ctx.fileVectors ?? null,
-        );
+        const outputs = executeLoadVector(data.params as LoadVectorParams, ctx.fileVectors ?? null);
         edgeOutputs.set(id, outputs);
         break;
       }
@@ -172,10 +169,7 @@ export function executePipeline(
         break;
       }
       case "add_bond": {
-        const outputs = executeAddBond(
-          data.params as AddBondParams,
-          inputs,
-        );
+        const outputs = executeAddBond(data.params as AddBondParams, inputs);
         edgeOutputs.set(id, outputs);
         if (inputs.get("particle")?.length && !outputs.has("bond")) {
           addError(id, { message: "No bonds found", severity: "warning" });
@@ -185,11 +179,7 @@ export function executePipeline(
         break;
       }
       case "filter": {
-        const outputs = executeFilter(
-          data.params as FilterParams,
-          inputs,
-          ctx.atomLabels ?? null,
-        );
+        const outputs = executeFilter(data.params as FilterParams, inputs, ctx.atomLabels ?? null);
         edgeOutputs.set(id, outputs);
         const outData = outputs.get("out");
         if (!inputs.get("in")?.length) {
@@ -203,10 +193,7 @@ export function executePipeline(
         break;
       }
       case "modify": {
-        const outputs = executeModify(
-          data.params as ModifyParams,
-          inputs,
-        );
+        const outputs = executeModify(data.params as ModifyParams, inputs);
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
@@ -239,10 +226,7 @@ export function executePipeline(
         break;
       }
       case "vector_overlay": {
-        const outputs = executeVectorOverlay(
-          data.params as VectorOverlayParams,
-          inputs,
-        );
+        const outputs = executeVectorOverlay(data.params as VectorOverlayParams, inputs);
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
@@ -250,10 +234,7 @@ export function executePipeline(
         break;
       }
       case "viewport": {
-        viewportState = executeViewport(
-          data.params as ViewportParams,
-          inputs,
-        );
+        viewportState = executeViewport(data.params as ViewportParams, inputs);
         break;
       }
     }

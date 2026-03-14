@@ -99,11 +99,17 @@ impl ParseResult {
             bonds_flat.push(*a);
             bonds_flat.push(*b);
         }
-        let bond_orders = data.bond_orders.unwrap_or_else(|| vec![1u8; data.bonds.len()]);
+        let bond_orders = data
+            .bond_orders
+            .unwrap_or_else(|| vec![1u8; data.bonds.len()]);
         let has_box = data.box_matrix.is_some();
         let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
         let n_frames = data.frame_positions.len() as u32;
-        let frame_data: Vec<f32> = data.frame_positions.into_iter().flat_map(|f| f.into_iter()).collect();
+        let frame_data: Vec<f32> = data
+            .frame_positions
+            .into_iter()
+            .flat_map(|f| f.into_iter())
+            .collect();
         let has_atom_labels = data.atom_labels.is_some();
         let atom_labels = data.atom_labels.map(|l| l.join("\n")).unwrap_or_default();
 
@@ -239,11 +245,7 @@ pub fn parse_lammps_data(text: &str) -> Result<ParseResult, JsError> {
 /// Infer bonds using VDW radii (threshold = vdw_sum * 0.6).
 /// Returns flat Uint32Array [a0, b0, a1, b1, ...].
 #[wasm_bindgen]
-pub fn infer_bonds_vdw(
-    positions: &[f32],
-    elements: &[u8],
-    n_atoms: u32,
-) -> Uint32Array {
+pub fn infer_bonds_vdw(positions: &[f32], elements: &[u8], n_atoms: u32) -> Uint32Array {
     let result = bonds::infer_bonds_vdw(positions, elements, n_atoms as usize);
     let mut flat: Vec<u32> = Vec::with_capacity(result.len() * 2);
     for (a, b) in &result {

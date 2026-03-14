@@ -1,3 +1,5 @@
+use crate::bonds;
+use crate::parser::symbol_to_atomic_num;
 /// GROMACS GRO text format parser.
 ///
 /// Format:
@@ -12,10 +14,7 @@
 ///     columns 29-36: y (nm)
 ///     columns 37-44: z (nm)
 ///   Last line: box vectors (v1x v2y v3z [v1y v1z v2x v2z v3x v3y])
-
 use std::collections::HashSet;
-use crate::bonds;
-use crate::parser::symbol_to_atomic_num;
 
 /// Guess atomic number from GRO atom name (e.g. "CA", "OW", "HW1").
 fn element_from_atom_name(name: &str) -> u8 {
@@ -81,8 +80,16 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         }
 
         // Residue number (cols 0-5) and residue name (cols 5-10)
-        let res_num = if line.len() >= 5 { line[0..5].trim() } else { "" };
-        let res_name = if line.len() >= 10 { line[5..10].trim() } else { "" };
+        let res_num = if line.len() >= 5 {
+            line[0..5].trim()
+        } else {
+            ""
+        };
+        let res_name = if line.len() >= 10 {
+            line[5..10].trim()
+        } else {
+            ""
+        };
         labels.push(format!("{}{}", res_name, res_num));
 
         // Atom name: columns 11-15 (0-indexed: 10..15)
@@ -167,12 +174,12 @@ mod tests {
 
     #[test]
     fn test_element_from_atom_name() {
-        assert_eq!(element_from_atom_name("CA"), 20);  // Ca (Calcium) — GRO "CA" maps to two-char "Ca"
-        assert_eq!(element_from_atom_name("OW"), 8);   // Oxygen (water)
-        assert_eq!(element_from_atom_name("HW1"), 1);  // Hydrogen
-        assert_eq!(element_from_atom_name("N"), 7);    // Nitrogen
+        assert_eq!(element_from_atom_name("CA"), 20); // Ca (Calcium) — GRO "CA" maps to two-char "Ca"
+        assert_eq!(element_from_atom_name("OW"), 8); // Oxygen (water)
+        assert_eq!(element_from_atom_name("HW1"), 1); // Hydrogen
+        assert_eq!(element_from_atom_name("N"), 7); // Nitrogen
         assert_eq!(element_from_atom_name("  CL"), 17); // Chlorine
-        assert_eq!(element_from_atom_name(""), 0);     // Empty
+        assert_eq!(element_from_atom_name(""), 0); // Empty
     }
 
     #[test]
@@ -181,13 +188,13 @@ mod tests {
         let result = parse(gro).expect("parse failed");
         assert_eq!(result.n_atoms, 3);
         // Positions should be in Angstroms (nm * 10)
-        assert!((result.positions[0] - 1.0).abs() < 0.01);   // 0.100 nm → 1.0 Å
-        assert!((result.positions[1] - 2.0).abs() < 0.01);   // 0.200 nm → 2.0 Å
-        assert!((result.positions[2] - 3.0).abs() < 0.01);   // 0.300 nm → 3.0 Å
-        // Elements
-        assert_eq!(result.elements[0], 8);  // O
-        assert_eq!(result.elements[1], 1);  // H
-        assert_eq!(result.elements[2], 1);  // H
+        assert!((result.positions[0] - 1.0).abs() < 0.01); // 0.100 nm → 1.0 Å
+        assert!((result.positions[1] - 2.0).abs() < 0.01); // 0.200 nm → 2.0 Å
+        assert!((result.positions[2] - 3.0).abs() < 0.01); // 0.300 nm → 3.0 Å
+                                                           // Elements
+        assert_eq!(result.elements[0], 8); // O
+        assert_eq!(result.elements[1], 1); // H
+        assert_eq!(result.elements[2], 1); // H
     }
 
     #[test]
@@ -196,9 +203,9 @@ mod tests {
         let result = parse(gro).expect("parse failed");
         assert!(result.box_matrix.is_some());
         let bm = result.box_matrix.unwrap();
-        assert!((bm[0] - 25.0).abs() < 0.01);  // 2.5 nm → 25.0 Å
-        assert!((bm[4] - 30.0).abs() < 0.01);  // 3.0 nm → 30.0 Å
-        assert!((bm[8] - 35.0).abs() < 0.01);  // 3.5 nm → 35.0 Å
+        assert!((bm[0] - 25.0).abs() < 0.01); // 2.5 nm → 25.0 Å
+        assert!((bm[4] - 30.0).abs() < 0.01); // 3.0 nm → 30.0 Å
+        assert!((bm[8] - 35.0).abs() < 0.01); // 3.5 nm → 35.0 Å
     }
 
     #[test]

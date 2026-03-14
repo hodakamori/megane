@@ -29,11 +29,7 @@ export function executeLoadStructure(
   outputs.set("particle", particle);
 
   if (structureFrames && structureFrames.length > 0 && structureMeta) {
-    const provider = new MemoryFrameProvider(
-      structureFrames,
-      structureMeta,
-      snapshot.positions,
-    );
+    const provider = new MemoryFrameProvider(structureFrames, structureMeta, snapshot.positions);
     const trajectory: TrajectoryData = {
       type: "trajectory",
       provider,

@@ -46,12 +46,42 @@ Structure: LoadStructure -> AddBond -> Viewport, with optional LoadTrajectory.
     }
   ],
   "edges": [
-    { "source": "loader-1", "target": "addbond-1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "traj-1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "viewport-1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "viewport-1", "sourceHandle": "cell", "targetHandle": "cell" },
-    { "source": "addbond-1", "target": "viewport-1", "sourceHandle": "bond", "targetHandle": "bond" },
-    { "source": "traj-1", "target": "viewport-1", "sourceHandle": "trajectory", "targetHandle": "trajectory" }
+    {
+      "source": "loader-1",
+      "target": "addbond-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "loader-1",
+      "target": "traj-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "loader-1",
+      "target": "viewport-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "loader-1",
+      "target": "viewport-1",
+      "sourceHandle": "cell",
+      "targetHandle": "cell"
+    },
+    {
+      "source": "addbond-1",
+      "target": "viewport-1",
+      "sourceHandle": "bond",
+      "targetHandle": "bond"
+    },
+    {
+      "source": "traj-1",
+      "target": "viewport-1",
+      "sourceHandle": "trajectory",
+      "targetHandle": "trajectory"
+    }
   ]
 }
 ```

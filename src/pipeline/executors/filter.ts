@@ -1,8 +1,4 @@
-import type {
-  PipelineData,
-  ParticleData,
-  FilterParams,
-} from "../types";
+import type { PipelineData, ParticleData, FilterParams } from "../types";
 import { evaluateSelection } from "../selection";
 
 export function executeFilter(
@@ -22,11 +18,7 @@ export function executeFilter(
     }
 
     try {
-      const selectionResult = evaluateSelection(
-        params.query,
-        particle.source,
-        atomLabels,
-      );
+      const selectionResult = evaluateSelection(params.query, particle.source, atomLabels);
 
       if (selectionResult === null) {
         outputs.set("out", particle);

@@ -45,9 +45,7 @@ export function getLayoutedElements<T extends Node>(
   // Sort ranks top-to-bottom, then within each rank keep dagre's x order
   const sortedRanks = [...rankMap.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([, ids]) =>
-      ids.sort((a, b) => g.node(a).x - g.node(b).x),
-    );
+    .map(([, ids]) => ids.sort((a, b) => g.node(a).x - g.node(b).x));
 
   // Place nodes row by row, wrapping ranks wider than MAX_COLS into sub-rows
   const positionMap = new Map<string, { x: number; y: number }>();
@@ -57,8 +55,7 @@ export function getLayoutedElements<T extends Node>(
     // Split into chunks of MAX_COLS
     for (let i = 0; i < rankIds.length; i += MAX_COLS) {
       const chunk = rankIds.slice(i, i + MAX_COLS);
-      const totalWidth =
-        chunk.length * NODE_WIDTH + (chunk.length - 1) * HORIZONTAL_GAP;
+      const totalWidth = chunk.length * NODE_WIDTH + (chunk.length - 1) * HORIZONTAL_GAP;
       const startX = -totalWidth / 2;
 
       for (let j = 0; j < chunk.length; j++) {

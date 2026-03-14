@@ -15,18 +15,10 @@ import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
-import {
-  decodeSnapshot,
-  decodeHeader,
-  MSG_SNAPSHOT,
-} from "../protocol/protocol";
+import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 import type { NodeSnapshotData } from "../pipeline/execute";
-import type {
-  Snapshot,
-  Frame,
-  Measurement,
-} from "../types";
+import type { Snapshot, Frame, Measurement } from "../types";
 
 interface WidgetViewerProps {
   snapshot: Snapshot | null;
@@ -55,9 +47,7 @@ export function WidgetViewer(props: WidgetViewerProps) {
 function decodeNodeSnapshot(data: DataView): Snapshot | null {
   if (!data || data.byteLength === 0) return null;
   const buffer = new ArrayBuffer(data.byteLength);
-  new Uint8Array(buffer).set(
-    new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-  );
+  new Uint8Array(buffer).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
   const { msgType } = decodeHeader(buffer);
   if (msgType === MSG_SNAPSHOT) {
     return decodeSnapshot(buffer);
@@ -147,12 +137,19 @@ function WidgetViewerPipeline({
     );
 
     const result = processPbcBonds(
-      newBonds, null, frame.positions,
-      snapshot.elements, snapshot.nAtoms, snapshot.box,
+      newBonds,
+      null,
+      frame.positions,
+      snapshot.elements,
+      snapshot.nAtoms,
+      snapshot.box,
     );
     renderer.updateBondsExt(
-      result.bondIndices, result.bondOrders,
-      result.positions, result.elements, result.nAtoms,
+      result.bondIndices,
+      result.bondOrders,
+      result.positions,
+      result.elements,
+      result.nAtoms,
     );
   }, [frame, snapshot]);
 

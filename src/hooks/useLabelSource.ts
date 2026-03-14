@@ -32,29 +32,39 @@ export function useLabelSource(
   const structureLabelsRef = useRef<string[] | null>(null);
   const fileLabelsRef = useRef<string[] | null>(null);
 
-  const setLabelSource = useCallback((source: LabelSource) => {
-    setLabelSourceState(source);
-    const base = baseSnapshotRef.current;
-    if (!base) {
-      setAtomLabels(null);
-      return;
-    }
-    const labels = computeLabelsForSource(source, {
-      structureLabels: structureLabelsRef.current,
-      fileLabels: fileLabelsRef.current,
-    }, base.nAtoms);
-    setAtomLabels(labels);
-  }, [baseSnapshotRef]);
+  const setLabelSource = useCallback(
+    (source: LabelSource) => {
+      setLabelSourceState(source);
+      const base = baseSnapshotRef.current;
+      if (!base) {
+        setAtomLabels(null);
+        return;
+      }
+      const labels = computeLabelsForSource(
+        source,
+        {
+          structureLabels: structureLabelsRef.current,
+          fileLabels: fileLabelsRef.current,
+        },
+        base.nAtoms,
+      );
+      setAtomLabels(labels);
+    },
+    [baseSnapshotRef],
+  );
 
-  const loadLabelFile = useCallback(async (file: File) => {
-    const base = baseSnapshotRef.current;
-    if (!base) return;
-    const { labels, fileName } = await loadLabelFileData(file, base.nAtoms);
-    fileLabelsRef.current = labels;
-    setLabelFileName(fileName);
-    setLabelSourceState("file");
-    setAtomLabels(labels);
-  }, [baseSnapshotRef]);
+  const loadLabelFile = useCallback(
+    async (file: File) => {
+      const base = baseSnapshotRef.current;
+      if (!base) return;
+      const { labels, fileName } = await loadLabelFileData(file, base.nAtoms);
+      fileLabelsRef.current = labels;
+      setLabelFileName(fileName);
+      setLabelSourceState("file");
+      setAtomLabels(labels);
+    },
+    [baseSnapshotRef],
+  );
 
   const reset = useCallback((labels: string[] | null) => {
     structureLabelsRef.current = labels;

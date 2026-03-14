@@ -20,7 +20,9 @@ export function computeViewBounds(snapshot: Snapshot): {
 } {
   const { positions, nAtoms } = snapshot;
 
-  let sumX = 0, sumY = 0, sumZ = 0;
+  let sumX = 0,
+    sumY = 0,
+    sumZ = 0;
   for (let i = 0; i < nAtoms; i++) {
     sumX += positions[i * 3];
     sumY += positions[i * 3 + 1];
@@ -28,8 +30,12 @@ export function computeViewBounds(snapshot: Snapshot): {
   }
 
   let cx: number, cy: number, cz: number;
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
 
   const hasBox = snapshot.box && snapshot.box.some((v) => v !== 0);
 
@@ -133,9 +139,7 @@ export function applyFrustumInsets(
   const effectiveAspect = effectiveWidth / containerHeight;
 
   const padding = 1.2;
-  const halfH =
-    Math.max(extent.extentY / 2, extent.extentX / (2 * effectiveAspect)) *
-    padding;
+  const halfH = Math.max(extent.extentY / 2, extent.extentX / (2 * effectiveAspect)) * padding;
   const frustumHeight = Math.max(halfH * 2, 0.1);
 
   const fullAspect = containerWidth / containerHeight;
@@ -175,9 +179,12 @@ export function createSwitchedCamera(
   } else {
     const frustumSize = 50;
     newCamera = new THREE.OrthographicCamera(
-      -frustumSize * aspect / 2, frustumSize * aspect / 2,
-      frustumSize / 2, -frustumSize / 2,
-      0.1, 10000,
+      (-frustumSize * aspect) / 2,
+      (frustumSize * aspect) / 2,
+      frustumSize / 2,
+      -frustumSize / 2,
+      0.1,
+      10000,
     );
   }
 

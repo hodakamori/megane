@@ -1,9 +1,4 @@
-import type {
-  PipelineData,
-  ParticleData,
-  LabelData,
-  LabelGeneratorParams,
-} from "../types";
+import type { PipelineData, ParticleData, LabelData, LabelGeneratorParams } from "../types";
 import { getElementSymbol } from "../../constants";
 
 export function executeLabelGenerator(

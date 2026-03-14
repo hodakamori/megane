@@ -30,7 +30,9 @@ async function ensureInit(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       const wasm = await import("../../crates/megane-wasm/pkg");
-      const wasmUrl = (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ as string | undefined;
+      const wasmUrl = (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ as
+        | string
+        | undefined;
       await wasm.default(wasmUrl);
       wasmParseXtc = wasm.parse_xtc_file;
       wasmParseLammpstrj = wasm.parse_lammpstrj_file;
@@ -77,10 +79,7 @@ function extractFrames(
  * Parse an XTC trajectory file.
  * Returns Frame[] (all frames) and TrajectoryMeta.
  */
-export async function parseXTCFile(
-  file: File,
-  expectedNAtoms: number,
-): Promise<XTCParseResult> {
+export async function parseXTCFile(file: File, expectedNAtoms: number): Promise<XTCParseResult> {
   await ensureInit();
 
   const buffer = await file.arrayBuffer();

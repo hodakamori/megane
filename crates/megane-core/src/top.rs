@@ -1,7 +1,7 @@
 /// GROMACS .top topology file parser.
 ///
 /// Extracts bond pairs from the [ bonds ] section.
-
+///
 /// Parse a GROMACS .top file and extract bond pairs.
 /// Returns Vec<(u32, u32)> with 0-indexed atom pairs.
 pub fn parse_top_bonds(text: &str, n_atoms: usize) -> Vec<(u32, u32)> {

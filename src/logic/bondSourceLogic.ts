@@ -47,11 +47,7 @@ export async function computeBondsForSource(
       return withBonds(base, new Uint32Array(0), null);
     case "distance": {
       if (!refs.vdwBonds) {
-        refs.vdwBonds = await inferBondsVdw(
-          base.positions,
-          base.elements,
-          base.nAtoms,
-        );
+        refs.vdwBonds = await inferBondsVdw(base.positions, base.elements, base.nAtoms);
       }
       return withBonds(base, refs.vdwBonds, null);
     }

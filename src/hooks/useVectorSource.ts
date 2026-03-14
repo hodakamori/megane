@@ -4,7 +4,11 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-import { getVectorsForFrame, loadVectorFileData, generateDemoVectors } from "../logic/vectorSourceLogic";
+import {
+  getVectorsForFrame,
+  loadVectorFileData,
+  generateDemoVectors,
+} from "../logic/vectorSourceLogic";
 import type { Snapshot, VectorSource, VectorFrame, TrajectoryMeta } from "../types";
 import type { Frame } from "../types";
 
@@ -35,35 +39,44 @@ export function useVectorSource(
 
   const fileVectorsRef = useRef<VectorFrame[] | null>(null);
 
-  const setVectorSource = useCallback((source: VectorSource) => {
-    setVectorSourceState(source);
-    if (source === "none") {
-      setAtomVectors(null);
-    } else if (source === "demo") {
+  const setVectorSource = useCallback(
+    (source: VectorSource) => {
+      setVectorSourceState(source);
+      if (source === "none") {
+        setAtomVectors(null);
+      } else if (source === "demo") {
+        const base = baseSnapshotRef.current;
+        if (!base) return;
+        const nFrames = fileTrajMetaRef.current?.nFrames ?? structureFramesRef.current.length + 1;
+        const vectors = generateDemoVectors(base.nAtoms, nFrames);
+        fileVectorsRef.current = vectors;
+        setVectorFileName("demo");
+        const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
+        setAtomVectors(vecs);
+      } else if (source === "file" && fileVectorsRef.current) {
+        const vecs = getVectorsForFrame(
+          { fileVectors: fileVectorsRef.current },
+          currentFrameRef.current,
+        );
+        setAtomVectors(vecs);
+      }
+    },
+    [baseSnapshotRef, currentFrameRef, structureFramesRef, fileTrajMetaRef],
+  );
+
+  const loadVectorFile = useCallback(
+    async (file: File) => {
       const base = baseSnapshotRef.current;
       if (!base) return;
-      const nFrames = fileTrajMetaRef.current?.nFrames ?? structureFramesRef.current.length + 1;
-      const vectors = generateDemoVectors(base.nAtoms, nFrames);
+      const { vectors, fileName } = await loadVectorFileData(file, base.nAtoms);
       fileVectorsRef.current = vectors;
-      setVectorFileName("demo");
+      setVectorFileName(fileName);
+      setVectorSourceState("file");
       const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
       setAtomVectors(vecs);
-    } else if (source === "file" && fileVectorsRef.current) {
-      const vecs = getVectorsForFrame({ fileVectors: fileVectorsRef.current }, currentFrameRef.current);
-      setAtomVectors(vecs);
-    }
-  }, [baseSnapshotRef, currentFrameRef, structureFramesRef, fileTrajMetaRef]);
-
-  const loadVectorFile = useCallback(async (file: File) => {
-    const base = baseSnapshotRef.current;
-    if (!base) return;
-    const { vectors, fileName } = await loadVectorFileData(file, base.nAtoms);
-    fileVectorsRef.current = vectors;
-    setVectorFileName(fileName);
-    setVectorSourceState("file");
-    const vecs = getVectorsForFrame({ fileVectors: vectors }, currentFrameRef.current);
-    setAtomVectors(vecs);
-  }, [baseSnapshotRef, currentFrameRef]);
+    },
+    [baseSnapshotRef, currentFrameRef],
+  );
 
   const loadDemoVectors = useCallback(() => {
     const base = baseSnapshotRef.current;

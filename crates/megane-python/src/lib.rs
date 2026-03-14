@@ -25,16 +25,11 @@ impl PyStructure {
         let n = data.n_atoms;
         let n_bonds = data.bonds.len();
 
-        let pos_array = Array2::from_shape_vec((n, 3), data.positions)
-            .expect("positions reshape");
+        let pos_array = Array2::from_shape_vec((n, 3), data.positions).expect("positions reshape");
 
         let elem_array = Array1::from_vec(data.elements);
 
-        let bonds_flat: Vec<u32> = data
-            .bonds
-            .iter()
-            .flat_map(|(a, b)| [*a, *b])
-            .collect();
+        let bonds_flat: Vec<u32> = data.bonds.iter().flat_map(|(a, b)| [*a, *b]).collect();
         let bond_array = if n_bonds > 0 {
             Array2::from_shape_vec((n_bonds, 2), bonds_flat).expect("bonds reshape")
         } else {
@@ -64,35 +59,35 @@ impl PyStructure {
 /// Parse a PDB file text and return structured data.
 #[pyfunction]
 fn parse_pdb(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
-    let data = megane_core::parser::parse(text).map_err(|e| PyValueError::new_err(e))?;
+    let data = megane_core::parser::parse(text).map_err(PyValueError::new_err)?;
     Ok(PyStructure::from_parsed(py, data))
 }
 
 /// Parse a GRO file text and return structured data.
 #[pyfunction]
 fn parse_gro(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
-    let data = megane_core::gro::parse(text).map_err(|e| PyValueError::new_err(e))?;
+    let data = megane_core::gro::parse(text).map_err(PyValueError::new_err)?;
     Ok(PyStructure::from_parsed(py, data))
 }
 
 /// Parse an XYZ file text and return structured data.
 #[pyfunction]
 fn parse_xyz(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
-    let data = megane_core::xyz::parse(text).map_err(|e| PyValueError::new_err(e))?;
+    let data = megane_core::xyz::parse(text).map_err(PyValueError::new_err)?;
     Ok(PyStructure::from_parsed(py, data))
 }
 
 /// Parse an MDL Molfile (V2000) text and return structured data.
 #[pyfunction]
 fn parse_mol(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
-    let data = megane_core::mol::parse(text).map_err(|e| PyValueError::new_err(e))?;
+    let data = megane_core::mol::parse(text).map_err(PyValueError::new_err)?;
     Ok(PyStructure::from_parsed(py, data))
 }
 
 /// Parse a LAMMPS data file text and return structured data.
 #[pyfunction]
 fn parse_lammps_data(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
-    let data = megane_core::lammps_data::parse(text).map_err(|e| PyValueError::new_err(e))?;
+    let data = megane_core::lammps_data::parse(text).map_err(PyValueError::new_err)?;
     Ok(PyStructure::from_parsed(py, data))
 }
 
@@ -114,8 +109,7 @@ struct PyLammpstrjData {
 /// Parse a LAMMPS dump trajectory text and return frame data.
 #[pyfunction]
 fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyLammpstrjData> {
-    let data = megane_core::lammpstrj::parse_lammpstrj(text)
-        .map_err(|e| PyValueError::new_err(e))?;
+    let data = megane_core::lammpstrj::parse_lammpstrj(text).map_err(PyValueError::new_err)?;
 
     let box_vec = match data.box_matrix {
         Some(m) => m.to_vec(),
@@ -129,8 +123,8 @@ fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyLammpstrjData> {
     for frame in &data.frame_positions {
         flat.extend_from_slice(frame);
     }
-    let frame_array = Array2::from_shape_vec((data.n_frames, stride), flat)
-        .expect("frame_positions reshape");
+    let frame_array =
+        Array2::from_shape_vec((data.n_frames, stride), flat).expect("frame_positions reshape");
 
     Ok(PyLammpstrjData {
         n_atoms: data.n_atoms,

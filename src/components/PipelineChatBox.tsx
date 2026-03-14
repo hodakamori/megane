@@ -255,10 +255,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       ]);
     } catch (e: unknown) {
       if ((e as Error).name === "AbortError") {
-        setMessages((prev) => [
-          ...prev,
-          { role: "error", content: "Generation cancelled." },
-        ]);
+        setMessages((prev) => [...prev, { role: "error", content: "Generation cancelled." }]);
       } else {
         setMessages((prev) => [
           ...prev,
@@ -269,7 +266,17 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       setIsStreaming(false);
       abortRef.current = null;
     }
-  }, [input, isStreaming, apiKey, provider, model, deserialize, autoLayout, onPipelineApplied, messages.length]);
+  }, [
+    input,
+    isStreaming,
+    apiKey,
+    provider,
+    model,
+    deserialize,
+    autoLayout,
+    onPipelineApplied,
+    messages.length,
+  ]);
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
@@ -333,20 +340,37 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
         <div style={messagesAreaStyle}>
           {messages.map((msg, i) => {
             if (msg.role === "user") {
-              return <div key={i} style={userMsgStyle}>{msg.content}</div>;
+              return (
+                <div key={i} style={userMsgStyle}>
+                  {msg.content}
+                </div>
+              );
             }
             if (msg.role === "error") {
-              return <div key={i} style={errorMsgStyle}>{msg.content}</div>;
+              return (
+                <div key={i} style={errorMsgStyle}>
+                  {msg.content}
+                </div>
+              );
             }
             // assistant
             if (msg.content === "Pipeline generated successfully!") {
-              return <div key={i} style={successMsgStyle}>{msg.content}</div>;
+              return (
+                <div key={i} style={successMsgStyle}>
+                  {msg.content}
+                </div>
+              );
             }
             // Show truncated streaming content
-            const display = msg.content.length > 80
-              ? msg.content.slice(0, 80) + "..."
-              : msg.content || (isStreaming ? "Generating..." : "");
-            return <div key={i} style={assistantMsgStyle}>{display}</div>;
+            const display =
+              msg.content.length > 80
+                ? msg.content.slice(0, 80) + "..."
+                : msg.content || (isStreaming ? "Generating..." : "");
+            return (
+              <div key={i} style={assistantMsgStyle}>
+                {display}
+              </div>
+            );
           })}
           <div ref={messagesEndRef} />
         </div>
