@@ -32,6 +32,6 @@ Keep the first line under 72 characters. Add details in the body if needed.
 
 ## After Committing
 
-Always create a pull request after pushing your changes using `gh pr create`. Include a summary of changes and a test plan in the PR body.
+Always create a pull request after pushing your changes using `gh pr create`. Include a summary of changes and a test plan in the PR body. See the `github-cli` skill for remote URL workaround if `gh` fails.
 
 If additional commits are pushed after the PR is created, review the PR title and description and update them to accurately reflect all changes. Both the title and summary must always match the actual diff.
