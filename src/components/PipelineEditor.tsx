@@ -38,6 +38,7 @@ import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
+import { StreamingNode } from "./nodes/StreamingNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
@@ -46,6 +47,7 @@ const nodeTypes = {
   load_structure: LoadStructureNode,
   load_trajectory: LoadTrajectoryNode,
   load_vector: LoadVectorNode,
+  streaming: StreamingNode,
   add_bond: AddBondNode,
   viewport: ViewportNode,
   filter: FilterNode,
@@ -56,7 +58,7 @@ const nodeTypes = {
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
-  { category: "data_load", label: "Data Load", types: ["load_structure", "load_trajectory", "load_vector"] },
+  { category: "data_load", label: "Data Load", types: ["load_structure", "load_trajectory", "load_vector", "streaming"] },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },
   { category: "modify", label: "Modify", types: ["modify"] },

@@ -155,7 +155,14 @@ describe("defaultParams", () => {
     expect(params).toEqual({
       type: "load_trajectory",
       fileName: null,
-      sourceMode: "file",
+    });
+  });
+
+  it("returns correct defaults for streaming", () => {
+    const params = defaultParams("streaming");
+    expect(params).toEqual({
+      type: "streaming",
+      connected: false,
     });
   });
 
@@ -172,7 +179,7 @@ describe("defaultParams", () => {
 
 describe("NODE_PORTS", () => {
   const allNodeTypes: PipelineNodeType[] = [
-    "load_structure", "load_trajectory", "load_vector",
+    "load_structure", "load_trajectory", "load_vector", "streaming",
     "add_bond", "viewport", "filter", "modify",
     "label_generator", "polyhedron_generator", "vector_overlay",
   ];

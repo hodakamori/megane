@@ -94,6 +94,16 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
 
   const streamProviderRef = useRef<StreamFrameProvider | null>(null);
 
+  /**
+   * Find the first streaming node ID in the pipeline.
+   * Used to associate WebSocket data with a streaming node.
+   */
+  const getStreamingNodeId = useCallback((): string | null => {
+    const nodes = usePipelineStore.getState().nodes;
+    const streamingNode = nodes.find((n) => n.type === "streaming");
+    return streamingNode?.id ?? null;
+  }, []);
+
   useEffect(() => {
     if (!url) return;
 
@@ -103,6 +113,7 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
       url,
       (data: ArrayBuffer) => {
         const { msgType } = decodeHeader(data);
+        const nodeId = getStreamingNodeId();
         if (msgType === MSG_SNAPSHOT) {
           const decoded = decodeSnapshot(data);
           baseSnapshotRef.current = decoded;
@@ -120,6 +131,15 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
           setVectorSourceState("none");
           setAtomVectors(null);
           setSnapshot(decoded);
+          // Update per-node streaming data
+          if (nodeId) {
+            const store = usePipelineStore.getState();
+            const existing = store.nodeStreamingData[nodeId];
+            store.setNodeStreamingData(nodeId, {
+              snapshot: decoded,
+              streamProvider: existing?.streamProvider ?? null,
+            });
+          }
         } else if (msgType === MSG_FRAME) {
           const decoded = decodeFrame(data);
           setFrame(decoded);
@@ -141,11 +161,27 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
           } else {
             streamProvider.meta = decoded;
           }
-          // Register with pipeline store so load_trajectory nodes can use it
-          usePipelineStore.getState().setStreamProvider(streamProvider);
+          // Update per-node streaming data with stream provider
+          if (nodeId) {
+            const store = usePipelineStore.getState();
+            const existing = store.nodeStreamingData[nodeId];
+            store.setNodeStreamingData(nodeId, {
+              snapshot: existing?.snapshot ?? baseSnapshotRef.current!,
+              streamProvider,
+            });
+            // Update the streaming node's connected status
+            store.updateNodeParams(nodeId, { connected: true });
+          }
         }
       },
-      setConnected,
+      (isConnected) => {
+        setConnected(isConnected);
+        // Update the streaming node's connected status
+        const nodeId = getStreamingNodeId();
+        if (nodeId) {
+          usePipelineStore.getState().updateNodeParams(nodeId, { connected: isConnected });
+        }
+      },
     );
 
     client.connect();
@@ -157,9 +193,13 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
         streamProviderRef.current.clear();
         streamProviderRef.current = null;
       }
-      usePipelineStore.getState().setStreamProvider(null);
+      const nodeId = getStreamingNodeId();
+      if (nodeId) {
+        usePipelineStore.getState().removeNodeStreamingData(nodeId);
+        usePipelineStore.getState().updateNodeParams(nodeId, { connected: false });
+      }
     };
-  }, [url]);
+  }, [url, getStreamingNodeId]);
 
   const setBondSource = useCallback(async (source: BondSource) => {
     setBondSourceState(source);

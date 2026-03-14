@@ -26,6 +26,7 @@ import type {
 } from "./types";
 import type { Frame, TrajectoryMeta, VectorFrame } from "../types";
 import type { FrameProvider } from "./types";
+import { executeStreaming, type NodeStreamingData } from "./executors/streaming";
 import { DEFAULT_VIEWPORT_STATE, NODE_PORTS } from "./types";
 import { topologicalSort, collectInputs, type EdgeOutputs } from "./graph";
 import { executeLoadStructure } from "./executors/loadStructure";
@@ -69,8 +70,8 @@ export interface PipelineExecutionContext {
   fileVectors?: VectorFrame[] | null;
   /** Per-node snapshots keyed by load_structure node ID. */
   nodeSnapshots?: Record<string, NodeSnapshotData>;
-  /** Stream frame provider for WebSocket streaming mode. */
-  streamProvider?: FrameProvider | null;
+  /** Per-node streaming data keyed by streaming node ID. */
+  nodeStreamingData?: Record<string, NodeStreamingData>;
 }
 
 export interface PipelineExecutionResult {
@@ -157,9 +158,17 @@ export function executePipeline(
           inputs,
           ctx.fileFrames ?? null,
           ctx.fileMeta ?? null,
-          ctx.streamProvider ?? null,
         );
         edgeOutputs.set(id, outputs);
+        break;
+      }
+      case "streaming": {
+        const streamingData = ctx.nodeStreamingData?.[id];
+        const outputs = executeStreaming(id, streamingData);
+        edgeOutputs.set(id, outputs);
+        if (!streamingData?.snapshot) {
+          addError(id, { message: "No streaming data available", severity: "warning" });
+        }
         break;
       }
       case "add_bond": {

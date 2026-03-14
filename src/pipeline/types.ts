@@ -151,6 +151,7 @@ export type PipelineNodeType =
   | "load_structure"
   | "load_trajectory"
   | "load_vector"
+  | "streaming"
   | "add_bond"
   | "viewport"
   | "filter"
@@ -164,6 +165,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   load_structure: "Load Structure",
   load_trajectory: "Load Trajectory",
   load_vector: "Load Vector",
+  streaming: "Streaming",
   add_bond: "Add Bond",
   viewport: "Viewport",
   filter: "Filter",
@@ -182,6 +184,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   load_structure: "data_load",
   load_trajectory: "data_load",
   load_vector: "data_load",
+  streaming: "data_load",
   add_bond: "bond",
   filter: "filter",
   modify: "modify",
@@ -223,6 +226,14 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     ],
     outputs: [
       { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+  },
+  streaming: {
+    inputs: [],
+    outputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+      { name: "cell", dataType: "cell", label: "Cell" },
     ],
   },
   load_vector: {
@@ -295,7 +306,11 @@ export interface LoadStructureParams {
 export interface LoadTrajectoryParams {
   type: "load_trajectory";
   fileName: string | null;
-  sourceMode: "file" | "stream";
+}
+
+export interface StreamingParams {
+  type: "streaming";
+  connected: boolean;
 }
 
 export interface AddBondParams {
@@ -351,6 +366,7 @@ export type PipelineNodeParams =
   | LoadStructureParams
   | LoadTrajectoryParams
   | LoadVectorParams
+  | StreamingParams
   | AddBondParams
   | ViewportParams
   | FilterParams
@@ -365,7 +381,9 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "load_structure":
       return { type, fileName: null, hasTrajectory: false, hasCell: false };
     case "load_trajectory":
-      return { type, fileName: null, sourceMode: "file" };
+      return { type, fileName: null };
+    case "streaming":
+      return { type, connected: false };
     case "load_vector":
       return { type, fileName: null };
     case "add_bond":
