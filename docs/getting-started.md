@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.10 or later
-- Node.js 18+ (for web development)
+- Node.js 22+ (for web development)
 
 ## Installation
 
@@ -26,20 +26,28 @@ npm install megane-viewer
 ```python
 import megane
 
-# Create a viewer widget
-viewer = megane.MolecularViewer()
-
-# Load a PDB file
-viewer.load("protein.pdb")
+# Build a pipeline
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+pipe.add_edge(s, bonds)
 
 # Display in notebook
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
 viewer
 ```
 
 With a trajectory:
 
 ```python
-viewer.load("protein.pdb", xtc="trajectory.xtc")
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
+pipe.add_edge(s, t)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
 viewer.frame_index = 50  # Jump to frame 50
 ```
 

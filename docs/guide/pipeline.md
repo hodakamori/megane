@@ -2,11 +2,13 @@
 
 megane's pipeline editor lets you build visualization workflows by wiring nodes — no code required. Open the pipeline panel from the sidebar to start building.
 
+Pipelines can also be built programmatically in Python using the `Pipeline` API (see [Python Pipeline API](#python-pipeline-api) below).
+
 ## Concept
 
 A pipeline is a directed graph of **nodes** connected by **edges**. Data flows from source nodes (like Load Structure) through processing nodes (like Filter or Modify) and into a Viewport node for rendering.
 
-Each edge carries a specific **data type** — particle, bond, cell, label, mesh, or trajectory — and only matching types can connect.
+Each edge carries a specific **data type** — particle, bond, cell, label, mesh, trajectory, or vector — and only matching types can connect.
 
 When a node encounters an error — for example, a parse failure in LoadStructure — an error icon appears on the node with a tooltip showing the details.
 
@@ -45,35 +47,55 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, CIF, LAMMPS, .traj) | — | particle, trajectory, cell |
-| **Load Trajectory** | Load an XTC trajectory file | particle | trajectory |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, LAMMPS data) | — | particle, trajectory, cell |
+| **Load Trajectory** | Load an XTC or ASE .traj trajectory file | particle | trajectory |
+| **Streaming** | WebSocket-based real-time data delivery | — | particle, bond, trajectory, cell |
+| **Load Vector** | Load per-atom vector data from a file | — | vector |
 
 ### Processing
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Add Bond** | Detect bonds from structure or by distance | particle | bond |
-| **Filter** | Select atoms using a query expression | particle, bond | particle, bond |
-| **Modify** | Override scale and opacity for a group of atoms | particle, bond | particle, bond |
-
-::: info Generic Ports
-Filter and Modify accept both **particle** and **bond** inputs. The output type matches the input type automatically.
-:::
+| **Filter** | Select atoms using a query expression | particle (in) | particle (out) |
+| **Modify** | Override scale and opacity for a group of atoms | particle (in) | particle (out) |
 
 ### Overlay
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
+| **Add Bond** | Detect bonds from structure or by distance | particle | bond |
 | **Label Generator** | Generate text labels at atom positions | particle | label |
 | **Polyhedron Generator** | Render coordination polyhedra (convex hulls) | particle | mesh |
+| **Vector Overlay** | Configure per-atom vector visualization (e.g. forces) | vector | vector |
 
 ### Output
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Viewport** | 3D rendering output | particle, bond, cell, trajectory, label, mesh | — |
+| **Viewport** | 3D rendering output | particle, bond, cell, trajectory, label, mesh, vector | — |
 
 ## Node Parameters
+
+### Load Structure
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.data` (LAMMPS) |
+
+### Load Trajectory
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| xtc | string | Path to XTC trajectory file |
+| traj | string | Path to ASE .traj trajectory file |
+
+Requires a connection from a LoadStructure node. Frames are loaded lazily when `frame_index` changes.
+
+### Load Vector
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| File path | string | Path to vector data file (JSON with per-atom 3D vectors) |
 
 ### Add Bond
 
@@ -114,6 +136,14 @@ The input field validates your query in real time — invalid syntax is highligh
 | Max distance | number | 2.5 Å | Maximum center–ligand distance |
 | Opacity | number | 0.5 | Face transparency (0–1) |
 | Show edges | boolean | off | Display wireframe edges |
+| Edge color | string | `#dddddd` | Wireframe edge color (hex) |
+| Edge width | number | 3.0 | Wireframe edge width (px) |
+
+### Vector Overlay
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| Scale | number | 1.0 | Vector arrow length multiplier |
 
 ### Viewport
 
@@ -124,7 +154,7 @@ The input field validates your query in real time — invalid syntax is highligh
 
 ## Data Types
 
-Six typed data channels flow through color-coded edges:
+Seven typed data channels flow through color-coded edges:
 
 | Type | Color | Description |
 |------|-------|-------------|
@@ -134,6 +164,7 @@ Six typed data channels flow through color-coded edges:
 | **label** | Violet | Text labels positioned at atoms |
 | **mesh** | Gray | Triangle mesh for polyhedra rendering |
 | **trajectory** | Pink | Multi-frame coordinate data |
+| **vector** | Teal | Per-atom 3D vector data (forces, velocities, etc.) |
 
 ## Filter DSL
 
@@ -190,11 +221,369 @@ Use Filter + Modify nodes to fade out water molecules while keeping the protein 
 1. Add a `LoadStructure` node and load your PDB file
 2. Add a `Filter` node with query: `resname == "HOH"`
 3. Add a `Modify` node and set opacity to 0.2, scale to 0.5
-4. Connect: `LoadStructure.particle → Filter.particle → Modify.particle → Viewport.particle`
+4. Connect: `LoadStructure.particle → Filter.in → Modify.in → Viewport.particle`
 5. Connect the original `LoadStructure.particle → Viewport.particle` as well (for the protein)
 
 The viewport renders both streams — the protein at full opacity, and the water as translucent small spheres.
 
 ## Serialization
 
-Pipelines serialize to JSON and can be saved, loaded, and version-controlled. The serialization format includes node types, parameters, positions, and edge connections.
+Pipelines serialize to JSON (v3 format) and can be saved, loaded, and version-controlled. The serialization format includes node types, parameters, positions, and edge connections.
+
+## Python Pipeline API
+
+Pipelines can be built programmatically in Python using the `Pipeline` class. This is the recommended way to use megane in Jupyter notebooks and scripts.
+
+### Overview
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+node = pipe.add_node(...)   # add a node
+pipe.add_edge(src, tgt)     # connect nodes
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)   # apply to viewer
+viewer                      # display in notebook
+```
+
+The pipeline serializes to the `SerializedPipeline` v3 JSON format. A `Viewport` node is auto-generated and all unconnected outputs are automatically connected to it.
+
+### Pipeline class
+
+| Method | Description |
+|--------|-------------|
+| `add_node(node)` | Add a node to the pipeline. Returns the node for use in `add_edge()` |
+| `add_edge(source, target)` | Connect source → target. Port handles are auto-resolved |
+| `to_dict()` | Serialize to v3 JSON dict (auto-generates Viewport) |
+
+### Node classes
+
+All node classes are importable from `megane`:
+
+```python
+from megane import (
+    LoadStructure,
+    LoadTrajectory,
+    Streaming,
+    LoadVector,
+    Filter,
+    Modify,
+    AddBonds,
+    AddLabels,
+    AddPolyhedra,
+    VectorOverlay,
+    Pipeline,
+)
+```
+
+#### LoadStructure
+
+Load a molecular structure file.
+
+```python
+megane.LoadStructure(path: str)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `str` | File path. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.data` (LAMMPS) |
+
+**Outputs:** `particle`, `trajectory`, `cell`
+
+#### LoadTrajectory
+
+Load an external trajectory file. Requires connection from a `LoadStructure` node.
+
+```python
+megane.LoadTrajectory(*, xtc: str | None = None, traj: str | None = None)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
+| `traj` | `str \| None` | `None` | Path to ASE .traj trajectory file |
+
+**Inputs:** `particle`
+**Outputs:** `trajectory`
+
+#### Streaming
+
+WebSocket-based real-time data delivery.
+
+```python
+megane.Streaming()
+```
+
+No parameters. **Outputs:** `particle`, `bond`, `trajectory`, `cell`
+
+#### LoadVector
+
+Load per-atom vector data from a file.
+
+```python
+megane.LoadVector(path: str)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `str` | Path to vector data file |
+
+**Outputs:** `vector`
+
+#### Filter
+
+Select atoms by a query expression.
+
+```python
+megane.Filter(*, query: str)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | `str` | Selection expression (see [Filter DSL](#filter-dsl)) |
+
+**Inputs:** `particle` (as "in" handle)
+**Outputs:** `particle` (as "out" handle)
+
+#### Modify
+
+Override per-atom visual properties.
+
+```python
+megane.Modify(*, scale: float = 1.0, opacity: float = 1.0)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `scale` | `float` | `1.0` | Atom sphere radius multiplier (0.1–2.0) |
+| `opacity` | `float` | `1.0` | Transparency (0 = invisible, 1 = opaque) |
+
+**Inputs:** `particle` (as "in" handle)
+**Outputs:** `particle` (as "out" handle)
+
+#### AddBonds
+
+Compute and display bonds.
+
+```python
+megane.AddBonds(*, source: Literal["distance", "structure"] = "distance")
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `source` | `str` | `"distance"` | `"distance"` for VDW-based inference, `"structure"` for file-based bonds |
+
+**Inputs:** `particle`
+**Outputs:** `bond`
+
+#### AddLabels
+
+Generate text labels at atom positions.
+
+```python
+megane.AddLabels(*, source: Literal["element", "resname", "index"] = "element")
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `source` | `str` | `"element"` | Label source: `"element"`, `"resname"`, or `"index"` |
+
+**Inputs:** `particle`
+**Outputs:** `label`
+
+#### AddPolyhedra
+
+Generate coordination polyhedra mesh.
+
+```python
+megane.AddPolyhedra(
+    *,
+    center_elements: list[int],
+    ligand_elements: list[int] | None = None,
+    max_distance: float = 2.5,
+    opacity: float = 0.5,
+    show_edges: bool = False,
+    edge_color: str = "#dddddd",
+    edge_width: float = 3.0,
+)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `center_elements` | `list[int]` | *(required)* | Atomic numbers of center atoms (e.g., Ti=22) |
+| `ligand_elements` | `list[int] \| None` | `[8]` (oxygen) | Atomic numbers of ligand atoms |
+| `max_distance` | `float` | `2.5` | Maximum center–ligand distance (Å) |
+| `opacity` | `float` | `0.5` | Face transparency (0–1) |
+| `show_edges` | `bool` | `False` | Display wireframe edges |
+| `edge_color` | `str` | `"#dddddd"` | Wireframe edge color (hex) |
+| `edge_width` | `float` | `3.0` | Wireframe edge width (px) |
+
+**Inputs:** `particle`
+**Outputs:** `mesh`
+
+#### VectorOverlay
+
+Configure per-atom vector visualization (e.g. forces, velocities).
+
+```python
+megane.VectorOverlay(*, scale: float = 1.0)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `scale` | `float` | `1.0` | Vector arrow length multiplier |
+
+**Inputs:** `vector`
+**Outputs:** `vector`
+
+### Port Resolution
+
+Edges are auto-resolved: `add_edge(source, target)` automatically picks the correct port handles based on node types. For example:
+
+- `LoadStructure → Filter` connects `particle → in`
+- `Filter → Modify` connects `out → in`
+- `LoadStructure → AddBonds` connects `particle → particle`
+- `AddBonds → Viewport` connects `bond → bond`
+
+### Example: Basic Structure with Bonds
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+pipe.add_edge(s, bonds)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```
+
+### Example: Filter and Modify
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+carbons = pipe.add_node(megane.Filter(query="element == 'C'"))
+big = pipe.add_node(megane.Modify(scale=1.5, opacity=0.8))
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+
+pipe.add_edge(s, carbons)
+pipe.add_edge(carbons, big)
+pipe.add_edge(s, bonds)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```
+
+### Example: Trajectory Playback
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
+bonds = pipe.add_node(megane.AddBonds(source="structure"))
+
+pipe.add_edge(s, t)
+pipe.add_edge(s, bonds)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer.frame_index = 50  # jump to frame 50
+```
+
+### Example: Make Solvent Translucent
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+
+# Filter water molecules and make them translucent
+water = pipe.add_node(megane.Filter(query='resname == "HOH"'))
+transparent = pipe.add_node(megane.Modify(scale=0.5, opacity=0.2))
+
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+
+pipe.add_edge(s, water)
+pipe.add_edge(water, transparent)
+pipe.add_edge(s, bonds)
+# Unconnected outputs (particle, cell from LoadStructure) auto-connect to Viewport
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```
+
+### Example: TiO₆ Coordination Polyhedra
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("SrTiO3_supercell.pdb"))
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+polyhedra = pipe.add_node(megane.AddPolyhedra(
+    center_elements=[22],     # Ti
+    ligand_elements=[8],      # O
+    max_distance=2.5,
+    opacity=0.5,
+    show_edges=True,
+))
+
+pipe.add_edge(s, bonds)
+pipe.add_edge(s, polyhedra)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```
+
+### Example: DAG Branching (Multiple Filters)
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+
+# Two independent filters from the same source
+carbon = pipe.add_node(megane.Filter(query="element == 'C'"))
+nitrogen = pipe.add_node(megane.Filter(query="element == 'N'"))
+labels = pipe.add_node(megane.AddLabels(source="element"))
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+
+pipe.add_edge(s, carbon)
+pipe.add_edge(s, nitrogen)
+pipe.add_edge(s, labels)
+pipe.add_edge(s, bonds)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```
+
+### Example: ASE .traj Trajectory
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("structure.pdb"))
+t = pipe.add_node(megane.LoadTrajectory(traj="simulation.traj"))
+
+pipe.add_edge(s, t)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```

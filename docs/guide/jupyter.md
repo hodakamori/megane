@@ -67,7 +67,8 @@ No required arguments. Inherits from `anywidget.AnyWidget`.
 
 | Method | Description |
 |--------|-------------|
-| `load(pdb_path, xtc=None)` | Load a PDB structure, optionally with an XTC trajectory |
+| `set_pipeline(pipeline)` | Apply a `Pipeline` to the viewer, or `None` to clear |
+| `load(pdb_path, xtc=None)` | *(Deprecated)* Load a PDB structure. Use `set_pipeline()` instead |
 | `on_event(name, callback=None)` | Register an event callback. Use as `@viewer.on_event("name")` decorator or `viewer.on_event("name", fn)` |
 | `off_event(name, callback=None)` | Remove a specific callback, or all callbacks for the event if `callback` is `None` |
 

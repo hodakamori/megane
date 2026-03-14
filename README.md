@@ -33,7 +33,7 @@
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
 - **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
-- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 8 node types with 6 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
+- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 11 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
 ### Scale
@@ -51,7 +51,7 @@ One codebase, every environment.
 | **Jupyter** | anywidget inline viewer | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf | Extension |
+| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .cif | Extension |
 
 The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
@@ -59,9 +59,9 @@ The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are writ
 
 Wire nodes to build visualization workflows — no code required.
 
-**8 node types** across 5 categories: load data, add bonds, filter atoms by query, modify scale and opacity per-group, generate labels, render coordination polyhedra, and display in a 3D viewport.
+**11 node types** across 5 categories: load data (structure, trajectory, streaming, vector), process (filter, modify), overlay (bonds, labels, polyhedra, vectors), and display in a 3D viewport.
 
-**6 typed data channels** — particle, bond, cell, label, mesh, trajectory — flow through color-coded edges. Only matching types can connect.
+**7 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
 
@@ -98,13 +98,16 @@ npm install megane-viewer
 ```python
 import megane
 
-viewer = megane.MolecularViewer()
-viewer.load("protein.pdb")
-viewer  # display in cell
+# Build a pipeline
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+bonds = pipe.add_node(megane.AddBonds(source="distance"))
+pipe.add_edge(s, bonds)
 
-# With trajectory
-viewer.load("protein.pdb", xtc="trajectory.xtc")
-viewer.frame_index = 50
+# Display in notebook
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
 ```
 
 ### CLI (Docker)
@@ -159,7 +162,7 @@ function App() {
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+
+- Node.js 22+
 - Rust (for building the parser)
 - [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) (for building WASM bindings)
 - [uv](https://docs.astral.sh/uv/)
@@ -226,6 +229,7 @@ crates/                  Rust workspace
   megane-wasm/           WASM bindings (wasm-bindgen)
 python/megane/           Python backend
   parsers/               PDB / XTC parsers
+  pipeline.py            Pipeline builder (NetworkX-style DAG)
   protocol.py            Binary protocol encoder
   server.py              FastAPI WebSocket server
   widget.py              anywidget Jupyter widget

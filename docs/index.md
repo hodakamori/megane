@@ -25,7 +25,7 @@ features:
   - title: "\U0001F30D Runs Everywhere"
     details: "Jupyter widget, CLI server, React component, VSCode extension. Rust parsers (PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, .traj) shared between Python (PyO3) and browser (WASM): parse once, run anywhere."
   - title: "\U0001F9E9 Visual Pipeline Editor"
-    details: Build visualization workflows by wiring nodes — filter atoms, adjust styles, generate labels, render coordination polyhedra. No code required. Typed data flows through color-coded edges. An AI generator can build pipelines from natural language.
+    details: Build visualization workflows by wiring 11 node types — load data, filter atoms, adjust styles, generate labels, render coordination polyhedra, overlay vectors. No code required. 7 typed data channels flow through color-coded edges. An AI generator can build pipelines from natural language.
   - title: "\U0001F517 Embed & Integrate"
     details: Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to frame_change, selection_change, and measurement events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 ---
@@ -54,7 +54,7 @@ One codebase, every environment.
 | **Jupyter** | anywidget inline viewer | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VSCode** | Custom editor for .pdb, .gro, .xyz | Extension |
+| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .cif | Extension |
 
 The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
@@ -75,9 +75,9 @@ The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are writ
 
 Wire nodes to build visualization workflows — no code required.
 
-**8 node types** across 5 categories: load data, add bonds, filter atoms by query, modify scale and opacity per-group, generate labels, render coordination polyhedra, and display in a 3D viewport.
+**11 node types** across 5 categories: load data (structure, trajectory, streaming, vector), process (filter, modify), overlay (bonds, labels, polyhedra, vectors), and display in a 3D viewport.
 
-**6 typed data channels** — particle, bond, cell, label, mesh, trajectory — flow through color-coded edges. Only matching types can connect.
+**7 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
 

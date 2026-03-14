@@ -42,7 +42,7 @@ class PipelineNode:
 class LoadStructure(PipelineNode):
     """Load a molecular structure from a file.
 
-    Supported formats: PDB, GRO, XYZ, MOL, LAMMPS data, CIF.
+    Supported formats: PDB, GRO, XYZ, MOL, LAMMPS data.
     """
 
     _node_type = "load_structure"
