@@ -38,6 +38,11 @@ Keep the first line under 72 characters. Add details in the body if needed.
      - `CHANGELOG.md` — notable changes
      - `docs/` — user-facing guides and API reference
    - Include doc updates in the same commit (or a separate `docs:` commit if the changes are substantial)
+5. If you changed pipeline nodes (`src/pipeline/`), ensure the Python API is also updated:
+   - Node classes in `python/megane/pipeline.py` (add/update corresponding `PipelineNode` subclass)
+   - Port mappings in `_SOURCE_OUTPUT_MAP` / `_TARGET_PORT_MAP`
+   - Public exports in `python/megane/__init__.py`
+   - Default parameters must match TypeScript `defaultParams()` in `src/pipeline/types.ts`
 
 ## After Committing
 
