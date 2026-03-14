@@ -23,9 +23,9 @@ features:
   - title: "\U0001F680 1M+ Atoms at 60fps"
     details: Billboard impostor rendering scales from small molecules to massive protein complexes in real time. Stream XTC trajectories over WebSocket — scrub thousands of frames without loading everything into memory.
   - title: "\U0001F30D Runs Everywhere"
-    details: "Jupyter widget, CLI server, React component, VSCode extension. Same Rust parsers shared between Python (PyO3) and browser (WASM): parse once, run anywhere."
+    details: "Jupyter widget, CLI server, React component, VSCode extension. Rust parsers (PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, .traj) shared between Python (PyO3) and browser (WASM): parse once, run anywhere."
   - title: "\U0001F9E9 Visual Pipeline Editor"
-    details: Build visualization workflows by wiring nodes — filter atoms, adjust styles, generate labels, render coordination polyhedra. No code required. Typed data flows through color-coded edges.
+    details: Build visualization workflows by wiring nodes — filter atoms, adjust styles, generate labels, render coordination polyhedra. No code required. Typed data flows through color-coded edges. An AI generator can build pipelines from natural language.
   - title: "\U0001F517 Embed & Integrate"
     details: Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to frame_change, selection_change, and measurement events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 ---
@@ -56,7 +56,7 @@ One codebase, every environment.
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
 | **VSCode** | Custom editor for .pdb, .gro, .xyz | Extension |
 
-The secret: PDB, GRO, XYZ, MOL, and XTC parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
   </div>
   <div class="pillar-images single-col">
