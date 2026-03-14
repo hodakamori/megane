@@ -41,8 +41,16 @@ test-rust:
 test-e2e-snapshot:
 	node tests/e2e/snapshot.test.mjs
 
-# Run all tests (Python + TypeScript + Rust + E2E)
-test-all: test test-ts test-rust test-e2e test-e2e-snapshot
+# Run notebook tests (headless, no browser needed)
+test-notebooks:
+	python -m pytest tests/python/test_notebooks.py -v
+
+# Run notebook E2E screenshot tests (requires Playwright + JupyterLab)
+test-e2e-notebooks:
+	node tests/e2e/test_notebook_screenshots.mjs
+
+# Run all tests (Python + TypeScript + Rust + E2E + Notebooks)
+test-all: test test-ts test-rust test-e2e test-e2e-snapshot test-notebooks
 
 # Run TypeScript tests with coverage
 coverage-ts:

@@ -64,6 +64,31 @@ jobs:
           files: coverage.xml
           fail_ci_on_error: false
 
+  test-notebooks:
+    name: Notebook tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: PUPPETEER_SKIP_DOWNLOAD=1 npm ci
+      - run: npm run build:wasm
+      - run: npm run build:widget
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package and notebook dependencies
+        run: pip install -e ".[dev]" jupyterlab
+      - name: Run notebook tests
+        run: python -m pytest tests/python/test_notebooks.py -v
+
   build:
     name: Docker build
     runs-on: ubuntu-latest
