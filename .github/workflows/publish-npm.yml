@@ -4,6 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip publish)"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip publish)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,7 +47,12 @@ jobs:
       - name: Build widget for npm
         run: npm run build:lib
 
+      - name: Verify package contents (dry run)
+        if: inputs.dry_run
+        run: npm pack --dry-run
+
       - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
