@@ -641,6 +641,96 @@ export class MoleculeRenderer {
     return this.renderer?.domElement ?? null;
   }
 
+  /** Get the Three.js scene. */
+  getScene(): THREE.Scene {
+    return this.scene;
+  }
+
+  /** Get the active camera. */
+  getCamera(): THREE.OrthographicCamera | THREE.PerspectiveCamera {
+    return this.camera;
+  }
+
+  /** Get the WebGL renderer. */
+  getRenderer(): THREE.WebGLRenderer {
+    return this.renderer;
+  }
+
+  /** Get the label overlay canvas. */
+  getLabelOverlay(): LabelOverlay | null {
+    return this.labelOverlay;
+  }
+
+  /**
+   * Render a single frame synchronously at the current (or custom) size.
+   * Used for image/video capture outside the rAF loop.
+   */
+  renderSingleFrame(): void {
+    this.controls.update();
+
+    if (this.polyhedronRenderer && this.container) {
+      const sz = new THREE.Vector2();
+      this.renderer.getSize(sz);
+      this.polyhedronRenderer.updateResolution(sz.x, sz.y);
+    }
+
+    this.renderer.render(this.scene, this.camera);
+
+    const _size = new THREE.Vector2();
+    this.renderer.getSize(_size);
+    const _dpr = this.renderer.getPixelRatio();
+
+    if (this.cellAxesRenderer) {
+      try {
+        this.cellAxesRenderer.render(this.renderer, this.camera, _size.x, _size.y);
+      } catch (e) {
+        console.warn("CellAxesRenderer render error:", e);
+      }
+    }
+
+    if (this.labelOverlay) {
+      this.labelOverlay.render(this.camera, _size.x, _size.y, _dpr);
+    }
+  }
+
+  /**
+   * Temporarily resize the renderer for capture, suppressing auto-resize.
+   * Returns a restore function to call after capture is complete.
+   */
+  resizeForCapture(width: number, height: number): () => void {
+    const savedW = this.lastContainerW;
+    const savedH = this.lastContainerH;
+    const savedDpr = this.lastDpr;
+
+    // Set size at 1:1 pixel ratio for exact resolution control
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(width, height, false);
+    this.labelOverlay?.resize(width, height, 1);
+
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      const aspect = width / height;
+      const frustumHalf = (this.camera.top - this.camera.bottom) / 2;
+      this.camera.left = -frustumHalf * aspect;
+      this.camera.right = frustumHalf * aspect;
+      this.camera.updateProjectionMatrix();
+    } else {
+      this.camera.aspect = width / height;
+      this.camera.updateProjectionMatrix();
+    }
+
+    // Update cached values to prevent animate() from overriding
+    this.lastContainerW = width;
+    this.lastContainerH = height;
+    this.lastDpr = 1;
+
+    return () => {
+      this.lastContainerW = savedW;
+      this.lastContainerH = savedH;
+      this.lastDpr = savedDpr;
+      this.onResize();
+    };
+  }
+
   /** Get a copy of current atom positions (public, for external use). */
   getCurrentPositionsCopy(): Float32Array | null {
     if (!this.snapshot) return null;

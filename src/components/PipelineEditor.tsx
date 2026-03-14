@@ -39,6 +39,8 @@ import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { PipelineChatBox } from "./PipelineChatBox";
+import { RenderModal } from "./RenderModal";
+import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 
 const nodeTypes = {
   load_structure: LoadStructureNode,
@@ -125,6 +127,17 @@ const layoutBtnStyle: React.CSSProperties = {
   color: "#10b981",
 };
 
+const renderBtnStyle: React.CSSProperties = {
+  background: "rgba(245, 158, 11, 0.08)",
+  border: "1px solid rgba(245, 158, 11, 0.25)",
+  borderRadius: 6,
+  padding: "4px 12px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#f59e0b",
+};
+
 const templateBtnStyle: React.CSSProperties = {
   background: "rgba(139, 92, 246, 0.08)",
   border: "1px solid rgba(139, 92, 246, 0.25)",
@@ -169,10 +182,18 @@ function PipelineEditorInner({
   collapsed,
   onToggleCollapse,
   onWidthChange,
+  rendererRef,
+  totalFrames,
+  currentFrame,
+  onSeek,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
+  rendererRef: React.RefObject<MoleculeRenderer | null>;
+  totalFrames: number;
+  currentFrame: number;
+  onSeek: (frame: number) => void;
 }) {
   const nodes = usePipelineStore((s) => s.nodes);
   const edges = usePipelineStore((s) => s.edges);
@@ -187,6 +208,7 @@ function PipelineEditorInner({
   const { screenToFlowPosition } = useReactFlow();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [showRenderModal, setShowRenderModal] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
@@ -286,6 +308,9 @@ function PipelineEditorInner({
 
   const headerExtra = (
     <>
+      <button onClick={() => setShowRenderModal(true)} style={renderBtnStyle}>
+        Render
+      </button>
       <button onClick={handleAutoLayout} style={layoutBtnStyle}>
         Auto Layout
       </button>
@@ -437,6 +462,14 @@ function PipelineEditorInner({
           });
         }}
       />
+      <RenderModal
+        open={showRenderModal}
+        onClose={() => setShowRenderModal(false)}
+        rendererRef={rendererRef}
+        totalFrames={totalFrames}
+        currentFrame={currentFrame}
+        onSeek={onSeek}
+      />
     </CollapsiblePanel>
   );
 }
@@ -445,17 +478,30 @@ export function PipelineEditor({
   collapsed,
   onToggleCollapse,
   onWidthChange,
+  rendererRef,
+  totalFrames = 0,
+  currentFrame = 0,
+  onSeek,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
+  rendererRef: React.RefObject<MoleculeRenderer | null>;
+  totalFrames?: number;
+  currentFrame?: number;
+  onSeek?: (frame: number) => void;
 }) {
+  const noopSeek = useCallback((_f: number) => {}, []);
   return (
     <ReactFlowProvider>
       <PipelineEditorInner
         collapsed={collapsed}
         onToggleCollapse={onToggleCollapse}
         onWidthChange={onWidthChange}
+        rendererRef={rendererRef}
+        totalFrames={totalFrames}
+        currentFrame={currentFrame}
+        onSeek={onSeek ?? noopSeek}
       />
     </ReactFlowProvider>
   );
