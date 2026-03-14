@@ -5,6 +5,8 @@
 1. **Commit messages MUST be in English.** Never use Japanese or any other language in commit messages.
 2. **NEVER use Puppeteer.** Although `puppeteer` is in package.json, it is NOT used by any script. All E2E tests and screenshot scripts use **Playwright** from the global install at `/opt/node22/lib/node_modules/`. Scripts resolve it via `createRequire("/opt/node22/lib/node_modules/")`.
 3. **Always build WASM before running the dev server or full build.** The WASM pkg directory (`crates/megane-wasm/pkg/`) does not exist until `npm run build:wasm` is run.
+4. **Always create a PR after pushing changes.** Use `gh pr create` to open a pull request. PR titles and descriptions must be in English. See the `github-cli` skill for remote URL workaround. Before reporting completion, verify CI passes with `gh run list`.
+5. **In plan mode, strictly follow the approved plan.** Do not skip steps, reorder them, or add unplanned work. If the plan needs changes, explain the reason and get approval before deviating.
 
 ## Dev Environment Setup
 
@@ -45,6 +47,14 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 | `make test-all` | All tests combined |
 | `node scripts/dev-preview.mjs --screenshot` | Dev preview screenshots |
 | `node scripts/capture-screenshots.mjs` | Hero screenshot for docs |
+
+## Skills
+
+Project-specific skills are defined in `.claude/skills/`. Each skill provides instructions for a specific workflow.
+
+- **At the start of a task**, run the `validate-skills` skill to confirm all skills are loaded.
+- **Always follow the instructions** in each skill when performing the corresponding workflow.
+- Skills cover: committing (`commit`), GitHub CLI usage (`github-cli`), dev environment setup (`dev-setup`), building (`build`), testing (`testing`), preview capture (`preview`), and skill validation (`validate-skills`).
 
 ## Architecture
 
