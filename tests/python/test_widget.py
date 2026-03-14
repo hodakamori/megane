@@ -1,12 +1,23 @@
 """Tests for Jupyter widget (Python side)."""
 
 import struct
+import warnings
 from pathlib import Path
 
+from megane.pipeline import Pipeline, LoadStructure, AddBonds
 from megane.protocol import MAGIC, MSG_SNAPSHOT
 from megane.widget import MolecularViewer
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
+
+
+def _make_pdb_pipeline(pdb_path: str) -> Pipeline:
+    """Helper: create a Pipeline that loads a PDB with bonds."""
+    pipe = Pipeline()
+    s = pipe.add_node(LoadStructure(pdb_path))
+    b = pipe.add_node(AddBonds(source="structure"))
+    pipe.add_edge(s, b)
+    return pipe
 
 
 def test_widget_instantiation():
@@ -37,28 +48,28 @@ def test_esm_has_default_export():
     assert "as default" in esm
 
 
-def test_load_populates_snapshot():
-    """load() sets _snapshot_data to valid binary starting with MEGN magic."""
+def test_set_pipeline_populates_snapshot():
+    """set_pipeline() sets _node_snapshots_data with valid binary."""
     v = MolecularViewer()
-    v.load(str(FIXTURES / "1crn.pdb"))
+    pipe = _make_pdb_pipeline(str(FIXTURES / "1crn.pdb"))
+    v.set_pipeline(pipe)
 
-    data = v._snapshot_data
-    assert len(data) > 0
-    assert data[:4] == MAGIC
-
-    msg_type = struct.unpack("<B", data[4:5])[0]
-    assert msg_type == MSG_SNAPSHOT
+    assert v._pipeline_enabled is True
+    assert v._pipeline_json != ""
+    assert len(v._node_snapshots_data) > 0
 
 
-def test_snapshot_atom_count_matches():
-    """Encoded snapshot contains the correct atom count."""
+def test_pipeline_snapshot_has_magic():
+    """Pipeline node snapshot data starts with MEGN magic."""
     v = MolecularViewer()
-    v.load(str(FIXTURES / "1crn.pdb"))
+    pipe = _make_pdb_pipeline(str(FIXTURES / "1crn.pdb"))
+    v.set_pipeline(pipe)
 
-    data = v._snapshot_data
-    n_atoms = struct.unpack("<I", data[8:12])[0]
-    assert n_atoms == v._structure.n_atoms
-    assert n_atoms == 327
+    for data in v._node_snapshots_data.values():
+        if len(data) > 4:
+            assert data[:4] == MAGIC
+            msg_type = struct.unpack("<B", data[4:5])[0]
+            assert msg_type == MSG_SNAPSHOT
 
 
 def test_widget_state_keys():
@@ -84,13 +95,25 @@ def test_model_metadata():
     assert "anywidget" in v._model_module
 
 
-def test_structure_accessible():
-    """Loaded structure is accessible via _structure attribute."""
+def test_set_pipeline_and_clear():
+    """set_pipeline(None) clears the pipeline."""
     v = MolecularViewer()
-    v.load(str(FIXTURES / "1crn.pdb"))
+    pipe = _make_pdb_pipeline(str(FIXTURES / "1crn.pdb"))
+    v.set_pipeline(pipe)
+    assert v._pipeline_enabled is True
 
-    s = v._structure
-    assert s is not None
-    assert s.n_atoms == 327
-    assert s.positions.shape == (327, 3)
-    assert len(s.bonds) > 0
+    v.set_pipeline(None)
+    assert v._pipeline_enabled is False
+    assert v._pipeline_json == ""
+    assert v._node_snapshots_data == {}
+
+
+def test_deprecated_load_warns():
+    """load() emits DeprecationWarning."""
+    v = MolecularViewer()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        v.load(str(FIXTURES / "1crn.pdb"))
+    assert len(w) == 1
+    assert issubclass(w[0].category, DeprecationWarning)
+    assert "set_pipeline" in str(w[0].message)

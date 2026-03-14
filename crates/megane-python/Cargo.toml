@@ -2,6 +2,10 @@
 name = "megane-python"
 version = "0.3.2"
 edition = "2021"
+description = "PyO3 Python bindings for megane molecular parsers"
+authors = ["hodakamori"]
+license = "MIT"
+repository = "https://github.com/hodakamori/megane"
 
 [lib]
 name = "megane_parser"

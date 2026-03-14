@@ -12,52 +12,30 @@ const ULM_MAGIC: &[u8; 8] = b"- of Ulm";
 
 // ---------- Binary readers ----------
 
+fn read_bytes<const N: usize>(data: &[u8], pos: usize, type_name: &str) -> Result<[u8; N], String> {
+    data.get(pos..pos + N)
+        .and_then(|s| s.try_into().ok())
+        .ok_or_else(|| format!("unexpected EOF reading {} at offset {}", type_name, pos))
+}
+
 fn read_i64(data: &[u8], pos: usize, little_endian: bool) -> Result<i64, String> {
-    if pos + 8 > data.len() {
-        return Err(format!("unexpected EOF reading i64 at offset {}", pos));
-    }
-    let bytes: [u8; 8] = data[pos..pos + 8].try_into().unwrap();
-    Ok(if little_endian {
-        i64::from_le_bytes(bytes)
-    } else {
-        i64::from_be_bytes(bytes)
-    })
+    let bytes = read_bytes::<8>(data, pos, "i64")?;
+    Ok(if little_endian { i64::from_le_bytes(bytes) } else { i64::from_be_bytes(bytes) })
 }
 
 fn read_f64(data: &[u8], pos: usize, little_endian: bool) -> Result<f64, String> {
-    if pos + 8 > data.len() {
-        return Err(format!("unexpected EOF reading f64 at offset {}", pos));
-    }
-    let bytes: [u8; 8] = data[pos..pos + 8].try_into().unwrap();
-    Ok(if little_endian {
-        f64::from_le_bytes(bytes)
-    } else {
-        f64::from_be_bytes(bytes)
-    })
+    let bytes = read_bytes::<8>(data, pos, "f64")?;
+    Ok(if little_endian { f64::from_le_bytes(bytes) } else { f64::from_be_bytes(bytes) })
 }
 
 fn read_f32_raw(data: &[u8], pos: usize, little_endian: bool) -> Result<f32, String> {
-    if pos + 4 > data.len() {
-        return Err(format!("unexpected EOF reading f32 at offset {}", pos));
-    }
-    let bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
-    Ok(if little_endian {
-        f32::from_le_bytes(bytes)
-    } else {
-        f32::from_be_bytes(bytes)
-    })
+    let bytes = read_bytes::<4>(data, pos, "f32")?;
+    Ok(if little_endian { f32::from_le_bytes(bytes) } else { f32::from_be_bytes(bytes) })
 }
 
 fn read_i32(data: &[u8], pos: usize, little_endian: bool) -> Result<i32, String> {
-    if pos + 4 > data.len() {
-        return Err(format!("unexpected EOF reading i32 at offset {}", pos));
-    }
-    let bytes: [u8; 4] = data[pos..pos + 4].try_into().unwrap();
-    Ok(if little_endian {
-        i32::from_le_bytes(bytes)
-    } else {
-        i32::from_be_bytes(bytes)
-    })
+    let bytes = read_bytes::<4>(data, pos, "i32")?;
+    Ok(if little_endian { i32::from_le_bytes(bytes) } else { i32::from_be_bytes(bytes) })
 }
 
 // ---------- Array reading helpers ----------
@@ -134,7 +112,7 @@ fn read_ndarray_int(
                 if pos + 2 > data.len() {
                     return Err("unexpected EOF reading int16 array".into());
                 }
-                let bytes: [u8; 2] = data[pos..pos + 2].try_into().unwrap();
+                let bytes: [u8; 2] = read_bytes::<2>(data, pos, "i16")?;
                 let val = if little_endian {
                     i16::from_le_bytes(bytes)
                 } else {
@@ -322,16 +300,20 @@ pub fn parse_traj(data: &[u8]) -> Result<ParsedStructure, String> {
     // native byte order.  We try little-endian first (the common case) and
     // fall back to big-endian if the values look unreasonable.
     let (little_endian_header, version, nitems, pos0) = {
-        let v_le = i64::from_le_bytes(data[24..32].try_into().unwrap());
-        let n_le = i64::from_le_bytes(data[32..40].try_into().unwrap());
-        let p_le = i64::from_le_bytes(data[40..48].try_into().unwrap());
+        let hdr_v = read_bytes::<8>(data, 24, "version")?;
+        let hdr_n = read_bytes::<8>(data, 32, "nitems")?;
+        let hdr_p = read_bytes::<8>(data, 40, "pos0")?;
+
+        let v_le = i64::from_le_bytes(hdr_v);
+        let n_le = i64::from_le_bytes(hdr_n);
+        let p_le = i64::from_le_bytes(hdr_p);
 
         if v_le > 0 && v_le <= 10 && n_le > 0 && n_le < 1_000_000_000 && p_le > 0 {
             (true, v_le, n_le as usize, p_le as usize)
         } else {
-            let v_be = i64::from_be_bytes(data[24..32].try_into().unwrap());
-            let n_be = i64::from_be_bytes(data[32..40].try_into().unwrap());
-            let p_be = i64::from_be_bytes(data[40..48].try_into().unwrap());
+            let v_be = i64::from_be_bytes(hdr_v);
+            let n_be = i64::from_be_bytes(hdr_n);
+            let p_be = i64::from_be_bytes(hdr_p);
             if v_be > 0 && v_be <= 10 && n_be > 0 {
                 (false, v_be, n_be as usize, p_be as usize)
             } else {

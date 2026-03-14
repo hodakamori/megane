@@ -2,6 +2,10 @@
 name = "megane-core"
 version = "0.3.2"
 edition = "2021"
+description = "Core molecular structure parsers (PDB, GRO, XYZ, MOL, CIF, LAMMPS, XTC, .traj)"
+authors = ["hodakamori"]
+license = "MIT"
+repository = "https://github.com/hodakamori/megane"
 
 [dependencies]
 serde_json = "1"
