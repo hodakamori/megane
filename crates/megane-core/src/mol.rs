@@ -117,7 +117,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
 }
 
 /// Parse an integer from a fixed-width field in a MOL file line.
-fn parse_mol_int(line: &str, start: usize, end: usize) -> Result<usize, String> {
+pub(crate) fn parse_mol_int(line: &str, start: usize, end: usize) -> Result<usize, String> {
     let end = end.min(line.len());
     if start >= end {
         return Err(format!("field {}..{} out of range", start, end));
@@ -126,5 +126,160 @@ fn parse_mol_int(line: &str, start: usize, end: usize) -> Result<usize, String> 
         .trim()
         .parse()
         .map_err(|_| format!("cannot parse integer from '{}'", &line[start..end]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const VALID_MOL: &str = "\
+Molecule Name
+  Program   timestamp
+Comment line
+  3  2  0  0  0  0  0  0  0  0999 V2000
+    0.0000    1.0000    2.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    3.0000    4.0000    5.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+    6.0000    7.0000    8.0000 N   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  2  0  0  0  0
+M  END
+";
+
+    #[test]
+    fn parse_valid_v2000() {
+        let result = parse(VALID_MOL).unwrap();
+        assert_eq!(result.n_atoms, 3);
+        assert_eq!(result.n_file_bonds, 2);
+        assert_eq!(result.positions, vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(result.elements[0], 6);  // C
+        assert_eq!(result.elements[1], 8);  // O
+        assert_eq!(result.elements[2], 7);  // N
+        assert_eq!(result.bonds, vec![(0, 1), (1, 2)]);
+        let orders = result.bond_orders.unwrap();
+        assert_eq!(orders, vec![1, 2]);
+    }
+
+    #[test]
+    fn parse_whitespace_delimited_fallback() {
+        // Counts line must be fixed-width (3-char fields), but atom/bond lines can be short
+        let mol = "\
+name
+prog
+comment
+  3  2  0  0  0  0  0  0  0  0999 V2000
+0.0 1.0 2.0 C
+3.0 4.0 5.0 O
+6.0 7.0 8.0 N
+1 2 1
+2 3 2
+M  END
+";
+        let result = parse(mol).unwrap();
+        assert_eq!(result.n_atoms, 3);
+        assert_eq!(result.n_file_bonds, 2);
+        assert_eq!(result.positions, vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(result.elements[0], 6);
+        assert_eq!(result.bonds, vec![(0, 1), (1, 2)]);
+    }
+
+    #[test]
+    fn error_too_short() {
+        let mol = "line1\nline2\nline3\n";
+        match parse(mol) {
+            Err(e) => assert!(e.contains("too short"), "unexpected error: {}", e),
+            Ok(_) => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn error_zero_atoms() {
+        let mol = "\
+name
+prog
+comment
+  0  0  0  0  0  0  0  0  0  0999 V2000
+M  END
+";
+        match parse(mol) {
+            Err(e) => assert!(e.contains("zero atoms"), "unexpected error: {}", e),
+            Ok(_) => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn error_malformed_counts() {
+        let mol = "\
+name
+prog
+comment
+ xx  2
+0.0 1.0 2.0 C
+";
+        assert!(parse(mol).is_err());
+    }
+
+    #[test]
+    fn error_too_few_atom_lines() {
+        let mol = "\
+name
+prog
+comment
+  3  0  0  0  0  0  0  0  0  0999 V2000
+    0.0000    1.0000    2.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+M  END
+";
+        assert!(parse(mol).is_err());
+    }
+
+    #[test]
+    fn error_malformed_atom_line() {
+        let mol = "\
+name
+prog
+comment
+  1  0  0  0  0  0  0  0  0  0999 V2000
+bad
+";
+        match parse(mol) {
+            Err(e) => assert!(e.contains("atom line") || e.contains("bad"), "unexpected error: {}", e),
+            Ok(_) => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn parse_mol_int_valid() {
+        assert_eq!(parse_mol_int("  3  2", 0, 3).unwrap(), 3);
+        assert_eq!(parse_mol_int("  3  2", 3, 6).unwrap(), 2);
+    }
+
+    #[test]
+    fn parse_mol_int_out_of_range() {
+        let result = parse_mol_int("ab", 5, 3);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_mol_int_non_numeric() {
+        let result = parse_mol_int("abc", 0, 3);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("cannot parse integer"));
+    }
+
+    #[test]
+    fn bond_order_sorted() {
+        // Bonds should always be stored as (min, max)
+        let mol = "\
+name
+prog
+comment
+  2  1  0  0  0  0  0  0  0  0999 V2000
+0.0 1.0 2.0 C
+3.0 4.0 5.0 O
+2 1 1
+M  END
+";
+        let result = parse(mol).unwrap();
+        assert_eq!(result.bonds[0], (0, 1)); // sorted: min=0, max=1
+    }
 }
 
