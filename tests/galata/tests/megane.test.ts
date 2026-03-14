@@ -9,7 +9,7 @@
  *   - render_video() → GIF export
  */
 
-import { test, expect, type Page, type Browser } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const NOTEBOOK = "tests/galata/notebooks/test_all.ipynb";
 const CANVAS_SELECTOR = ".jp-OutputArea canvas";
@@ -90,13 +90,34 @@ async function waitForAllCellsExecution(
   );
 }
 
-test.describe.serial("megane widget tests", () => {
-  let page: Page;
-  const jsErrors: string[] = [];
+/** Execute all cells sequentially using Shift+Enter. */
+async function executeAllCells(page: Page, cellCount: number) {
+  for (let i = 0; i < cellCount; i++) {
+    const cell = page.locator(".jp-Cell").nth(i);
+    const cellInput = cell.locator(".jp-Cell-inputArea .cm-editor .cm-content");
+    await cellInput.click();
+    await page.keyboard.press("Shift+Enter");
 
-  test.beforeAll(async ({ browser }, testInfo) => {
-    testInfo.setTimeout(300_000); // 6 cells including render_video need more time
-    page = await browser.newPage();
+    // Wait for this cell to finish before moving to the next
+    await page.waitForFunction(
+      (cellIndex) => {
+        const prompts = document.querySelectorAll(".jp-InputPrompt");
+        if (cellIndex >= prompts.length) return false;
+        const text = prompts[cellIndex].textContent || "";
+        return text.includes("[") && !text.includes("*") && /\[\d+\]/.test(text);
+      },
+      i,
+      { timeout: 120_000 },
+    );
+  }
+}
+
+test.describe.serial("megane widget tests", () => {
+  const jsErrors: string[] = [];
+  let setupDone = false;
+
+  test("loads and executes notebook", async ({ page }) => {
+    test.setTimeout(600_000); // All cells including render_video
 
     // Collect JS errors
     page.on("console", (msg) => {
@@ -117,120 +138,87 @@ test.describe.serial("megane widget tests", () => {
       .catch(() => {});
     await page.waitForTimeout(2_000);
 
-    // Run all cells (Ctrl+Shift+Enter)
-    await page.keyboard.press("Control+Shift+Enter");
-
-    // Wait for all cells to complete (render_video can be slow)
-    await waitForAllCellsExecution(page, TOTAL_CELLS, 300_000);
+    // Execute all cells sequentially
+    await executeAllCells(page, TOTAL_CELLS);
 
     // Wait for WebGL rendering to settle
     await page.waitForTimeout(RENDER_WAIT_MS);
-  });
 
-  test.afterAll(async () => {
-    await page?.close();
-  });
+    // --- All assertions in this single test ---
 
-  // --- Caffeine water basic tests (Cell 0) ---
+    // Caffeine water (Cell 0): canvas exists
+    const cell0Output = page.locator(".jp-Cell:nth-child(1) .jp-OutputArea");
+    const cell0CanvasCount = await cell0Output.locator("canvas").count();
+    expect(cell0CanvasCount).toBeGreaterThan(0);
 
-  test("caffeine water renders canvas", async () => {
-    const outputAreas = page.locator(".jp-Cell .jp-OutputArea");
-    const firstOutput = outputAreas.nth(0);
-    const canvasCount = await firstOutput.locator("canvas").count();
-    expect(canvasCount).toBeGreaterThan(0);
-  });
-
-  test("caffeine water canvas has content", async () => {
-    const result = await checkCanvasHasContent(
+    // Caffeine water: canvas has content
+    const cell0Content = await checkCanvasHasContent(
       page,
       ".jp-Cell:nth-child(1) .jp-OutputArea canvas",
     );
-    expect(result.hasContent).toBe(true);
-  });
+    expect(cell0Content.hasContent).toBe(true);
 
-  test("caffeine water snapshot", async () => {
-    const widget = page
+    // Caffeine water: snapshot
+    const widget0 = page
       .locator(".jp-Cell:nth-child(1) .jp-OutputArea-child")
       .last();
-    await expect(widget).toHaveScreenshot("caffeine-water-widget.png", {
+    await expect(widget0).toHaveScreenshot("caffeine-water-widget.png", {
       maxDiffPixelRatio: 0.03,
     });
-  });
 
-  // --- Perovskite pipeline tests (Cell 1) ---
-
-  test("perovskite renders canvas with content", async () => {
-    const cell = page.locator(".jp-Cell:nth-child(2) .jp-OutputArea");
-    const canvasCount = await cell.locator("canvas").count();
-    expect(canvasCount).toBeGreaterThan(0);
-
-    const result = await checkCanvasHasContent(
+    // Perovskite (Cell 1): canvas with content
+    const cell1Output = page.locator(".jp-Cell:nth-child(2) .jp-OutputArea");
+    const cell1CanvasCount = await cell1Output.locator("canvas").count();
+    expect(cell1CanvasCount).toBeGreaterThan(0);
+    const cell1Content = await checkCanvasHasContent(
       page,
       ".jp-Cell:nth-child(2) .jp-OutputArea canvas",
     );
-    expect(result.hasContent).toBe(true);
-  });
+    expect(cell1Content.hasContent).toBe(true);
 
-  test("perovskite snapshot", async () => {
-    const widget = page
+    // Perovskite: snapshot
+    const widget1 = page
       .locator(".jp-Cell:nth-child(2) .jp-OutputArea-child")
       .last();
-    await expect(widget).toHaveScreenshot("perovskite-polyhedra.png", {
+    await expect(widget1).toHaveScreenshot("perovskite-polyhedra.png", {
       maxDiffPixelRatio: 0.03,
     });
-  });
 
-  // --- Filter + Modify + Labels tests (Cell 2) ---
-
-  test("filter modify renders canvas with content", async () => {
-    const cell = page.locator(".jp-Cell:nth-child(3) .jp-OutputArea");
-    const canvasCount = await cell.locator("canvas").count();
-    expect(canvasCount).toBeGreaterThan(0);
-
-    const result = await checkCanvasHasContent(
+    // Filter + Modify (Cell 2): canvas with content
+    const cell2Output = page.locator(".jp-Cell:nth-child(3) .jp-OutputArea");
+    const cell2CanvasCount = await cell2Output.locator("canvas").count();
+    expect(cell2CanvasCount).toBeGreaterThan(0);
+    const cell2Content = await checkCanvasHasContent(
       page,
       ".jp-Cell:nth-child(3) .jp-OutputArea canvas",
     );
-    expect(result.hasContent).toBe(true);
-  });
+    expect(cell2Content.hasContent).toBe(true);
 
-  test("filter modify snapshot", async () => {
-    const widget = page
+    // Filter + Modify: snapshot
+    const widget2 = page
       .locator(".jp-Cell:nth-child(3) .jp-OutputArea-child")
       .last();
-    await expect(widget).toHaveScreenshot("filter-modify-labels.png", {
+    await expect(widget2).toHaveScreenshot("filter-modify-labels.png", {
       maxDiffPixelRatio: 0.03,
     });
-  });
 
-  // --- Render image test (Cell 3) ---
-
-  test("render_image produces valid PNG", async () => {
-    const outputText = await page
+    // render_image (Cell 3): check output
+    const cell3Output = await page
       .locator(".jp-Cell:nth-child(4) .jp-OutputArea-output")
       .allInnerTexts();
-    const allText = outputText.join("\n");
-    expect(allText).toContain("Image render: OK");
-  });
+    expect(cell3Output.join("\n")).toContain("Image render: OK");
 
-  // --- Render video test (Cells 4-5) ---
-
-  test("render_video produces valid GIF", async () => {
-    const outputText = await page
+    // render_video (Cell 5 = 6th child): check output
+    const cell5Output = await page
       .locator(".jp-Cell:nth-child(6) .jp-OutputArea-output")
       .allInnerTexts();
-    const allText = outputText.join("\n");
-    expect(allText).toContain("Video render: OK");
-  });
+    expect(cell5Output.join("\n")).toContain("Video render: OK");
 
-  // --- Cross-cutting tests ---
-
-  test("no critical JS errors", async () => {
+    // No critical JS errors
     const critical = jsErrors.filter(isCriticalError);
     expect(critical).toHaveLength(0);
-  });
 
-  test("all cells execute without errors", async () => {
+    // No Python tracebacks
     const tracebacks = await page
       .locator(
         '.jp-OutputArea-child .jp-RenderedText[data-mime-type="application/vnd.jupyter.stderr"]',
