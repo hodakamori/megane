@@ -29,6 +29,15 @@ Keep the first line under 72 characters. Add details in the body if needed.
    - Python changes: `python -m pytest`
 2. Ensure the build succeeds for frontend changes: `npm run build`
 3. Do NOT commit generated files: `crates/megane-wasm/pkg/`, `dist/`, `target/`, `node_modules/`, `dev-preview/`
+4. Check if your changes require documentation updates:
+   - Review `README.md`, `CLAUDE.md`, and files under `docs/` for any descriptions affected by your changes
+   - If you added/changed/removed features, CLI options, API, commands, configuration, or architecture, update the corresponding documentation
+   - Key docs to check:
+     - `README.md` — project overview, usage examples
+     - `CLAUDE.md` — dev instructions, key commands, architecture notes
+     - `CHANGELOG.md` — notable changes
+     - `docs/` — user-facing guides and API reference
+   - Include doc updates in the same commit (or a separate `docs:` commit if the changes are substantial)
 
 ## After Committing
 
