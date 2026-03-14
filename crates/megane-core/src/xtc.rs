@@ -2,7 +2,7 @@
 ///
 /// Port of the xdrfile BSD-licensed decompression algorithm
 /// (Erik Lindahl & David van der Spoel, 2009-2014).
-
+///
 /// Magic number that identifies an XTC frame header.
 const XTC_MAGIC: i32 = 1995;
 
@@ -158,10 +158,7 @@ impl BitReader {
             }
             nums[i] = num as i32;
         }
-        nums[0] = (bytes[0]
-            | (bytes[1] << 8)
-            | (bytes[2] << 16)
-            | (bytes[3] << 24)) as i32;
+        nums[0] = (bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24)) as i32;
 
         nums
     }
@@ -184,11 +181,11 @@ fn sizeofints(num_of_ints: usize, sizes: &[u32]) -> u32 {
     let mut num_of_bytes: usize = 1;
     bytes[0] = 1;
 
-    for i in 0..num_of_ints {
+    for &size in sizes.iter().take(num_of_ints) {
         let mut tmp: u64 = 0;
-        for bytecnt in 0..num_of_bytes {
-            tmp = bytes[bytecnt] as u64 * sizes[i] as u64 + tmp;
-            bytes[bytecnt] = (tmp & 0xff) as u32;
+        for byte in bytes.iter_mut().take(num_of_bytes) {
+            tmp += *byte as u64 * size as u64;
+            *byte = (tmp & 0xff) as u32;
             tmp >>= 8;
         }
         while tmp != 0 {
@@ -214,10 +211,7 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
     // Read lsize (number of atoms in coordinate block)
     let lsize = xdr.read_i32()? as usize;
     if lsize != natoms {
-        return Err(format!(
-            "coord block size {} != natoms {}",
-            lsize, natoms
-        ));
+        return Err(format!("coord block size {} != natoms {}", lsize, natoms));
     }
 
     let size3 = natoms * 3;
@@ -345,15 +339,9 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
 
                 if k == 0 {
                     // Swap first run coord with the large coord
-                    let swap0 = coords[ri];
-                    coords[ri] = prevcoord[0];
-                    prevcoord[0] = swap0;
-                    let swap1 = coords[ri + 1];
-                    coords[ri + 1] = prevcoord[1];
-                    prevcoord[1] = swap1;
-                    let swap2 = coords[ri + 2];
-                    coords[ri + 2] = prevcoord[2];
-                    prevcoord[2] = swap2;
+                    std::mem::swap(&mut coords[ri], &mut prevcoord[0]);
+                    std::mem::swap(&mut coords[ri + 1], &mut prevcoord[1]);
+                    std::mem::swap(&mut coords[ri + 2], &mut prevcoord[2]);
 
                     output.push(prevcoord[0] as f32 * inv_precision);
                     output.push(prevcoord[1] as f32 * inv_precision);
@@ -483,7 +471,11 @@ mod tests {
 
     #[test]
     fn test_parse_demo_xtc() {
-        let data = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/1crn_vibration.xtc")).expect("read XTC");
+        let data = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/1crn_vibration.xtc"
+        ))
+        .expect("read XTC");
         let result = parse_xtc(&data).expect("parse XTC");
         assert_eq!(result.n_atoms, 327);
         assert_eq!(result.n_frames, 100);
@@ -495,7 +487,13 @@ mod tests {
             assert!(
                 (x - ex).abs() < 0.02 && (y - ey).abs() < 0.02 && (z - ez).abs() < 0.02,
                 "atom {} mismatch: got ({:.4},{:.4},{:.4}), expected ({:.4},{:.4},{:.4})",
-                idx, x, y, z, ex, ey, ez,
+                idx,
+                x,
+                y,
+                z,
+                ex,
+                ey,
+                ez,
             );
         };
         check(0, 17.22, 14.25, 3.76);

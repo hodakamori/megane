@@ -2,7 +2,6 @@
 ///
 /// The ULM format stores frames as binary array data + JSON metadata.
 /// Each frame contains atomic positions, elements, and optionally cell vectors.
-
 use std::collections::HashSet;
 
 use crate::bonds;
@@ -20,22 +19,38 @@ fn read_bytes<const N: usize>(data: &[u8], pos: usize, type_name: &str) -> Resul
 
 fn read_i64(data: &[u8], pos: usize, little_endian: bool) -> Result<i64, String> {
     let bytes = read_bytes::<8>(data, pos, "i64")?;
-    Ok(if little_endian { i64::from_le_bytes(bytes) } else { i64::from_be_bytes(bytes) })
+    Ok(if little_endian {
+        i64::from_le_bytes(bytes)
+    } else {
+        i64::from_be_bytes(bytes)
+    })
 }
 
 fn read_f64(data: &[u8], pos: usize, little_endian: bool) -> Result<f64, String> {
     let bytes = read_bytes::<8>(data, pos, "f64")?;
-    Ok(if little_endian { f64::from_le_bytes(bytes) } else { f64::from_be_bytes(bytes) })
+    Ok(if little_endian {
+        f64::from_le_bytes(bytes)
+    } else {
+        f64::from_be_bytes(bytes)
+    })
 }
 
 fn read_f32_raw(data: &[u8], pos: usize, little_endian: bool) -> Result<f32, String> {
     let bytes = read_bytes::<4>(data, pos, "f32")?;
-    Ok(if little_endian { f32::from_le_bytes(bytes) } else { f32::from_be_bytes(bytes) })
+    Ok(if little_endian {
+        f32::from_le_bytes(bytes)
+    } else {
+        f32::from_be_bytes(bytes)
+    })
 }
 
 fn read_i32(data: &[u8], pos: usize, little_endian: bool) -> Result<i32, String> {
     let bytes = read_bytes::<4>(data, pos, "i32")?;
-    Ok(if little_endian { i32::from_le_bytes(bytes) } else { i32::from_be_bytes(bytes) })
+    Ok(if little_endian {
+        i32::from_le_bytes(bytes)
+    } else {
+        i32::from_be_bytes(bytes)
+    })
 }
 
 // ---------- Array reading helpers ----------
@@ -129,9 +144,7 @@ fn read_ndarray_int(
 // ---------- JSON metadata parsing ----------
 
 /// Extract ndarray info from a JSON value like {"ndarray": [shape, dtype, offset]}
-fn parse_ndarray_ref(
-    value: &serde_json::Value,
-) -> Option<(Vec<usize>, String, usize)> {
+fn parse_ndarray_ref(value: &serde_json::Value) -> Option<(Vec<usize>, String, usize)> {
     let obj = value.as_object()?;
     let arr = obj.get("ndarray")?.as_array()?;
     if arr.len() != 3 {
@@ -235,11 +248,7 @@ fn extract_numbers(
 }
 
 /// Extract cell matrix from a frame's JSON metadata.
-fn extract_cell(
-    data: &[u8],
-    json: &serde_json::Value,
-    little_endian: bool,
-) -> Option<[f32; 9]> {
+fn extract_cell(data: &[u8], json: &serde_json::Value, little_endian: bool) -> Option<[f32; 9]> {
     // Try "cell." key (ndarray reference)
     if let Some(val) = json.get("cell.") {
         if let Some((shape, dtype, offset)) = parse_ndarray_ref(val) {
@@ -423,7 +432,7 @@ mod tests {
         };
         let result = parse_traj(&data).expect("parse traj");
         assert_eq!(result.n_atoms, 3); // water: O + 2H
-        assert!(result.frame_positions.len() >= 1); // at least 2 frames total
+        assert!(!result.frame_positions.is_empty()); // at least 1 frame
         assert_eq!(result.positions.len(), 9); // 3 atoms * 3 coords
         assert!(result.elements.contains(&8)); // oxygen
         assert!(result.elements.contains(&1)); // hydrogen

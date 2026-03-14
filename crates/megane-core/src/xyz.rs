@@ -1,13 +1,12 @@
+use crate::bonds;
+use crate::parser::symbol_to_atomic_num;
 /// XYZ text format parser.
 ///
 /// Format (repeating blocks for multi-frame):
 ///   Line 1: number of atoms
 ///   Line 2: comment
 ///   Lines 3..n+2: element x y z [extra_fields...] (Angstrom)
-
 use std::collections::HashSet;
-use crate::bonds;
-use crate::parser::symbol_to_atomic_num;
 
 /// Parse `Lattice="ax ay az bx by bz cx cy cz"` from an extended XYZ comment line.
 fn parse_lattice(comment: &str) -> Option<[f32; 9]> {
@@ -20,7 +19,10 @@ fn parse_lattice(comment: &str) -> Option<[f32; 9]> {
     let inner_start = quote_char.len_utf8();
     let inner_end = rest[inner_start..].find(quote_char)?;
     let inner = &rest[inner_start..inner_start + inner_end];
-    let vals: Vec<f32> = inner.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+    let vals: Vec<f32> = inner
+        .split_whitespace()
+        .filter_map(|s| s.parse().ok())
+        .collect();
     if vals.len() == 9 {
         let mut m = [0.0f32; 9];
         m.copy_from_slice(&vals);
@@ -211,9 +213,11 @@ O 1.0 0.0 0.0
 
     #[test]
     fn test_parse_xyz_fixture() {
-        let text = std::fs::read_to_string(
-            concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/si_diamond.xyz")
-        ).expect("read fixture");
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/si_diamond.xyz"
+        ))
+        .expect("read fixture");
         let result = parse(&text).expect("parse failed");
         assert_eq!(result.n_atoms, 8);
         assert!(result.elements.iter().all(|&e| e == 14)); // Si = 14
