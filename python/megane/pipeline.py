@@ -53,16 +53,14 @@ class LoadStructure(PipelineNode):
 
 
 class LoadTrajectory(PipelineNode):
-    """Load an external trajectory (XTC or ASE .traj) or stream from server.
+    """Load an external trajectory file (XTC or ASE .traj).
 
     Requires connection from a ``LoadStructure`` node.
     Frames are loaded lazily when ``frame_index`` changes.
 
     Args:
-        xtc: Path to XTC trajectory file (source_mode="file").
-        traj: Path to ASE .traj file (source_mode="file").
-        source_mode: ``"file"`` for local file loading,
-                     ``"stream"`` for WebSocket streaming from server.
+        xtc: Path to XTC trajectory file.
+        traj: Path to ASE .traj file.
     """
 
     _node_type = "load_trajectory"
@@ -72,12 +70,23 @@ class LoadTrajectory(PipelineNode):
         *,
         xtc: str | None = None,
         traj: str | None = None,
-        source_mode: Literal["file", "stream"] = "file",
     ) -> None:
         super().__init__()
         self.xtc = xtc
         self.traj = traj
-        self.source_mode = source_mode
+
+
+class Streaming(PipelineNode):
+    """Streaming source node for WebSocket-based data delivery.
+
+    Connects to the server via WebSocket and provides particle,
+    trajectory, and cell data from the streaming connection.
+    """
+
+    _node_type = "streaming"
+
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class LoadVector(PipelineNode):
@@ -401,7 +410,8 @@ class Pipeline:
             base["hasCell"] = has_cell
         elif isinstance(node, LoadTrajectory):
             base["fileName"] = node.xtc or node.traj
-            base["sourceMode"] = node.source_mode
+        elif isinstance(node, Streaming):
+            base["connected"] = False
         elif isinstance(node, Filter):
             base["query"] = node.query
         elif isinstance(node, Modify):
@@ -477,6 +487,7 @@ class Pipeline:
             "load_structure": ["particle", "trajectory", "cell"],
             "load_trajectory": ["trajectory"],
             "load_vector": ["vector"],
+            "streaming": ["particle", "trajectory", "cell"],
             "filter": ["out"],
             "modify": ["out"],
             "add_bond": ["bond"],

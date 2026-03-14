@@ -13,6 +13,7 @@ import type {
   LoadStructureParams,
   LoadTrajectoryParams,
   LoadVectorParams,
+  StreamingParams,
   PolyhedronGeneratorParams,
 } from "./types";
 import { NODE_PORTS } from "./types";
@@ -152,6 +153,16 @@ export function validatePipeline(
         if (!p.fileName) {
           addError(node.id, {
             message: "No trajectory file loaded",
+            severity: "warning",
+          });
+        }
+        break;
+      }
+      case "streaming": {
+        const p = params as StreamingParams;
+        if (!p.connected) {
+          addError(node.id, {
+            message: "Not connected to server",
             severity: "warning",
           });
         }

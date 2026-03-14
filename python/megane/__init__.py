@@ -14,6 +14,7 @@ from megane.pipeline import (
     LoadVector,
     Modify,
     Pipeline,
+    Streaming,
     VectorOverlay,
 )
 from megane.widget import MolecularViewer
@@ -29,6 +30,7 @@ __all__ = [
     "MolecularViewer",
     "Modify",
     "Pipeline",
+    "Streaming",
     "VectorOverlay",
     "load_lammps_data",
     "load_pdb",

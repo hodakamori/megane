@@ -59,78 +59,33 @@ export function LoadTrajectoryNode({ id, data }: NodeProps<Node<PipelineNodeData
     e.stopPropagation();
   }, []);
 
-  const sourceMode = params.sourceMode ?? "file";
-
-  const handleSourceModeChange = useCallback(
-    (mode: "file" | "stream") => {
-      updateNodeParams(id, { sourceMode: mode });
-    },
-    [id, updateNodeParams],
-  );
-
   return (
     <NodeShell id={id} nodeType="load_trajectory" enabled={data.enabled}>
       <div onDrop={handleDrop} onDragOver={handleDragOver}>
-        {/* Source mode toggle */}
-        <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
-          <button
-            onClick={() => handleSourceModeChange("file")}
-            style={{
-              ...smallBtnStyle,
-              flex: 1,
-              background: sourceMode === "file" ? "#3b82f6" : undefined,
-              color: sourceMode === "file" ? "#fff" : undefined,
-              borderColor: sourceMode === "file" ? "#3b82f6" : undefined,
-            }}
-          >
-            File
-          </button>
-          <button
-            onClick={() => handleSourceModeChange("stream")}
-            style={{
-              ...smallBtnStyle,
-              flex: 1,
-              background: sourceMode === "stream" ? "#3b82f6" : undefined,
-              color: sourceMode === "stream" ? "#fff" : undefined,
-              borderColor: sourceMode === "stream" ? "#3b82f6" : undefined,
-            }}
-          >
-            Stream
-          </button>
-        </div>
-
-        {sourceMode === "file" ? (
-          <>
-            {params.fileName ? (
-              <div style={fileNameStyle}>{params.fileName}</div>
-            ) : (
-              <div style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}>
-                No trajectory loaded
-              </div>
-            )}
-            <button
-              onClick={() => inputRef.current?.click()}
-              style={{ ...smallBtnStyle, marginTop: 6, width: "100%" }}
-            >
-              Load trajectory...
-            </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={TRAJECTORY_ACCEPT}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFile(file);
-                e.target.value = "";
-              }}
-              style={{ display: "none" }}
-            />
-          </>
+        {params.fileName ? (
+          <div style={fileNameStyle}>{params.fileName}</div>
         ) : (
-          <div style={{ fontSize: 11, color: "#94a3b8", fontStyle: "italic" }}>
-            Streaming from server (same origin /ws)
+          <div style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}>
+            No trajectory loaded
           </div>
         )}
+        <button
+          onClick={() => inputRef.current?.click()}
+          style={{ ...smallBtnStyle, marginTop: 6, width: "100%" }}
+        >
+          Load trajectory...
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={TRAJECTORY_ACCEPT}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+            e.target.value = "";
+          }}
+          style={{ display: "none" }}
+        />
       </div>
     </NodeShell>
   );
