@@ -25,7 +25,7 @@ jobs:
   publish:
     name: Build and publish to npm
     runs-on: ubuntu-latest
-    environment: npm
+    environment: ${{ (!inputs.dry_run) && 'npm' || '' }}
     steps:
       - uses: actions/checkout@v4
 

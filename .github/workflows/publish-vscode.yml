@@ -24,7 +24,7 @@ jobs:
   publish:
     name: Build and publish VS Code extension
     runs-on: ubuntu-latest
-    environment: vscode
+    environment: ${{ (!inputs.dry_run) && 'vscode' || '' }}
     steps:
       - uses: actions/checkout@v4
 
