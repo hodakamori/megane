@@ -232,6 +232,7 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     inputs: [],
     outputs: [
       { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "bond", dataType: "bond", label: "Bond" },
       { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
       { name: "cell", dataType: "cell", label: "Cell" },
     ],
