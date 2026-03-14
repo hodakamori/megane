@@ -82,6 +82,7 @@ function WidgetViewerPipeline({
 
   // Subscribe to pipeline store
   const viewportState = usePipelineStore((s) => s.viewportState);
+  const storeSnapshot = usePipelineStore((s) => s.snapshot);
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
 
   // Push per-node snapshots from Python to the pipeline store
@@ -228,7 +229,7 @@ function WidgetViewerPipeline({
       }}
     >
       <Viewport
-        snapshot={snapshot}
+        snapshot={storeSnapshot ?? snapshot}
         frame={frame}
         onRendererReady={handleRendererReady}
         onHover={() => {}}
