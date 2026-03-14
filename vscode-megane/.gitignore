@@ -2,3 +2,4 @@ out/
 media/
 node_modules/
 *.vsix
+README.md

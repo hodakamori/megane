@@ -45,6 +45,9 @@ jobs:
       - name: Build extension
         run: cd vscode-megane && npm run build
 
+      - name: Copy README for extension packaging
+        run: cp README.md vscode-megane/README.md
+
       - name: Package VSIX
         run: cd vscode-megane && npx vsce package
 
