@@ -48,13 +48,9 @@ jobs:
       - name: Install vscode-megane dependencies
         run: cd vscode-megane && npm ci
 
-      - name: Set version from tag or root package.json
+      - name: Set version from root package.json
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION=$(node -p "require('./package.json').version")
-          fi
+          VERSION=$(node -p "require('./package.json').version")
           echo "Setting vscode-megane version to ${VERSION}"
           cd vscode-megane
           npm version "$VERSION" --no-git-tag-version --allow-same-version
