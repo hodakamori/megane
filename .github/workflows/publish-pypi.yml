@@ -4,6 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip publish)"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip publish)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -90,6 +102,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
+    if: ${{ !inputs.dry_run }}
     needs: [build-wheels, build-sdist]
     runs-on: ubuntu-latest
     environment: pypi
@@ -108,3 +121,49 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  dry-run-summary:
+    name: Dry run summary
+    if: ${{ inputs.dry_run }}
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist/
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/
+
+      - name: List built artifacts
+        run: ls -lh dist/
+
+      - name: Validate package metadata
+        run: |
+          pip install twine
+          twine check dist/*
+
+      - name: Check version not already published
+        run: |
+          PKG_VERSION=$(python -c "
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              print(tomllib.load(f)['project']['version'])
+          ")
+          echo "Checking if megane==${PKG_VERSION} already exists on PyPI..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/megane/${PKG_VERSION}/json")
+          if [ "$STATUS" = "200" ]; then
+            echo "::error::Version ${PKG_VERSION} already exists on PyPI"
+            exit 1
+          fi
+          echo "Version ${PKG_VERSION} is available"
