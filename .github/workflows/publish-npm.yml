@@ -4,6 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip publish)"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip publish)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,7 +47,24 @@ jobs:
       - name: Build widget for npm
         run: npm run build:lib
 
+      - name: Check version not already published
+        if: inputs.dry_run
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "Checking if ${PKG_NAME}@${PKG_VERSION} already exists on npm..."
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version 2>/dev/null; then
+            echo "::error::Version ${PKG_VERSION} already exists on npm"
+            exit 1
+          fi
+          echo "Version ${PKG_VERSION} is available"
+
+      - name: Verify publish (dry run)
+        if: inputs.dry_run
+        run: npm publish --dry-run --access public
+
       - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

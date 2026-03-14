@@ -1,0 +1,49 @@
+name: Release Dry Run
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dry-run-npm:
+    name: "Dry run: npm"
+    uses: ./.github/workflows/publish-npm.yml
+    with:
+      dry_run: true
+
+  dry-run-pypi:
+    name: "Dry run: PyPI"
+    uses: ./.github/workflows/publish-pypi.yml
+    with:
+      dry_run: true
+
+  dry-run-vscode:
+    name: "Dry run: VS Code Marketplace"
+    uses: ./.github/workflows/publish-vscode.yml
+    with:
+      dry_run: true
+
+  summary:
+    name: Dry run summary
+    needs: [dry-run-npm, dry-run-pypi, dry-run-vscode]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "## Release Dry Run Results"
+          echo ""
+          echo "- npm:    ${{ needs.dry-run-npm.result }}"
+          echo "- PyPI:   ${{ needs.dry-run-pypi.result }}"
+          echo "- VSCode: ${{ needs.dry-run-vscode.result }}"
+          echo ""
+          if [ "${{ needs.dry-run-npm.result }}" != "success" ] || \
+             [ "${{ needs.dry-run-pypi.result }}" != "success" ] || \
+             [ "${{ needs.dry-run-vscode.result }}" != "success" ]; then
+            echo "::error::One or more dry runs failed. Do not proceed with release."
+            exit 1
+          fi
+          echo "All dry runs passed. Safe to release."
