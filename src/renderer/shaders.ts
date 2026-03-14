@@ -239,4 +239,3 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     fragColor = vec4(color, uOpacity);
   }
 `;
-

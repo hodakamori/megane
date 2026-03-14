@@ -23,9 +23,7 @@ export function decodeHeader(buffer: ArrayBuffer): {
   const view = new DataView(buffer);
   const magic = view.getUint32(0, true);
   if (magic !== MAGIC) {
-    throw new Error(
-      `Invalid magic: 0x${magic.toString(16)}, expected 0x${MAGIC.toString(16)}`
-    );
+    throw new Error(`Invalid magic: 0x${magic.toString(16)}, expected 0x${MAGIC.toString(16)}`);
   }
   return {
     msgType: view.getUint8(4),

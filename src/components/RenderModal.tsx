@@ -5,12 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
-import {
-  captureSnapshot,
-  captureGif,
-  captureVideo,
-  downloadBlob,
-} from "../renderer/RenderCapture";
+import { captureSnapshot, captureGif, captureVideo, downloadBlob } from "../renderer/RenderCapture";
 
 type Mode = "snapshot" | "animation";
 type SnapshotFormat = "png" | "eps";
@@ -234,9 +229,19 @@ export function RenderModal({
       setProgress(0);
     }
   }, [
-    rendererRef, mode, snapshotFormat, animationFormat,
-    width, height, scaleFactor, transparent,
-    startFrame, endFrame, animFps, onSeek, currentFrame,
+    rendererRef,
+    mode,
+    snapshotFormat,
+    animationFormat,
+    width,
+    height,
+    scaleFactor,
+    transparent,
+    startFrame,
+    endFrame,
+    animFps,
+    onSeek,
+    currentFrame,
   ]);
 
   if (!open) return null;
@@ -255,9 +260,7 @@ export function RenderModal({
             marginBottom: 16,
           }}
         >
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
-            Render
-          </span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Render</span>
           <button
             onClick={onClose}
             disabled={exporting}
@@ -432,9 +435,7 @@ export function RenderModal({
                 type="number"
                 value={startFrame}
                 onChange={(e) =>
-                  setStartFrame(
-                    Math.max(0, Math.min(parseInt(e.target.value) || 0, endFrame)),
-                  )
+                  setStartFrame(Math.max(0, Math.min(parseInt(e.target.value) || 0, endFrame)))
                 }
                 style={{ ...inputStyle, width: "auto", flex: 1 }}
                 min={0}
@@ -447,10 +448,7 @@ export function RenderModal({
                 value={endFrame}
                 onChange={(e) =>
                   setEndFrame(
-                    Math.min(
-                      totalFrames - 1,
-                      Math.max(parseInt(e.target.value) || 0, startFrame),
-                    ),
+                    Math.min(totalFrames - 1, Math.max(parseInt(e.target.value) || 0, startFrame)),
                   )
                 }
                 style={{ ...inputStyle, width: "auto", flex: 1 }}

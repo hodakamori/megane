@@ -59,12 +59,8 @@ export class ImpostorBondMesh {
 
     // Quad: 2 triangles, XY in [-1, 1]
     this.geo = new THREE.InstancedBufferGeometry();
-    const verts = new Float32Array([
-      -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0,
-    ]);
-    const uvs = new Float32Array([
-      -1, -1, 1, -1, 1, 1, -1, 1,
-    ]);
+    const verts = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
+    const uvs = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]);
     const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
     this.geo.setAttribute("position", new THREE.BufferAttribute(verts, 3));
     this.geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
@@ -83,8 +79,11 @@ export class ImpostorBondMesh {
     // Initial DataTexture (1x1 placeholder)
     this.positionTexData = new Float32Array(4);
     this.positionTex = new THREE.DataTexture(
-      this.positionTexData, 1, 1,
-      THREE.RGBAFormat, THREE.FloatType,
+      this.positionTexData,
+      1,
+      1,
+      THREE.RGBAFormat,
+      THREE.FloatType,
     );
     this.positionTex.minFilter = THREE.NearestFilter;
     this.positionTex.magFilter = THREE.NearestFilter;
@@ -167,8 +166,18 @@ export class ImpostorBondMesh {
 
       if (order === BOND_DOUBLE) {
         for (const sign of [-1, 1]) {
-          this.setTopology(idx, ai, bi, sign * DOUBLE_BOND_OFFSET, 0,
-            DOUBLE_BOND_RADIUS, cr, cg, cb, 0);
+          this.setTopology(
+            idx,
+            ai,
+            bi,
+            sign * DOUBLE_BOND_OFFSET,
+            0,
+            DOUBLE_BOND_RADIUS,
+            cr,
+            cg,
+            cb,
+            0,
+          );
           idx++;
         }
       } else if (order === BOND_TRIPLE) {
@@ -176,23 +185,19 @@ export class ImpostorBondMesh {
         for (const angle of angles) {
           const ox = Math.cos(angle) * TRIPLE_BOND_OFFSET;
           const oy = Math.sin(angle) * TRIPLE_BOND_OFFSET;
-          this.setTopology(idx, ai, bi, ox, oy,
-            TRIPLE_BOND_RADIUS, cr, cg, cb, 0);
+          this.setTopology(idx, ai, bi, ox, oy, TRIPLE_BOND_RADIUS, cr, cg, cb, 0);
           idx++;
         }
       } else if (order === BOND_AROMATIC) {
         // Solid bond
-        this.setTopology(idx, ai, bi, 0, 0,
-          AROMATIC_BOND_RADIUS, cr, cg, cb, 0);
+        this.setTopology(idx, ai, bi, 0, 0, AROMATIC_BOND_RADIUS, cr, cg, cb, 0);
         idx++;
         // Dashed offset bond
-        this.setTopology(idx, ai, bi, DOUBLE_BOND_OFFSET, 0,
-          AROMATIC_DASH_RADIUS, cr, cg, cb, 1);
+        this.setTopology(idx, ai, bi, DOUBLE_BOND_OFFSET, 0, AROMATIC_DASH_RADIUS, cr, cg, cb, 1);
         idx++;
       } else {
         // Single bond
-        this.setTopology(idx, ai, bi, 0, 0,
-          BOND_RADIUS, cr, cg, cb, 0);
+        this.setTopology(idx, ai, bi, 0, 0, BOND_RADIUS, cr, cg, cb, 0);
         idx++;
       }
     }
@@ -204,11 +209,7 @@ export class ImpostorBondMesh {
     this.geo.instanceCount = idx;
   }
 
-  updatePositions(
-    positions: Float32Array,
-    _bonds: Uint32Array,
-    _nBonds: number,
-  ): void {
+  updatePositions(positions: Float32Array, _bonds: Uint32Array, _nBonds: number): void {
     this.copyPositionsToTexData(positions);
     this.positionTex.needsUpdate = true;
   }

@@ -49,9 +49,10 @@ export function serializePipeline(
 /**
  * Deserialize the portable JSON format into xyflow nodes and edges.
  */
-export function deserializePipeline(
-  json: SerializedPipeline,
-): { nodes: Node<PipelineNodeData>[]; edges: Edge[] } {
+export function deserializePipeline(json: SerializedPipeline): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
   if (json.version !== 3) {
     throw new Error(`Unsupported pipeline version: ${json.version}`);
   }

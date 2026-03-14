@@ -29,10 +29,7 @@ export function getVectorsForFrame(
  * Generate demo vector data (small random displacements) for visualization testing.
  * Produces per-frame vectors that vary smoothly over time using a sine-based pattern.
  */
-export function generateDemoVectors(
-  nAtoms: number,
-  nFrames: number,
-): VectorFrame[] {
+export function generateDemoVectors(nAtoms: number, nFrames: number): VectorFrame[] {
   const frames: VectorFrame[] = [];
   for (let f = 0; f < nFrames; f++) {
     const vectors = new Float32Array(nAtoms * 3);

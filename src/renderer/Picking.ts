@@ -6,11 +6,7 @@
 
 import * as THREE from "three";
 import type { Snapshot, HoverInfo } from "../types";
-import {
-  getElementSymbol,
-  getRadius,
-  BALL_STICK_ATOM_SCALE,
-} from "../constants";
+import { getElementSymbol, getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 
 // Temporary vector for screen-space projection (avoids allocation per atom)
 const _projVec = new THREE.Vector4();
@@ -18,8 +14,11 @@ const _projVec = new THREE.Vector4();
 /** Project a 3D point to screen coordinates. Returns {sx, sy, depth} in pixels. */
 export function projectToScreen(
   camera: THREE.Camera,
-  x: number, y: number, z: number,
-  w: number, h: number,
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+  h: number,
 ): { sx: number; sy: number; depth: number } {
   _projVec.set(x, y, z, 1);
   _projVec.applyMatrix4(camera.matrixWorldInverse);
@@ -75,7 +74,12 @@ export function pickAtPixel(
 
   for (let i = 0; i < nAtoms; i++) {
     const { sx, sy, depth } = projectToScreen(
-      camera, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], w, h,
+      camera,
+      pos[i * 3],
+      pos[i * 3 + 1],
+      pos[i * 3 + 2],
+      w,
+      h,
     );
     if (depth <= 0) continue; // behind camera
 

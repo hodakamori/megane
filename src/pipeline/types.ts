@@ -9,25 +9,32 @@ import type { Snapshot, Frame, TrajectoryMeta, BondSource, VectorFrame } from ".
 // ─── Pipeline Data Types ──────────────────────────────────────────────
 
 /** The possible data types flowing through pipeline edges. */
-export type PipelineDataType = "particle" | "bond" | "cell" | "label" | "mesh" | "trajectory" | "vector";
+export type PipelineDataType =
+  | "particle"
+  | "bond"
+  | "cell"
+  | "label"
+  | "mesh"
+  | "trajectory"
+  | "vector";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   particle: "#3b82f6", // blue
-  bond: "#f59e0b",     // amber
-  cell: "#10b981",     // emerald
-  label: "#8b5cf6",    // violet
-  mesh: "#6b7280",     // gray
+  bond: "#f59e0b", // amber
+  cell: "#10b981", // emerald
+  label: "#8b5cf6", // violet
+  mesh: "#6b7280", // gray
   trajectory: "#ec4899", // pink
-  vector: "#ef4444",     // red
+  vector: "#ef4444", // red
 };
 
 /** Particle data flowing through the pipeline. */
 export interface ParticleData {
   type: "particle";
   source: Snapshot;
-  sourceNodeId: string;                  // load_structure node that produced this
-  indices: Uint32Array | null;           // null = all atoms
+  sourceNodeId: string; // load_structure node that produced this
+  indices: Uint32Array | null; // null = all atoms
   scaleOverrides: Float32Array | null;
   opacityOverrides: Float32Array | null;
 }
@@ -35,22 +42,22 @@ export interface ParticleData {
 /** Bond data flowing through the pipeline. */
 export interface BondData {
   type: "bond";
-  sourceNodeId: string;              // load_structure node that produced the particles
-  bondIndices: Uint32Array;  // pairs: [a0,b0, a1,b1, ...]
+  sourceNodeId: string; // load_structure node that produced the particles
+  bondIndices: Uint32Array; // pairs: [a0,b0, a1,b1, ...]
   bondOrders: Uint8Array | null;
   nBonds: number;
   scale: number;
   opacity: number;
   // Extended data for PBC half-bonds (ghost atoms appended)
-  positions: Float32Array | null;  // null = use particle positions
-  elements: Uint8Array | null;     // null = use particle elements
-  nAtoms: number;                  // total atoms including ghosts (0 = use particle nAtoms)
+  positions: Float32Array | null; // null = use particle positions
+  elements: Uint8Array | null; // null = use particle elements
+  nAtoms: number; // total atoms including ghosts (0 = use particle nAtoms)
 }
 
 /** Simulation cell data. */
 export interface CellData {
   type: "cell";
-  sourceNodeId: string;              // load_structure node that produced this
+  sourceNodeId: string; // load_structure node that produced this
   box: Float32Array; // 3x3 row-major
   visible: boolean;
   axesVisible: boolean;
@@ -66,15 +73,15 @@ export interface LabelData {
 /** Mesh data for polyhedron rendering. */
 export interface MeshData {
   type: "mesh";
-  positions: Float32Array;          // flat xyz vertex positions
-  indices: Uint32Array;             // triangle indices
-  normals: Float32Array;            // per-vertex normals
-  colors: Float32Array;             // per-vertex RGBA (length = nVertices * 4)
+  positions: Float32Array; // flat xyz vertex positions
+  indices: Uint32Array; // triangle indices
+  normals: Float32Array; // per-vertex normals
+  colors: Float32Array; // per-vertex RGBA (length = nVertices * 4)
   opacity: number;
   showEdges: boolean;
   edgePositions: Float32Array | null; // line segment pairs for wireframe
-  edgeColor: string;                // edge color as hex string (e.g. "#dddddd")
-  edgeWidth: number;                // edge line width in pixels
+  edgeColor: string; // edge color as hex string (e.g. "#dddddd")
+  edgeWidth: number; // edge line width in pixels
 }
 
 // ─── Frame Provider ──────────────────────────────────────────────────
@@ -130,15 +137,22 @@ export interface VectorData {
 }
 
 /** Union of all pipeline data types. */
-export type PipelineData = ParticleData | BondData | CellData | LabelData | MeshData | TrajectoryData | VectorData;
+export type PipelineData =
+  | ParticleData
+  | BondData
+  | CellData
+  | LabelData
+  | MeshData
+  | TrajectoryData
+  | VectorData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
 /** A named port on a node (input or output). */
 export interface PortDefinition {
-  name: string;                    // xyflow Handle id
+  name: string; // xyflow Handle id
   dataType: PipelineDataType;
-  label: string;                   // display label
+  label: string; // display label
 }
 
 /** For generic nodes (filter/modify): accepted input types. */
@@ -195,12 +209,12 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
 };
 
 export const NODE_CATEGORY_COLORS: Record<NodeCategory, string> = {
-  data_load: "#3b82f6",  // blue
-  bond: "#f59e0b",       // amber
-  filter: "#10b981",     // green
-  modify: "#8b5cf6",     // purple
-  overlay: "#ec4899",    // pink
-  viewport: "#64748b",   // slate
+  data_load: "#3b82f6", // blue
+  bond: "#f59e0b", // amber
+  filter: "#10b981", // green
+  modify: "#8b5cf6", // purple
+  overlay: "#ec4899", // pink
+  viewport: "#64748b", // slate
 };
 
 // ─── Port Definitions Per Node Type ───────────────────────────────────
@@ -221,12 +235,8 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     ],
   },
   load_trajectory: {
-    inputs: [
-      { name: "particle", dataType: "particle", label: "Particle" },
-    ],
-    outputs: [
-      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
-    ],
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "trajectory", dataType: "trajectory", label: "Trajectory" }],
   },
   streaming: {
     inputs: [],
@@ -239,17 +249,11 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   },
   load_vector: {
     inputs: [],
-    outputs: [
-      { name: "vector", dataType: "vector", label: "Vector" },
-    ],
+    outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
   },
   add_bond: {
-    inputs: [
-      { name: "particle", dataType: "particle", label: "Particle" },
-    ],
-    outputs: [
-      { name: "bond", dataType: "bond", label: "Bond" },
-    ],
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "bond", dataType: "bond", label: "Bond" }],
   },
   viewport: {
     inputs: [
@@ -353,13 +357,13 @@ export interface VectorOverlayParams {
 
 export interface PolyhedronGeneratorParams {
   type: "polyhedron_generator";
-  centerElements: number[];      // atomic numbers of center atoms
-  ligandElements: number[];      // atomic numbers of ligand atoms
-  maxDistance: number;            // max bond distance in Angstroms
-  opacity: number;               // face opacity 0-1
-  showEdges: boolean;            // wireframe edges
-  edgeColor: string;             // edge color as hex string
-  edgeWidth: number;             // edge line width in pixels
+  centerElements: number[]; // atomic numbers of center atoms
+  ligandElements: number[]; // atomic numbers of ligand atoms
+  maxDistance: number; // max bond distance in Angstroms
+  opacity: number; // face opacity 0-1
+  showEdges: boolean; // wireframe edges
+  edgeColor: string; // edge color as hex string
+  edgeWidth: number; // edge line width in pixels
 }
 
 /** Discriminated union of all node parameter types. */
@@ -449,9 +453,7 @@ export function canConnect(
  * Resolve the effective data type for a generic node's input,
  * based on what is actually connected to it.
  */
-export function resolveGenericPortType(
-  sourceDataType: PipelineDataType,
-): PipelineDataType {
+export function resolveGenericPortType(sourceDataType: PipelineDataType): PipelineDataType {
   return sourceDataType;
 }
 

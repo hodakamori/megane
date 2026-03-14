@@ -25,11 +25,7 @@ export class StreamFrameProvider implements FrameProvider {
   private maxCacheSize: number;
   private onFrameReady: ((frame: Frame) => void) | null = null;
 
-  constructor(
-    client: WebSocketClient,
-    meta: TrajectoryMeta,
-    maxCacheSize = DEFAULT_CACHE_SIZE,
-  ) {
+  constructor(client: WebSocketClient, meta: TrajectoryMeta, maxCacheSize = DEFAULT_CACHE_SIZE) {
     this.client = client;
     this.meta = meta;
     this.maxCacheSize = maxCacheSize;

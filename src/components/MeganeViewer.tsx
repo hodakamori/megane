@@ -23,11 +23,7 @@ import { setVectorLoadHandler } from "./nodes/LoadVectorNode";
 import { loadVectorFileData } from "../logic/vectorSourceLogic";
 import { parseStructureFile } from "../parsers/structure";
 import type { NodeSnapshotData } from "../pipeline/execute";
-import type {
-  Snapshot,
-  Frame,
-  HoverInfo,
-} from "../types";
+import type { Snapshot, Frame, HoverInfo } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
 interface MeganeViewerProps {
@@ -82,13 +78,8 @@ export function MeganeViewer({
   const prevViewportStateRef = useRef<ViewportState | null>(null);
 
   // Shared atom selection & measurement
-  const {
-    selection,
-    measurement,
-    handleAtomRightClick,
-    handleClearSelection,
-    handleFrameUpdated,
-  } = useAtomSelection(rendererRef);
+  const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
+    useAtomSelection(rendererRef);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
@@ -127,24 +118,26 @@ export function MeganeViewer({
   useEffect(() => {
     setStructureLoadHandler((nodeId, file) => {
       // Parse file and store per-node snapshot
-      parseStructureFile(file).then((result) => {
-        clearNodeParseError(nodeId);
-        const data: NodeSnapshotData = {
-          snapshot: result.snapshot,
-          frames: result.frames.length > 0 ? result.frames : null,
-          meta: result.meta,
-          labels: result.labels,
-        };
-        setNodeSnapshot(nodeId, data);
-        // Update node port availability indicators
-        updateNodeParams(nodeId, {
-          hasTrajectory: result.frames.length > 0,
-          hasCell: !!result.snapshot.box,
+      parseStructureFile(file)
+        .then((result) => {
+          clearNodeParseError(nodeId);
+          const data: NodeSnapshotData = {
+            snapshot: result.snapshot,
+            frames: result.frames.length > 0 ? result.frames : null,
+            meta: result.meta,
+            labels: result.labels,
+          };
+          setNodeSnapshot(nodeId, data);
+          // Update node port availability indicators
+          updateNodeParams(nodeId, {
+            hasTrajectory: result.frames.length > 0,
+            hasCell: !!result.snapshot.box,
+          });
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          setNodeParseError(nodeId, `Failed to parse file: ${message}`);
         });
-      }).catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        setNodeParseError(nodeId, `Failed to parse file: ${message}`);
-      });
       // For the primary node, also trigger legacy load path for trajectory/label compat
       if (nodeId === primaryNodeIdRef.current) {
         onUploadStructure(file);
@@ -153,7 +146,13 @@ export function MeganeViewer({
     return () => {
       setStructureLoadHandler(null);
     };
-  }, [onUploadStructure, setNodeSnapshot, updateNodeParams, setNodeParseError, clearNodeParseError]);
+  }, [
+    onUploadStructure,
+    setNodeSnapshot,
+    updateNodeParams,
+    setNodeParseError,
+    clearNodeParseError,
+  ]);
 
   useEffect(() => {
     if (onUploadTrajectory) {
@@ -183,7 +182,12 @@ export function MeganeViewer({
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
-    applyViewportState(renderer, viewportState, prevViewportStateRef.current, primaryNodeIdRef.current);
+    applyViewportState(
+      renderer,
+      viewportState,
+      prevViewportStateRef.current,
+      primaryNodeIdRef.current,
+    );
     prevViewportStateRef.current = viewportState;
   }, [viewportState]);
 
@@ -226,12 +230,19 @@ export function MeganeViewer({
     );
 
     const result = processPbcBonds(
-      newBonds, null, effectiveFrame.positions,
-      snapshot.elements, snapshot.nAtoms, snapshot.box,
+      newBonds,
+      null,
+      effectiveFrame.positions,
+      snapshot.elements,
+      snapshot.nAtoms,
+      snapshot.box,
     );
     renderer.updateBondsExt(
-      result.bondIndices, result.bondOrders,
-      result.positions, result.elements, result.nAtoms,
+      result.bondIndices,
+      result.bondOrders,
+      result.positions,
+      result.elements,
+      result.nAtoms,
     );
   }, [effectiveFrame, snapshot]);
 
@@ -247,11 +258,13 @@ export function MeganeViewer({
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
-    renderer.setViewInsets(
-      0,
-      pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12,
+    renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
+    applyViewportState(
+      renderer,
+      usePipelineStore.getState().viewportState,
+      null,
+      primaryNodeIdRef.current,
     );
-    applyViewportState(renderer, usePipelineStore.getState().viewportState, null, primaryNodeIdRef.current);
     prevViewportStateRef.current = usePipelineStore.getState().viewportState;
   }, []);
 
@@ -267,10 +280,7 @@ export function MeganeViewer({
   }, []);
 
   useEffect(() => {
-    rendererRef.current?.setViewInsets(
-      0,
-      pipelineCollapsed ? 0 : pipelineWidthRef.current + 12,
-    );
+    rendererRef.current?.setViewInsets(0, pipelineCollapsed ? 0 : pipelineWidthRef.current + 12);
   }, [pipelineCollapsed]);
 
   return (

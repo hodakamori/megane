@@ -41,9 +41,7 @@ export class ArrowRenderer {
     this.mesh.visible = false;
 
     // Shaft geometry: cylinder along Y, bottom at y=0, top at y=1
-    const shaftGeo = new THREE.CylinderGeometry(
-      SHAFT_RADIUS, SHAFT_RADIUS, 1, SHAFT_SEGMENTS,
-    );
+    const shaftGeo = new THREE.CylinderGeometry(SHAFT_RADIUS, SHAFT_RADIUS, 1, SHAFT_SEGMENTS);
     // Shift so bottom is at origin, top at y=1
     shaftGeo.translate(0, 0.5, 0);
 
@@ -136,11 +134,7 @@ export class ArrowRenderer {
       this.shaftMesh.setMatrixAt(i, _mat);
 
       // Head: position at tip of shaft
-      _pos.set(
-        ox + _dir.x * shaftLen,
-        oy + _dir.y * shaftLen,
-        oz + _dir.z * shaftLen,
-      );
+      _pos.set(ox + _dir.x * shaftLen, oy + _dir.y * shaftLen, oz + _dir.z * shaftLen);
       _scale.set(1, 1, 1);
       _mat.compose(_pos, _quat, _scale);
       this.headMesh.setMatrixAt(i, _mat);

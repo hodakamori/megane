@@ -1,9 +1,4 @@
-import type {
-  PipelineData,
-  ParticleData,
-  BondData,
-  ModifyParams,
-} from "../types";
+import type { PipelineData, ParticleData, BondData, ModifyParams } from "../types";
 
 export function executeModify(
   params: ModifyParams,

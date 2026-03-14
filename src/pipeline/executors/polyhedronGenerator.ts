@@ -1,9 +1,4 @@
-import type {
-  PipelineData,
-  ParticleData,
-  MeshData,
-  PolyhedronGeneratorParams,
-} from "../types";
+import type { PipelineData, ParticleData, MeshData, PolyhedronGeneratorParams } from "../types";
 import { getColor } from "../../constants";
 import { computeConvexHull } from "../../logic/convexHull";
 import { invert3x3 } from "./mathUtils";
@@ -12,8 +7,11 @@ import { invert3x3 } from "./mathUtils";
  * Apply minimum-image convention to a displacement vector using cell matrix.
  */
 function minimumImage(
-  dx: number, dy: number, dz: number,
-  box: Float32Array, boxInv: Float32Array,
+  dx: number,
+  dy: number,
+  dz: number,
+  box: Float32Array,
+  boxInv: Float32Array,
 ): [number, number, number] {
   let sx = boxInv[0] * dx + boxInv[3] * dy + boxInv[6] * dz;
   let sy = boxInv[1] * dx + boxInv[4] * dy + boxInv[7] * dz;

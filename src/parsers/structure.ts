@@ -55,7 +55,9 @@ async function ensureInit(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       const wasm = await import("../../crates/megane-wasm/pkg");
-      const wasmUrl = (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ as string | undefined;
+      const wasmUrl = (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ as
+        | string
+        | undefined;
       await wasm.default(wasmUrl);
       wasmModule = {
         parse_pdb: wasm.parse_pdb,
@@ -99,7 +101,10 @@ function getParserForExtension(ext: string): ParseFn {
  * Parse structure text using the WASM parser.
  * If fileName is provided, auto-detects format from extension; otherwise defaults to PDB.
  */
-export async function parseStructureText(text: string, fileName?: string): Promise<StructureParseResult> {
+export async function parseStructureText(
+  text: string,
+  fileName?: string,
+): Promise<StructureParseResult> {
   await ensureInit();
   const ext = fileName?.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb";
   const parseFn = getParserForExtension(ext);
@@ -156,9 +161,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
     }
   }
 
-  const labels: string[] | null = result.has_atom_labels
-    ? result.atom_labels.split("\n")
-    : null;
+  const labels: string[] | null = result.has_atom_labels ? result.atom_labels.split("\n") : null;
 
   result.free();
 
@@ -181,28 +184,19 @@ export async function inferBondsVdw(
 }
 
 /** Parse GROMACS .top file and extract bond pairs. */
-export async function parseTopBonds(
-  text: string,
-  nAtoms: number,
-): Promise<Uint32Array> {
+export async function parseTopBonds(text: string, nAtoms: number): Promise<Uint32Array> {
   await ensureInit();
   return wasmModule!.parse_top_bonds(text, nAtoms);
 }
 
 /** Extract only CONECT bonds from a PDB file. */
-export async function parsePdbBonds(
-  text: string,
-  nAtoms: number,
-): Promise<Uint32Array> {
+export async function parsePdbBonds(text: string, nAtoms: number): Promise<Uint32Array> {
   await ensureInit();
   return wasmModule!.parse_pdb_bonds(text, nAtoms);
 }
 
 /** Extract atom labels from a file (structure format or plain text). */
-export async function extractLabelsFromFile(
-  file: File,
-  nAtoms: number,
-): Promise<string[]> {
+export async function extractLabelsFromFile(file: File, nAtoms: number): Promise<string[]> {
   const text = await file.text();
   const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
 
@@ -211,7 +205,14 @@ export async function extractLabelsFromFile(
     labels = text.split("\n").map((l) => l.trim());
   } else {
     await ensureInit();
-    const format = ext === ".gro" ? "gro" : ext === ".xyz" ? "xyz" : ext === ".data" || ext === ".lammps" ? "lammps_data" : "pdb";
+    const format =
+      ext === ".gro"
+        ? "gro"
+        : ext === ".xyz"
+          ? "xyz"
+          : ext === ".data" || ext === ".lammps"
+            ? "lammps_data"
+            : "pdb";
     const raw = wasmModule!.extract_labels(text, format);
     labels = raw ? raw.split("\n") : [];
   }
