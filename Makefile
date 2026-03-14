@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-e2e-widget-snapshot test-e2e-widget-snapshot-update test-ts test-rust test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -41,8 +41,16 @@ test-rust:
 test-e2e-snapshot:
 	node tests/e2e/snapshot.test.mjs
 
+# Run E2E widget snapshot tests (Playwright + JupyterLab)
+test-e2e-widget-snapshot:
+	node tests/e2e/widget_snapshot.test.mjs
+
+# Update widget snapshot baselines
+test-e2e-widget-snapshot-update:
+	node tests/e2e/widget_snapshot.test.mjs --update
+
 # Run all tests (Python + TypeScript + Rust + E2E)
-test-all: test test-ts test-rust test-e2e test-e2e-snapshot
+test-all: test test-ts test-rust test-e2e test-e2e-snapshot test-e2e-widget-snapshot
 
 # Run TypeScript tests with coverage
 coverage-ts:
