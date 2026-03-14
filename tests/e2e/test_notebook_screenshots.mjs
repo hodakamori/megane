@@ -15,7 +15,7 @@
 import { createRequire } from "module";
 import { execSync, spawn } from "child_process";
 import { randomBytes } from "crypto";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 // Playwright is installed globally; resolve it explicitly.
@@ -151,11 +151,6 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
   // Allow time for Three.js rendering
   await page.waitForTimeout(3000);
 
-  // Take screenshot
-  const screenshotPath = join(SNAPSHOT_DIR, screenshotName);
-  await page.screenshot({ path: screenshotPath, fullPage: true });
-  console.log(`  Screenshot saved: ${screenshotPath}`);
-
   // ---- Assertions ----
 
   // 1. Check if canvas exists
@@ -164,6 +159,61 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
     assert(true, `[${name}] Widget canvas created (${canvasCount} canvas elements)`);
   } else {
     console.log(`  INFO: No canvas elements found (headless rendering limitation)`);
+  }
+
+  // 2. Take per-widget screenshots by scrolling each canvas into view
+  const baseName = screenshotName.replace(".png", "");
+  if (canvasCount > 0) {
+    for (let i = 0; i < canvasCount; i++) {
+      const canvas = page.locator(canvasSelector).nth(i);
+
+      // Scroll so the canvas center is at the viewport center
+      await canvas.evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const scrollParent = el.closest(".jp-WindowedPanel-outer") || el.closest(".jp-Notebook");
+        if (scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          const targetScroll = scrollParent.scrollTop + rect.top - parentRect.top
+            - parentRect.height / 2 + rect.height / 2;
+          scrollParent.scrollTop = Math.max(0, targetScroll);
+        } else {
+          el.scrollIntoView({ block: "center", behavior: "instant" });
+        }
+      });
+      // Force Three.js re-render
+      await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+      await page.waitForTimeout(2000);
+
+      // Take a viewport screenshot showing the widget
+      const widgetPath = join(SNAPSHOT_DIR, `${baseName}_widget_${i}.png`);
+      await page.screenshot({ path: widgetPath });
+      console.log(`  Widget screenshot saved: ${widgetPath}`);
+    }
+
+    // Also save the first widget view as the main notebook screenshot
+    const firstCanvas = page.locator(canvasSelector).first();
+    await firstCanvas.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      const scrollParent = el.closest(".jp-WindowedPanel-outer") || el.closest(".jp-Notebook");
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const targetScroll = scrollParent.scrollTop + rect.top - parentRect.top
+          - parentRect.height / 2 + rect.height / 2;
+        scrollParent.scrollTop = Math.max(0, targetScroll);
+      } else {
+        el.scrollIntoView({ block: "center", behavior: "instant" });
+      }
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+    await page.waitForTimeout(1500);
+    const screenshotPath = join(SNAPSHOT_DIR, screenshotName);
+    await page.screenshot({ path: screenshotPath });
+    console.log(`  Screenshot saved: ${screenshotPath}`);
+  } else {
+    // Fallback: full page screenshot
+    const screenshotPath = join(SNAPSHOT_DIR, screenshotName);
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    console.log(`  Screenshot saved: ${screenshotPath}`);
   }
 
   // 2. No critical JS errors
@@ -213,6 +263,24 @@ try {
     }
   }
 
+  // Disable JupyterLab's windowed notebook rendering so that WebGL canvases
+  // stay in the DOM when scrolling.  Without this, Three.js loses its context
+  // when cells are virtualized off-screen and cannot repaint.
+  //
+  // JupyterLab reads overrides.json from <lab_dir>/settings/.  We find the
+  // lab dir relative to the venv and write the override there.
+  const venvLabDir = join(CWD, ".venv", "share", "jupyter", "lab");
+  const labSettingsDir = join(venvLabDir, "settings");
+  mkdirSync(labSettingsDir, { recursive: true });
+  writeFileSync(
+    join(labSettingsDir, "overrides.json"),
+    JSON.stringify({
+      "@jupyterlab/notebook-extension:tracker": {
+        windowingMode: "none",
+      },
+    }),
+  );
+
   // Start JupyterLab
   server = spawn(
     jupyterCmd,
@@ -226,7 +294,10 @@ try {
       `--notebook-dir=${CWD}`,
     ],
     {
-      env: { ...process.env, HOME: "/root" },
+      env: {
+        ...process.env,
+        HOME: "/root",
+      },
       stdio: ["ignore", "pipe", "pipe"],
       cwd: CWD,
     },
@@ -243,6 +314,31 @@ try {
     viewport: { width: 1280, height: 960 },
   });
   const page = await context.newPage();
+
+  // Navigate to JupyterLab to disable windowed rendering via Settings API.
+  // The overrides.json file in lab/settings/ may not always take effect, so
+  // we also set it programmatically before opening any notebooks.
+  const labUrl = `http://localhost:${PORT}/lab?token=${TOKEN}`;
+  await page.goto(labUrl, { timeout: 30000 });
+  await page.waitForSelector(".jp-Launcher", { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(2000);
+  try {
+    await page.evaluate(async () => {
+      // Access JupyterLab application singleton
+      const app = window._jupyterlab;
+      if (app && app.settingRegistry) {
+        await app.settingRegistry.set(
+          "@jupyterlab/notebook-extension:tracker",
+          "windowingMode",
+          "none",
+        );
+        console.log("Set windowingMode to none via settings API");
+      }
+    });
+    console.log("Disabled windowed rendering via settings API");
+  } catch (e) {
+    console.log(`Settings API not available: ${e.message}`);
+  }
 
   // Test each notebook
   const notebooks = [
