@@ -29,16 +29,34 @@ export function computeAngle(pos: Float32Array, a: number, b: number, c: number)
 
 /** Compute dihedral angle (in degrees) for atoms a-b-c-d. */
 export function computeDihedral(
-  pos: Float32Array, a: number, b: number, c: number, d: number,
+  pos: Float32Array,
+  a: number,
+  b: number,
+  c: number,
+  d: number,
 ): number {
-  const b1x = pos[b * 3] - pos[a * 3], b1y = pos[b * 3 + 1] - pos[a * 3 + 1], b1z = pos[b * 3 + 2] - pos[a * 3 + 2];
-  const b2x = pos[c * 3] - pos[b * 3], b2y = pos[c * 3 + 1] - pos[b * 3 + 1], b2z = pos[c * 3 + 2] - pos[b * 3 + 2];
-  const b3x = pos[d * 3] - pos[c * 3], b3y = pos[d * 3 + 1] - pos[c * 3 + 1], b3z = pos[d * 3 + 2] - pos[c * 3 + 2];
-  const n1x = b1y * b2z - b1z * b2y, n1y = b1z * b2x - b1x * b2z, n1z = b1x * b2y - b1y * b2x;
-  const n2x = b2y * b3z - b2z * b3y, n2y = b2z * b3x - b2x * b3z, n2z = b2x * b3y - b2y * b3x;
+  const b1x = pos[b * 3] - pos[a * 3],
+    b1y = pos[b * 3 + 1] - pos[a * 3 + 1],
+    b1z = pos[b * 3 + 2] - pos[a * 3 + 2];
+  const b2x = pos[c * 3] - pos[b * 3],
+    b2y = pos[c * 3 + 1] - pos[b * 3 + 1],
+    b2z = pos[c * 3 + 2] - pos[b * 3 + 2];
+  const b3x = pos[d * 3] - pos[c * 3],
+    b3y = pos[d * 3 + 1] - pos[c * 3 + 1],
+    b3z = pos[d * 3 + 2] - pos[c * 3 + 2];
+  const n1x = b1y * b2z - b1z * b2y,
+    n1y = b1z * b2x - b1x * b2z,
+    n1z = b1x * b2y - b1y * b2x;
+  const n2x = b2y * b3z - b2z * b3y,
+    n2y = b2z * b3x - b2x * b3z,
+    n2z = b2x * b3y - b2y * b3x;
   const b2len = Math.sqrt(b2x * b2x + b2y * b2y + b2z * b2z);
-  const ub2x = b2x / b2len, ub2y = b2y / b2len, ub2z = b2z / b2len;
-  const m1x = n1y * ub2z - n1z * ub2y, m1y = n1z * ub2x - n1x * ub2z, m1z = n1x * ub2y - n1y * ub2x;
+  const ub2x = b2x / b2len,
+    ub2y = b2y / b2len,
+    ub2z = b2z / b2len;
+  const m1x = n1y * ub2z - n1z * ub2y,
+    m1y = n1z * ub2x - n1x * ub2z,
+    m1z = n1x * ub2y - n1y * ub2x;
   const x = n1x * n2x + n1y * n2y + n1z * n2z;
   const y = m1x * n2x + m1y * n2y + m1z * n2z;
   return Math.atan2(y, x) * (180 / Math.PI);

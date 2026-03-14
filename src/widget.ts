@@ -46,9 +46,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const data = model.get("_snapshot_data") as DataView | null;
     if (!data || data.byteLength === 0) return null;
     const buffer = new ArrayBuffer(data.byteLength);
-    new Uint8Array(buffer).set(
-      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    );
+    new Uint8Array(buffer).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     const { msgType } = decodeHeader(buffer);
     if (msgType === MSG_SNAPSHOT) {
       return decodeSnapshot(buffer);
@@ -60,9 +58,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const data = model.get("_frame_data") as DataView | null;
     if (!data || data.byteLength === 0) return null;
     const buffer = new ArrayBuffer(data.byteLength);
-    new Uint8Array(buffer).set(
-      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    );
+    new Uint8Array(buffer).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     const { msgType } = decodeHeader(buffer);
     if (msgType === MSG_FRAME) {
       return decodeFrame(buffer);
@@ -122,8 +118,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
 
   function initApp(): boolean {
     if (root || disposed) return !!root;
-    if (container.clientWidth === 0 || container.clientHeight === 0)
-      return false;
+    if (container.clientWidth === 0 || container.clientHeight === 0) return false;
 
     root = createRoot(container);
     currentSnapshot = parseSnapshot();

@@ -30,14 +30,14 @@ interface HullFace {
 }
 
 function cross(
-  ax: number, ay: number, az: number,
-  bx: number, by: number, bz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
 ): [number, number, number] {
-  return [
-    ay * bz - az * by,
-    az * bx - ax * bz,
-    ax * by - ay * bx,
-  ];
+  return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
 }
 
 function dot3(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
@@ -45,15 +45,28 @@ function dot3(ax: number, ay: number, az: number, bx: number, by: number, bz: nu
 }
 
 function makeFace(
-  a: number, b: number, c: number,
-  pts: Float32Array, centroid: [number, number, number],
+  a: number,
+  b: number,
+  c: number,
+  pts: Float32Array,
+  centroid: [number, number, number],
 ): HullFace {
-  const ax = pts[a * 3], ay = pts[a * 3 + 1], az = pts[a * 3 + 2];
-  const bx = pts[b * 3], by = pts[b * 3 + 1], bz = pts[b * 3 + 2];
-  const cx = pts[c * 3], cy = pts[c * 3 + 1], cz = pts[c * 3 + 2];
+  const ax = pts[a * 3],
+    ay = pts[a * 3 + 1],
+    az = pts[a * 3 + 2];
+  const bx = pts[b * 3],
+    by = pts[b * 3 + 1],
+    bz = pts[b * 3 + 2];
+  const cx = pts[c * 3],
+    cy = pts[c * 3 + 1],
+    cz = pts[c * 3 + 2];
 
-  const abx = bx - ax, aby = by - ay, abz = bz - az;
-  const acx = cx - ax, acy = cy - ay, acz = cz - az;
+  const abx = bx - ax,
+    aby = by - ay,
+    abz = bz - az;
+  const acx = cx - ax,
+    acy = cy - ay,
+    acz = cz - az;
   let [nx, ny, nz] = cross(abx, aby, abz, acx, acy, acz);
 
   const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
@@ -86,11 +99,15 @@ function signedDistance(face: HullFace, px: number, py: number, pz: number): num
  * Find 4 non-coplanar points to form the initial tetrahedron.
  * Returns indices or null if all points are coplanar.
  */
-function findInitialTetrahedron(pts: Float32Array, n: number): [number, number, number, number] | null {
+function findInitialTetrahedron(
+  pts: Float32Array,
+  n: number,
+): [number, number, number, number] | null {
   if (n < 4) return null;
 
   // Find two most distant points along any axis
-  let i0 = 0, i1 = 1;
+  let i0 = 0,
+    i1 = 1;
   let maxDist = -1;
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
@@ -113,7 +130,9 @@ function findInitialTetrahedron(pts: Float32Array, n: number): [number, number, 
   const ey = pts[i1 * 3 + 1] - pts[i0 * 3 + 1];
   const ez = pts[i1 * 3 + 2] - pts[i0 * 3 + 2];
   const eLen = Math.sqrt(ex * ex + ey * ey + ez * ez);
-  const ux = ex / eLen, uy = ey / eLen, uz = ez / eLen;
+  const ux = ex / eLen,
+    uy = ey / eLen,
+    uz = ez / eLen;
 
   let i2 = -1;
   let maxLineDist = -1;

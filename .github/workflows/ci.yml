@@ -55,6 +55,8 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build:wasm
+      - run: npm run format:check
+      - run: npm run lint
       - run: npm test
 
   test-python:

@@ -18,11 +18,7 @@ export class WebSocketClient {
   private reconnectDelay = INITIAL_RECONNECT_DELAY;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    url: string,
-    onMessage: OnMessageCallback,
-    onStatus?: OnStatusCallback,
-  ) {
+  constructor(url: string, onMessage: OnMessageCallback, onStatus?: OnStatusCallback) {
     this.url = url;
     this.onMessage = onMessage;
     this.onStatus = onStatus ?? null;
@@ -69,10 +65,7 @@ export class WebSocketClient {
       this._connect();
     }, this.reconnectDelay);
 
-    this.reconnectDelay = Math.min(
-      this.reconnectDelay * 2,
-      MAX_RECONNECT_DELAY,
-    );
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_DELAY);
   }
 
   /** Send a JSON command to the server. */

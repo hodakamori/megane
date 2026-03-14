@@ -157,15 +157,7 @@ export class BondMesh {
           offsetDir: zeroDir,
           offsetMag: 0,
         });
-        this.setCylinderAt(
-          instanceIdx,
-          positions,
-          ai,
-          bi,
-          AROMATIC_BOND_RADIUS,
-          zeroDir,
-          0,
-        );
+        this.setCylinderAt(instanceIdx, positions, ai, bi, AROMATIC_BOND_RADIUS, zeroDir, 0);
         _color.setRGB(cr, cg, cb);
         this.mesh.setColorAt(instanceIdx, _color);
         instanceIdx++;
@@ -189,11 +181,7 @@ export class BondMesh {
           DOUBLE_BOND_OFFSET,
         );
         // Lighter color for aromatic "dashed" bond
-        _color.setRGB(
-          Math.min(1, cr + 0.3),
-          Math.min(1, cg + 0.3),
-          Math.min(1, cb + 0.3),
-        );
+        _color.setRGB(Math.min(1, cr + 0.3), Math.min(1, cg + 0.3), Math.min(1, cb + 0.3));
         this.mesh.setColorAt(instanceIdx, _color);
         instanceIdx++;
       } else {
@@ -206,15 +194,7 @@ export class BondMesh {
           offsetDir: zeroDir,
           offsetMag: 0,
         });
-        this.setCylinderAt(
-          instanceIdx,
-          positions,
-          ai,
-          bi,
-          BOND_RADIUS,
-          zeroDir,
-          0,
-        );
+        this.setCylinderAt(instanceIdx, positions, ai, bi, BOND_RADIUS, zeroDir, 0);
         _color.setRGB(cr, cg, cb);
         this.mesh.setColorAt(instanceIdx, _color);
         instanceIdx++;
@@ -229,22 +209,10 @@ export class BondMesh {
   }
 
   /** Update bond positions for a new frame. */
-  updatePositions(
-    positions: Float32Array,
-    bonds: Uint32Array,
-    nBonds: number,
-  ): void {
+  updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void {
     for (let i = 0; i < this.visualBonds.length; i++) {
       const vb = this.visualBonds[i];
-      this.setCylinderAt(
-        i,
-        positions,
-        vb.ai,
-        vb.bi,
-        vb.radius,
-        vb.offsetDir,
-        vb.offsetMag,
-      );
+      this.setCylinderAt(i, positions, vb.ai, vb.bi, vb.radius, vb.offsetDir, vb.offsetMag);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
   }

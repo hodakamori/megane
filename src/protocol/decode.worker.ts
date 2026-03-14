@@ -6,13 +6,7 @@
  * This keeps the main thread free for rendering during large file loads.
  */
 
-import {
-  decodeSnapshot,
-  decodeFrame,
-  decodeHeader,
-  MSG_SNAPSHOT,
-  MSG_FRAME,
-} from "./protocol";
+import { decodeSnapshot, decodeFrame, decodeHeader, MSG_SNAPSHOT, MSG_FRAME } from "./protocol";
 
 export interface WorkerRequest {
   id: number;
@@ -72,9 +66,7 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
       );
     } else if (msgType === MSG_FRAME) {
       const frame = decodeFrame(buffer);
-      const transfers: ArrayBuffer[] = [
-        frame.positions.buffer as ArrayBuffer,
-      ];
+      const transfers: ArrayBuffer[] = [frame.positions.buffer as ArrayBuffer];
       ctx.postMessage(
         {
           id,

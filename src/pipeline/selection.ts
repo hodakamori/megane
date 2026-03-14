@@ -20,9 +20,18 @@ import { getElementSymbol, getAtomicMass } from "../constants";
 // --- Tokenizer ---
 
 type TokenType =
-  | "field" | "op" | "number" | "string"
-  | "and" | "or" | "not" | "lparen" | "rparen"
-  | "all" | "none" | "eof";
+  | "field"
+  | "op"
+  | "number"
+  | "string"
+  | "and"
+  | "or"
+  | "not"
+  | "lparen"
+  | "rparen"
+  | "all"
+  | "none"
+  | "eof";
 
 interface Token {
   type: TokenType;
@@ -36,19 +45,54 @@ function tokenize(query: string): Token[] {
   let i = 0;
   while (i < query.length) {
     // Skip whitespace
-    if (/\s/.test(query[i])) { i++; continue; }
+    if (/\s/.test(query[i])) {
+      i++;
+      continue;
+    }
 
     // Parentheses
-    if (query[i] === "(") { tokens.push({ type: "lparen", value: "(" }); i++; continue; }
-    if (query[i] === ")") { tokens.push({ type: "rparen", value: ")" }); i++; continue; }
+    if (query[i] === "(") {
+      tokens.push({ type: "lparen", value: "(" });
+      i++;
+      continue;
+    }
+    if (query[i] === ")") {
+      tokens.push({ type: "rparen", value: ")" });
+      i++;
+      continue;
+    }
 
     // Operators (multi-char first)
-    if (query.startsWith("==", i)) { tokens.push({ type: "op", value: "==" }); i += 2; continue; }
-    if (query.startsWith("!=", i)) { tokens.push({ type: "op", value: "!=" }); i += 2; continue; }
-    if (query.startsWith(">=", i)) { tokens.push({ type: "op", value: ">=" }); i += 2; continue; }
-    if (query.startsWith("<=", i)) { tokens.push({ type: "op", value: "<=" }); i += 2; continue; }
-    if (query[i] === ">") { tokens.push({ type: "op", value: ">" }); i++; continue; }
-    if (query[i] === "<") { tokens.push({ type: "op", value: "<" }); i++; continue; }
+    if (query.startsWith("==", i)) {
+      tokens.push({ type: "op", value: "==" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith("!=", i)) {
+      tokens.push({ type: "op", value: "!=" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith(">=", i)) {
+      tokens.push({ type: "op", value: ">=" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith("<=", i)) {
+      tokens.push({ type: "op", value: "<=" });
+      i += 2;
+      continue;
+    }
+    if (query[i] === ">") {
+      tokens.push({ type: "op", value: ">" });
+      i++;
+      continue;
+    }
+    if (query[i] === "<") {
+      tokens.push({ type: "op", value: "<" });
+      i++;
+      continue;
+    }
 
     // Quoted string
     if (query[i] === '"' || query[i] === "'") {
@@ -62,7 +106,10 @@ function tokenize(query: string): Token[] {
     }
 
     // Number (including negative and decimal)
-    if (/[\d.]/.test(query[i]) || (query[i] === "-" && i + 1 < query.length && /[\d.]/.test(query[i + 1]))) {
+    if (
+      /[\d.]/.test(query[i]) ||
+      (query[i] === "-" && i + 1 < query.length && /[\d.]/.test(query[i + 1]))
+    ) {
       let j = i;
       if (query[j] === "-") j++;
       while (j < query.length && /[\d.]/.test(query[j])) j++;
@@ -269,13 +316,20 @@ function compileAST(
         }
 
         switch (op) {
-          case "==": return fieldValue === value;
-          case "!=": return fieldValue !== value;
-          case ">":  return fieldValue > value;
-          case "<":  return fieldValue < value;
-          case ">=": return fieldValue >= value;
-          case "<=": return fieldValue <= value;
-          default: return false;
+          case "==":
+            return fieldValue === value;
+          case "!=":
+            return fieldValue !== value;
+          case ">":
+            return fieldValue > value;
+          case "<":
+            return fieldValue < value;
+          case ">=":
+            return fieldValue >= value;
+          case "<=":
+            return fieldValue <= value;
+          default:
+            return false;
         }
       };
     }

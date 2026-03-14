@@ -87,11 +87,7 @@ export class LabelOverlay {
       const label = this.labels[i];
       if (!label) continue;
 
-      this.tmpVec.set(
-        this.positions[i * 3],
-        this.positions[i * 3 + 1],
-        this.positions[i * 3 + 2],
-      );
+      this.tmpVec.set(this.positions[i * 3], this.positions[i * 3 + 1], this.positions[i * 3 + 2]);
       this.tmpVec.project(camera);
 
       // Frustum cull

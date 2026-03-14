@@ -52,12 +52,42 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
     }
   ],
   "edges": [
-    { "source": "loader-1", "target": "addbond-1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "polyhedron-1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "viewport-1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "viewport-1", "sourceHandle": "cell", "targetHandle": "cell" },
-    { "source": "addbond-1", "target": "viewport-1", "sourceHandle": "bond", "targetHandle": "bond" },
-    { "source": "polyhedron-1", "target": "viewport-1", "sourceHandle": "mesh", "targetHandle": "mesh" }
+    {
+      "source": "loader-1",
+      "target": "addbond-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "loader-1",
+      "target": "polyhedron-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "loader-1",
+      "target": "viewport-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "loader-1",
+      "target": "viewport-1",
+      "sourceHandle": "cell",
+      "targetHandle": "cell"
+    },
+    {
+      "source": "addbond-1",
+      "target": "viewport-1",
+      "sourceHandle": "bond",
+      "targetHandle": "bond"
+    },
+    {
+      "source": "polyhedron-1",
+      "target": "viewport-1",
+      "sourceHandle": "mesh",
+      "targetHandle": "mesh"
+    }
   ]
 }
 ```

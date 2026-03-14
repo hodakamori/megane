@@ -1,9 +1,4 @@
-import type {
-  PipelineData,
-  ParticleData,
-  BondData,
-  AddBondParams,
-} from "../types";
+import type { PipelineData, ParticleData, BondData, AddBondParams } from "../types";
 import { inferBondsVdwJS } from "../../parsers/inferBondsJS";
 import { invert3x3 } from "./mathUtils";
 
@@ -40,12 +35,26 @@ export function processPbcBonds(
   box: Float32Array | null,
 ): PbcBondResult {
   if (!box || !box.some((v) => v !== 0)) {
-    return { bondIndices, bondOrders, nBonds: bondIndices.length / 2, positions: null, elements: null, nAtoms: 0 };
+    return {
+      bondIndices,
+      bondOrders,
+      nBonds: bondIndices.length / 2,
+      positions: null,
+      elements: null,
+      nAtoms: 0,
+    };
   }
 
   const boxInv = invert3x3(box);
   if (!boxInv) {
-    return { bondIndices, bondOrders, nBonds: bondIndices.length / 2, positions: null, elements: null, nAtoms: 0 };
+    return {
+      bondIndices,
+      bondOrders,
+      nBonds: bondIndices.length / 2,
+      positions: null,
+      elements: null,
+      nAtoms: 0,
+    };
   }
 
   // Threshold: half the shortest cell vector length
@@ -75,7 +84,14 @@ export function processPbcBonds(
 
   if (nPbc === 0) {
     // No PBC bonds — return original data unchanged
-    return { bondIndices, bondOrders, nBonds: nBondsIn, positions: null, elements: null, nAtoms: 0 };
+    return {
+      bondIndices,
+      bondOrders,
+      nBonds: nBondsIn,
+      positions: null,
+      elements: null,
+      nAtoms: 0,
+    };
   }
 
   // Allocate: normal bonds + 2 half-bonds per PBC bond
@@ -187,8 +203,12 @@ export function executeAddBond(
       let extNAtoms = 0;
 
       const result = processPbcBonds(
-        bondIndices, bondOrders, snapshot.positions,
-        snapshot.elements, snapshot.nAtoms, snapshot.box,
+        bondIndices,
+        bondOrders,
+        snapshot.positions,
+        snapshot.elements,
+        snapshot.nAtoms,
+        snapshot.box,
       );
       bondIndices = result.bondIndices;
       bondOrders = result.bondOrders;
@@ -229,8 +249,12 @@ export function executeAddBond(
       let extNAtoms = 0;
 
       const result = processPbcBonds(
-        bondIndices, null, snapshot.positions,
-        snapshot.elements, snapshot.nAtoms, snapshot.box,
+        bondIndices,
+        null,
+        snapshot.positions,
+        snapshot.elements,
+        snapshot.nAtoms,
+        snapshot.box,
       );
       bondIndices = result.bondIndices;
       nBonds = result.nBonds;

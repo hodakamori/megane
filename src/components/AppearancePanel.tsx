@@ -100,11 +100,7 @@ export function AppearancePanel({
   onToggleCollapse,
 }: AppearancePanelProps) {
   return (
-    <CollapsiblePanel
-      title="Appearance"
-      collapsed={collapsed}
-      onToggleCollapse={onToggleCollapse}
-    >
+    <CollapsiblePanel title="Appearance" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
       <div
         style={{
           flex: 1,
@@ -134,9 +130,7 @@ export function AppearancePanel({
               onChange={(e) => onAtomScaleChange(parseFloat(e.target.value))}
               style={sliderTrackStyle}
             />
-            <span style={valueDisplayStyle}>
-              {atomScale.toFixed(2)}
-            </span>
+            <span style={valueDisplayStyle}>{atomScale.toFixed(2)}</span>
           </div>
         </div>
 
@@ -159,9 +153,7 @@ export function AppearancePanel({
               onChange={(e) => onAtomOpacityChange(parseFloat(e.target.value))}
               style={sliderTrackStyle}
             />
-            <span style={valueDisplayStyle}>
-              {Math.round(atomOpacity * 100)}%
-            </span>
+            <span style={valueDisplayStyle}>{Math.round(atomOpacity * 100)}%</span>
           </div>
         </div>
 
@@ -184,9 +176,7 @@ export function AppearancePanel({
               onChange={(e) => onBondScaleChange(parseFloat(e.target.value))}
               style={sliderTrackStyle}
             />
-            <span style={valueDisplayStyle}>
-              {bondScale.toFixed(2)}
-            </span>
+            <span style={valueDisplayStyle}>{bondScale.toFixed(2)}</span>
           </div>
         </div>
 
@@ -209,9 +199,7 @@ export function AppearancePanel({
               onChange={(e) => onBondOpacityChange(parseFloat(e.target.value))}
               style={sliderTrackStyle}
             />
-            <span style={valueDisplayStyle}>
-              {Math.round(bondOpacity * 100)}%
-            </span>
+            <span style={valueDisplayStyle}>{Math.round(bondOpacity * 100)}%</span>
           </div>
         </div>
 
@@ -235,9 +223,7 @@ export function AppearancePanel({
                 onChange={(e) => onVdwScaleChange(parseFloat(e.target.value))}
                 style={sliderTrackStyle}
               />
-              <span style={valueDisplayStyle}>
-                {vdwScale.toFixed(2)}
-              </span>
+              <span style={valueDisplayStyle}>{vdwScale.toFixed(2)}</span>
             </div>
           </div>
         )}
@@ -266,9 +252,7 @@ export function AppearancePanel({
               onFile={labels.onUploadFile}
               label="Load labels..."
             >
-              {labels.fileName && (
-                <div style={fileNameStyle}>{labels.fileName}</div>
-              )}
+              {labels.fileName && <div style={fileNameStyle}>{labels.fileName}</div>}
             </DropZone>
           )}
         </div>
@@ -293,9 +277,7 @@ export function AppearancePanel({
                 onFile={vectors.onUploadFile}
                 label="Load vectors..."
               >
-                {vectors.fileName && (
-                  <div style={fileNameStyle}>{vectors.fileName}</div>
-                )}
+                {vectors.fileName && <div style={fileNameStyle}>{vectors.fileName}</div>}
               </DropZone>
             )}
             {vectors.source !== "none" && vectorScale != null && onVectorScaleChange && (
@@ -317,9 +299,7 @@ export function AppearancePanel({
                     onChange={(e) => onVectorScaleChange(parseFloat(e.target.value))}
                     style={sliderTrackStyle}
                   />
-                  <span style={valueDisplayStyle}>
-                    {vectorScale.toFixed(1)}
-                  </span>
+                  <span style={valueDisplayStyle}>{vectorScale.toFixed(1)}</span>
                 </div>
               </div>
             )}

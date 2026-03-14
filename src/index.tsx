@@ -75,7 +75,9 @@ function App() {
         const store = usePipelineStore.getState();
         const streamNode = store.nodes.find((n) => n.type === "streaming");
         if (streamNode) {
-          const provider = meta ? new MemoryFrameProvider(frames, meta, result.snapshot.positions) : null;
+          const provider = meta
+            ? new MemoryFrameProvider(frames, meta, result.snapshot.positions)
+            : null;
           store.setNodeStreamingData(streamNode.id, {
             snapshot: result.snapshot,
             streamProvider: provider,
@@ -100,9 +102,12 @@ function App() {
     togglePlayPause();
   }, [togglePlayPause]);
 
-  const handleFpsChange = useCallback((newFps: number) => {
-    setFps(newFps);
-  }, [setFps]);
+  const handleFpsChange = useCallback(
+    (newFps: number) => {
+      setFps(newFps);
+    },
+    [setFps],
+  );
 
   const handleUploadStructure = useCallback(
     (file: File) => {

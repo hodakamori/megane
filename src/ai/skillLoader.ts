@@ -34,10 +34,10 @@ export interface ToolDefinition {
  * Import all .md files from the skills directory at build time.
  * Vite's import.meta.glob with ?raw returns file contents as strings.
  */
-const skillModules: Record<string, { default: string }> = import.meta.glob(
-  "./skills/*.md",
-  { query: "?raw", eager: true },
-) as Record<string, { default: string }>;
+const skillModules: Record<string, { default: string }> = import.meta.glob("./skills/*.md", {
+  query: "?raw",
+  eager: true,
+}) as Record<string, { default: string }>;
 
 /**
  * Parse YAML frontmatter from a markdown string.
@@ -111,10 +111,7 @@ export function buildToolDefinitions(skills: PipelineSkill[]): ToolDefinition[] 
  * Execute a skill by tool name. Returns the skill's markdown content.
  * Returns null if no matching skill is found.
  */
-export function executeSkill(
-  skills: PipelineSkill[],
-  toolName: string,
-): string | null {
+export function executeSkill(skills: PipelineSkill[], toolName: string): string | null {
   const skill = skills.find((s) => toSnakeCase(s.name) === toolName);
   return skill?.content ?? null;
 }

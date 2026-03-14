@@ -58,11 +58,19 @@ const nodeTypes = {
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
-  { category: "data_load", label: "Data Load", types: ["load_structure", "load_trajectory", "load_vector", "streaming"] },
+  {
+    category: "data_load",
+    label: "Data Load",
+    types: ["load_structure", "load_trajectory", "load_vector", "streaming"],
+  },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },
   { category: "modify", label: "Modify", types: ["modify"] },
-  { category: "overlay", label: "Overlay", types: ["label_generator", "polyhedron_generator", "vector_overlay"] },
+  {
+    category: "overlay",
+    label: "Overlay",
+    types: ["label_generator", "polyhedron_generator", "vector_overlay"],
+  },
 ];
 
 const MIN_WIDTH = 320;
@@ -216,32 +224,44 @@ function PipelineEditorInner({
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Resize drag handling
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startWidth: panelWidth };
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragRef.current = { startX: e.clientX, startWidth: panelWidth };
 
-    const handleMouseMove = (ev: MouseEvent) => {
-      if (!dragRef.current) return;
-      // Panel is on the right: dragging left increases width
-      const newWidth = dragRef.current.startWidth - (ev.clientX - dragRef.current.startX);
-      const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
-      setPanelWidth(clamped);
-      onWidthChange?.(clamped);
-    };
+      const handleMouseMove = (ev: MouseEvent) => {
+        if (!dragRef.current) return;
+        // Panel is on the right: dragging left increases width
+        const newWidth = dragRef.current.startWidth - (ev.clientX - dragRef.current.startX);
+        const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
+        setPanelWidth(clamped);
+        onWidthChange?.(clamped);
+      };
 
-    const handleMouseUp = () => {
-      dragRef.current = null;
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
+      const handleMouseUp = () => {
+        dragRef.current = null;
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  }, [panelWidth, onWidthChange]);
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [panelWidth, onWidthChange],
+  );
 
   // Connection validation using typed port matching
   const isValidConnection = useCallback(
-    (connection: Connection | { source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }) => {
+    (
+      connection:
+        | Connection
+        | {
+            source: string;
+            target: string;
+            sourceHandle?: string | null;
+            targetHandle?: string | null;
+          },
+    ) => {
       if (connection.source === connection.target) return false;
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
