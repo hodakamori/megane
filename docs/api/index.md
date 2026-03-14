@@ -13,9 +13,13 @@ The Python API is used for:
 ```python
 import megane
 
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
+pipe.add_edge(s, t)
+
 viewer = megane.MolecularViewer()
-structure = megane.load_pdb("protein.pdb")
-trajectory = megane.load_trajectory("protein.pdb", "trajectory.xtc")
+viewer.set_pipeline(pipe)
 ```
 
 [Python API Reference →](/api/python/)
@@ -29,7 +33,7 @@ The TypeScript API is used for:
 - **Protocol decoding** — Parse binary WebSocket messages
 
 ```ts
-import { MeganeViewer, MoleculeRenderer } from "megane";
+import { MeganeViewer, MoleculeRenderer } from "megane-viewer";
 ```
 
 [TypeScript API Reference →](/api/typescript/)

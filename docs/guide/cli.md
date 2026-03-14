@@ -23,7 +23,7 @@ docker run --rm -p 8080:8080 -v ./mydata:/data megane \
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+
+- Node.js 22+
 - Rust
 - [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
 - [uv](https://docs.astral.sh/uv/)

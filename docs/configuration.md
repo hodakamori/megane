@@ -5,7 +5,7 @@
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+
+- Node.js 22+
 - Rust (for building the parser)
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 
@@ -50,11 +50,12 @@ npm run dev
 ```
 megane/
 ├── crates/                    # Rust workspace
-│   ├── megane-core/           # Core parsers (PDB, GRO, XYZ, MOL, XTC)
+│   ├── megane-core/           # Core parsers (PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, .traj, .lammpstrj)
 │   ├── megane-python/         # PyO3 bindings
 │   └── megane-wasm/           # WASM bindings
 ├── python/megane/             # Python package
 │   ├── widget.py              # Jupyter widget (anywidget)
+│   ├── pipeline.py            # Pipeline builder (NetworkX-style DAG)
 │   ├── server.py              # FastAPI WebSocket server
 │   ├── cli.py                 # CLI entry point
 │   ├── protocol.py            # Binary protocol encoder
