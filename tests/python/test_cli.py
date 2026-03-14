@@ -1,9 +1,17 @@
-"""Tests for CLI argument parsing."""
+"""Tests for CLI argument parsing and main() function."""
+
+from __future__ import annotations
 
 import argparse
-from unittest.mock import patch
+import logging
+from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Original argparse-only tests
+# ---------------------------------------------------------------------------
 
 
 def test_serve_command_basic():
@@ -100,3 +108,91 @@ def test_missing_command():
 
     with pytest.raises(SystemExit):
         parser.parse_args([])
+
+
+# ---------------------------------------------------------------------------
+# Tests that exercise the actual main() function
+# ---------------------------------------------------------------------------
+
+
+@patch("uvicorn.run")
+@patch("megane.cli.webbrowser")
+@patch("megane.server.configure")
+def test_main_serve_with_pdb(mock_configure, mock_webbrowser, mock_uvicorn_run):
+    """main() with 'serve <pdb>' calls configure and uvicorn.run."""
+    from megane.cli import main
+
+    with patch("sys.argv", ["megane", "serve", "test.pdb"]):
+        main()
+
+    mock_configure.assert_called_once_with("test.pdb", None)
+    mock_uvicorn_run.assert_called_once()
+    call_kwargs = mock_uvicorn_run.call_args
+    assert call_kwargs[1]["port"] == 8765
+
+
+@patch("uvicorn.run")
+@patch("megane.cli.webbrowser")
+@patch("megane.server.configure")
+def test_main_serve_no_browser(mock_configure, mock_webbrowser, mock_uvicorn_run):
+    """main() with --no-browser skips webbrowser.open."""
+    from megane.cli import main
+
+    with patch("sys.argv", ["megane", "serve", "test.pdb", "--no-browser"]):
+        main()
+
+    mock_webbrowser.open.assert_not_called()
+    mock_uvicorn_run.assert_called_once()
+
+
+@patch("uvicorn.run")
+@patch("megane.cli.webbrowser")
+@patch("megane.server.configure")
+def test_main_serve_dev_flag(mock_configure, mock_webbrowser, mock_uvicorn_run, caplog):
+    """main() with --dev logs dev message and skips browser open."""
+    from megane.cli import main
+
+    with patch("sys.argv", ["megane", "serve", "test.pdb", "--dev"]):
+        with caplog.at_level(logging.INFO):
+            main()
+
+    # --dev implies no browser
+    mock_webbrowser.open.assert_not_called()
+    assert any("Dev mode" in r.message for r in caplog.records)
+
+
+@patch("uvicorn.run")
+@patch("megane.cli.webbrowser")
+@patch("megane.server.configure")
+def test_main_serve_traj(mock_configure, mock_webbrowser, mock_uvicorn_run):
+    """main() with --traj passes traj_path to configure."""
+    from megane.cli import main
+
+    with patch("sys.argv", ["megane", "serve", "--traj", "sim.traj"]):
+        main()
+
+    mock_configure.assert_called_once_with("", traj_path="sim.traj")
+
+
+@patch("uvicorn.run")
+@patch("megane.cli.webbrowser")
+@patch("megane.server.configure")
+def test_main_serve_no_pdb(mock_configure, mock_webbrowser, mock_uvicorn_run, caplog):
+    """main() with no PDB file logs waiting-for-upload message."""
+    from megane.cli import main
+
+    with patch("sys.argv", ["megane", "serve", "--no-browser"]):
+        with caplog.at_level(logging.INFO):
+            main()
+
+    mock_configure.assert_not_called()
+    assert any("Waiting for file upload" in r.message for r in caplog.records)
+
+
+def test_main_no_args():
+    """main() with no arguments raises SystemExit."""
+    from megane.cli import main
+
+    with patch("sys.argv", ["megane"]):
+        with pytest.raises(SystemExit):
+            main()

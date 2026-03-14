@@ -20,6 +20,10 @@ Describe the visualization you want in natural language, and megane builds the n
 
 The generator creates the appropriate LoadStructure, AddBond, Filter, Modify, and Viewport nodes, wires them together, and places them in the editor. You can then adjust parameters or add more nodes manually.
 
+## VSCode Extension Auto-Setup
+
+When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
+
 ## Getting Started
 
 The simplest pipeline loads a structure and displays it:
@@ -152,6 +156,8 @@ The input field validates your query in real time — invalid syntax is highligh
 | Perspective | off | Toggle perspective / orthographic projection |
 | Cell axes visible | on | Show simulation cell axes with labels |
 
+A **Render Export** button is available in the pipeline editor toolbar. Click it to export the current viewport as a PNG image (or other formats such as EPS, GIF, and MP4 via the render modal).
+
 ## Data Types
 
 Seven typed data channels flow through color-coded edges:
@@ -225,6 +231,38 @@ Use Filter + Modify nodes to fade out water molecules while keeping the protein 
 5. Connect the original `LoadStructure.particle → Viewport.particle` as well (for the protein)
 
 The viewport renders both streams — the protein at full opacity, and the water as translucent small spheres.
+
+## Multiple Structure Layers
+
+You can load multiple structure files simultaneously, with each file rendered as a separate layer in the viewport. Each `LoadStructure` node connected to a `Viewport` creates an independent rendering layer, allowing you to combine different molecules in a single view.
+
+For example, to display a protein and a ligand loaded from separate files:
+
+```
+LoadStructure (protein.pdb) → AddBond → Viewport
+LoadStructure (ligand.mol)  → AddBond ↗
+```
+
+In Python:
+
+```python
+import megane
+
+pipe = megane.Pipeline()
+protein = pipe.add_node(megane.LoadStructure("protein.pdb"))
+ligand = pipe.add_node(megane.LoadStructure("ligand.mol"))
+bonds_p = pipe.add_node(megane.AddBonds(source="distance"))
+bonds_l = pipe.add_node(megane.AddBonds(source="structure"))
+
+pipe.add_edge(protein, bonds_p)
+pipe.add_edge(ligand, bonds_l)
+
+viewer = megane.MolecularViewer()
+viewer.set_pipeline(pipe)
+viewer
+```
+
+Each layer is processed independently through its own chain of Filter, Modify, and overlay nodes before reaching the Viewport.
 
 ## Serialization
 

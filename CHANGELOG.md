@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **LAMMPS data format** — LAMMPS data file (`.data`, `.lammps`) parser with auto-detection of atom_style
 - **ASE .traj format** — ASE trajectory (`.traj`) parser for ULM binary format
 - **LAMMPS dump trajectory** — LAMMPS dump (`.lammpstrj`) parser
+- **Streaming node** — dedicated `Streaming` node for WebSocket-based real-time data delivery with bond output support
 - AI pipeline generator — describe visualizations in natural language and the node graph is built automatically
 - Pipeline error display with node-level error icons and tooltips
 - Multiple structure loading with layer-based rendering
@@ -20,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - VSCode extension auto-setup: opening a PDB file creates a LoadStructure + AddBond + Viewport pipeline
 - Test coverage measurement for TypeScript, Python, and Rust
 - Tests for pipeline graph/validate/types, protocol, server, and CLI modules
+
+### Changed
+
+- Removed unused `puppeteer` dependency (all E2E tests use Playwright)
+- Added metadata (description, authors, license, repository) to all Rust crates
 
 ### Fixed
 

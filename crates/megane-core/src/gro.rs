@@ -31,12 +31,14 @@ fn element_from_atom_name(name: &str) -> u8 {
     }
 
     // Try two-char symbol first (e.g. "CL", "BR", "FE")
-    if clean.len() >= 2 {
-        let two = format!(
-            "{}{}",
-            clean.chars().next().unwrap().to_uppercase().next().unwrap(),
-            clean.chars().nth(1).unwrap().to_lowercase().next().unwrap()
-        );
+    let mut chars = clean.chars();
+    let first = match chars.next() {
+        Some(c) => c,
+        None => return 0,
+    };
+
+    if let Some(second) = chars.next() {
+        let two: String = first.to_uppercase().chain(second.to_lowercase()).collect();
         let num = symbol_to_atomic_num(&two);
         if num != 0 {
             return num;
@@ -44,7 +46,7 @@ fn element_from_atom_name(name: &str) -> u8 {
     }
 
     // Fall back to single-char
-    let one = clean.chars().next().unwrap().to_uppercase().next().unwrap().to_string();
+    let one: String = first.to_uppercase().collect();
     symbol_to_atomic_num(&one)
 }
 

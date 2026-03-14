@@ -1,0 +1,32 @@
+name: Feature Request
+description: Suggest a new feature or improvement for megane
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature. Please describe it below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear summary of the feature you would like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Explain the problem this feature would solve or the workflow it would improve.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you think this feature could be implemented, if you have ideas.
+    validations:
+      required: false

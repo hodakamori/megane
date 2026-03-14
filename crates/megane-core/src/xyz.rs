@@ -118,7 +118,8 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     }
 
     let positions = first_positions.ok_or("XYZ file contains no atoms")?;
-    let elements = first_elements.unwrap();
+    // SAFETY: first_elements is always set when first_positions is set
+    let elements = first_elements.ok_or("XYZ file contains no atoms")?;
 
     // Infer bonds from first frame
     let empty_bonds = HashSet::new();
