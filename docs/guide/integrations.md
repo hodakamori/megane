@@ -14,7 +14,12 @@ import ipywidgets as widgets
 import megane
 
 viewer = megane.MolecularViewer()
-viewer.load("protein.pdb", xtc="trajectory.xtc")
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
+pipe.add_edge(s, t)
+viewer.set_pipeline(pipe)
 
 # Create a Plotly time-series chart
 fig = go.FigureWidget(
@@ -107,7 +112,10 @@ Use `on_event()` as a decorator or method call:
 import megane
 
 viewer = megane.MolecularViewer()
-viewer.load("protein.pdb")
+
+pipe = megane.Pipeline()
+s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+viewer.set_pipeline(pipe)
 
 # As decorator
 @viewer.on_event("measurement")
