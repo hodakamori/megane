@@ -1,0 +1,4 @@
+dist/
+crates/*/pkg/
+python/megane/static/
+node_modules/

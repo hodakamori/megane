@@ -7,7 +7,13 @@
 import { useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { PipelineNodeType, PortDefinition, NodeError } from "../../pipeline/types";
-import { NODE_TYPE_LABELS, NODE_PORTS, DATA_TYPE_COLORS, NODE_CATEGORY, NODE_CATEGORY_COLORS } from "../../pipeline/types";
+import {
+  NODE_TYPE_LABELS,
+  NODE_PORTS,
+  DATA_TYPE_COLORS,
+  NODE_CATEGORY,
+  NODE_CATEGORY_COLORS,
+} from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 
 interface NodeShellProps {
@@ -256,11 +262,7 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
           />
         </div>
         {nodeType !== "viewport" && (
-          <button
-            onClick={() => removeNode(id)}
-            style={iconBtnStyle}
-            title="Remove node"
-          >
+          <button onClick={() => removeNode(id)} style={iconBtnStyle} title="Remove node">
             &times;
           </button>
         )}

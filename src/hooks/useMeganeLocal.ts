@@ -11,7 +11,15 @@ import { parseXTCFile, parseLammpstrjFile } from "../parsers/xtc";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource } from "../types";
+import type {
+  Snapshot,
+  Frame,
+  TrajectoryMeta,
+  BondSource,
+  TrajectorySource,
+  LabelSource,
+  VectorSource,
+} from "../types";
 
 export interface MeganeLocalState {
   snapshot: Snapshot | null;
@@ -71,7 +79,12 @@ export function useMeganeLocal(): MeganeLocalState {
   // Sub-hooks for source management
   const bonds = useBondSource(baseSnapshotRef, setSnapshot);
   const labels = useLabelSource(baseSnapshotRef);
-  const vectors = useVectorSource(baseSnapshotRef, currentFrameRef, structureFramesRef, fileTrajMetaRef);
+  const vectors = useVectorSource(
+    baseSnapshotRef,
+    currentFrameRef,
+    structureFramesRef,
+    fileTrajMetaRef,
+  );
 
   const resetPlayback = useCallback(() => {
     setFrame(null);
@@ -104,7 +117,12 @@ export function useMeganeLocal(): MeganeLocalState {
   }, []);
 
   const applyResult = useCallback(
-    (result: { snapshot: Snapshot; frames: Frame[]; meta: TrajectoryMeta | null; labels: string[] | null }) => {
+    (result: {
+      snapshot: Snapshot;
+      frames: Frame[];
+      meta: TrajectoryMeta | null;
+      labels: string[] | null;
+    }) => {
       baseSnapshotRef.current = result.snapshot;
       structureFramesRef.current = result.frames;
       fileFramesRef.current = [];
@@ -130,79 +148,92 @@ export function useMeganeLocal(): MeganeLocalState {
     [resetPlayback, bonds.reset, labels.reset, vectors.reset],
   );
 
-  const loadFile = useCallback(async (pdb: File) => {
-    const result = await parseStructureFile(pdb);
-    applyResult(result);
-    setPdbFileName(pdb.name);
-    setXtcFileName(result.meta ? "PDB models" : null);
-  }, [applyResult]);
+  const loadFile = useCallback(
+    async (pdb: File) => {
+      const result = await parseStructureFile(pdb);
+      applyResult(result);
+      setPdbFileName(pdb.name);
+      setXtcFileName(result.meta ? "PDB models" : null);
+    },
+    [applyResult],
+  );
 
-  const loadText = useCallback(async (text: string, fileName?: string) => {
-    const result = await parseStructureText(text, fileName);
-    applyResult(result);
-    setPdbFileName(fileName ?? "caffeine_water.pdb");
-    setXtcFileName(result.meta ? "PDB models" : null);
-  }, [applyResult]);
+  const loadText = useCallback(
+    async (text: string, fileName?: string) => {
+      const result = await parseStructureText(text, fileName);
+      applyResult(result);
+      setPdbFileName(fileName ?? "caffeine_water.pdb");
+      setXtcFileName(result.meta ? "PDB models" : null);
+    },
+    [applyResult],
+  );
 
-  const loadXtc = useCallback(async (xtc: File) => {
-    if (!baseSnapshotRef.current) {
-      throw new Error("Load a structure before loading a trajectory");
-    }
-    const ext = xtc.name.toLowerCase();
-    const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
-    const parseFn = isLammpstrj ? parseLammpstrjFile : parseXTCFile;
-    const { frames, meta: xtcMeta } = await parseFn(
-      xtc,
-      baseSnapshotRef.current.nAtoms,
-    );
-    fileFramesRef.current = frames;
-    fileTrajMetaRef.current = xtcMeta;
-    xtcFileNameRef.current = xtc.name;
-    setHasFileFrames(true);
-
-    currentTrajSourceRef.current = "file";
-    setTrajectorySourceState("file");
-    setMeta(xtcMeta);
-    resetPlayback();
-    setXtcFileName(xtc.name);
-  }, [resetPlayback]);
-
-  const seekFrame = useCallback((frameIdx: number) => {
-    const frames = currentTrajSourceRef.current === "file"
-      ? fileFramesRef.current
-      : structureFramesRef.current;
-
-    if (frameIdx === 0) {
-      if (baseSnapshotRef.current) {
-        setFrame({
-          frameId: 0,
-          nAtoms: baseSnapshotRef.current.nAtoms,
-          positions: baseSnapshotRef.current.positions,
-        });
+  const loadXtc = useCallback(
+    async (xtc: File) => {
+      if (!baseSnapshotRef.current) {
+        throw new Error("Load a structure before loading a trajectory");
       }
-    } else {
-      const f = frames[frameIdx - 1];
-      if (f) setFrame(f);
-    }
-    setCurrentFrame(frameIdx);
-    currentFrameRef.current = frameIdx;
+      const ext = xtc.name.toLowerCase();
+      const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
+      const parseFn = isLammpstrj ? parseLammpstrjFile : parseXTCFile;
+      const { frames, meta: xtcMeta } = await parseFn(xtc, baseSnapshotRef.current.nAtoms);
+      fileFramesRef.current = frames;
+      fileTrajMetaRef.current = xtcMeta;
+      xtcFileNameRef.current = xtc.name;
+      setHasFileFrames(true);
 
-    // Update vectors for this frame
-    vectors.updateForFrame(frameIdx);
-  }, [vectors.updateForFrame]);
+      currentTrajSourceRef.current = "file";
+      setTrajectorySourceState("file");
+      setMeta(xtcMeta);
+      resetPlayback();
+      setXtcFileName(xtc.name);
+    },
+    [resetPlayback],
+  );
 
-  const setTrajectorySource = useCallback((source: TrajectorySource) => {
-    currentTrajSourceRef.current = source;
-    setTrajectorySourceState(source);
-    updateMetaForTrajSource(source);
-    resetPlayback();
+  const seekFrame = useCallback(
+    (frameIdx: number) => {
+      const frames =
+        currentTrajSourceRef.current === "file"
+          ? fileFramesRef.current
+          : structureFramesRef.current;
 
-    if (source === "file") {
-      setXtcFileName(xtcFileNameRef.current);
-    } else {
-      setXtcFileName(structureFramesRef.current.length > 0 ? "PDB models" : null);
-    }
-  }, [updateMetaForTrajSource, resetPlayback]);
+      if (frameIdx === 0) {
+        if (baseSnapshotRef.current) {
+          setFrame({
+            frameId: 0,
+            nAtoms: baseSnapshotRef.current.nAtoms,
+            positions: baseSnapshotRef.current.positions,
+          });
+        }
+      } else {
+        const f = frames[frameIdx - 1];
+        if (f) setFrame(f);
+      }
+      setCurrentFrame(frameIdx);
+      currentFrameRef.current = frameIdx;
+
+      // Update vectors for this frame
+      vectors.updateForFrame(frameIdx);
+    },
+    [vectors.updateForFrame],
+  );
+
+  const setTrajectorySource = useCallback(
+    (source: TrajectorySource) => {
+      currentTrajSourceRef.current = source;
+      setTrajectorySourceState(source);
+      updateMetaForTrajSource(source);
+      resetPlayback();
+
+      if (source === "file") {
+        setXtcFileName(xtcFileNameRef.current);
+      } else {
+        setXtcFileName(structureFramesRef.current.length > 0 ? "PDB models" : null);
+      }
+    },
+    [updateMetaForTrajSource, resetPlayback],
+  );
 
   return {
     snapshot,

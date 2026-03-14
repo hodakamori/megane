@@ -28,10 +28,7 @@ import { ArrowRenderer } from "./ArrowRenderer";
 import { PolyhedronRenderer } from "./PolyhedronRenderer";
 import { StructureLayer } from "./StructureLayer";
 import type { MeshData } from "../pipeline/types";
-import {
-  getRadius,
-  BALL_STICK_ATOM_SCALE,
-} from "../constants";
+import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import {
@@ -131,9 +128,12 @@ export class MoleculeRenderer {
     const aspect = container.clientWidth / container.clientHeight;
     const frustumSize = 50;
     this.camera = new THREE.OrthographicCamera(
-      -frustumSize * aspect / 2, frustumSize * aspect / 2,
-      frustumSize / 2, -frustumSize / 2,
-      0.1, 10000,
+      (-frustumSize * aspect) / 2,
+      (frustumSize * aspect) / 2,
+      frustumSize / 2,
+      -frustumSize / 2,
+      0.1,
+      10000,
     );
     this.camera.position.set(0, -50, 0);
     this.camera.up.set(0, 0, 1);
@@ -244,11 +244,7 @@ export class MoleculeRenderer {
     this.atomRenderer.updatePositions(frame.positions);
     this.labelOverlay?.setPositions(frame.positions);
     this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
-    this.bondRenderer.updatePositions(
-      frame.positions,
-      this.snapshot.bonds,
-      this.snapshot.nBonds,
-    );
+    this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
     }
@@ -258,10 +254,7 @@ export class MoleculeRenderer {
    * Replace bond data and re-render bonds without resetting the camera.
    * Used for per-frame bond recalculation (e.g. distance-based bonds).
    */
-  updateBonds(
-    bonds: Uint32Array,
-    bondOrders: Uint8Array | null,
-  ): void {
+  updateBonds(bonds: Uint32Array, bondOrders: Uint8Array | null): void {
     if (!this.snapshot || !this.bondRenderer) return;
     const positions = this.currentPositions ?? this.snapshot.positions;
     const updated: Snapshot = {
@@ -481,11 +474,7 @@ export class MoleculeRenderer {
   /** Returns true if the CSS-pixel coordinate hits the axes inset. */
   hitTestAxesInset(cssX: number, cssY: number): boolean {
     if (!this.cellAxesRenderer || !this.container) return false;
-    return this.cellAxesRenderer.hitTest(
-      cssX,
-      cssY,
-      this.container.clientHeight,
-    );
+    return this.cellAxesRenderer.hitTest(cssX, cssY, this.container.clientHeight);
   }
 
   /** Begin an axes-inset drag at the given CSS coordinates. */
@@ -499,18 +488,12 @@ export class MoleculeRenderer {
 
   /** Continue an axes-inset drag. Returns true if currently dragging. */
   moveAxesDrag(cssX: number, cssY: number): boolean {
-    if (!this.axesDragging || !this.cellAxesRenderer || !this.container)
-      return false;
+    if (!this.axesDragging || !this.cellAxesRenderer || !this.container) return false;
     const dx = cssX - this.axesDragLastX;
     const dy = cssY - this.axesDragLastY;
     this.axesDragLastX = cssX;
     this.axesDragLastY = cssY;
-    this.cellAxesRenderer.moveBy(
-      dx,
-      dy,
-      this.container.clientWidth,
-      this.container.clientHeight,
-    );
+    this.cellAxesRenderer.moveBy(dx, dy, this.container.clientWidth, this.container.clientHeight);
     return true;
   }
 
@@ -612,8 +595,10 @@ export class MoleculeRenderer {
 
     const target = this.controls.target.clone();
     const newCamera = createSwitchedCamera(
-      this.camera, enabled,
-      this.container.clientWidth, this.container.clientHeight,
+      this.camera,
+      enabled,
+      this.container.clientWidth,
+      this.container.clientHeight,
     );
 
     // Recreate controls with new camera
@@ -748,9 +733,13 @@ export class MoleculeRenderer {
   raycastAtPixel(clientX: number, clientY: number): HoverInfo {
     if (!this.container || !this.snapshot) return null;
     return pickAtPixel(
-      this.camera, this.container, this.snapshot,
-      this.getCurrentPositions(), this.atomScale,
-      clientX, clientY,
+      this.camera,
+      this.container,
+      this.snapshot,
+      this.getCurrentPositions(),
+      this.atomScale,
+      clientX,
+      clientY,
     );
   }
 
@@ -821,11 +810,7 @@ export class MoleculeRenderer {
         depthWrite: false,
       });
       const sphere = new THREE.Mesh(geo, mat);
-      sphere.position.set(
-        pos[atomIdx * 3],
-        pos[atomIdx * 3 + 1],
-        pos[atomIdx * 3 + 2],
-      );
+      sphere.position.set(pos[atomIdx * 3], pos[atomIdx * 3 + 1], pos[atomIdx * 3 + 2]);
       this.selectionGroup.add(sphere);
     }
 
@@ -850,15 +835,11 @@ export class MoleculeRenderer {
       this.onResize();
       // Re-register for the new DPR value
       this.dprMediaQuery?.removeEventListener("change", update);
-      this.dprMediaQuery = window.matchMedia(
-        `(resolution: ${window.devicePixelRatio}dppx)`,
-      );
+      this.dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
       this.dprChangeHandler = update;
       this.dprMediaQuery.addEventListener("change", update);
     };
-    this.dprMediaQuery = window.matchMedia(
-      `(resolution: ${window.devicePixelRatio}dppx)`,
-    );
+    this.dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
     this.dprChangeHandler = update;
     this.dprMediaQuery.addEventListener("change", update);
   }
@@ -933,12 +914,7 @@ export class MoleculeRenderer {
     // Render cell axes inset (after main scene, before label overlay)
     if (this.cellAxesRenderer) {
       try {
-        this.cellAxesRenderer.render(
-          this.renderer,
-          this.camera,
-          _size.x,
-          _size.y,
-        );
+        this.cellAxesRenderer.render(this.renderer, this.camera, _size.x, _size.y);
       } catch (e) {
         console.warn("CellAxesRenderer render error:", e);
         this.cellAxesRenderer = null;
@@ -946,12 +922,7 @@ export class MoleculeRenderer {
     }
 
     if (this.labelOverlay) {
-      this.labelOverlay.render(
-        this.camera,
-        _size.x,
-        _size.y,
-        _dpr,
-      );
+      this.labelOverlay.render(this.camera, _size.x, _size.y, _dpr);
     }
   };
 

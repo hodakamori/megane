@@ -52,9 +52,7 @@ export function validatePipeline(
     const ports = NODE_PORTS[nodeType];
     if (!ports || ports.inputs.length === 0) continue;
 
-    const connectedInputs = new Set(
-      (incomingEdges.get(node.id) ?? []).map((e) => e.targetHandle),
-    );
+    const connectedInputs = new Set((incomingEdges.get(node.id) ?? []).map((e) => e.targetHandle));
 
     const hasAnyInput = ports.inputs.some((p) => connectedInputs.has(p.name));
     if (!hasAnyInput) {
@@ -63,9 +61,7 @@ export function validatePipeline(
   }
 
   // 2. Viewport reachability check
-  const viewportIds = nodes
-    .filter((n) => n.type === "viewport")
-    .map((n) => n.id);
+  const viewportIds = nodes.filter((n) => n.type === "viewport").map((n) => n.id);
 
   if (viewportIds.length > 0) {
     // Build reverse adjacency (target → sources) to find what reaches viewport

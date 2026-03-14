@@ -13,10 +13,7 @@ export class CellRenderer {
     this.geometry = new THREE.BufferGeometry();
     // 12 edges × 2 vertices × 3 components = 72 floats
     const positions = new Float32Array(72);
-    this.geometry.setAttribute(
-      "position",
-      new THREE.BufferAttribute(positions, 3),
-    );
+    this.geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
     const material = new THREE.LineBasicMaterial({
       color: 0x666666,
@@ -67,9 +64,7 @@ export class CellRenderer {
       [ab, abc],
     ];
 
-    const attr = this.geometry.getAttribute(
-      "position",
-    ) as THREE.BufferAttribute;
+    const attr = this.geometry.getAttribute("position") as THREE.BufferAttribute;
     const buf = attr.array as Float32Array;
 
     for (let i = 0; i < 12; i++) {

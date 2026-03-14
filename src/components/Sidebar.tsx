@@ -100,9 +100,7 @@ export function Sidebar({
           title="Open sidebar"
         >
           megane
-          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>
-            &#9654;
-          </span>
+          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>&#9654;</span>
         </button>
       </div>
     );
@@ -178,66 +176,67 @@ export function Sidebar({
       >
         {/* Mode Section (hidden when embedded / stream mode unavailable) */}
         {onToggleMode && (
-        <div>
-          <div style={sectionLabelStyle}>Mode</div>
-          <div
-            style={{
-              display: "flex",
-              borderRadius: 6,
-              overflow: "hidden",
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <button
-              onClick={mode === "local" ? undefined : onToggleMode}
+          <div>
+            <div style={sectionLabelStyle}>Mode</div>
+            <div
               style={{
-                flex: 1,
-                background:
-                  mode === "local" ? "rgba(59,130,246,0.08)" : "none",
-                border: "none",
-                borderRight: "1px solid #e2e8f0",
-                padding: "4px 0",
-                cursor: mode === "local" ? "default" : "pointer",
-                fontSize: 12,
-                fontWeight: 500,
-                color: mode === "local" ? "#3b82f6" : "#94a3b8",
-                transition: "all 0.15s",
+                display: "flex",
+                borderRadius: 6,
+                overflow: "hidden",
+                border: "1px solid #e2e8f0",
               }}
             >
-              Local
-            </button>
-            <button
-              onClick={mode === "streaming" ? undefined : onToggleMode}
-              style={{
-                flex: 1,
-                background:
-                  mode === "streaming" ? "rgba(59,130,246,0.08)" : "none",
-                border: "none",
-                padding: "4px 0",
-                cursor: mode === "streaming" ? "default" : "pointer",
-                fontSize: 12,
-                fontWeight: 500,
-                color: mode === "streaming" ? "#3b82f6" : "#94a3b8",
-                transition: "all 0.15s",
-              }}
-            >
-              Stream
-            </button>
+              <button
+                onClick={mode === "local" ? undefined : onToggleMode}
+                style={{
+                  flex: 1,
+                  background: mode === "local" ? "rgba(59,130,246,0.08)" : "none",
+                  border: "none",
+                  borderRight: "1px solid #e2e8f0",
+                  padding: "4px 0",
+                  cursor: mode === "local" ? "default" : "pointer",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: mode === "local" ? "#3b82f6" : "#94a3b8",
+                  transition: "all 0.15s",
+                }}
+              >
+                Local
+              </button>
+              <button
+                onClick={mode === "streaming" ? undefined : onToggleMode}
+                style={{
+                  flex: 1,
+                  background: mode === "streaming" ? "rgba(59,130,246,0.08)" : "none",
+                  border: "none",
+                  padding: "4px 0",
+                  cursor: mode === "streaming" ? "default" : "pointer",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: mode === "streaming" ? "#3b82f6" : "#94a3b8",
+                  transition: "all 0.15s",
+                }}
+              >
+                Stream
+              </button>
+            </div>
           </div>
-        </div>
         )}
 
         {/* Structure Section */}
         <div>
           <div style={sectionLabelStyle}>Structure</div>
-          <DropZone accept={STRUCTURE_ACCEPT} exts={STRUCTURE_EXTS} onFile={onUploadStructure} label="Change...">
+          <DropZone
+            accept={STRUCTURE_ACCEPT}
+            exts={STRUCTURE_EXTS}
+            onFile={onUploadStructure}
+            label="Change..."
+          >
             {structure.fileName ? (
               <>
                 <div style={fileNameStyle}>{structure.fileName}</div>
                 {structure.atomCount > 0 && (
-                  <div style={statsStyle}>
-                    {structure.atomCount.toLocaleString()} atoms
-                  </div>
+                  <div style={statsStyle}>{structure.atomCount.toLocaleString()} atoms</div>
                 )}
               </>
             ) : (
@@ -266,14 +265,10 @@ export function Sidebar({
               onFile={bonds.onUploadFile}
               label="Load PDB/TOP..."
             >
-              {bonds.fileName && (
-                <div style={fileNameStyle}>{bonds.fileName}</div>
-              )}
+              {bonds.fileName && <div style={fileNameStyle}>{bonds.fileName}</div>}
             </DropZone>
           )}
-          <div style={statsStyle}>
-            {bonds.count.toLocaleString()} bonds
-          </div>
+          <div style={statsStyle}>{bonds.count.toLocaleString()} bonds</div>
         </div>
 
         {/* Trajectory Section */}
@@ -293,7 +288,12 @@ export function Sidebar({
             }
           />
           {trajectory.source === "file" && (
-            <DropZone accept=".xtc,.lammpstrj,.dump" exts={[".xtc", ".lammpstrj", ".dump"]} onFile={trajectory.onUploadXtc} label="Load trajectory...">
+            <DropZone
+              accept=".xtc,.lammpstrj,.dump"
+              exts={[".xtc", ".lammpstrj", ".dump"]}
+              onFile={trajectory.onUploadXtc}
+              label="Load trajectory..."
+            >
               {trajectory.fileName ? (
                 <>
                   <div style={fileNameStyle}>{trajectory.fileName}</div>
@@ -308,18 +308,15 @@ export function Sidebar({
               )}
             </DropZone>
           )}
-          {trajectory.source === "structure" && (
-            trajectory.fileName ? (
+          {trajectory.source === "structure" &&
+            (trajectory.fileName ? (
               <>
                 <div style={fileNameStyle}>{trajectory.fileName}</div>
-                <div style={statsStyle}>
-                  {trajectory.totalFrames.toLocaleString()} frames
-                </div>
+                <div style={statsStyle}>{trajectory.totalFrames.toLocaleString()} frames</div>
               </>
             ) : (
               <div style={placeholderStyle}>No multi-model data</div>
-            )
-          )}
+            ))}
         </div>
       </div>
 

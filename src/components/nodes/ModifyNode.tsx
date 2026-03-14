@@ -51,9 +51,7 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
               max={2.0}
               step={0.01}
               value={params.scale}
-              onChange={(e) =>
-                updateNodeParams(id, { scale: parseFloat(e.target.value) })
-              }
+              onChange={(e) => updateNodeParams(id, { scale: parseFloat(e.target.value) })}
               style={sliderStyle}
             />
             <span style={valueStyle}>{params.scale.toFixed(2)}</span>
@@ -69,9 +67,7 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
               max={1}
               step={0.01}
               value={params.opacity}
-              onChange={(e) =>
-                updateNodeParams(id, { opacity: parseFloat(e.target.value) })
-              }
+              onChange={(e) => updateNodeParams(id, { opacity: parseFloat(e.target.value) })}
               style={sliderStyle}
             />
             <span style={valueStyle}>{`${Math.round(params.opacity * 100)}%`}</span>

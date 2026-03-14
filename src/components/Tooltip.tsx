@@ -52,8 +52,7 @@ export function Tooltip({ info }: TooltipProps) {
           : `${info.atomA} \u2014 ${info.atomB}`}
       </div>
       <div style={{ opacity: 0.7, fontSize: 11 }}>
-        {BOND_ORDER_NAMES[info.bondOrder] ?? "Bond"} |{" "}
-        {info.bondLength.toFixed(2)} {"\u00c5"}
+        {BOND_ORDER_NAMES[info.bondOrder] ?? "Bond"} | {info.bondLength.toFixed(2)} {"\u00c5"}
       </div>
     </div>
   );

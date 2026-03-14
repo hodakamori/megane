@@ -99,16 +99,9 @@ export function DropZone({
   );
 
   return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      style={{ minHeight: 0 }}
-    >
+    <div onDrop={handleDrop} onDragOver={handleDragOver} style={{ minHeight: 0 }}>
       {children}
-      <button
-        onClick={() => inputRef.current?.click()}
-        style={{ ...smallBtnStyle, marginTop: 10 }}
-      >
+      <button onClick={() => inputRef.current?.click()} style={{ ...smallBtnStyle, marginTop: 10 }}>
         {label}
       </button>
       <input

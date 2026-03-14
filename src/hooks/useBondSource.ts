@@ -33,32 +33,41 @@ export function useBondSource(
   const fileBondsRef = useRef<Uint32Array | null>(null);
   const vdwBondsRef = useRef<Uint32Array | null>(null);
 
-  const applyBondSource = useCallback(async (source: BondSource) => {
-    const result = await computeBondsForSource(source, {
-      baseSnapshot: baseSnapshotRef.current,
-      fileBonds: fileBondsRef.current,
-      vdwBonds: vdwBondsRef.current,
-    });
-    if (source === "distance" && result) {
-      vdwBondsRef.current = result.bonds;
-    }
-    if (result) setSnapshot(result);
-  }, [baseSnapshotRef, setSnapshot]);
+  const applyBondSource = useCallback(
+    async (source: BondSource) => {
+      const result = await computeBondsForSource(source, {
+        baseSnapshot: baseSnapshotRef.current,
+        fileBonds: fileBondsRef.current,
+        vdwBonds: vdwBondsRef.current,
+      });
+      if (source === "distance" && result) {
+        vdwBondsRef.current = result.bonds;
+      }
+      if (result) setSnapshot(result);
+    },
+    [baseSnapshotRef, setSnapshot],
+  );
 
-  const setBondSource = useCallback(async (source: BondSource) => {
-    setBondSourceState(source);
-    await applyBondSource(source);
-  }, [applyBondSource]);
+  const setBondSource = useCallback(
+    async (source: BondSource) => {
+      setBondSourceState(source);
+      await applyBondSource(source);
+    },
+    [applyBondSource],
+  );
 
-  const loadBondFile = useCallback(async (file: File) => {
-    const base = baseSnapshotRef.current;
-    if (!base) return;
-    const { bonds, fileName } = await loadBondFileData(file, base.nAtoms);
-    fileBondsRef.current = bonds;
-    setBondFileName(fileName);
-    setBondSourceState("file");
-    setSnapshot(withBonds(base, bonds, null));
-  }, [baseSnapshotRef, setSnapshot]);
+  const loadBondFile = useCallback(
+    async (file: File) => {
+      const base = baseSnapshotRef.current;
+      if (!base) return;
+      const { bonds, fileName } = await loadBondFileData(file, base.nAtoms);
+      fileBondsRef.current = bonds;
+      setBondFileName(fileName);
+      setBondSourceState("file");
+      setSnapshot(withBonds(base, bonds, null));
+    },
+    [baseSnapshotRef, setSnapshot],
+  );
 
   const reset = useCallback((snapshot: Snapshot) => {
     fileBondsRef.current = null;

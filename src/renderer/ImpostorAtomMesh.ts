@@ -39,9 +39,7 @@ export class ImpostorAtomMesh {
 
     // Billboard quad: 2 triangles, [-1,1] in XY
     this.geo = new THREE.InstancedBufferGeometry();
-    const verts = new Float32Array([
-      -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0,
-    ]);
+    const verts = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
     const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
     this.geo.setAttribute("position", new THREE.BufferAttribute(verts, 3));
     this.geo.setIndex(new THREE.BufferAttribute(indices, 1));
@@ -160,7 +158,10 @@ export class ImpostorAtomMesh {
     // Enable transparency if any atom has opacity < 1
     let hasTransparent = false;
     for (let i = 0; i < this.nAtoms; i++) {
-      if (this.opacityOverrideBuf[i] < 1.0) { hasTransparent = true; break; }
+      if (this.opacityOverrideBuf[i] < 1.0) {
+        hasTransparent = true;
+        break;
+      }
     }
     if (hasTransparent) {
       this.material.transparent = true;

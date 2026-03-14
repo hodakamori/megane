@@ -22,7 +22,16 @@ import { computeLabelsForSource, loadLabelFileData } from "../logic/labelSourceL
 import { getVectorsForFrame, loadVectorFileData } from "../logic/vectorSourceLogic";
 import { usePipelineStore } from "../pipeline/store";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
-import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../types";
+import type {
+  Snapshot,
+  Frame,
+  TrajectoryMeta,
+  BondSource,
+  TrajectorySource,
+  LabelSource,
+  VectorSource,
+  VectorFrame,
+} from "../types";
 
 export interface MeganeWebSocketState {
   snapshot: Snapshot | null;
@@ -201,13 +210,16 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
     };
   }, [url, getStreamingNodeId]);
 
-  const setBondSource = useCallback(async (source: BondSource) => {
-    setBondSourceState(source);
-    const base = baseSnapshotRef.current;
-    if (base) {
-      await applyBondSource(source, base);
-    }
-  }, [applyBondSource]);
+  const setBondSource = useCallback(
+    async (source: BondSource) => {
+      setBondSourceState(source);
+      const base = baseSnapshotRef.current;
+      if (base) {
+        await applyBondSource(source, base);
+      }
+    },
+    [applyBondSource],
+  );
 
   const setTrajectorySource = useCallback((source: TrajectorySource) => {
     setTrajectorySourceState(source);
@@ -231,10 +243,14 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
       setAtomLabels(null);
       return;
     }
-    const labels = computeLabelsForSource(source, {
-      structureLabels: null, // streaming mode has no structure labels
-      fileLabels: fileLabelsRef.current,
-    }, base.nAtoms);
+    const labels = computeLabelsForSource(
+      source,
+      {
+        structureLabels: null, // streaming mode has no structure labels
+        fileLabels: fileLabelsRef.current,
+      },
+      base.nAtoms,
+    );
     setAtomLabels(labels);
   }, []);
 
@@ -254,7 +270,10 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
     if (source === "none") {
       setAtomVectors(null);
     } else if (source === "file" && fileVectorsRef.current) {
-      const vecs = getVectorsForFrame({ fileVectors: fileVectorsRef.current }, currentFrameRef.current);
+      const vecs = getVectorsForFrame(
+        { fileVectors: fileVectorsRef.current },
+        currentFrameRef.current,
+      );
       setAtomVectors(vecs);
     }
   }, []);

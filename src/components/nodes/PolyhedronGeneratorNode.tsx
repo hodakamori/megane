@@ -174,9 +174,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
               max={5.0}
               step={0.1}
               value={params.maxDistance}
-              onChange={(e) =>
-                updateNodeParams(id, { maxDistance: parseFloat(e.target.value) })
-              }
+              onChange={(e) => updateNodeParams(id, { maxDistance: parseFloat(e.target.value) })}
               style={sliderStyle}
             />
             <span style={valueStyle}>{params.maxDistance.toFixed(1)}</span>
@@ -192,9 +190,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
               max={1}
               step={0.05}
               value={params.opacity}
-              onChange={(e) =>
-                updateNodeParams(id, { opacity: parseFloat(e.target.value) })
-              }
+              onChange={(e) => updateNodeParams(id, { opacity: parseFloat(e.target.value) })}
               style={sliderStyle}
             />
             <span style={valueStyle}>{`${Math.round(params.opacity * 100)}%`}</span>
@@ -217,7 +213,13 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
                 type="color"
                 value={params.edgeColor}
                 onChange={(e) => updateNodeParams(id, { edgeColor: e.target.value })}
-                style={{ width: "100%", height: 28, cursor: "pointer", border: "1px solid #e2e8f0", borderRadius: 4 }}
+                style={{
+                  width: "100%",
+                  height: 28,
+                  cursor: "pointer",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 4,
+                }}
               />
             </div>
             <div>
@@ -230,9 +232,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
                   max={10}
                   step={0.5}
                   value={params.edgeWidth}
-                  onChange={(e) =>
-                    updateNodeParams(id, { edgeWidth: parseFloat(e.target.value) })
-                  }
+                  onChange={(e) => updateNodeParams(id, { edgeWidth: parseFloat(e.target.value) })}
                   style={sliderStyle}
                 />
                 <span style={valueStyle}>{params.edgeWidth.toFixed(1)}</span>

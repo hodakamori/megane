@@ -30,12 +30,15 @@ export function useAtomSelection(
     onMeasurementChangeRef.current?.(m);
   }, []);
 
-  const handleAtomRightClick = useCallback((atomIndex: number) => {
-    if (!rendererRef.current) return;
-    const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
-    setSelection(newSelection);
-    updateMeasurement(rendererRef.current.getMeasurement());
-  }, [rendererRef, updateMeasurement]);
+  const handleAtomRightClick = useCallback(
+    (atomIndex: number) => {
+      if (!rendererRef.current) return;
+      const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
+      setSelection(newSelection);
+      updateMeasurement(rendererRef.current.getMeasurement());
+    },
+    [rendererRef, updateMeasurement],
+  );
 
   const handleClearSelection = useCallback(() => {
     rendererRef.current?.clearSelection();
@@ -49,18 +52,21 @@ export function useAtomSelection(
     if (m) updateMeasurement(m);
   }, [rendererRef, updateMeasurement]);
 
-  const setExternalSelection = useCallback((atoms: number[]) => {
-    if (!rendererRef.current) return;
-    if (atoms.length === 0) {
-      rendererRef.current.clearSelection();
-      setSelection({ atoms: [] });
-      updateMeasurement(null);
-    } else {
-      const newSelection = rendererRef.current.setSelection(atoms);
-      setSelection(newSelection);
-      updateMeasurement(rendererRef.current.getMeasurement());
-    }
-  }, [rendererRef, updateMeasurement]);
+  const setExternalSelection = useCallback(
+    (atoms: number[]) => {
+      if (!rendererRef.current) return;
+      if (atoms.length === 0) {
+        rendererRef.current.clearSelection();
+        setSelection({ atoms: [] });
+        updateMeasurement(null);
+      } else {
+        const newSelection = rendererRef.current.setSelection(atoms);
+        setSelection(newSelection);
+        updateMeasurement(rendererRef.current.getMeasurement());
+      }
+    },
+    [rendererRef, updateMeasurement],
+  );
 
   return {
     selection,

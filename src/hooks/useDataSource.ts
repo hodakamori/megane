@@ -7,7 +7,15 @@
 import { useCallback } from "react";
 import { useMeganeWebSocket } from "./useMeganeWebSocket";
 import { useMeganeLocal, type MeganeLocalState } from "./useMeganeLocal";
-import type { DataMode, Snapshot, Frame, TrajectoryMeta, BondSource, LabelSource, VectorSource } from "../types";
+import type {
+  DataMode,
+  Snapshot,
+  Frame,
+  TrajectoryMeta,
+  BondSource,
+  LabelSource,
+  VectorSource,
+} from "../types";
 
 export interface DataSource {
   snapshot: Snapshot | null;

@@ -78,12 +78,48 @@ function createMoleculeTemplate(): {
       },
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "loader-1", target: "traj-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e3", source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e4", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
-      { id: "e5", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e6", source: "traj-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" },
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "traj-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e4",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+      {
+        id: "e5",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e6",
+        source: "traj-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
     ],
   };
 }
@@ -132,8 +168,8 @@ function createSolidTemplate(): {
         data: {
           params: {
             type: "polyhedron_generator",
-            centerElements: [22],   // Ti
-            ligandElements: [8],    // O
+            centerElements: [22], // Ti
+            ligandElements: [8], // O
             maxDistance: 2.5,
             opacity: 0.5,
             showEdges: false,
@@ -158,12 +194,48 @@ function createSolidTemplate(): {
       },
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "loader-1", target: "polyhedron-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e3", source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e4", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
-      { id: "e5", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e6", source: "polyhedron-1", target: "viewport-1", sourceHandle: "mesh", targetHandle: "mesh" },
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "polyhedron-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e4",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+      {
+        id: "e5",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e6",
+        source: "polyhedron-1",
+        target: "viewport-1",
+        sourceHandle: "mesh",
+        targetHandle: "mesh",
+      },
     ],
   };
 }
@@ -205,10 +277,34 @@ function createStreamingTemplate(): {
       },
     ],
     edges: [
-      { id: "e1", source: "streaming-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "streaming-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e3", source: "streaming-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" },
-      { id: "e4", source: "streaming-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
+      {
+        id: "e1",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e2",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e3",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e4",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
     ],
   };
 }

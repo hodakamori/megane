@@ -53,11 +53,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /** Wrap a PNG image as an EPS file with embedded raster data. */
-export async function wrapInEPS(
-  pngBlob: Blob,
-  width: number,
-  height: number,
-): Promise<Blob> {
+export async function wrapInEPS(pngBlob: Blob, width: number, height: number): Promise<Blob> {
   // Convert PNG to raw RGB pixel data via canvas
   const img = await createImageBitmap(pngBlob);
   const canvas = document.createElement("canvas");
@@ -208,7 +204,7 @@ export async function captureGif(
     const composited = compositeCanvases(webglCanvas, labelCanvas, width, height);
 
     gif.addFrame(composited, { delay, copy: true });
-    onProgress?.((i - startFrame + 1) / totalFrames * 0.8);
+    onProgress?.(((i - startFrame + 1) / totalFrames) * 0.8);
   }
 
   // Restore
@@ -303,7 +299,9 @@ export async function captureVideo(
     }
 
     // Request a frame from the capture stream
-    const videoTrack = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+    const videoTrack = stream.getVideoTracks()[0] as MediaStreamTrack & {
+      requestFrame?: () => void;
+    };
     videoTrack.requestFrame?.();
 
     // Wait for frame duration
