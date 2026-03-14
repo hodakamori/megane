@@ -24,3 +24,4 @@ docs/notebooks/
 docs/public/notebooks/
 dev-preview/videos/tmp-*/
 coverage/
+.coverage
