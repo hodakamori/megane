@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean lint lint-python lint-fix
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -91,6 +91,20 @@ preview-video:
 # Dev preview: clean previous captures
 preview-clean:
 	rm -rf dev-preview/
+
+# Lint Python code (ruff + ty)
+lint-python:
+	ruff check python/
+	ruff format --check python/
+	ty check python/
+
+# Lint all languages
+lint: lint-python
+
+# Auto-fix Python lint issues
+lint-fix:
+	ruff check --fix python/
+	ruff format python/
 
 # Clean build artifacts
 clean:

@@ -28,8 +28,12 @@ class Structure:
 
 
 def cell_params_to_matrix(
-    a: float, b: float, c: float,
-    alpha: float, beta: float, gamma: float,
+    a: float,
+    b: float,
+    c: float,
+    alpha: float,
+    beta: float,
+    gamma: float,
 ) -> np.ndarray:
     """Convert crystallographic cell parameters to a 3x3 matrix of cell vectors.
 
