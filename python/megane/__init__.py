@@ -37,4 +37,4 @@ __all__ = [
     "load_traj",
     "load_trajectory",
 ]
-__version__ = "0.3.2"
+__version__ = "0.4.0"
