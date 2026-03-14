@@ -77,12 +77,48 @@ export interface MeshData {
   edgeWidth: number;                // edge line width in pixels
 }
 
+// ─── Frame Provider ──────────────────────────────────────────────────
+
+/** Abstract interface for frame delivery (memory or streaming). */
+export interface FrameProvider {
+  readonly kind: "memory" | "stream";
+  /** Get a frame by index. Returns null if not yet available (streaming). */
+  getFrame(index: number): Frame | null;
+  readonly meta: TrajectoryMeta;
+}
+
+/** In-memory frame provider wrapping a Frame[]. */
+export class MemoryFrameProvider implements FrameProvider {
+  readonly kind = "memory" as const;
+  readonly meta: TrajectoryMeta;
+  private readonly frames: Frame[];
+  private readonly basePositions: Float32Array | null;
+
+  constructor(frames: Frame[], meta: TrajectoryMeta, basePositions?: Float32Array | null) {
+    this.frames = frames;
+    this.meta = meta;
+    this.basePositions = basePositions ?? null;
+  }
+
+  getFrame(index: number): Frame | null {
+    if (index === 0 && this.basePositions) {
+      return {
+        frameId: 0,
+        nAtoms: this.meta.nAtoms,
+        positions: this.basePositions,
+      };
+    }
+    const f = this.frames[index - (this.basePositions ? 1 : 0)];
+    return f ?? null;
+  }
+}
+
 /** Trajectory data flowing through the pipeline. */
 export interface TrajectoryData {
   type: "trajectory";
-  frames: Frame[];
+  provider: FrameProvider;
   meta: TrajectoryMeta;
-  source: "structure" | "file";
+  source: "structure" | "file" | "stream";
 }
 
 /** Per-atom vector data (e.g. forces) flowing through the pipeline. */
@@ -259,6 +295,7 @@ export interface LoadStructureParams {
 export interface LoadTrajectoryParams {
   type: "load_trajectory";
   fileName: string | null;
+  sourceMode: "file" | "stream";
 }
 
 export interface AddBondParams {
@@ -328,7 +365,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "load_structure":
       return { type, fileName: null, hasTrajectory: false, hasCell: false };
     case "load_trajectory":
-      return { type, fileName: null };
+      return { type, fileName: null, sourceMode: "file" };
     case "load_vector":
       return { type, fileName: null };
     case "add_bond":
