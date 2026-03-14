@@ -58,7 +58,11 @@ jobs:
           python-version: "3.11"
       - name: Install package
         run: pip install -e ".[dev]"
-      - run: python -m pytest
+      - run: python -m pytest --cov-report=xml:coverage.xml
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          fail_ci_on_error: false
 
   build:
     name: Docker build

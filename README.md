@@ -11,6 +11,9 @@
   <a href="https://pypi.org/project/megane/"><img src="https://img.shields.io/pypi/v/megane" alt="PyPI" /></a>
   <a href="https://www.npmjs.com/package/megane-viewer"><img src="https://img.shields.io/npm/v/megane-viewer" alt="npm" /></a>
   <a href="https://github.com/hodakamori/megane/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+  <a href="https://pypi.org/project/megane/"><img src="https://img.shields.io/pypi/pyversions/megane" alt="Python" /></a>
+  <a href="https://hodakamori.github.io/megane/"><img src="https://img.shields.io/badge/docs-online-blue" alt="Docs" /></a>
+  <a href="https://codecov.io/gh/hodakamori/megane"><img src="https://codecov.io/gh/hodakamori/megane/graph/badge.svg" alt="codecov" /></a>
 </p>
 
 <p align="center">
