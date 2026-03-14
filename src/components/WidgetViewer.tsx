@@ -242,6 +242,10 @@ function WidgetViewerPipeline({
         collapsed={pipelineCollapsed}
         onToggleCollapse={handleTogglePipeline}
         onWidthChange={handlePipelineWidthChange}
+        rendererRef={rendererRef}
+        totalFrames={totalFrames}
+        currentFrame={currentFrame}
+        onSeek={onSeek}
       />
 
       {totalFrames > 1 && (

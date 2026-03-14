@@ -269,6 +269,10 @@ export function MeganeViewer({
         collapsed={pipelineCollapsed}
         onToggleCollapse={handleTogglePipeline}
         onWidthChange={handlePipelineWidthChange}
+        rendererRef={rendererRef}
+        totalFrames={totalFrames}
+        currentFrame={currentFrame}
+        onSeek={onSeek}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline
