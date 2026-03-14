@@ -159,6 +159,18 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             await websocket.send_bytes(_build_metadata_bytes())
 
         # Handle client commands
+        stream_task: asyncio.Task | None = None
+
+        async def _run_stream(
+            traj, start: int, end: int, stride: int, fps: int
+        ) -> None:
+            """Stream frames at the given FPS. Runs as a cancellable task."""
+            delay = 1.0 / fps
+            for i in range(start, end, stride):
+                positions = traj.get_frame(i)
+                await websocket.send_bytes(encode_frame(i, positions))
+                await asyncio.sleep(delay)
+
         while True:
             data = await websocket.receive_text()
             msg = json.loads(data)
@@ -174,19 +186,20 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     )
 
             elif cmd == "stream" and traj is not None:
+                # Cancel any existing stream
+                if stream_task and not stream_task.done():
+                    stream_task.cancel()
                 start = msg.get("start", 0)
                 end = msg.get("end", traj.n_frames)
                 stride = msg.get("stride", 1)
                 fps = msg.get("fps", 30)
-                delay = 1.0 / fps
-
-                for i in range(start, end, stride):
-                    positions = traj.get_frame(i)
-                    await websocket.send_bytes(encode_frame(i, positions))
-                    await asyncio.sleep(delay)
+                stream_task = asyncio.create_task(
+                    _run_stream(traj, start, end, stride, fps)
+                )
 
             elif cmd == "stop":
-                pass  # Stream cancellation handled by new commands
+                if stream_task and not stream_task.done():
+                    stream_task.cancel()
 
     except WebSocketDisconnect:
         logger.info("Client disconnected")

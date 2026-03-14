@@ -155,6 +155,7 @@ describe("defaultParams", () => {
     expect(params).toEqual({
       type: "load_trajectory",
       fileName: null,
+      sourceMode: "file",
     });
   });
 
