@@ -49,3 +49,21 @@ Keep the first line under 72 characters. Add details in the body if needed.
 Always create a pull request after pushing your changes using `gh pr create`. Include a summary of changes and a test plan in the PR body. See the `github-cli` skill for remote URL workaround if `gh` fails.
 
 If additional commits are pushed after the PR is created, review the PR title and description and update them to accurately reflect all changes. Both the title and summary must always match the actual diff.
+
+## Reporting Results — CI Check Required
+
+Before reporting task completion to the user, always verify that CI has passed on the pushed branch:
+
+```bash
+# Check CI status for the current branch
+ORIG_REMOTE=$(git remote get-url origin)
+git remote set-url origin https://github.com/hodakamori/megane.git
+gh run list --branch "$(git branch --show-current)" --limit 1
+# For more detail on a specific run:
+# gh run view <run-id>
+git remote set-url origin "$ORIG_REMOTE"
+```
+
+- If CI is still running, wait and re-check before reporting.
+- If CI has failed, investigate the failure (`gh run view <run-id> --log-failed`), fix the issue, and push again.
+- Only report success to the user after CI passes.

@@ -57,3 +57,18 @@ node tests/e2e/test_widget_render.mjs
 make test-all
 ```
 Runs: Python tests + TypeScript tests + Rust tests + E2E snapshot tests.
+
+## Reporting Results — CI Check Required
+
+After pushing changes and before reporting test results to the user, verify that CI has passed on the remote branch:
+
+```bash
+ORIG_REMOTE=$(git remote get-url origin)
+git remote set-url origin https://github.com/hodakamori/megane.git
+gh run list --branch "$(git branch --show-current)" --limit 1
+git remote set-url origin "$ORIG_REMOTE"
+```
+
+- If CI is still running, wait and re-check.
+- If CI has failed, inspect with `gh run view <run-id> --log-failed`, fix the issue, and push again.
+- Only report success after CI passes.
