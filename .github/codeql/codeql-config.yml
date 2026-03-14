@@ -1,0 +1,8 @@
+name: "CodeQL config"
+
+paths-ignore:
+  # Build artifacts (minified/bundled JS) — not source code
+  - python/megane/static
+  - dist
+  - node_modules
+  - "**/*.min.js"
