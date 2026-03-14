@@ -103,8 +103,7 @@ class MolecularViewer(anywidget.AnyWidget):
                 are read from the .traj file.
         """
         warnings.warn(
-            "MolecularViewer.load() is deprecated. "
-            "Use set_pipeline() with a Pipeline instead.",
+            "MolecularViewer.load() is deprecated. Use set_pipeline() with a Pipeline instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -147,9 +146,12 @@ class MolecularViewer(anywidget.AnyWidget):
                     self._frame_data = encode_frame(idx, positions)
                     break
 
-        self._fire_event("frame_change", {
-            "frame_index": idx,
-        })
+        self._fire_event(
+            "frame_change",
+            {
+                "frame_index": idx,
+            },
+        )
 
     @traitlets.observe("_measurement_json")
     def _on_measurement_change(self, change: dict) -> None:
@@ -164,9 +166,12 @@ class MolecularViewer(anywidget.AnyWidget):
     @traitlets.observe("selected_atoms")
     def _on_selected_atoms_change(self, change: dict) -> None:
         """Fire selection_change event."""
-        self._fire_event("selection_change", {
-            "atoms": list(change["new"]),
-        })
+        self._fire_event(
+            "selection_change",
+            {
+                "atoms": list(change["new"]),
+            },
+        )
 
     @property
     def measurement(self) -> dict | None:
@@ -216,6 +221,7 @@ class MolecularViewer(anywidget.AnyWidget):
         def decorator(fn: Callable) -> Callable:
             self._event_handlers[event_name].append(fn)
             return fn
+
         return decorator
 
     def off_event(self, event_name: str, callback: Callable | None = None):
@@ -230,9 +236,7 @@ class MolecularViewer(anywidget.AnyWidget):
             self._event_handlers.pop(event_name, None)
         else:
             handlers = self._event_handlers.get(event_name, [])
-            self._event_handlers[event_name] = [
-                h for h in handlers if h is not callback
-            ]
+            self._event_handlers[event_name] = [h for h in handlers if h is not callback]
 
     def set_pipeline(self, pipeline: Pipeline | None) -> None:
         """Apply a pipeline to this viewer.

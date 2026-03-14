@@ -161,9 +161,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         # Handle client commands
         stream_task: asyncio.Task | None = None
 
-        async def _run_stream(
-            traj, start: int, end: int, stride: int, fps: int
-        ) -> None:
+        async def _run_stream(traj, start: int, end: int, stride: int, fps: int) -> None:
             """Stream frames at the given FPS. Runs as a cancellable task."""
             delay = 1.0 / fps
             for i in range(start, end, stride):
@@ -181,9 +179,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 frame_idx = msg["frame"]
                 if 0 <= frame_idx < traj.n_frames:
                     positions = traj.get_frame(frame_idx)
-                    await websocket.send_bytes(
-                        encode_frame(frame_idx, positions)
-                    )
+                    await websocket.send_bytes(encode_frame(frame_idx, positions))
 
             elif cmd == "stream" and traj is not None:
                 # Cancel any existing stream
@@ -193,9 +189,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 end = msg.get("end", traj.n_frames)
                 stride = msg.get("stride", 1)
                 fps = msg.get("fps", 30)
-                stream_task = asyncio.create_task(
-                    _run_stream(traj, start, end, stride, fps)
-                )
+                stream_task = asyncio.create_task(_run_stream(traj, start, end, stride, fps))
 
             elif cmd == "stop":
                 if stream_task and not stream_task.done():
@@ -210,9 +204,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 # Try to serve static files for the built web app
 _static_dir = Path(__file__).parent / "static" / "app"
 if _static_dir.exists():
-    app.mount(
-        "/", StaticFiles(directory=str(_static_dir), html=True), name="app"
-    )
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="app")
 else:
     logger.warning(
         "Static app directory not found at %s. "

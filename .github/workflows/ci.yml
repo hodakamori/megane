@@ -10,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  lint-python:
+    name: Python lint & type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uvx ruff check python/
+      - run: uvx ruff format --check python/
+      - run: uvx ty check python/
+
   test-rust:
     name: Rust tests
     runs-on: ubuntu-latest

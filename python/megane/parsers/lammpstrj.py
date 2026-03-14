@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from megane.parsers.pdb import cell_params_to_matrix
-
 
 @dataclass
 class InMemoryTrajectory:
@@ -90,11 +88,14 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
                 lx = float(hi[0] - lo[0])
                 ly = float(hi[1] - lo[1])
                 lz = float(hi[2] - lo[2])
-                box_matrix = np.array([
-                    [lx, 0.0, 0.0],
-                    [xy, ly, 0.0],
-                    [xz, yz, lz],
-                ], dtype=np.float32)
+                box_matrix = np.array(
+                    [
+                        [lx, 0.0, 0.0],
+                        [xy, ly, 0.0],
+                        [xz, yz, lz],
+                    ],
+                    dtype=np.float32,
+                )
             else:
                 lx = float(hi[0] - lo[0])
                 ly = float(hi[1] - lo[1])
@@ -145,9 +146,7 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
 
         # Sort by id
         atoms.sort(key=lambda a: a[0])
-        positions = np.array(
-            [[x, y, z] for _, x, y, z in atoms], dtype=np.float32
-        )
+        positions = np.array([[x, y, z] for _, x, y, z in atoms], dtype=np.float32)
         frames.append(positions)
         i += 1
 
