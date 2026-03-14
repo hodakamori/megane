@@ -490,4 +490,3 @@ class Pipeline:
 
             _, trajectory = load_traj(node.traj)
             self._trajectories[node._id] = trajectory
-
