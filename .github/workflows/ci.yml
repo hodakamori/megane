@@ -89,6 +89,31 @@ jobs:
       - name: Run notebook tests
         run: python -m pytest tests/python/test_notebooks.py -v
 
+  test-integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build:wasm
+      - run: npm run build:widget
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package
+        run: pip install -e ".[dev]"
+      - name: Run integration tests
+        run: python -m pytest tests/python/test_serve_integration.py tests/python/test_demo_code.py -v
+
   build:
     name: Docker build
     runs-on: ubuntu-latest
