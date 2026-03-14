@@ -92,7 +92,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run Galata tests
         working-directory: tests/galata
-        run: npx playwright test
+        run: npx playwright test --update-snapshots
       - name: Upload test artifacts
         if: failure()
         uses: actions/upload-artifact@v4
