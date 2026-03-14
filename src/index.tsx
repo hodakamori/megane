@@ -15,6 +15,9 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
+import { parseStructureText } from "./parsers/structure";
+import { parseXTCFile } from "./parsers/xtc";
+import { MemoryFrameProvider } from "./pipeline/types";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3_3x3x3.xyz?raw";
@@ -62,6 +65,23 @@ function App() {
         await ds.local.loadXtc(xtcFile);
       } else if (pendingTemplateId === "solid") {
         await ds.local.loadText(perovskiteXYZ, "perovskite_srtio3_3x3x3.xyz");
+      } else if (pendingTemplateId === "streaming") {
+        // Simulate streaming by parsing local data and populating nodeStreamingData
+        const result = await parseStructureText(defaultPDB, "caffeine_water.pdb");
+        const resp = await fetch(defaultXtcUrl);
+        const blob = await resp.blob();
+        const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
+        const { frames, meta } = await parseXTCFile(xtcFile, result.snapshot.nAtoms);
+        const store = usePipelineStore.getState();
+        const streamNode = store.nodes.find((n) => n.type === "streaming");
+        if (streamNode) {
+          const provider = meta ? new MemoryFrameProvider(frames, meta, result.snapshot.positions) : null;
+          store.setNodeStreamingData(streamNode.id, {
+            snapshot: result.snapshot,
+            streamProvider: provider,
+          });
+          store.updateNodeParams(streamNode.id, { connected: true });
+        }
       }
       clearPendingTemplate();
     })().catch(() => {});

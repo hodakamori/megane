@@ -168,6 +168,51 @@ function createSolidTemplate(): {
   };
 }
 
+/**
+ * Streaming template: WebSocket streaming with bonds and trajectory.
+ * Streaming → Viewport (particle, bond, trajectory, cell)
+ */
+function createStreamingTemplate(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "streaming-1",
+        type: "streaming",
+        position: { x: 425, y: 0 },
+        data: {
+          params: {
+            type: "streaming",
+            connected: false,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 425, y: 310 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [
+      { id: "e1", source: "streaming-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+      { id: "e2", source: "streaming-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
+      { id: "e3", source: "streaming-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" },
+      { id: "e4", source: "streaming-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
+    ],
+  };
+}
+
 export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
   {
     id: "molecule",
@@ -180,5 +225,11 @@ export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
     label: "Solid",
     description: "Perovskite with coordination polyhedra",
     create: createSolidTemplate,
+  },
+  {
+    id: "streaming",
+    label: "Streaming",
+    description: "WebSocket streaming with bonds",
+    create: createStreamingTemplate,
   },
 ];

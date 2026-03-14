@@ -17,9 +17,11 @@ export function StreamingNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const connected = params.connected;
   const hasSnapshot = !!nodeStreamingData?.snapshot;
   const hasTrajectory = !!nodeStreamingData?.streamProvider;
+  const hasBond = !!nodeStreamingData?.snapshot?.nBonds;
   const hasCell = !!nodeStreamingData?.snapshot?.box;
 
   const disabledPorts = new Set<string>();
+  if (!hasBond) disabledPorts.add("bond");
   if (!hasTrajectory) disabledPorts.add("trajectory");
   if (!hasCell) disabledPorts.add("cell");
 
@@ -46,6 +48,7 @@ export function StreamingNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         {hasSnapshot && (
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
             {nodeStreamingData!.snapshot.nAtoms} atoms
+            {hasBond && `, ${nodeStreamingData!.snapshot.nBonds} bonds`}
             {hasTrajectory && `, ${nodeStreamingData!.streamProvider!.meta.nFrames} frames`}
           </div>
         )}
