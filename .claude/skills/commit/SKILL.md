@@ -4,9 +4,9 @@ description: Guidelines for making git commits in the megane project. Use when c
 
 # Commit Guidelines
 
-## RULE: All commit messages MUST be in English
+## RULE: All commit messages and PR descriptions MUST be in English
 
-This is a hard requirement. Never write commit messages in Japanese or any other non-English language.
+This is a hard requirement. Never write commit messages, PR titles, or PR descriptions in Japanese or any other non-English language.
 
 ## Commit Message Style
 
