@@ -9,18 +9,13 @@ log() { echo "[session-start] $*"; }
 
 # --- GitHub CLI ---
 if ! command -v gh &>/dev/null; then
-  log "Installing GitHub CLI..."
-  GH_VERSION=$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest 2>/dev/null \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))" 2>/dev/null)
-  if [ -n "$GH_VERSION" ]; then
-    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -o /tmp/gh.tar.gz \
-      && tar -xzf /tmp/gh.tar.gz -C /tmp \
-      && sudo cp "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
-      && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
-    log "GitHub CLI installed: $(gh --version | head -1)"
-  else
-    log "WARNING: Could not fetch gh release info, skipping gh install"
-  fi
+  log "Installing GitHub CLI via apt..."
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+  sudo apt-get update -qq && sudo apt-get install -y -qq gh
+  log "GitHub CLI installed: $(gh --version | head -1)"
 else
   log "GitHub CLI already installed: $(gh --version | head -1)"
 fi

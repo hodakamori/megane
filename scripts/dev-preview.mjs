@@ -25,7 +25,6 @@
  *     videos/
  *       desktop-<timestamp>.webm
  *       mobile-<timestamp>.webm
- *     latest.md           (GitHub-friendly markdown with embedded images)
  */
 
 import { spawn, execSync } from "child_process";
@@ -242,37 +241,6 @@ async function captureVideo(browser, viewport, durationMs) {
   }
 }
 
-function generateMarkdown(screenshots, videos) {
-  const lines = [
-    `# Dev Preview - ${TIMESTAMP.replace("_", " ").replace(/-/g, ":")}`,
-    "",
-  ];
-
-  if (screenshots.length > 0) {
-    lines.push("## Screenshots", "");
-    for (const { name, filename } of screenshots) {
-      lines.push(`### ${name}`);
-      lines.push(`![${name}](screenshots/${filename})`, "");
-    }
-  }
-
-  if (videos.length > 0) {
-    lines.push("## Videos", "");
-    lines.push(
-      "> Note: `.webm` videos can be viewed by opening the file in a browser",
-      "> or by clicking the file on GitHub.",
-      ""
-    );
-    for (const { name, filename } of videos) {
-      lines.push(`### ${name}`);
-      lines.push(`- [${filename}](videos/${filename})`, "");
-    }
-  }
-
-  const mdPath = join(OUTPUT_DIR, "latest.md");
-  writeFileSync(mdPath, lines.join("\n"));
-  console.log(`\nMarkdown summary: ${mdPath}`);
-}
 
 // ---- Main ----
 
@@ -311,8 +279,6 @@ try {
       }
     }
   }
-
-  generateMarkdown(screenshotResults, videoResults);
 
   console.log("\nDev preview capture complete!");
   console.log(`Output: ${OUTPUT_DIR}`);
