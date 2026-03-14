@@ -23,9 +23,7 @@ def main() -> None:
     parser.add_argument("--xtc", help="Path to XTC trajectory file")
     parser.add_argument("--traj", help="Path to ASE .traj trajectory file")
     parser.add_argument("--port", type=int, default=8765, help="Server port")
-    parser.add_argument(
-        "--no-browser", action="store_true", help="Don't open browser"
-    )
+    parser.add_argument("--no-browser", action="store_true", help="Don't open browser")
     parser.add_argument(
         "--dev",
         action="store_true",
@@ -44,9 +42,7 @@ def main() -> None:
         elif args.pdb:
             configure(args.pdb, args.xtc)
         else:
-            logging.info(
-                "No PDB file specified. Waiting for file upload from browser..."
-            )
+            logging.info("No PDB file specified. Waiting for file upload from browser...")
 
         if not args.no_browser and not args.dev:
             url = f"http://localhost:{args.port}"

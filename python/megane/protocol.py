@@ -88,15 +88,7 @@ def encode_snapshot(structure: StructureLike) -> bytes:
     # Snapshot header: n_atoms(4) + n_bonds(4) = 8 bytes
     snapshot_header = struct.pack("<II", n_atoms, n_bonds)
 
-    return (
-        header
-        + snapshot_header
-        + pos_bytes
-        + elem_bytes
-        + bond_bytes
-        + bond_order_bytes
-        + box_bytes
-    )
+    return header + snapshot_header + pos_bytes + elem_bytes + bond_bytes + bond_order_bytes + box_bytes
 
 
 def encode_frame(frame_id: int, positions: np.ndarray) -> bytes:

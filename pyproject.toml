@@ -53,6 +53,25 @@ module-name = "megane.megane_parser"
 features = ["pyo3/extension-module"]
 include = ["python/megane/static/**", "LICENSE"]
 
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+src = ["python"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["megane"]
+
+[tool.ty.environment]
+python-version = "3.10"
+
+[tool.ty.rules]
+unresolved-import = "ignore"
+unresolved-attribute = "ignore"
+
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
 addopts = "--cov=megane --cov-report=term-missing --cov-report=html:coverage/python --cov-report=json:coverage/python/coverage.json"

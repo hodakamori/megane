@@ -27,7 +27,7 @@ class Trajectory:
         """
         import MDAnalysis as mda
 
-        universe: mda.Universe = self._universe  # type: ignore
+        universe: mda.Universe = self._universe
         universe.trajectory[index]
         return universe.atoms.positions.astype(np.float32)
 
@@ -39,8 +39,7 @@ def _box_from_dimensions(dimensions: np.ndarray | None) -> np.ndarray:
     a, b, c, alpha, beta, gamma = dimensions
     if a == 0 and b == 0 and c == 0:
         return np.zeros((3, 3), dtype=np.float32)
-    return cell_params_to_matrix(float(a), float(b), float(c),
-                                 float(alpha), float(beta), float(gamma))
+    return cell_params_to_matrix(float(a), float(b), float(c), float(alpha), float(beta), float(gamma))
 
 
 def load_trajectory(pdb_path: str, xtc_path: str) -> Trajectory:

@@ -26,7 +26,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 # ─── Node Classes ───────────────────────────────────────────────────
 
 
@@ -237,9 +236,7 @@ def _resolve_ports(
     target: PipelineNode,
 ) -> tuple[str, str]:
     """Resolve source and target port handles from node types."""
-    target_handle = _TARGET_PORT_MAP.get(
-        target._node_type, ("particle", "particle")
-    )[1]
+    target_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[1]
 
     # Source handle: use the source node's known output, or infer
     # from what the target expects.
@@ -247,9 +244,7 @@ def _resolve_ports(
     if source_handle is None:
         # LoadStructure or other multi-output node: use what the
         # target expects as its input type.
-        source_handle = _TARGET_PORT_MAP.get(
-            target._node_type, ("particle", "particle")
-        )[0]
+        source_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[0]
 
     return source_handle, target_handle
 
@@ -284,10 +279,7 @@ def _load_structure_file(path: str):
 
     parse_fn = parsers.get(ext)
     if parse_fn is None:
-        raise ValueError(
-            f"Unsupported structure format: {ext!r}.  "
-            f"Supported: {', '.join(sorted(parsers))}"
-        )
+        raise ValueError(f"Unsupported structure format: {ext!r}.  Supported: {', '.join(sorted(parsers))}")
 
     result = parse_fn(text)
     return Structure(
@@ -345,22 +337,20 @@ class Pipeline:
         Port handles are auto-resolved from the node types.
         """
         if source._id is None or target._id is None:
-            raise ValueError(
-                "Both nodes must be added to the pipeline before connecting."
-            )
+            raise ValueError("Both nodes must be added to the pipeline before connecting.")
         source_handle, target_handle = _resolve_ports(source, target)
-        self._edges.append({
-            "source": source._id,
-            "target": target._id,
-            "sourceHandle": source_handle,
-            "targetHandle": target_handle,
-        })
+        self._edges.append(
+            {
+                "source": source._id,
+                "target": target._id,
+                "sourceHandle": source_handle,
+                "targetHandle": target_handle,
+            }
+        )
 
         # Trigger lazy trajectory loading when connecting
         # LoadStructure → LoadTrajectory.
-        if isinstance(target, LoadTrajectory) and isinstance(
-            source, LoadStructure
-        ):
+        if isinstance(target, LoadTrajectory) and isinstance(source, LoadStructure):
             self._load_trajectory_data(target, source)
 
     # ── Serialization ───────────────────────────────────────
@@ -393,6 +383,7 @@ class Pipeline:
 
     def _serialize_node(self, node: PipelineNode) -> dict:
         """Convert a node instance to the TS SerializedPipeline node dict."""
+        assert node._id is not None
         base: dict = {
             "id": node._id,
             "type": node._node_type,
@@ -404,6 +395,7 @@ class Pipeline:
             has_cell = False
             if structure is not None:
                 import numpy as np
+
                 has_cell = bool(np.any(structure.box != 0))
             base["fileName"] = node.path
             base["hasTrajectory"] = False
@@ -440,12 +432,12 @@ class Pipeline:
         """Load structure file and store binary snapshot data."""
         from megane.protocol import encode_snapshot
 
+        assert node._id is not None
         structure = _load_structure_file(node.path)
         self._structures[node._id] = structure
         self._node_data[node._id] = encode_snapshot(structure)
 
         # Re-serialize to update hasCell
-        import numpy as np
         for i, (n, _) in enumerate(self._nodes):
             if n._id == node._id:
                 self._nodes[i] = (n, self._serialize_node(n))
@@ -457,12 +449,11 @@ class Pipeline:
         source: LoadStructure,
     ) -> None:
         """Load trajectory object for lazy frame loading."""
+        assert node._id is not None
         if node.xtc is not None:
             from megane.parsers.xtc import load_trajectory
 
-            self._trajectories[node._id] = load_trajectory(
-                source.path, node.xtc
-            )
+            self._trajectories[node._id] = load_trajectory(source.path, node.xtc)
 
             # Update parent LoadStructure's hasTrajectory flag
             for i, (n, config) in enumerate(self._nodes):
@@ -515,11 +506,13 @@ class Pipeline:
                 if (node._id, handle) not in used_outputs:
                     viewport_handle = handle_to_viewport.get(handle)
                     if viewport_handle:
-                        viewport_edges.append({
-                            "source": node._id,
-                            "target": viewport_id,
-                            "sourceHandle": handle,
-                            "targetHandle": viewport_handle,
-                        })
+                        viewport_edges.append(
+                            {
+                                "source": node._id,
+                                "target": viewport_id,
+                                "sourceHandle": handle,
+                                "targetHandle": viewport_handle,
+                            }
+                        )
 
         return viewport_edges
