@@ -487,7 +487,7 @@ class Pipeline:
             "load_structure": ["particle", "trajectory", "cell"],
             "load_trajectory": ["trajectory"],
             "load_vector": ["vector"],
-            "streaming": ["particle", "trajectory", "cell"],
+            "streaming": ["particle", "bond", "trajectory", "cell"],
             "filter": ["out"],
             "modify": ["out"],
             "add_bond": ["bond"],

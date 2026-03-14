@@ -8,6 +8,7 @@ import type { Snapshot } from "../../types";
 import type {
   PipelineData,
   ParticleData,
+  BondData,
   CellData,
   TrajectoryData,
   FrameProvider,
@@ -37,6 +38,23 @@ export function executeStreaming(
     opacityOverrides: null,
   };
   outputs.set("particle", particle);
+
+  // Output bond data if bonds are available in the snapshot
+  if (snapshot.nBonds > 0) {
+    const bond: BondData = {
+      type: "bond",
+      sourceNodeId: nodeId,
+      bondIndices: snapshot.bonds,
+      bondOrders: snapshot.bondOrders,
+      nBonds: snapshot.nBonds,
+      scale: 1.0,
+      opacity: 1.0,
+      positions: null,
+      elements: null,
+      nAtoms: snapshot.nAtoms,
+    };
+    outputs.set("bond", bond);
+  }
 
   // Output trajectory data if stream provider is available
   if (streamProvider) {
