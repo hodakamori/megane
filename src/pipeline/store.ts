@@ -8,7 +8,7 @@ import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyfl
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } from "./execute";
 import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
-import type { PipelineNodeType, ViewportState, SerializedPipeline, NodeError } from "./types";
+import type { PipelineNodeType, ViewportState, SerializedPipeline, NodeError, FrameProvider } from "./types";
 import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect, NODE_PORTS, GENERIC_NODE_ACCEPTS } from "./types";
 import { executePipeline } from "./execute";
 import { validatePipeline } from "./validate";
@@ -38,6 +38,7 @@ export interface PipelineStore {
   fileFrames: Frame[] | null;
   fileMeta: TrajectoryMeta | null;
   fileVectors: VectorFrame[] | null;
+  streamProvider: FrameProvider | null;
 
   // Per-node snapshot storage (keyed by load_structure node ID)
   nodeSnapshots: Record<string, NodeSnapshotData>;
@@ -48,6 +49,7 @@ export interface PipelineStore {
   setStructureFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileVectors: (vectors: VectorFrame[] | null) => void;
+  setStreamProvider: (provider: FrameProvider | null) => void;
   setNodeSnapshot: (nodeId: string, data: NodeSnapshotData) => void;
   removeNodeSnapshot: (nodeId: string) => void;
   setNodeParseError: (nodeId: string, message: string) => void;
@@ -105,6 +107,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   fileFrames: null,
   fileMeta: null,
   fileVectors: null,
+  streamProvider: null,
   nodeSnapshots: {},
   nodeParseErrors: {},
 
@@ -126,6 +129,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
   setFileVectors: (vectors) => {
     set({ fileVectors: vectors });
+    get().execute();
+  },
+  setStreamProvider: (provider) => {
+    set({ streamProvider: provider });
     get().execute();
   },
 
@@ -285,7 +292,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   },
 
   execute: () => {
-    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors, nodeSnapshots, nodeParseErrors } = get();
+    const { nodes, edges, snapshot, atomLabels, structureFrames, structureMeta, fileFrames, fileMeta, fileVectors, streamProvider, nodeSnapshots, nodeParseErrors } = get();
     const ctx: PipelineExecutionContext = {
       snapshot,
       atomLabels,
@@ -294,6 +301,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       fileFrames,
       fileMeta,
       fileVectors,
+      streamProvider,
       nodeSnapshots,
     };
 

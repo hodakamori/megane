@@ -14,6 +14,7 @@ import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
+import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
@@ -186,6 +187,25 @@ export function MeganeViewer({
     prevViewportStateRef.current = viewportState;
   }, [viewportState]);
 
+  // Connect pipeline trajectories to the playback store
+  const setPlaybackProvider = usePlaybackStore((s) => s.setProvider);
+  const prevTrajectoryRef = useRef<unknown>(null);
+  useEffect(() => {
+    const traj = viewportState.trajectories[0] ?? null;
+    // Only update if the trajectory provider actually changed
+    const provider = traj?.provider ?? null;
+    if (provider !== prevTrajectoryRef.current) {
+      prevTrajectoryRef.current = provider;
+      setPlaybackProvider(provider);
+    }
+  }, [viewportState.trajectories, setPlaybackProvider]);
+
+  // Use playback store's frame for rendering (prefer over prop)
+  const playbackFrame = usePlaybackStore((s) => s.currentFrameData);
+  const playbackCurrentFrame = usePlaybackStore((s) => s.currentFrame);
+  const effectiveFrame = playbackFrame ?? frame;
+  const effectiveCurrentFrame = playbackFrame ? playbackCurrentFrame : currentFrame;
+
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
     const nodes = usePipelineStore.getState().nodes;
@@ -193,12 +213,12 @@ export function MeganeViewer({
     if (!bondNode) return;
     const params = bondNode.data.params;
     if (params.type !== "add_bond" || (params as AddBondParams).bondSource !== "distance") return;
-    if (!snapshot || !frame) return;
+    if (!snapshot || !effectiveFrame) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
 
     const newBonds = inferBondsVdwJS(
-      frame.positions,
+      effectiveFrame.positions,
       snapshot.elements,
       snapshot.nAtoms,
       0.6,
@@ -206,14 +226,14 @@ export function MeganeViewer({
     );
 
     const result = processPbcBonds(
-      newBonds, null, frame.positions,
+      newBonds, null, effectiveFrame.positions,
       snapshot.elements, snapshot.nAtoms, snapshot.box,
     );
     renderer.updateBondsExt(
       result.bondIndices, result.bondOrders,
       result.positions, result.elements, result.nAtoms,
     );
-  }, [frame, snapshot]);
+  }, [effectiveFrame, snapshot]);
 
   // Per-frame vector update
   useEffect(() => {
@@ -221,9 +241,9 @@ export function MeganeViewer({
     if (!renderer) return;
     const vs = usePipelineStore.getState().viewportState;
     if (vs.vectors.length > 0) {
-      applyVectorsForFrame(renderer, vs.vectors, currentFrame);
+      applyVectorsForFrame(renderer, vs.vectors, effectiveCurrentFrame);
     }
-  }, [currentFrame]);
+  }, [effectiveCurrentFrame]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -257,7 +277,7 @@ export function MeganeViewer({
     <div style={{ width, height, position: "relative", overflow: "hidden" }}>
       <Viewport
         snapshot={snapshot}
-        frame={frame}
+        frame={effectiveFrame}
         atomLabels={null}
         atomVectors={null}
         onRendererReady={handleRendererReady}
@@ -271,12 +291,12 @@ export function MeganeViewer({
         onWidthChange={handlePipelineWidthChange}
         rendererRef={rendererRef}
         totalFrames={totalFrames}
-        currentFrame={currentFrame}
+        currentFrame={effectiveCurrentFrame}
         onSeek={onSeek}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline
-          currentFrame={currentFrame}
+          currentFrame={effectiveCurrentFrame}
           totalFrames={totalFrames}
           playing={playing}
           fps={fps}

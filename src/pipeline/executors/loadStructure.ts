@@ -6,6 +6,7 @@ import type {
   TrajectoryData,
   LoadStructureParams,
 } from "../types";
+import { MemoryFrameProvider } from "../types";
 
 export function executeLoadStructure(
   params: LoadStructureParams,
@@ -28,9 +29,14 @@ export function executeLoadStructure(
   outputs.set("particle", particle);
 
   if (structureFrames && structureFrames.length > 0 && structureMeta) {
+    const provider = new MemoryFrameProvider(
+      structureFrames,
+      structureMeta,
+      snapshot.positions,
+    );
     const trajectory: TrajectoryData = {
       type: "trajectory",
-      frames: structureFrames,
+      provider,
       meta: structureMeta,
       source: "structure",
     };

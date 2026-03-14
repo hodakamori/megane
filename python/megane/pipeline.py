@@ -53,10 +53,16 @@ class LoadStructure(PipelineNode):
 
 
 class LoadTrajectory(PipelineNode):
-    """Load an external trajectory (XTC or ASE .traj).
+    """Load an external trajectory (XTC or ASE .traj) or stream from server.
 
     Requires connection from a ``LoadStructure`` node.
     Frames are loaded lazily when ``frame_index`` changes.
+
+    Args:
+        xtc: Path to XTC trajectory file (source_mode="file").
+        traj: Path to ASE .traj file (source_mode="file").
+        source_mode: ``"file"`` for local file loading,
+                     ``"stream"`` for WebSocket streaming from server.
     """
 
     _node_type = "load_trajectory"
@@ -66,10 +72,12 @@ class LoadTrajectory(PipelineNode):
         *,
         xtc: str | None = None,
         traj: str | None = None,
+        source_mode: Literal["file", "stream"] = "file",
     ) -> None:
         super().__init__()
         self.xtc = xtc
         self.traj = traj
+        self.source_mode = source_mode
 
 
 class LoadVector(PipelineNode):
@@ -393,6 +401,7 @@ class Pipeline:
             base["hasCell"] = has_cell
         elif isinstance(node, LoadTrajectory):
             base["fileName"] = node.xtc or node.traj
+            base["sourceMode"] = node.source_mode
         elif isinstance(node, Filter):
             base["query"] = node.query
         elif isinstance(node, Modify):

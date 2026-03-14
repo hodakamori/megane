@@ -43,6 +43,7 @@ export function createDefaultPipeline(): {
           params: {
             type: "load_trajectory",
             fileName: "caffeine_water_vibration.xtc",
+            sourceMode: "file",
           },
           enabled: true,
         },

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WebSocketClient } from "../stream/WebSocketClient";
+import { StreamFrameProvider } from "../stream/StreamFrameProvider";
 import {
   decodeSnapshot,
   decodeFrame,
@@ -19,6 +20,8 @@ import {
 import { withBonds, computeBondsForSource, loadBondFileData } from "../logic/bondSourceLogic";
 import { computeLabelsForSource, loadLabelFileData } from "../logic/labelSourceLogic";
 import { getVectorsForFrame, loadVectorFileData } from "../logic/vectorSourceLogic";
+import { usePipelineStore } from "../pipeline/store";
+import { usePlaybackStore } from "../stores/usePlaybackStore";
 import type { Snapshot, Frame, TrajectoryMeta, BondSource, TrajectorySource, LabelSource, VectorSource, VectorFrame } from "../types";
 
 export interface MeganeWebSocketState {
@@ -89,8 +92,12 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
     if (result) setSnapshot(result);
   }, []);
 
+  const streamProviderRef = useRef<StreamFrameProvider | null>(null);
+
   useEffect(() => {
     if (!url) return;
+
+    let streamProvider: StreamFrameProvider | null = null;
 
     const client = new WebSocketClient(
       url,
@@ -118,8 +125,24 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
           setFrame(decoded);
           setCurrentFrame(decoded.frameId);
           currentFrameRef.current = decoded.frameId;
+          // Forward frame to stream provider for caching + playback store
+          streamProvider?.receiveFrame(decoded);
         } else if (msgType === MSG_METADATA) {
-          setMeta(decodeMetadata(data));
+          const decoded = decodeMetadata(data);
+          setMeta(decoded);
+          // Create or update stream provider with metadata
+          if (!streamProvider) {
+            streamProvider = new StreamFrameProvider(client, decoded);
+            streamProviderRef.current = streamProvider;
+            // Wire async frame delivery to the playback store
+            streamProvider.setOnFrameReady((frame) => {
+              usePlaybackStore.getState()._onAsyncFrame(frame);
+            });
+          } else {
+            streamProvider.meta = decoded;
+          }
+          // Register with pipeline store so load_trajectory nodes can use it
+          usePipelineStore.getState().setStreamProvider(streamProvider);
         }
       },
       setConnected,
@@ -130,6 +153,11 @@ export function useMeganeWebSocket(url: string | null): MeganeWebSocketState {
 
     return () => {
       client.disconnect();
+      if (streamProviderRef.current) {
+        streamProviderRef.current.clear();
+        streamProviderRef.current = null;
+      }
+      usePipelineStore.getState().setStreamProvider(null);
     };
   }, [url]);
 
