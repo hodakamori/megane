@@ -48,6 +48,14 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 | `node scripts/dev-preview.mjs --screenshot` | Dev preview screenshots |
 | `node scripts/capture-screenshots.mjs` | Hero screenshot for docs |
 
+## Skills
+
+Project-specific skills are defined in `.claude/skills/`. Each skill provides instructions for a specific workflow.
+
+- **At the start of a task**, run the `validate-skills` skill to confirm all skills are loaded.
+- **Always follow the instructions** in each skill when performing the corresponding workflow.
+- Skills cover: committing (`commit`), GitHub CLI usage (`github-cli`), dev environment setup (`dev-setup`), building (`build`), testing (`testing`), preview capture (`preview`), and skill validation (`validate-skills`).
+
 ## Architecture
 
 - TypeScript source: `src/` (import alias `@/` → `src/`)
