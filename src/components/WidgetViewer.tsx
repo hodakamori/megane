@@ -2,20 +2,26 @@
  * Simplified megane viewer for Jupyter widget embedding.
  * Minimal UI: Viewport + Timeline only.
  *
- * When `pipeline` prop is true, shows the PipelineEditor and drives
- * rendering through the pipeline store (like MeganeViewer).
+ * When `pipeline` prop is true, drives rendering through the pipeline
+ * store using the pipeline JSON and per-node snapshot data from Python.
+ * The pipeline editor UI is not shown — pipeline is built in Python.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
-import { PipelineEditor } from "./PipelineEditor";
 import { Timeline } from "./Timeline";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
+import {
+  decodeSnapshot,
+  decodeHeader,
+  MSG_SNAPSHOT,
+} from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
+import type { NodeSnapshotData } from "../pipeline/execute";
 import type {
   Snapshot,
   Frame,
@@ -32,6 +38,7 @@ interface WidgetViewerProps {
   onMeasurementChange?: (measurement: Measurement | null) => void;
   pipeline?: boolean;
   pipelineJson?: string;
+  nodeSnapshotsData?: Record<string, DataView>;
   onPipelineChange?: (json: string) => void;
 }
 
@@ -44,6 +51,20 @@ export function WidgetViewer(props: WidgetViewerProps) {
 
 /* ─── Pipeline mode ──────────────────────────────────────────────── */
 
+/** Decode a binary DataView into a Snapshot. */
+function decodeNodeSnapshot(data: DataView): Snapshot | null {
+  if (!data || data.byteLength === 0) return null;
+  const buffer = new ArrayBuffer(data.byteLength);
+  new Uint8Array(buffer).set(
+    new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+  );
+  const { msgType } = decodeHeader(buffer);
+  if (msgType === MSG_SNAPSHOT) {
+    return decodeSnapshot(buffer);
+  }
+  return null;
+}
+
 function WidgetViewerPipeline({
   snapshot,
   frame,
@@ -51,36 +72,51 @@ function WidgetViewerPipeline({
   totalFrames,
   onSeek,
   pipelineJson,
-  onPipelineChange,
+  nodeSnapshotsData,
 }: WidgetViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
-  const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
-  const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
-  const pipelineCollapsedRef = useRef(isNarrow);
-  const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
-
-  useEffect(() => {
-    pipelineCollapsedRef.current = pipelineCollapsed;
-  }, [pipelineCollapsed]);
 
   // Subscribe to pipeline store
   const viewportState = usePipelineStore((s) => s.viewportState);
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
 
-  // Push snapshot to pipeline store
+  // Push per-node snapshots from Python to the pipeline store
   useEffect(() => {
-    setSnapshot(snapshot);
+    if (!nodeSnapshotsData || Object.keys(nodeSnapshotsData).length === 0) {
+      // Fall back to the global snapshot (legacy)
+      setSnapshot(snapshot);
+    } else {
+      // Decode each per-node snapshot and populate nodeSnapshots
+      const store = usePipelineStore.getState();
+      for (const [nodeId, data] of Object.entries(nodeSnapshotsData)) {
+        const decoded = decodeNodeSnapshot(data);
+        if (decoded) {
+          store.setNodeSnapshot(nodeId, {
+            snapshot: decoded,
+            frames: null,
+            meta: null,
+            labels: null,
+          });
+        }
+      }
+      // Also set the first snapshot as the global one for the renderer
+      const firstData = Object.values(nodeSnapshotsData)[0];
+      if (firstData) {
+        const firstSnapshot = decodeNodeSnapshot(firstData);
+        setSnapshot(firstSnapshot);
+      }
+    }
     const renderer = rendererRef.current;
     if (renderer) {
       const vs = usePipelineStore.getState().viewportState;
       applyViewportState(renderer, vs, null);
       prevViewportStateRef.current = vs;
     }
-  }, [snapshot, setSnapshot]);
+  }, [snapshot, nodeSnapshotsData, setSnapshot]);
 
   // Apply viewportState changes to the renderer
   useEffect(() => {
@@ -132,49 +168,11 @@ function WidgetViewerPipeline({
     }
   }, [pipelineJson]);
 
-  // Sync pipeline changes back to Python
-  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!onPipelineChange) return;
-    // Debounce pipeline sync to avoid excessive updates
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(() => {
-      const serialized = usePipelineStore.getState().serialize();
-      const json = JSON.stringify(serialized);
-      if (json !== prevPipelineJsonRef.current) {
-        prevPipelineJsonRef.current = json;
-        onPipelineChange(json);
-      }
-    }, 500);
-  }, [viewportState, onPipelineChange]);
-
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
-    renderer.setViewInsets(
-      0,
-      pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12,
-    );
     applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
     prevViewportStateRef.current = usePipelineStore.getState().viewportState;
   }, []);
-
-  const handleTogglePipeline = useCallback(() => {
-    setPipelineCollapsed((prev) => !prev);
-  }, []);
-
-  const handlePipelineWidthChange = useCallback((w: number) => {
-    pipelineWidthRef.current = w;
-    if (!pipelineCollapsedRef.current) {
-      rendererRef.current?.setViewInsets(0, w + 12);
-    }
-  }, []);
-
-  useEffect(() => {
-    rendererRef.current?.setViewInsets(
-      0,
-      pipelineCollapsed ? 0 : pipelineWidthRef.current + 12,
-    );
-  }, [pipelineCollapsed]);
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
@@ -236,12 +234,6 @@ function WidgetViewerPipeline({
         onHover={() => {}}
         onAtomRightClick={() => {}}
         onFrameUpdated={() => {}}
-      />
-
-      <PipelineEditor
-        collapsed={pipelineCollapsed}
-        onToggleCollapse={handleTogglePipeline}
-        onWidthChange={handlePipelineWidthChange}
       />
 
       {totalFrames > 1 && (

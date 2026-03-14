@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 import pathlib
+import warnings
 from collections import defaultdict
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import anywidget
 import traitlets
 
 from megane.parsers.pdb import load_pdb
 from megane.protocol import encode_frame, encode_snapshot
+
+if TYPE_CHECKING:
+    from megane.pipeline import Pipeline
 
 _STATIC_DIR = pathlib.Path(__file__).parent / "static"
 
@@ -64,8 +68,11 @@ class MolecularViewer(anywidget.AnyWidget):
     _measurement_json = traitlets.Unicode("").tag(sync=True)
 
     # Pipeline
-    pipeline = traitlets.Bool(False).tag(sync=True)
+    _pipeline_enabled = traitlets.Bool(False).tag(sync=True)
     _pipeline_json = traitlets.Unicode("").tag(sync=True)
+    _node_snapshots_data = traitlets.Dict(
+        value_trait=traitlets.Bytes(),
+    ).tag(sync=True)
 
     # Internal (not synced)
     _structure = None
@@ -74,6 +81,7 @@ class MolecularViewer(anywidget.AnyWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._event_handlers: dict[str, list[Callable]] = defaultdict(list)
+        self._pipeline_ref: Pipeline | None = None
 
     def load(
         self,
@@ -83,6 +91,10 @@ class MolecularViewer(anywidget.AnyWidget):
     ) -> None:
         """Load a molecular structure, optionally with a trajectory.
 
+        .. deprecated::
+            Use :meth:`set_pipeline` with a :class:`~megane.pipeline.Pipeline`
+            instead.
+
         Args:
             pdb_path: Path to PDB file.
             xtc: Optional path to XTC trajectory file.
@@ -90,6 +102,12 @@ class MolecularViewer(anywidget.AnyWidget):
                 *pdb_path* is ignored and both structure and trajectory
                 are read from the .traj file.
         """
+        warnings.warn(
+            "MolecularViewer.load() is deprecated. "
+            "Use set_pipeline() with a Pipeline instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if traj is not None:
             from megane.parsers.traj import load_traj
 
@@ -113,13 +131,24 @@ class MolecularViewer(anywidget.AnyWidget):
     @traitlets.observe("frame_index")
     def _on_frame_change(self, change: dict) -> None:
         """Send new frame data when frame_index changes."""
+        idx = change["new"]
+
+        # Legacy trajectory (from viewer.load())
         if self._trajectory is not None:
-            idx = change["new"]
             if 0 <= idx < self._trajectory.n_frames:
                 positions = self._trajectory.get_frame(idx)
                 self._frame_data = encode_frame(idx, positions)
+
+        # Pipeline trajectory (from set_pipeline())
+        if self._pipeline_ref is not None:
+            for traj in self._pipeline_ref._trajectories.values():
+                if 0 <= idx < traj.n_frames:
+                    positions = traj.get_frame(idx)
+                    self._frame_data = encode_frame(idx, positions)
+                    break
+
         self._fire_event("frame_change", {
-            "frame_index": change["new"],
+            "frame_index": idx,
         })
 
     @traitlets.observe("_measurement_json")
@@ -205,22 +234,32 @@ class MolecularViewer(anywidget.AnyWidget):
                 h for h in handlers if h is not callback
             ]
 
-    def load_pipeline(self, config: dict | str) -> None:
-        """Load a pipeline configuration.
+    def set_pipeline(self, pipeline: Pipeline | None) -> None:
+        """Apply a pipeline to this viewer.
 
         Args:
-            config: Pipeline configuration as a dict or JSON string.
+            pipeline: A :class:`~megane.pipeline.Pipeline` instance,
+                or ``None`` to clear the pipeline.
         """
-        if isinstance(config, dict):
-            config = json.dumps(config)
-        self._pipeline_json = config
+        if pipeline is None:
+            self._pipeline_enabled = False
+            self._pipeline_json = ""
+            self._node_snapshots_data = {}
+            self._pipeline_ref = None
+            return
 
-    @property
-    def pipeline_config(self) -> dict | None:
-        """Current pipeline configuration, or None if not set."""
-        if not self._pipeline_json:
-            return None
-        return json.loads(self._pipeline_json)
+        # Send per-node binary snapshot data
+        self._node_snapshots_data = dict(pipeline._node_data)
+
+        # Send pipeline config JSON
+        self._pipeline_json = json.dumps(pipeline.to_dict())
+        self._pipeline_enabled = True
+
+        # Store trajectory refs for lazy loading
+        self._pipeline_ref = pipeline
+        if pipeline._trajectories:
+            first_traj = next(iter(pipeline._trajectories.values()))
+            self.total_frames = first_traj.n_frames
 
     def _fire_event(self, event_name: str, data) -> None:
         """Invoke all registered callbacks for an event."""
