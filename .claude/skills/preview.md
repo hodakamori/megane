@@ -28,7 +28,7 @@ node scripts/dev-preview.mjs --interact
 ```
 or: `make preview`
 
-Output goes to `dev-preview/` directory with a `latest.md` markdown summary.
+Output goes to `dev-preview/` directory.
 
 ### Options
 - `--desktop-only` / `--mobile-only` — limit viewports
