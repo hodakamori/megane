@@ -1,33 +1,32 @@
 /// Distance-based bond inference using cell-list spatial search.
-
 use std::collections::HashSet;
 
 /// Covalent radii in Angstroms, indexed by atomic number.
 fn covalent_radius(atomic_num: u8) -> f32 {
     match atomic_num {
-        1 => 0.31,   // H
-        5 => 0.84,   // B
-        6 => 0.76,   // C
-        7 => 0.71,   // N
-        8 => 0.66,   // O
-        9 => 0.57,   // F
-        11 => 1.66,  // Na
-        12 => 1.41,  // Mg
-        14 => 1.11,  // Si
-        15 => 1.07,  // P
-        16 => 1.05,  // S
-        17 => 1.02,  // Cl
-        19 => 2.03,  // K
-        20 => 1.76,  // Ca
-        25 => 1.39,  // Mn
-        26 => 1.32,  // Fe
-        27 => 1.26,  // Co
-        28 => 1.24,  // Ni
-        29 => 1.32,  // Cu
-        30 => 1.22,  // Zn
-        34 => 1.20,  // Se
-        35 => 1.20,  // Br
-        53 => 1.39,  // I
+        1 => 0.31,  // H
+        5 => 0.84,  // B
+        6 => 0.76,  // C
+        7 => 0.71,  // N
+        8 => 0.66,  // O
+        9 => 0.57,  // F
+        11 => 1.66, // Na
+        12 => 1.41, // Mg
+        14 => 1.11, // Si
+        15 => 1.07, // P
+        16 => 1.05, // S
+        17 => 1.02, // Cl
+        19 => 2.03, // K
+        20 => 1.76, // Ca
+        25 => 1.39, // Mn
+        26 => 1.32, // Fe
+        27 => 1.26, // Co
+        28 => 1.24, // Ni
+        29 => 1.32, // Cu
+        30 => 1.22, // Zn
+        34 => 1.20, // Se
+        35 => 1.20, // Br
+        53 => 1.39, // I
         _ => 0.77,
     }
 }
@@ -36,21 +35,21 @@ fn covalent_radius(atomic_num: u8) -> f32 {
 /// Matches the constants in src/core/constants.ts.
 pub fn vdw_radius(atomic_num: u8) -> f32 {
     match atomic_num {
-        1 => 1.20,   // H
-        6 => 1.70,   // C
-        7 => 1.55,   // N
-        8 => 1.52,   // O
-        9 => 1.47,   // F
-        11 => 2.27,  // Na
-        12 => 1.73,  // Mg
-        15 => 1.80,  // P
-        16 => 1.80,  // S
-        17 => 1.75,  // Cl
-        19 => 2.75,  // K
-        20 => 2.31,  // Ca
-        26 => 2.04,  // Fe
-        29 => 1.40,  // Cu
-        30 => 1.39,  // Zn
+        1 => 1.20,  // H
+        6 => 1.70,  // C
+        7 => 1.55,  // N
+        8 => 1.52,  // O
+        9 => 1.47,  // F
+        11 => 2.27, // Na
+        12 => 1.73, // Mg
+        15 => 1.80, // P
+        16 => 1.80, // S
+        17 => 1.75, // Cl
+        19 => 2.75, // K
+        20 => 2.31, // Ca
+        26 => 2.04, // Fe
+        29 => 1.40, // Cu
+        30 => 1.39, // Zn
         _ => 1.50,
     }
 }
@@ -132,8 +131,7 @@ where
                 for ii in 0..cell.len() {
                     let i = cell[ii];
 
-                    for jj in (ii + 1)..cell.len() {
-                        let j = cell[jj];
+                    for &j in &cell[(ii + 1)..] {
                         if let Some(bond) = check_pair(i, j) {
                             bonds.push(bond);
                         }
@@ -203,11 +201,7 @@ pub fn infer_bonds(
 }
 
 /// Infer bonds using VDW radii: bond if distance <= (vdw_i + vdw_j) * 0.6.
-pub fn infer_bonds_vdw(
-    positions: &[f32],
-    elements: &[u8],
-    n_atoms: usize,
-) -> Vec<(u32, u32)> {
+pub fn infer_bonds_vdw(positions: &[f32], elements: &[u8], n_atoms: usize) -> Vec<(u32, u32)> {
     let cell_size: f32 = 2.0;
 
     cell_list_scan(positions, n_atoms, cell_size, |i, j| {
@@ -240,9 +234,15 @@ mod tests {
         let oh = 0.96f32;
         let half_angle = (104.5f32 / 2.0).to_radians();
         let positions = vec![
-            0.0, 0.0, 0.0,                                      // O
-            oh * half_angle.sin(), oh * half_angle.cos(), 0.0,   // H1
-            -oh * half_angle.sin(), oh * half_angle.cos(), 0.0,  // H2
+            0.0,
+            0.0,
+            0.0, // O
+            oh * half_angle.sin(),
+            oh * half_angle.cos(),
+            0.0, // H1
+            -oh * half_angle.sin(),
+            oh * half_angle.cos(),
+            0.0, // H2
         ];
         let elements = vec![8, 1, 1]; // O, H, H
         (positions, elements)

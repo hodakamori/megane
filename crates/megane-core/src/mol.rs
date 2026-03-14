@@ -6,7 +6,6 @@
 ///   Lines 5..4+natoms: atom block (x y z symbol ...)
 ///   Lines 5+natoms..4+natoms+nbonds: bond block (atom1 atom2 bond_order ...)
 ///   M  END
-
 use crate::parser::symbol_to_atomic_num;
 
 pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
@@ -48,9 +47,15 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             if parts.len() < 4 {
                 return Err(format!("MOL atom line {} too short", i + 1));
             }
-            let x: f32 = parts[0].parse().map_err(|_| format!("bad x at atom {}", i + 1))?;
-            let y: f32 = parts[1].parse().map_err(|_| format!("bad y at atom {}", i + 1))?;
-            let z: f32 = parts[2].parse().map_err(|_| format!("bad z at atom {}", i + 1))?;
+            let x: f32 = parts[0]
+                .parse()
+                .map_err(|_| format!("bad x at atom {}", i + 1))?;
+            let y: f32 = parts[1]
+                .parse()
+                .map_err(|_| format!("bad y at atom {}", i + 1))?;
+            let z: f32 = parts[2]
+                .parse()
+                .map_err(|_| format!("bad z at atom {}", i + 1))?;
             let sym = crate::parser::capitalize(parts[3]);
             positions.push(x);
             positions.push(y);
@@ -89,8 +94,14 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             if parts.len() < 3 {
                 return Err(format!("MOL bond line {} too short", i + 1));
             }
-            let a: u32 = parts[0].parse::<u32>().map_err(|_| format!("bad bond atom1 at bond {}", i + 1))? - 1;
-            let b: u32 = parts[1].parse::<u32>().map_err(|_| format!("bad bond atom2 at bond {}", i + 1))? - 1;
+            let a: u32 = parts[0]
+                .parse::<u32>()
+                .map_err(|_| format!("bad bond atom1 at bond {}", i + 1))?
+                - 1;
+            let b: u32 = parts[1]
+                .parse::<u32>()
+                .map_err(|_| format!("bad bond atom2 at bond {}", i + 1))?
+                - 1;
             let order: u8 = parts[2].parse().unwrap_or(1);
             bonds.push((a.min(b), a.max(b)));
             bond_orders.push(order);
@@ -150,10 +161,13 @@ M  END
         let result = parse(VALID_MOL).unwrap();
         assert_eq!(result.n_atoms, 3);
         assert_eq!(result.n_file_bonds, 2);
-        assert_eq!(result.positions, vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
-        assert_eq!(result.elements[0], 6);  // C
-        assert_eq!(result.elements[1], 8);  // O
-        assert_eq!(result.elements[2], 7);  // N
+        assert_eq!(
+            result.positions,
+            vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        );
+        assert_eq!(result.elements[0], 6); // C
+        assert_eq!(result.elements[1], 8); // O
+        assert_eq!(result.elements[2], 7); // N
         assert_eq!(result.bonds, vec![(0, 1), (1, 2)]);
         let orders = result.bond_orders.unwrap();
         assert_eq!(orders, vec![1, 2]);
@@ -177,7 +191,10 @@ M  END
         let result = parse(mol).unwrap();
         assert_eq!(result.n_atoms, 3);
         assert_eq!(result.n_file_bonds, 2);
-        assert_eq!(result.positions, vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(
+            result.positions,
+            vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        );
         assert_eq!(result.elements[0], 6);
         assert_eq!(result.bonds, vec![(0, 1), (1, 2)]);
     }
@@ -241,7 +258,11 @@ comment
 bad
 ";
         match parse(mol) {
-            Err(e) => assert!(e.contains("atom line") || e.contains("bad"), "unexpected error: {}", e),
+            Err(e) => assert!(
+                e.contains("atom line") || e.contains("bad"),
+                "unexpected error: {}",
+                e
+            ),
             Ok(_) => panic!("expected error"),
         }
     }
@@ -282,4 +303,3 @@ M  END
         assert_eq!(result.bonds[0], (0, 1)); // sorted: min=0, max=1
     }
 }
-
