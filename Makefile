@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -49,8 +49,12 @@ test-notebooks:
 test-e2e-notebooks:
 	node tests/e2e/test_notebook_screenshots.mjs
 
-# Run all tests (Python + TypeScript + Rust + E2E + Notebooks)
-test-all: test test-ts test-rust test-e2e test-e2e-snapshot test-notebooks
+# Run integration tests (pip install smoke tests + demo code verification)
+test-integration:
+	python -m pytest tests/python/test_serve_integration.py tests/python/test_demo_code.py -v
+
+# Run all tests (Python + TypeScript + Rust + E2E + Notebooks + Integration)
+test-all: test test-ts test-rust test-e2e test-e2e-snapshot test-notebooks test-integration
 
 # Run TypeScript tests with coverage
 coverage-ts:
