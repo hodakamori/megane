@@ -5,19 +5,25 @@ Nodes are class instances added via ``add_node()``, connections via
 serializes to the same ``SerializedPipeline`` v3 JSON format used by
 the TypeScript pipeline engine, which remains the source of truth.
 
+A ``Viewport`` node must be explicitly added and connected for data
+to be rendered.
+
 Example::
 
-    from megane.pipeline import Pipeline, LoadStructure, Filter, Modify, AddBonds
+    from megane.pipeline import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport
 
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure("protein.pdb"))
     carbons = pipe.add_node(Filter(query="element == 'C'"))
     m = pipe.add_node(Modify(scale=1.3))
     bonds = pipe.add_node(AddBonds(source="distance"))
+    v = pipe.add_node(Viewport())
 
     pipe.add_edge(s, carbons)
     pipe.add_edge(carbons, m)
     pipe.add_edge(s, bonds)
+    pipe.add_edge(m, v)
+    pipe.add_edge(bonds, v)
 
     viewer.set_pipeline(pipe)
 """
@@ -205,6 +211,25 @@ class VectorOverlay(PipelineNode):
         self.scale = scale
 
 
+class Viewport(PipelineNode):
+    """3D rendering output node.
+
+    All data to be rendered must be explicitly connected to this node.
+    """
+
+    _node_type = "viewport"
+
+    def __init__(
+        self,
+        *,
+        perspective: bool = False,
+        cell_axes_visible: bool = True,
+    ) -> None:
+        super().__init__()
+        self.perspective = perspective
+        self.cell_axes_visible = cell_axes_visible
+
+
 # ─── Port Resolution ────────────────────────────────────────────────
 
 # target_node_type → (default source_handle, target_handle)
@@ -236,8 +261,6 @@ def _resolve_ports(
     target: PipelineNode,
 ) -> tuple[str, str]:
     """Resolve source and target port handles from node types."""
-    target_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[1]
-
     # Source handle: use the source node's known output, or infer
     # from what the target expects.
     source_handle = _SOURCE_OUTPUT_MAP.get(source._node_type)
@@ -245,6 +268,23 @@ def _resolve_ports(
         # LoadStructure or other multi-output node: use what the
         # target expects as its input type.
         source_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[0]
+
+    # For viewport targets, the target handle matches the source output type.
+    if isinstance(target, Viewport):
+        # Map source output handles to viewport input handles.
+        _viewport_handle = {
+            "particle": "particle",
+            "out": "particle",
+            "bond": "bond",
+            "cell": "cell",
+            "trajectory": "trajectory",
+            "label": "label",
+            "mesh": "mesh",
+            "vector": "vector",
+        }
+        target_handle = _viewport_handle.get(source_handle, "particle")
+    else:
+        target_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[1]
 
     return source_handle, target_handle
 
@@ -356,27 +396,9 @@ class Pipeline:
     # ── Serialization ───────────────────────────────────────
 
     def to_dict(self) -> dict:
-        """Serialize to ``SerializedPipeline`` v3 format.
-
-        A viewport node is auto-generated and connected to all
-        unconnected output ports.
-        """
+        """Serialize to ``SerializedPipeline`` v3 format."""
         nodes = [config for _, config in self._nodes]
         edges = list(self._edges)
-
-        viewport_id = "viewport-auto"
-        viewport_node = {
-            "id": viewport_id,
-            "type": "viewport",
-            "perspective": False,
-            "cellAxesVisible": True,
-            "position": {"x": 0, "y": 0},
-        }
-        nodes.append(viewport_node)
-
-        viewport_edges = self._auto_connect_viewport(viewport_id)
-        edges.extend(viewport_edges)
-
         return {"version": 3, "nodes": nodes, "edges": edges}
 
     # ── Internal ────────────────────────────────────────────
@@ -425,6 +447,9 @@ class Pipeline:
             base["fileName"] = node.path
         elif isinstance(node, VectorOverlay):
             base["scale"] = node.scale
+        elif isinstance(node, Viewport):
+            base["perspective"] = node.perspective
+            base["cellAxesVisible"] = node.cell_axes_visible
 
         return base
 
@@ -466,53 +491,3 @@ class Pipeline:
             _, trajectory = load_traj(node.traj)
             self._trajectories[node._id] = trajectory
 
-    def _auto_connect_viewport(self, viewport_id: str) -> list[dict]:
-        """Connect all unconnected outputs to the auto-generated viewport."""
-        # Collect set of (node_id, handle) that are already used as edge sources
-        used_outputs: set[tuple[str, str]] = set()
-        for edge in self._edges:
-            used_outputs.add((edge["source"], edge["sourceHandle"]))
-
-        # Map of node_type → list of output handles
-        output_handles: dict[str, list[str]] = {
-            "load_structure": ["particle", "trajectory", "cell"],
-            "load_trajectory": ["trajectory"],
-            "load_vector": ["vector"],
-            "streaming": ["particle", "bond", "trajectory", "cell"],
-            "filter": ["out"],
-            "modify": ["out"],
-            "add_bond": ["bond"],
-            "label_generator": ["label"],
-            "polyhedron_generator": ["mesh"],
-            "vector_overlay": ["vector"],
-        }
-
-        # Map output handle name → viewport input handle name
-        handle_to_viewport: dict[str, str] = {
-            "particle": "particle",
-            "out": "particle",  # filter/modify output → viewport particle
-            "bond": "bond",
-            "cell": "cell",
-            "trajectory": "trajectory",
-            "label": "label",
-            "mesh": "mesh",
-            "vector": "vector",
-        }
-
-        viewport_edges: list[dict] = []
-        for node, _ in self._nodes:
-            handles = output_handles.get(node._node_type, [])
-            for handle in handles:
-                if (node._id, handle) not in used_outputs:
-                    viewport_handle = handle_to_viewport.get(handle)
-                    if viewport_handle:
-                        viewport_edges.append(
-                            {
-                                "source": node._id,
-                                "target": viewport_id,
-                                "sourceHandle": handle,
-                                "targetHandle": viewport_handle,
-                            }
-                        )
-
-        return viewport_edges
