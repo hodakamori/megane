@@ -66,7 +66,40 @@ jobs:
 
       - name: Verify VSIX package (dry run)
         if: inputs.dry_run
-        run: ls -lh vscode-megane/*.vsix
+        run: |
+          ls -lh vscode-megane/*.vsix
+          cd vscode-megane
+          npx vsce ls
+
+      - name: Check version not already published
+        if: inputs.dry_run
+        run: |
+          PKG_VERSION=$(node -p "require('./vscode-megane/package.json').version")
+          echo "Checking if hodakamori.vscode-megane@${PKG_VERSION} already exists on Marketplace..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json;api-version=6.0-preview.1" \
+            -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"hodakamori.vscode-megane\"}]}],\"flags\":0}")
+          LATEST=$(curl -s \
+            -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json;api-version=6.0-preview.1" \
+            -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"hodakamori.vscode-megane\"}]}],\"flags\":1}" \
+            | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          exts = data.get('results', [{}])[0].get('extensions', [])
+          if exts:
+              versions = exts[0].get('versions', [])
+              if versions:
+                  print(versions[0].get('version', ''))
+          " 2>/dev/null || echo "")
+          if [ "$LATEST" = "$PKG_VERSION" ]; then
+            echo "::error::Version ${PKG_VERSION} already exists on VS Code Marketplace"
+            exit 1
+          fi
+          echo "Version ${PKG_VERSION} is available (latest published: ${LATEST:-none})"
 
       - name: Publish to VS Code Marketplace
         if: ${{ !inputs.dry_run }}
