@@ -94,7 +94,8 @@ test.describe.serial("megane widget tests", () => {
   let page: Page;
   const jsErrors: string[] = [];
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(300_000); // 6 cells including render_video need more time
     page = await browser.newPage();
 
     // Collect JS errors
