@@ -74,6 +74,10 @@ class MolecularViewer(anywidget.AnyWidget):
         value_trait=traitlets.Bytes(),
     ).tag(sync=True)
 
+    # Render capture (Python → JS request, JS → Python result)
+    _render_request = traitlets.Unicode("").tag(sync=True)
+    _render_result = traitlets.Bytes(b"").tag(sync=True)
+
     # Internal (not synced)
     _structure = None
     _trajectory = None
@@ -260,6 +264,93 @@ class MolecularViewer(anywidget.AnyWidget):
         if pipeline._trajectories:
             first_traj = next(iter(pipeline._trajectories.values()))
             self.total_frames = first_traj.n_frames
+
+    def render_image(
+        self,
+        width: int = 800,
+        height: int = 600,
+        transparent: bool = False,
+        timeout: float = 30,
+    ) -> bytes:
+        """Render the current view as a PNG image.
+
+        Args:
+            width: Image width in pixels.
+            height: Image height in pixels.
+            transparent: If True, use transparent background.
+            timeout: Max seconds to wait for rendering.
+
+        Returns:
+            PNG image bytes.
+        """
+        import time
+
+        request = json.dumps({
+            "type": "image",
+            "width": width,
+            "height": height,
+            "transparent": transparent,
+        })
+        self._render_result = b""
+        self._render_request = request
+
+        start = time.time()
+        while self._render_result == b"" and time.time() - start < timeout:
+            time.sleep(0.1)
+
+        if self._render_result == b"":
+            raise TimeoutError("Render did not complete within timeout")
+
+        result = bytes(self._render_result)
+        self._render_result = b""
+        return result
+
+    def render_video(
+        self,
+        width: int = 800,
+        height: int = 600,
+        fps: int = 30,
+        format: str = "gif",
+        timeout: float = 120,
+    ) -> bytes:
+        """Render the trajectory as a GIF or WebM video.
+
+        Requires a loaded trajectory with ``total_frames > 1``.
+
+        Args:
+            width: Video width in pixels.
+            height: Video height in pixels.
+            fps: Frames per second.
+            format: ``"gif"`` or ``"webm"``.
+            timeout: Max seconds to wait for rendering.
+
+        Returns:
+            Video binary data (GIF or WebM).
+        """
+        import time
+
+        request = json.dumps({
+            "type": "video",
+            "width": width,
+            "height": height,
+            "fps": fps,
+            "format": format,
+            "startFrame": 0,
+            "endFrame": max(self.total_frames - 1, 0),
+        })
+        self._render_result = b""
+        self._render_request = request
+
+        start = time.time()
+        while self._render_result == b"" and time.time() - start < timeout:
+            time.sleep(0.1)
+
+        if self._render_result == b"":
+            raise TimeoutError("Render did not complete within timeout")
+
+        result = bytes(self._render_result)
+        self._render_result = b""
+        return result
 
     def _fire_event(self, event_name: str, data) -> None:
         """Invoke all registered callbacks for an event."""

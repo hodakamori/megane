@@ -40,6 +40,8 @@ interface WidgetViewerProps {
   pipelineJson?: string;
   nodeSnapshotsData?: Record<string, DataView>;
   onPipelineChange?: (json: string) => void;
+  /** Callback to expose the MoleculeRenderer instance to the parent. */
+  onRendererRef?: (renderer: MoleculeRenderer | null) => void;
 }
 
 export function WidgetViewer(props: WidgetViewerProps) {
@@ -73,6 +75,7 @@ function WidgetViewerPipeline({
   onSeek,
   pipelineJson,
   nodeSnapshotsData,
+  onRendererRef,
 }: WidgetViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -172,7 +175,8 @@ function WidgetViewerPipeline({
     rendererRef.current = renderer;
     applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
     prevViewportStateRef.current = usePipelineStore.getState().viewportState;
-  }, []);
+    onRendererRef?.(renderer);
+  }, [onRendererRef]);
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
@@ -259,6 +263,7 @@ function WidgetViewerSimple({
   currentFrame,
   totalFrames,
   onSeek,
+  onRendererRef,
 }: WidgetViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -267,7 +272,8 @@ function WidgetViewerSimple({
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
-  }, []);
+    onRendererRef?.(renderer);
+  }, [onRendererRef]);
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {

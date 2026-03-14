@@ -17,6 +17,12 @@ import {
   MSG_SNAPSHOT,
   MSG_FRAME,
 } from "./protocol/protocol";
+import {
+  captureSnapshot,
+  captureGif,
+  captureVideo,
+} from "./renderer/RenderCapture";
+import type { MoleculeRenderer } from "./renderer/MoleculeRenderer";
 import type { Snapshot, Frame, Measurement } from "./types";
 
 interface AnyWidgetModel {
@@ -41,6 +47,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   let currentSnapshot: Snapshot | null = null;
   let currentFrame: Frame | null = null;
   let disposed = false;
+  let widgetRenderer: MoleculeRenderer | null = null;
 
   function parseSnapshot(): Snapshot | null {
     const data = model.get("_snapshot_data") as DataView | null;
@@ -94,6 +101,10 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     model.save_changes();
   }
 
+  function handleRendererRef(renderer: MoleculeRenderer | null) {
+    widgetRenderer = renderer;
+  }
+
   function renderApp() {
     if (!root || disposed) return;
     const frameIndex = (model.get("frame_index") as number) || 0;
@@ -116,6 +127,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         pipelineJson: pipelineJson,
         nodeSnapshotsData: nodeSnapshotsData,
         onPipelineChange: handlePipelineChange,
+        onRendererRef: handleRendererRef,
       }),
     );
   }
@@ -173,6 +185,56 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
 
   model.on("change:_pipeline_json", () => {
     renderApp();
+  });
+
+  // Handle render capture requests from Python
+  model.on("change:_render_request", async () => {
+    const requestJson = model.get("_render_request") as string;
+    if (!requestJson || !widgetRenderer) return;
+
+    try {
+      const request = JSON.parse(requestJson) as {
+        type: string;
+        width: number;
+        height: number;
+        transparent?: boolean;
+        fps?: number;
+        format?: string;
+        startFrame?: number;
+        endFrame?: number;
+      };
+
+      let blob: Blob;
+
+      if (request.type === "image") {
+        blob = await captureSnapshot(widgetRenderer, {
+          width: request.width,
+          height: request.height,
+          transparent: request.transparent ?? false,
+          format: "png",
+        });
+      } else if (request.type === "video") {
+        const captureFn =
+          request.format === "gif" ? captureGif : captureVideo;
+        blob = await captureFn(widgetRenderer, {
+          width: request.width,
+          height: request.height,
+          transparent: false,
+          startFrame: request.startFrame ?? 0,
+          endFrame: request.endFrame ?? 0,
+          fps: request.fps ?? 30,
+          seekFrame: (frame: number) => handleSeek(frame),
+        });
+      } else {
+        return;
+      }
+
+      const arrayBuffer = await blob.arrayBuffer();
+      model.set("_render_result", new DataView(arrayBuffer));
+      model.save_changes();
+    } catch (err) {
+      console.error("Render capture failed:", err);
+    }
   });
 
   // Cleanup

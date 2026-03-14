@@ -25,3 +25,5 @@ docs/public/notebooks/
 dev-preview/videos/tmp-*/
 coverage/
 .coverage
+tests/galata/test-results/
+tests/galata/playwright-report/

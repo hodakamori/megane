@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
+.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-galata test-galata-install test-galata-update test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -41,8 +41,21 @@ test-rust:
 test-e2e-snapshot:
 	node tests/e2e/snapshot.test.mjs
 
-# Run all tests (Python + TypeScript + Rust + E2E)
-test-all: test test-ts test-rust test-e2e test-e2e-snapshot
+# Install Galata test dependencies
+test-galata-install:
+	cd tests/galata && npm install
+	cd tests/galata && npx playwright install chromium
+
+# Run Galata widget tests (requires: build, maturin develop, jupyterlab installed)
+test-galata:
+	cd tests/galata && npx playwright test
+
+# Update Galata snapshots
+test-galata-update:
+	cd tests/galata && npx playwright test --update-snapshots
+
+# Run all tests (Python + TypeScript + Rust + E2E + Galata)
+test-all: test test-ts test-rust test-e2e test-e2e-snapshot test-galata
 
 # Run TypeScript tests with coverage
 coverage-ts:
