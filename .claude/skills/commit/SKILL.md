@@ -4,9 +4,9 @@ description: Guidelines for making git commits in the megane project. Use when c
 
 # Commit Guidelines
 
-## RULE: All commit messages MUST be in English
+## RULE: All commit messages and PR descriptions MUST be in English
 
-This is a hard requirement. Never write commit messages in Japanese or any other non-English language.
+This is a hard requirement. Never write commit messages, PR titles, or PR descriptions in Japanese or any other non-English language.
 
 ## Commit Message Style
 
@@ -29,6 +29,20 @@ Keep the first line under 72 characters. Add details in the body if needed.
    - Python changes: `python -m pytest`
 2. Ensure the build succeeds for frontend changes: `npm run build`
 3. Do NOT commit generated files: `crates/megane-wasm/pkg/`, `dist/`, `target/`, `node_modules/`, `dev-preview/`
+4. Check if your changes require documentation updates:
+   - Review `README.md`, `CLAUDE.md`, and files under `docs/` for any descriptions affected by your changes
+   - If you added/changed/removed features, CLI options, API, commands, configuration, or architecture, update the corresponding documentation
+   - Key docs to check:
+     - `README.md` — project overview, usage examples
+     - `CLAUDE.md` — dev instructions, key commands, architecture notes
+     - `CHANGELOG.md` — notable changes
+     - `docs/` — user-facing guides and API reference
+   - Include doc updates in the same commit (or a separate `docs:` commit if the changes are substantial)
+5. If you changed pipeline nodes (`src/pipeline/`), ensure the Python API is also updated:
+   - Node classes in `python/megane/pipeline.py` (add/update corresponding `PipelineNode` subclass)
+   - Port mappings in `_SOURCE_OUTPUT_MAP` / `_TARGET_PORT_MAP`
+   - Public exports in `python/megane/__init__.py`
+   - Default parameters must match TypeScript `defaultParams()` in `src/pipeline/types.ts`
 
 ## After Committing
 
