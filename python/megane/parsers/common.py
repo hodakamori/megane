@@ -33,7 +33,5 @@ class InMemoryTrajectory:
             ValueError: If *index* is out of range.
         """
         if not (0 <= index < self.n_frames):
-            raise ValueError(
-                f"Frame index {index} is out of range for trajectory with {self.n_frames} frames."
-            )
+            raise ValueError(f"Frame index {index} is out of range for trajectory with {self.n_frames} frames.")
         return self._frames[index]
