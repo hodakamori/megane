@@ -5,6 +5,7 @@ export default defineConfig({
   title: "megane",
   description: "Spectacles for atomistic data",
   base: "/megane/",
+  ignoreDeadLinks: [/localhost/],
 
   head: [["link", { rel: "icon", href: "/megane/logo.png" }]],
 
