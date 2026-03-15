@@ -5,15 +5,10 @@
 ///
 /// Supports coordinate columns: x/y/z (unscaled), xs/ys/zs (scaled),
 /// xu/yu/zu (unwrapped). Atoms are sorted by id within each frame.
-///
-/// Parsed LAMMPS dump trajectory data.
-pub struct LammpstrjData {
-    pub n_atoms: usize,
-    pub n_frames: usize,
-    pub timestep_ps: f32,
-    pub box_matrix: Option<[f32; 9]>,
-    pub frame_positions: Vec<Vec<f32>>,
-}
+use crate::trajectory::TrajectoryData;
+
+/// Type alias kept for backwards compatibility.
+pub type LammpstrjData = TrajectoryData;
 
 /// Detected coordinate type.
 #[derive(Clone, Copy)]

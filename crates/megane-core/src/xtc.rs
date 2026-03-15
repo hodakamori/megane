@@ -20,14 +20,10 @@ static MAGICINTS: [u32; 73] = [
     10568983, 13316085, 16777216,
 ];
 
-/// Parsed XTC trajectory data.
-pub struct XtcData {
-    pub n_atoms: usize,
-    pub n_frames: usize,
-    pub timestep_ps: f32,
-    pub box_matrix: Option<[f32; 9]>,
-    pub frame_positions: Vec<Vec<f32>>,
-}
+use crate::trajectory::TrajectoryData;
+
+/// Type alias kept for backwards compatibility.
+pub type XtcData = TrajectoryData;
 
 // ---------- XDR primitive readers ----------
 

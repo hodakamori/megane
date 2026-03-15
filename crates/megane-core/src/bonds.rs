@@ -1,58 +1,9 @@
 /// Distance-based bond inference using cell-list spatial search.
 use std::collections::HashSet;
 
-/// Covalent radii in Angstroms, indexed by atomic number.
-fn covalent_radius(atomic_num: u8) -> f32 {
-    match atomic_num {
-        1 => 0.31,  // H
-        5 => 0.84,  // B
-        6 => 0.76,  // C
-        7 => 0.71,  // N
-        8 => 0.66,  // O
-        9 => 0.57,  // F
-        11 => 1.66, // Na
-        12 => 1.41, // Mg
-        14 => 1.11, // Si
-        15 => 1.07, // P
-        16 => 1.05, // S
-        17 => 1.02, // Cl
-        19 => 2.03, // K
-        20 => 1.76, // Ca
-        25 => 1.39, // Mn
-        26 => 1.32, // Fe
-        27 => 1.26, // Co
-        28 => 1.24, // Ni
-        29 => 1.32, // Cu
-        30 => 1.22, // Zn
-        34 => 1.20, // Se
-        35 => 1.20, // Br
-        53 => 1.39, // I
-        _ => 0.77,
-    }
-}
-
-/// Van der Waals radii in Angstroms, indexed by atomic number.
-/// Matches the constants in src/core/constants.ts.
-pub fn vdw_radius(atomic_num: u8) -> f32 {
-    match atomic_num {
-        1 => 1.20,  // H
-        6 => 1.70,  // C
-        7 => 1.55,  // N
-        8 => 1.52,  // O
-        9 => 1.47,  // F
-        11 => 2.27, // Na
-        12 => 1.73, // Mg
-        15 => 1.80, // P
-        16 => 1.80, // S
-        17 => 1.75, // Cl
-        19 => 2.75, // K
-        20 => 2.31, // Ca
-        26 => 2.04, // Fe
-        29 => 1.40, // Cu
-        30 => 1.39, // Zn
-        _ => 1.50,
-    }
-}
+use crate::atomic::covalent_radius;
+// Re-export so that `megane_core::bonds::vdw_radius` continues to work.
+pub use crate::atomic::vdw_radius;
 
 const BOND_TOLERANCE: f32 = 1.3;
 const MIN_BOND_DIST: f32 = 0.4;
