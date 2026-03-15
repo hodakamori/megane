@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -41,7 +41,6 @@ class ServerState:
     pdb_path: str = ""
     xtc_path: Optional[str] = None
     trajectory: Optional[Trajectory | InMemoryTrajectory] = None
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 _state = ServerState()
@@ -215,8 +214,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             _clients.discard(websocket)
 
 
-# Resolve static files directory: override via MEGANE_STATIC_DIR env var
-_static_dir = Path(os.environ.get("MEGANE_STATIC_DIR", Path(__file__).parent / "static" / "app"))
+# Resolve static files directory: override via MEGANE_STATIC_DIR env var.
+# Empty or whitespace values are treated as unset to avoid accidentally
+# exposing the current working directory via StaticFiles.
+_default_static_dir = Path(__file__).parent / "static" / "app"
+_env_static_dir = os.environ.get("MEGANE_STATIC_DIR", "").strip()
+_static_dir = Path(_env_static_dir).resolve() if _env_static_dir else _default_static_dir
 if _static_dir.exists():
     app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="app")
 else:
