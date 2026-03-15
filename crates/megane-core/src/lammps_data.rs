@@ -94,7 +94,7 @@ fn parse_header(lines: &[&str]) -> HeaderData {
         }
         let tokens: Vec<&str> = trimmed.split_whitespace().collect();
 
-        // "N atoms" / "N bonds"
+        // "N atoms" header line
         if tokens.len() == 2 && tokens[1] == "atoms" {
             if let Ok(n) = tokens[0].parse::<usize>() {
                 hd.n_atoms = n;
@@ -121,7 +121,7 @@ fn parse_header(lines: &[&str]) -> HeaderData {
             }
         }
 
-        // Tilt factors: "xy xz yz xy xz yz"
+        // Tilt factors: "<xy> <xz> <yz> xy xz yz"
         if tokens.len() >= 6 && tokens[3] == "xy" && tokens[4] == "xz" && tokens[5] == "yz" {
             hd.xy = tokens[0].parse().unwrap_or(0.0);
             hd.xz = tokens[1].parse().unwrap_or(0.0);
