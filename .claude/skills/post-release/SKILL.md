@@ -56,6 +56,51 @@ gh run view --workflow=publish-vscode.yml --limit 1
 ```
 Confirm the extension version matches `X.Y.Z`.
 
+## Phase 2.5: Clean Environment Rendering Verification
+
+Verify that the published packages actually work in a clean environment — not just that they exist, but that molecular structures render correctly.
+
+### 2.5.1 Python + npm: widget rendering in fresh virtualenv
+
+Install from PyPI into an isolated virtualenv (no local source files), then run the existing E2E widget test against it. This covers both the Python package (PyO3 native extension, parsers) and the npm package (megane-viewer WASM loaded by anywidget in the browser).
+
+```bash
+# Create isolated virtualenv and install from PyPI only
+VENV=/tmp/megane-verify-X.Y.Z
+python -m venv $VENV
+$VENV/bin/pip install megane==X.Y.Z jupyterlab
+
+# Run the widget E2E test using the PyPI-installed megane
+# PATH override ensures local dev installation is NOT used
+PATH=$VENV/bin:$PATH node tests/e2e/test_widget_render.mjs
+```
+
+Expected: all assertions pass — canvas created, non-white pixels rendered (atoms visible), no critical JS errors.
+
+This test verifies:
+- PyPI install succeeds and PyO3 native extension loads
+- megane-viewer (npm) WASM is bundled correctly and loads in browser
+- Molecule rendering pipeline works end-to-end
+
+### 2.5.2 VS Code extension: rendering via code-server
+
+Download the VSIX from the VS Code Marketplace (the same artifact users install), run it in code-server, and verify the megane custom editor renders a molecule.
+
+```bash
+# Run the VS Code rendering E2E test
+# Downloads VSIX from Marketplace, installs in code-server, verifies canvas render
+node tests/e2e/test_vscode_render.mjs X.Y.Z
+```
+
+Expected: `PASS` for all assertions — canvas created in webview, non-white pixels rendered, no critical JS errors. Screenshot saved to `tests/e2e/screenshot_vscode_render.png`.
+
+If code-server is not installed, the script installs it automatically via `npm install -g code-server`.
+
+This test verifies:
+- VSIX is available on VS Code Marketplace at version X.Y.Z
+- Extension installs and activates correctly in code-server
+- Webview loads WASM and renders the molecular structure
+
 ## Phase 3: GitHub Release Notes & Publishing
 
 ### 3.1 Find the previous release tag
@@ -179,5 +224,7 @@ Once all phases are complete, the release is done. Key verification:
 | All CI workflows | `gh run list --limit 10` |
 | PyPI version | `pip index versions megane` |
 | npm version | `npm view megane-viewer version` |
+| Python + npm rendering (clean venv) | See Phase 2.5.1 — install from PyPI, then `node tests/e2e/test_widget_render.mjs` |
+| VS Code rendering (code-server) | `node tests/e2e/test_vscode_render.mjs X.Y.Z` |
 | GitHub release draft with notes ready | `gh release view vX.Y.Z` |
 | Docs site updated | `gh run list --workflow=docs.yml` |
