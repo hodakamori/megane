@@ -108,12 +108,41 @@ node scripts/capture-screenshots.mjs
 ```
 Review generated screenshots visually for rendering regressions.
 
-### 5.2 Live demo (AWS ECS) health
-Check that the latest deploy workflow succeeded:
+### 5.2 Live demo (AWS ECS) — health check and visual verification
+
+**Step 1**: Confirm the latest deploy succeeded and retrieve the URL:
 ```bash
-gh run list --workflow=deploy.yml --limit 1
+ORIG_REMOTE=$(git remote get-url origin)
+git remote set-url origin https://github.com/hodakamori/megane.git
+RUN_ID=$(gh run list --workflow=deploy.yml --limit 1 --json databaseId -q '.[0].databaseId')
+gh run view "$RUN_ID" --log | grep "URL:"
+git remote set-url origin "$ORIG_REMOTE"
 ```
-Confirm status is `success`. If not, investigate before releasing.
+Note the URL (e.g., `https://XXXX.example.com`).
+
+**Step 2**: Take a screenshot of the live demo with Playwright and verify rendering:
+```bash
+node -e "
+const { createRequire } = require('module');
+const require2 = createRequire('/opt/node22/lib/node_modules/');
+const { chromium } = require2('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await page.goto('LIVE_DEMO_URL', { waitUntil: 'networkidle', timeout: 30000 });
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: 'dev-preview/live-demo.png', fullPage: false });
+  await browser.close();
+  console.log('Screenshot saved to dev-preview/live-demo.png');
+})();
+"
+```
+Replace `LIVE_DEMO_URL` with the URL from Step 1.
+
+**Step 3**: Review the screenshot `dev-preview/live-demo.png` and confirm:
+- The viewer loads without blank screen or error messages
+- A molecule is rendered (atoms/bonds visible)
+- The UI controls (toolbar, sidebar) are present
 
 ## Phase 6: Dry Run
 
