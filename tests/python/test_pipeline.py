@@ -276,6 +276,25 @@ class TestPipelineAddEdge:
         with pytest.raises(ValueError, match="must be added"):
             pipe.add_edge(s.out.particle, f.inp.particle)
 
+    def test_error_on_wrong_type_raises_type_error(self):
+        """Passing PipelineNode instead of NodePort raises TypeError with guidance."""
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        f = pipe.add_node(Filter(query="element == 'C'"))
+        with pytest.raises(TypeError, match="NodePort"):
+            pipe.add_edge(s, f)  # type: ignore[arg-type]
+
+    def test_error_on_cross_pipeline_nodes(self):
+        """Ports from a different pipeline instance are rejected."""
+        pipe1 = Pipeline()
+        s1 = pipe1.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+
+        pipe2 = Pipeline()
+        f2 = pipe2.add_node(Filter(query="element == 'C'"))
+
+        with pytest.raises(ValueError, match="must be added"):
+            pipe1.add_edge(s1.out.particle, f2.inp.particle)
+
 
 class TestPipelineSerialization:
     """Pipeline.to_dict() produces valid SerializedPipeline v3."""

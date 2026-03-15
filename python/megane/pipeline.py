@@ -10,7 +10,7 @@ to be rendered.
 
 Example::
 
-    from megane import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport
+    from megane import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport, MolecularViewer
 
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure("protein.pdb"))
@@ -25,6 +25,7 @@ Example::
     pipe.add_edge(m.out.particle, v.inp.particle)
     pipe.add_edge(b.out.bond, v.inp.bond)
 
+    viewer = MolecularViewer()
     viewer.set_pipeline(pipe)
 """
 
@@ -469,8 +470,15 @@ class Pipeline:
             pipe.add_edge(s.out.particle, f.inp.particle)
             pipe.add_edge(s.out.traj, v.inp.traj)
         """
-        if source._node._id is None or target._node._id is None:
-            raise ValueError("Both nodes must be added to the pipeline before connecting.")
+        if not isinstance(source, NodePort) or not isinstance(target, NodePort):
+            raise TypeError(
+                "add_edge() requires NodePort arguments. "
+                "Use node.out.<name> and node.inp.<name>, "
+                "e.g. pipe.add_edge(s.out.particle, f.inp.particle)."
+            )
+        node_ids = {n._id for n, _ in self._nodes}
+        if source._node._id not in node_ids or target._node._id not in node_ids:
+            raise ValueError("Both nodes must be added to this pipeline before connecting.")
         self._edges.append(
             {
                 "source": source._node._id,
