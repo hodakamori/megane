@@ -1,36 +1,81 @@
 """NetworkX-style pipeline builder for megane molecular viewer.
 
 Nodes are class instances added via ``add_node()``, connections via
-``add_edge()`` with ports auto-resolved from types.  The pipeline
-serializes to the same ``SerializedPipeline`` v3 JSON format used by
-the TypeScript pipeline engine, which remains the source of truth.
+``add_edge()`` with explicit port objects.  The pipeline serializes to
+the same ``SerializedPipeline`` v3 JSON format used by the TypeScript
+pipeline engine, which remains the source of truth.
 
 A ``Viewport`` node must be explicitly added and connected for data
 to be rendered.
 
 Example::
 
-    from megane.pipeline import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport
+    from megane import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport
 
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure("protein.pdb"))
-    carbons = pipe.add_node(Filter(query="element == 'C'"))
+    f = pipe.add_node(Filter(query="element == 'C'"))
     m = pipe.add_node(Modify(scale=1.3))
-    bonds = pipe.add_node(AddBonds(source="distance"))
+    b = pipe.add_node(AddBonds())
     v = pipe.add_node(Viewport())
 
-    pipe.add_edge(s, carbons)
-    pipe.add_edge(carbons, m)
-    pipe.add_edge(s, bonds)
-    pipe.add_edge(m, v)
-    pipe.add_edge(bonds, v)
+    pipe.add_edge(s.out.particle, f.inp.particle)
+    pipe.add_edge(f.out.particle, m.inp.particle)
+    pipe.add_edge(s.out.particle, b.inp.particle)
+    pipe.add_edge(m.out.particle, v.inp.particle)
+    pipe.add_edge(b.out.bond, v.inp.bond)
 
     viewer.set_pipeline(pipe)
 """
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    pass
+
+# ─── Port Objects ────────────────────────────────────────────────────
+
+
+class NodePort:
+    """A single typed I/O port on a pipeline node.
+
+    Returned by ``node.out.<name>`` and ``node.inp.<name>``.
+    Pass to ``Pipeline.add_edge()`` to connect nodes explicitly.
+    """
+
+    def __init__(self, node: PipelineNode, handle: str) -> None:
+        self._node = node
+        self.handle = handle  # JSON wire name, e.g. "particle", "trajectory", "in"
+
+
+class PortNamespace:
+    """Attribute-access namespace that returns :class:`NodePort` instances.
+
+    Example: ``node.out.particle`` → ``NodePort(node, 'particle')``.
+    """
+
+    def __init__(self, node: PipelineNode, port_map: dict[str, str]) -> None:
+        # Use object.__setattr__ to avoid triggering our own __getattr__.
+        object.__setattr__(self, "_node", node)
+        object.__setattr__(self, "_port_map", port_map)
+
+    def __getattr__(self, name: str) -> NodePort:
+        port_map: dict[str, str] = object.__getattribute__(self, "_port_map")
+        node: PipelineNode = object.__getattribute__(self, "_node")
+        if name not in port_map:
+            available = ", ".join(sorted(port_map)) or "(none)"
+            raise AttributeError(
+                f"No port {name!r} on {node._node_type!r} node. "
+                f"Available: {available}"
+            )
+        return NodePort(node, port_map[name])
+
+    def __dir__(self) -> list[str]:
+        port_map: dict[str, str] = object.__getattribute__(self, "_port_map")
+        return sorted(port_map)
+
 
 # ─── Node Classes ───────────────────────────────────────────────────
 
@@ -39,18 +84,29 @@ class PipelineNode:
     """Base class for all pipeline node types."""
 
     _node_type: str = ""
+    _out_ports: dict[str, str] = {}
+    _inp_ports: dict[str, str] = {}
 
     def __init__(self) -> None:
         self._id: str | None = None
+        self.out = PortNamespace(self, self.__class__._out_ports)
+        self.inp = PortNamespace(self, self.__class__._inp_ports)
 
 
 class LoadStructure(PipelineNode):
     """Load a molecular structure from a file.
 
     Supported formats: PDB, GRO, XYZ, MOL, LAMMPS data.
+
+    Ports:
+        out.particle — atom data
+        out.traj     — trajectory channel
+        out.cell     — simulation cell
     """
 
     _node_type = "load_structure"
+    _out_ports = {"particle": "particle", "traj": "trajectory", "cell": "cell"}
+    _inp_ports: dict[str, str] = {}
 
     def __init__(self, path: str) -> None:
         super().__init__()
@@ -60,15 +116,22 @@ class LoadStructure(PipelineNode):
 class LoadTrajectory(PipelineNode):
     """Load an external trajectory file (XTC or ASE .traj).
 
-    Requires connection from a ``LoadStructure`` node.
+    Requires connection from a ``LoadStructure`` node via
+    ``pipe.add_edge(s.out.particle, t.inp.particle)``.
     Frames are loaded lazily when ``frame_index`` changes.
 
     Args:
         xtc: Path to XTC trajectory file.
         traj: Path to ASE .traj file.
+
+    Ports:
+        inp.particle — atom topology source
+        out.traj     — trajectory frames
     """
 
     _node_type = "load_trajectory"
+    _out_ports = {"traj": "trajectory"}
+    _inp_ports = {"particle": "particle"}
 
     def __init__(
         self,
@@ -86,18 +149,37 @@ class Streaming(PipelineNode):
 
     Connects to the server via WebSocket and provides particle,
     trajectory, and cell data from the streaming connection.
+
+    Ports:
+        out.particle — atom data
+        out.bond     — bond data
+        out.traj     — trajectory channel
+        out.cell     — simulation cell
     """
 
     _node_type = "streaming"
+    _out_ports = {
+        "particle": "particle",
+        "bond": "bond",
+        "traj": "trajectory",
+        "cell": "cell",
+    }
+    _inp_ports: dict[str, str] = {}
 
     def __init__(self) -> None:
         super().__init__()
 
 
 class LoadVector(PipelineNode):
-    """Load per-atom vector data from a file."""
+    """Load per-atom vector data from a file.
+
+    Ports:
+        out.vector — vector field
+    """
 
     _node_type = "load_vector"
+    _out_ports = {"vector": "vector"}
+    _inp_ports: dict[str, str] = {}
 
     def __init__(self, path: str) -> None:
         super().__init__()
@@ -113,9 +195,15 @@ class Filter(PipelineNode):
         element == 'O' and x > 5.0
         resname == 'ALA'
         index >= 100 and index < 200
+
+    Ports:
+        inp.particle — atom data in
+        out.particle — filtered atom data
     """
 
     _node_type = "filter"
+    _out_ports = {"particle": "out"}
+    _inp_ports = {"particle": "in"}
 
     def __init__(self, *, query: str) -> None:
         super().__init__()
@@ -123,9 +211,16 @@ class Filter(PipelineNode):
 
 
 class Modify(PipelineNode):
-    """Modify per-atom visual properties (scale, opacity)."""
+    """Modify per-atom visual properties (scale, opacity).
+
+    Ports:
+        inp.particle — atom data in
+        out.particle — modified atom data
+    """
 
     _node_type = "modify"
+    _out_ports = {"particle": "out"}
+    _inp_ports = {"particle": "in"}
 
     def __init__(
         self,
@@ -144,9 +239,15 @@ class AddBonds(PipelineNode):
     Args:
         source: ``"distance"`` for VDW-based inference,
                 ``"structure"`` to use bonds from the file.
+
+    Ports:
+        inp.particle — atom data
+        out.bond     — computed bonds
     """
 
     _node_type = "add_bond"
+    _out_ports = {"bond": "bond"}
+    _inp_ports = {"particle": "particle"}
 
     def __init__(
         self,
@@ -162,9 +263,15 @@ class AddLabels(PipelineNode):
 
     Args:
         source: ``"element"``, ``"resname"``, or ``"index"``.
+
+    Ports:
+        inp.particle — atom data
+        out.label    — label data
     """
 
     _node_type = "label_generator"
+    _out_ports = {"label": "label"}
+    _inp_ports = {"particle": "particle"}
 
     def __init__(
         self,
@@ -176,9 +283,16 @@ class AddLabels(PipelineNode):
 
 
 class AddPolyhedra(PipelineNode):
-    """Generate coordination polyhedra mesh."""
+    """Generate coordination polyhedra mesh.
+
+    Ports:
+        inp.particle — atom data
+        out.mesh     — polyhedra mesh
+    """
 
     _node_type = "polyhedron_generator"
+    _out_ports = {"mesh": "mesh"}
+    _inp_ports = {"particle": "particle"}
 
     def __init__(
         self,
@@ -202,9 +316,16 @@ class AddPolyhedra(PipelineNode):
 
 
 class VectorOverlay(PipelineNode):
-    """Configure per-atom vector visualization (e.g. forces)."""
+    """Configure per-atom vector visualization (e.g. forces).
+
+    Ports:
+        inp.vector — vector field in
+        out.vector — configured vector field
+    """
 
     _node_type = "vector_overlay"
+    _out_ports = {"vector": "vector"}
+    _inp_ports = {"vector": "vector"}
 
     def __init__(self, *, scale: float = 1.0) -> None:
         super().__init__()
@@ -215,9 +336,28 @@ class Viewport(PipelineNode):
     """3D rendering output node.
 
     All data to be rendered must be explicitly connected to this node.
+
+    Ports:
+        inp.particle — atom data
+        inp.bond     — bond data
+        inp.cell     — simulation cell
+        inp.traj     — trajectory frames
+        inp.label    — text labels
+        inp.mesh     — polyhedra mesh
+        inp.vector   — vector field
     """
 
     _node_type = "viewport"
+    _out_ports: dict[str, str] = {}
+    _inp_ports = {
+        "particle": "particle",
+        "bond": "bond",
+        "cell": "cell",
+        "traj": "trajectory",
+        "label": "label",
+        "mesh": "mesh",
+        "vector": "vector",
+    }
 
     def __init__(
         self,
@@ -228,65 +368,6 @@ class Viewport(PipelineNode):
         super().__init__()
         self.perspective = perspective
         self.cell_axes_visible = cell_axes_visible
-
-
-# ─── Port Resolution ────────────────────────────────────────────────
-
-# target_node_type → (default source_handle, target_handle)
-_TARGET_PORT_MAP: dict[str, tuple[str, str]] = {
-    "load_trajectory": ("particle", "particle"),
-    "filter": ("particle", "in"),
-    "modify": ("particle", "in"),
-    "add_bond": ("particle", "particle"),
-    "label_generator": ("particle", "particle"),
-    "polyhedron_generator": ("particle", "particle"),
-    "vector_overlay": ("vector", "vector"),
-    "viewport": ("particle", "particle"),  # fallback; actual handle varies
-}
-
-# source_node_type → default output handle
-_SOURCE_OUTPUT_MAP: dict[str, str] = {
-    "filter": "out",
-    "modify": "out",
-    "load_vector": "vector",
-    "vector_overlay": "vector",
-    "add_bond": "bond",
-    "label_generator": "label",
-    "polyhedron_generator": "mesh",
-}
-
-
-def _resolve_ports(
-    source: PipelineNode,
-    target: PipelineNode,
-) -> tuple[str, str]:
-    """Resolve source and target port handles from node types."""
-    # Source handle: use the source node's known output, or infer
-    # from what the target expects.
-    source_handle = _SOURCE_OUTPUT_MAP.get(source._node_type)
-    if source_handle is None:
-        # LoadStructure or other multi-output node: use what the
-        # target expects as its input type.
-        source_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[0]
-
-    # For viewport targets, the target handle matches the source output type.
-    if isinstance(target, Viewport):
-        # Map source output handles to viewport input handles.
-        _viewport_handle = {
-            "particle": "particle",
-            "out": "particle",
-            "bond": "bond",
-            "cell": "cell",
-            "trajectory": "trajectory",
-            "label": "label",
-            "mesh": "mesh",
-            "vector": "vector",
-        }
-        target_handle = _viewport_handle.get(source_handle, "particle")
-    else:
-        target_handle = _TARGET_PORT_MAP.get(target._node_type, ("particle", "particle"))[1]
-
-    return source_handle, target_handle
 
 
 # ─── Pipeline ───────────────────────────────────────────────────────
@@ -338,6 +419,15 @@ class Pipeline:
     Build a DAG of processing nodes and serialize to the
     ``SerializedPipeline`` v3 JSON format understood by the
     TypeScript pipeline engine.
+
+    Example::
+
+        from megane import Pipeline, LoadStructure, Viewport
+
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure("protein.pdb"))
+        v = pipe.add_node(Viewport())
+        pipe.add_edge(s.out.particle, v.inp.particle)
     """
 
     def __init__(self) -> None:
@@ -353,8 +443,11 @@ class Pipeline:
     def add_node(self, node: PipelineNode) -> PipelineNode:
         """Add a node to the pipeline.
 
-        Returns the same node instance so it can be used in
-        ``add_edge()`` calls.
+        Returns the same node instance so its ports can be used in
+        ``add_edge()`` calls::
+
+            s = pipe.add_node(LoadStructure("protein.pdb"))
+            pipe.add_edge(s.out.particle, ...)
         """
         self._counter += 1
         node._id = f"{node._node_type}-{self._counter}"
@@ -369,29 +462,31 @@ class Pipeline:
 
     def add_edge(
         self,
-        source: PipelineNode,
-        target: PipelineNode,
+        source: NodePort,
+        target: NodePort,
     ) -> None:
-        """Connect *source* → *target*.
+        """Connect *source* port to *target* port.
 
-        Port handles are auto-resolved from the node types.
+        Both ports must belong to nodes already added to this pipeline::
+
+            pipe.add_edge(s.out.particle, f.inp.particle)
+            pipe.add_edge(s.out.traj, v.inp.traj)
         """
-        if source._id is None or target._id is None:
+        if source._node._id is None or target._node._id is None:
             raise ValueError("Both nodes must be added to the pipeline before connecting.")
-        source_handle, target_handle = _resolve_ports(source, target)
         self._edges.append(
             {
-                "source": source._id,
-                "target": target._id,
-                "sourceHandle": source_handle,
-                "targetHandle": target_handle,
+                "source": source._node._id,
+                "target": target._node._id,
+                "sourceHandle": source.handle,
+                "targetHandle": target.handle,
             }
         )
 
         # Trigger lazy trajectory loading when connecting
         # LoadStructure → LoadTrajectory.
-        if isinstance(target, LoadTrajectory) and isinstance(source, LoadStructure):
-            self._load_trajectory_data(target, source)
+        if isinstance(target._node, LoadTrajectory) and isinstance(source._node, LoadStructure):
+            self._load_trajectory_data(target._node, source._node)
 
     # ── Serialization ───────────────────────────────────────
 

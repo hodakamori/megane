@@ -246,23 +246,23 @@ LoadStructure (ligand.mol)  → AddBond ↗
 In Python:
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, AddBonds, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-protein = pipe.add_node(megane.LoadStructure("protein.pdb"))
-ligand = pipe.add_node(megane.LoadStructure("ligand.mol"))
-bonds_p = pipe.add_node(megane.AddBonds(source="distance"))
-bonds_l = pipe.add_node(megane.AddBonds(source="structure"))
-v = pipe.add_node(megane.Viewport())
+pipe = Pipeline()
+protein = pipe.add_node(LoadStructure("protein.pdb"))
+ligand = pipe.add_node(LoadStructure("ligand.mol"))
+bonds_p = pipe.add_node(AddBonds(source="distance"))
+bonds_l = pipe.add_node(AddBonds(source="structure"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(protein, bonds_p)
-pipe.add_edge(ligand, bonds_l)
-pipe.add_edge(protein, v)
-pipe.add_edge(bonds_p, v)
-pipe.add_edge(ligand, v)
-pipe.add_edge(bonds_l, v)
+pipe.add_edge(protein.out.particle, bonds_p.inp.particle)
+pipe.add_edge(ligand.out.particle, bonds_l.inp.particle)
+pipe.add_edge(protein.out.particle, v.inp.particle)
+pipe.add_edge(bonds_p.out.bond, v.inp.bond)
+pipe.add_edge(ligand.out.particle, v.inp.particle)
+pipe.add_edge(bonds_l.out.bond, v.inp.bond)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```
@@ -280,27 +280,26 @@ Pipelines can be built programmatically in Python using the `Pipeline` class. Th
 ### Overview
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-node = pipe.add_node(...)       # add a node
-v = pipe.add_node(megane.Viewport())  # add viewport
-pipe.add_edge(src, tgt)         # connect nodes
-pipe.add_edge(node, v)          # connect to viewport
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("protein.pdb"))  # returns node with .out/.inp
+v = pipe.add_node(Viewport())
+pipe.add_edge(s.out.particle, v.inp.particle)    # connect explicit ports
 
-viewer = megane.MolecularViewer()
-viewer.set_pipeline(pipe)       # apply to viewer
-viewer                          # display in notebook
+viewer = MolecularViewer()
+viewer.set_pipeline(pipe)   # apply to viewer
+viewer                      # display in notebook
 ```
 
-The pipeline serializes to the `SerializedPipeline` v3 JSON format. A `Viewport` node must be explicitly added and connected for data to be rendered.
+After `add_node()`, each node exposes `.out` and `.inp` namespaces for its ports. Pass these port objects to `add_edge()` to wire nodes together explicitly. The pipeline serializes to the `SerializedPipeline` v3 JSON format. A `Viewport` node must be explicitly added and connected for data to be rendered.
 
 ### Pipeline class
 
 | Method | Description |
 |--------|-------------|
-| `add_node(node)` | Add a node to the pipeline. Returns the node for use in `add_edge()` |
-| `add_edge(source, target)` | Connect source → target. Port handles are auto-resolved |
+| `add_node(node)` | Add a node to the pipeline. Returns the node (with `.out`/`.inp` ports) for use in `add_edge()` |
+| `add_edge(source_port, target_port)` | Connect `source.out.<name>` → `target.inp.<name>` |
 | `to_dict()` | Serialize to v3 JSON dict |
 
 ### Node classes
@@ -329,21 +328,21 @@ from megane import (
 Load a molecular structure file.
 
 ```python
-megane.LoadStructure(path: str)
+LoadStructure(path: str)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | `str` | File path. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.data` (LAMMPS) |
 
-**Outputs:** `particle`, `trajectory`, `cell`
+**Ports:** `out.particle`, `out.traj`, `out.cell`
 
 #### LoadTrajectory
 
 Load an external trajectory file. Requires connection from a `LoadStructure` node.
 
 ```python
-megane.LoadTrajectory(*, xtc: str | None = None, traj: str | None = None)
+LoadTrajectory(*, xtc: str | None = None, traj: str | None = None)
 ```
 
 | Parameter | Type | Default | Description |
@@ -351,54 +350,52 @@ megane.LoadTrajectory(*, xtc: str | None = None, traj: str | None = None)
 | `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
 | `traj` | `str \| None` | `None` | Path to ASE .traj trajectory file |
 
-**Inputs:** `particle`
-**Outputs:** `trajectory`
+**Ports:** `inp.particle`, `out.traj`
 
 #### Streaming
 
 WebSocket-based real-time data delivery.
 
 ```python
-megane.Streaming()
+Streaming()
 ```
 
-No parameters. **Outputs:** `particle`, `bond`, `trajectory`, `cell`
+No parameters. **Ports:** `out.particle`, `out.bond`, `out.traj`, `out.cell`
 
 #### LoadVector
 
 Load per-atom vector data from a file.
 
 ```python
-megane.LoadVector(path: str)
+LoadVector(path: str)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | `str` | Path to vector data file |
 
-**Outputs:** `vector`
+**Ports:** `out.vector`
 
 #### Filter
 
 Select atoms by a query expression.
 
 ```python
-megane.Filter(*, query: str)
+Filter(*, query: str)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `query` | `str` | Selection expression (see [Filter DSL](#filter-dsl)) |
 
-**Inputs:** `particle` (as "in" handle)
-**Outputs:** `particle` (as "out" handle)
+**Ports:** `inp.particle`, `out.particle`
 
 #### Modify
 
 Override per-atom visual properties.
 
 ```python
-megane.Modify(*, scale: float = 1.0, opacity: float = 1.0)
+Modify(*, scale: float = 1.0, opacity: float = 1.0)
 ```
 
 | Parameter | Type | Default | Description |
@@ -406,45 +403,42 @@ megane.Modify(*, scale: float = 1.0, opacity: float = 1.0)
 | `scale` | `float` | `1.0` | Atom sphere radius multiplier (0.1–2.0) |
 | `opacity` | `float` | `1.0` | Transparency (0 = invisible, 1 = opaque) |
 
-**Inputs:** `particle` (as "in" handle)
-**Outputs:** `particle` (as "out" handle)
+**Ports:** `inp.particle`, `out.particle`
 
 #### AddBonds
 
 Compute and display bonds.
 
 ```python
-megane.AddBonds(*, source: Literal["distance", "structure"] = "distance")
+AddBonds(*, source: Literal["distance", "structure"] = "distance")
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `source` | `str` | `"distance"` | `"distance"` for VDW-based inference, `"structure"` for file-based bonds |
 
-**Inputs:** `particle`
-**Outputs:** `bond`
+**Ports:** `inp.particle`, `out.bond`
 
 #### AddLabels
 
 Generate text labels at atom positions.
 
 ```python
-megane.AddLabels(*, source: Literal["element", "resname", "index"] = "element")
+AddLabels(*, source: Literal["element", "resname", "index"] = "element")
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `source` | `str` | `"element"` | Label source: `"element"`, `"resname"`, or `"index"` |
 
-**Inputs:** `particle`
-**Outputs:** `label`
+**Ports:** `inp.particle`, `out.label`
 
 #### AddPolyhedra
 
 Generate coordination polyhedra mesh.
 
 ```python
-megane.AddPolyhedra(
+AddPolyhedra(
     *,
     center_elements: list[int],
     ligand_elements: list[int] | None = None,
@@ -466,30 +460,28 @@ megane.AddPolyhedra(
 | `edge_color` | `str` | `"#dddddd"` | Wireframe edge color (hex) |
 | `edge_width` | `float` | `3.0` | Wireframe edge width (px) |
 
-**Inputs:** `particle`
-**Outputs:** `mesh`
+**Ports:** `inp.particle`, `out.mesh`
 
 #### VectorOverlay
 
 Configure per-atom vector visualization (e.g. forces, velocities).
 
 ```python
-megane.VectorOverlay(*, scale: float = 1.0)
+VectorOverlay(*, scale: float = 1.0)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `scale` | `float` | `1.0` | Vector arrow length multiplier |
 
-**Inputs:** `vector`
-**Outputs:** `vector`
+**Ports:** `inp.vector`, `out.vector`
 
 #### Viewport
 
 3D rendering output node. All data to be rendered must be explicitly connected to this node.
 
 ```python
-megane.Viewport(*, perspective: bool = False, cell_axes_visible: bool = True)
+Viewport(*, perspective: bool = False, cell_axes_visible: bool = True)
 ```
 
 | Parameter | Type | Default | Description |
@@ -497,33 +489,32 @@ megane.Viewport(*, perspective: bool = False, cell_axes_visible: bool = True)
 | `perspective` | `bool` | `False` | Toggle perspective / orthographic projection |
 | `cell_axes_visible` | `bool` | `True` | Show simulation cell axes with labels |
 
-**Inputs:** `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, `vector`
-**Outputs:** —
+**Ports:** `inp.particle`, `inp.bond`, `inp.cell`, `inp.traj`, `inp.label`, `inp.mesh`, `inp.vector`
 
-### Port Resolution
+### Ports
 
-Edges are auto-resolved: `add_edge(source, target)` automatically picks the correct port handles based on node types. For example:
+After `add_node()`, each node exposes two port namespaces:
 
-- `LoadStructure → Filter` connects `particle → in`
-- `Filter → Modify` connects `out → in`
-- `LoadStructure → AddBonds` connects `particle → particle`
-- `AddBonds → Viewport` connects `bond → bond`
+- `node.out.<name>` — output port (pass as first arg to `add_edge`)
+- `node.inp.<name>` — input port (pass as second arg to `add_edge`)
+
+The port name `.traj` maps to the `"trajectory"` wire handle internally. Accessing an undefined port raises `AttributeError` with a helpful message listing available ports.
 
 ### Example: Basic Structure with Bonds
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, AddBonds, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
-bonds = pipe.add_node(megane.AddBonds(source="distance"))
-v = pipe.add_node(megane.Viewport())
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("protein.pdb"))
+bonds = pipe.add_node(AddBonds(source="distance"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, bonds)
-pipe.add_edge(s, v)
-pipe.add_edge(bonds, v)
+pipe.add_edge(s.out.particle, bonds.inp.particle)
+pipe.add_edge(s.out.particle, v.inp.particle)
+pipe.add_edge(bonds.out.bond, v.inp.bond)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```
@@ -531,22 +522,22 @@ viewer
 ### Example: Filter and Modify
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
-carbons = pipe.add_node(megane.Filter(query="element == 'C'"))
-big = pipe.add_node(megane.Modify(scale=1.5, opacity=0.8))
-bonds = pipe.add_node(megane.AddBonds(source="distance"))
-v = pipe.add_node(megane.Viewport())
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("protein.pdb"))
+carbons = pipe.add_node(Filter(query="element == 'C'"))
+big = pipe.add_node(Modify(scale=1.5, opacity=0.8))
+bonds = pipe.add_node(AddBonds(source="distance"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, carbons)
-pipe.add_edge(carbons, big)
-pipe.add_edge(s, bonds)
-pipe.add_edge(big, v)
-pipe.add_edge(bonds, v)
+pipe.add_edge(s.out.particle, carbons.inp.particle)
+pipe.add_edge(carbons.out.particle, big.inp.particle)
+pipe.add_edge(s.out.particle, bonds.inp.particle)
+pipe.add_edge(big.out.particle, v.inp.particle)
+pipe.add_edge(bonds.out.bond, v.inp.bond)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```
@@ -554,21 +545,21 @@ viewer
 ### Example: Trajectory Playback
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, LoadTrajectory, AddBonds, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
-t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
-bonds = pipe.add_node(megane.AddBonds(source="structure"))
-v = pipe.add_node(megane.Viewport())
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("protein.pdb"))
+t = pipe.add_node(LoadTrajectory(xtc="trajectory.xtc"))
+bonds = pipe.add_node(AddBonds(source="structure"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, t)
-pipe.add_edge(s, bonds)
-pipe.add_edge(s, v)
-pipe.add_edge(t, v)
-pipe.add_edge(bonds, v)
+pipe.add_edge(s.out.particle, t.inp.particle)
+pipe.add_edge(s.out.particle, bonds.inp.particle)
+pipe.add_edge(s.out.particle, v.inp.particle)
+pipe.add_edge(t.out.traj, v.inp.traj)
+pipe.add_edge(bonds.out.bond, v.inp.bond)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer.frame_index = 50  # jump to frame 50
 ```
@@ -576,26 +567,26 @@ viewer.frame_index = 50  # jump to frame 50
 ### Example: Make Solvent Translucent
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("protein.pdb"))
 
 # Filter water molecules and make them translucent
-water = pipe.add_node(megane.Filter(query='resname == "HOH"'))
-transparent = pipe.add_node(megane.Modify(scale=0.5, opacity=0.2))
+water = pipe.add_node(Filter(query='resname == "HOH"'))
+transparent = pipe.add_node(Modify(scale=0.5, opacity=0.2))
 
-bonds = pipe.add_node(megane.AddBonds(source="distance"))
-v = pipe.add_node(megane.Viewport())
+bonds = pipe.add_node(AddBonds(source="distance"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, water)
-pipe.add_edge(water, transparent)
-pipe.add_edge(s, bonds)
-pipe.add_edge(s, v)           # protein particle + cell
-pipe.add_edge(transparent, v) # translucent water
-pipe.add_edge(bonds, v)
+pipe.add_edge(s.out.particle, water.inp.particle)
+pipe.add_edge(water.out.particle, transparent.inp.particle)
+pipe.add_edge(s.out.particle, bonds.inp.particle)
+pipe.add_edge(s.out.particle, v.inp.particle)       # protein particle + cell
+pipe.add_edge(transparent.out.particle, v.inp.particle)  # translucent water
+pipe.add_edge(bonds.out.bond, v.inp.bond)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```
@@ -603,27 +594,27 @@ viewer
 ### Example: TiO₆ Coordination Polyhedra
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("SrTiO3_supercell.pdb"))
-bonds = pipe.add_node(megane.AddBonds(source="distance"))
-polyhedra = pipe.add_node(megane.AddPolyhedra(
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("SrTiO3_supercell.pdb"))
+bonds = pipe.add_node(AddBonds(source="distance"))
+polyhedra = pipe.add_node(AddPolyhedra(
     center_elements=[22],     # Ti
     ligand_elements=[8],      # O
     max_distance=2.5,
     opacity=0.5,
     show_edges=True,
 ))
-v = pipe.add_node(megane.Viewport())
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, bonds)
-pipe.add_edge(s, polyhedra)
-pipe.add_edge(s, v)
-pipe.add_edge(bonds, v)
-pipe.add_edge(polyhedra, v)
+pipe.add_edge(s.out.particle, bonds.inp.particle)
+pipe.add_edge(s.out.particle, polyhedra.inp.particle)
+pipe.add_edge(s.out.particle, v.inp.particle)
+pipe.add_edge(bonds.out.bond, v.inp.bond)
+pipe.add_edge(polyhedra.out.mesh, v.inp.mesh)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```
@@ -631,28 +622,28 @@ viewer
 ### Example: DAG Branching (Multiple Filters)
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, Filter, AddLabels, AddBonds, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("protein.pdb"))
 
 # Two independent filters from the same source
-carbon = pipe.add_node(megane.Filter(query="element == 'C'"))
-nitrogen = pipe.add_node(megane.Filter(query="element == 'N'"))
-labels = pipe.add_node(megane.AddLabels(source="element"))
-bonds = pipe.add_node(megane.AddBonds(source="distance"))
-v = pipe.add_node(megane.Viewport())
+carbon = pipe.add_node(Filter(query="element == 'C'"))
+nitrogen = pipe.add_node(Filter(query="element == 'N'"))
+labels = pipe.add_node(AddLabels(source="element"))
+bonds = pipe.add_node(AddBonds(source="distance"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, carbon)
-pipe.add_edge(s, nitrogen)
-pipe.add_edge(s, labels)
-pipe.add_edge(s, bonds)
-pipe.add_edge(carbon, v)
-pipe.add_edge(nitrogen, v)
-pipe.add_edge(labels, v)
-pipe.add_edge(bonds, v)
+pipe.add_edge(s.out.particle, carbon.inp.particle)
+pipe.add_edge(s.out.particle, nitrogen.inp.particle)
+pipe.add_edge(s.out.particle, labels.inp.particle)
+pipe.add_edge(s.out.particle, bonds.inp.particle)
+pipe.add_edge(carbon.out.particle, v.inp.particle)
+pipe.add_edge(nitrogen.out.particle, v.inp.particle)
+pipe.add_edge(labels.out.label, v.inp.label)
+pipe.add_edge(bonds.out.bond, v.inp.bond)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```
@@ -660,18 +651,18 @@ viewer
 ### Example: ASE .traj Trajectory
 
 ```python
-import megane
+from megane import Pipeline, LoadStructure, LoadTrajectory, Viewport, MolecularViewer
 
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("structure.pdb"))
-t = pipe.add_node(megane.LoadTrajectory(traj="simulation.traj"))
-v = pipe.add_node(megane.Viewport())
+pipe = Pipeline()
+s = pipe.add_node(LoadStructure("structure.pdb"))
+t = pipe.add_node(LoadTrajectory(traj="simulation.traj"))
+v = pipe.add_node(Viewport())
 
-pipe.add_edge(s, t)
-pipe.add_edge(s, v)
-pipe.add_edge(t, v)
+pipe.add_edge(s.out.particle, t.inp.particle)
+pipe.add_edge(s.out.particle, v.inp.particle)
+pipe.add_edge(t.out.traj, v.inp.traj)
 
-viewer = megane.MolecularViewer()
+viewer = MolecularViewer()
 viewer.set_pipeline(pipe)
 viewer
 ```

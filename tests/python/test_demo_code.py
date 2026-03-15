@@ -127,7 +127,7 @@ def test_pipeline_load_structure():
     pipe = megane.Pipeline()
     s = pipe.add_node(megane.LoadStructure(str(FIXTURES / "1crn.pdb")))
     v = pipe.add_node(megane.Viewport())
-    pipe.add_edge(s, v)
+    pipe.add_edge(s.out.particle, v.inp.particle)
 
     viewer = megane.MolecularViewer()
     viewer.set_pipeline(pipe)
@@ -144,9 +144,9 @@ def test_pipeline_with_trajectory():
         xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
     ))
     v = pipe.add_node(megane.Viewport())
-    pipe.add_edge(s, t)
-    pipe.add_edge(s, v)
-    pipe.add_edge(t, v)
+    pipe.add_edge(s.out.particle, t.inp.particle)
+    pipe.add_edge(s.out.particle, v.inp.particle)
+    pipe.add_edge(t.out.traj, v.inp.traj)
 
     viewer = megane.MolecularViewer()
     viewer.set_pipeline(pipe)
