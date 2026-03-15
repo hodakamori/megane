@@ -336,22 +336,22 @@ mod tests {
 
     #[test]
     fn test_mass_to_atomic_num() {
-        assert_eq!(mass_to_atomic_num(1.008), 1);   // H
-        assert_eq!(mass_to_atomic_num(12.011), 6);  // C
-        assert_eq!(mass_to_atomic_num(14.007), 7);  // N
-        assert_eq!(mass_to_atomic_num(15.999), 8);  // O
+        assert_eq!(mass_to_atomic_num(1.008), 1); // H
+        assert_eq!(mass_to_atomic_num(12.011), 6); // C
+        assert_eq!(mass_to_atomic_num(14.007), 7); // N
+        assert_eq!(mass_to_atomic_num(15.999), 8); // O
         assert_eq!(mass_to_atomic_num(55.845), 26); // Fe
         assert_eq!(mass_to_atomic_num(196.97), 79); // Au
-        assert_eq!(mass_to_atomic_num(999.0), 0);   // unknown
+        assert_eq!(mass_to_atomic_num(999.0), 0); // unknown
     }
 
     #[test]
     fn test_element_from_atom_name() {
         assert_eq!(element_from_atom_name("CA"), 20); // Ca (Calcium)
-        assert_eq!(element_from_atom_name("OW"), 8);  // Oxygen (water)
+        assert_eq!(element_from_atom_name("OW"), 8); // Oxygen (water)
         assert_eq!(element_from_atom_name("HW1"), 1); // Hydrogen
-        assert_eq!(element_from_atom_name("N"), 7);   // Nitrogen
+        assert_eq!(element_from_atom_name("N"), 7); // Nitrogen
         assert_eq!(element_from_atom_name("  CL"), 17); // Chlorine
-        assert_eq!(element_from_atom_name(""), 0);    // Empty
+        assert_eq!(element_from_atom_name(""), 0); // Empty
     }
 }

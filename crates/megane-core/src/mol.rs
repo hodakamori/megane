@@ -205,7 +205,11 @@ M  END
         let Err(msg) = parse(mol) else {
             panic!("expected parse to fail for too-short input")
         };
-        assert!(msg.contains("too short"), "expected 'too short' in error: {}", msg);
+        assert!(
+            msg.contains("too short"),
+            "expected 'too short' in error: {}",
+            msg
+        );
     }
 
     #[test]
@@ -220,7 +224,11 @@ M  END
         let Err(msg) = parse(mol) else {
             panic!("expected parse to fail for zero atoms")
         };
-        assert!(msg.contains("zero atoms"), "expected 'zero atoms' in error: {}", msg);
+        assert!(
+            msg.contains("zero atoms"),
+            "expected 'zero atoms' in error: {}",
+            msg
+        );
     }
 
     #[test]

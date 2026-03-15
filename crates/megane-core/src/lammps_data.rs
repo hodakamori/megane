@@ -370,14 +370,22 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     if hd.n_atoms == 0 {
         return Err("LAMMPS data file contains no atoms".into());
     }
-    let atoms_line = hd.atoms_start.ok_or("No Atoms section found in LAMMPS data file")?;
+    let atoms_line = hd
+        .atoms_start
+        .ok_or("No Atoms section found in LAMMPS data file")?;
 
     let type_to_mass = hd
         .masses_start
         .map(|s| parse_masses_section(&lines, s))
         .unwrap_or_default();
 
-    let atoms = parse_atoms_section(&lines, atoms_line, hd.atoms_style_hint, &type_to_mass, hd.n_atoms)?;
+    let atoms = parse_atoms_section(
+        &lines,
+        atoms_line,
+        hd.atoms_style_hint,
+        &type_to_mass,
+        hd.n_atoms,
+    )?;
 
     if atoms.count == 0 {
         return Err("No atoms parsed from Atoms section".into());
@@ -596,10 +604,10 @@ Atoms # atomic
         let result = parse(data).expect("parse failed");
         let bm = result.box_matrix.unwrap();
         assert!((bm[0] - 10.0).abs() < 1e-5); // lx
-        assert!((bm[3] - 1.0).abs() < 1e-5);  // xy
+        assert!((bm[3] - 1.0).abs() < 1e-5); // xy
         assert!((bm[4] - 10.0).abs() < 1e-5); // ly
-        assert!((bm[6] - 0.5).abs() < 1e-5);  // xz
-        assert!((bm[7] - 0.0).abs() < 1e-5);  // yz
+        assert!((bm[6] - 0.5).abs() < 1e-5); // xz
+        assert!((bm[7] - 0.0).abs() < 1e-5); // yz
         assert!((bm[8] - 10.0).abs() < 1e-5); // lz
     }
 
