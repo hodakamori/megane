@@ -15,6 +15,7 @@ from megane.pipeline import (
     Modify,
     Pipeline,
     VectorOverlay,
+    Viewport,
 )
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -174,26 +175,65 @@ class TestPipelineSerialization:
         result = pipe.to_dict()
         assert result["version"] == 3
 
-    def test_viewport_auto_generated(self):
+    def test_no_viewport_without_explicit_node(self):
+        """Pipeline without Viewport node should not include viewport."""
         pipe = Pipeline()
         pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
         result = pipe.to_dict()
 
         node_types = [n["type"] for n in result["nodes"]]
-        assert "viewport" in node_types
+        assert "viewport" not in node_types
 
-    def test_terminal_nodes_connected_to_viewport(self):
+    def test_explicit_viewport_node(self):
+        """Viewport node appears when explicitly added."""
         pipe = Pipeline()
         s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        v = pipe.add_node(Viewport())
+        pipe.add_edge(s, v)
         result = pipe.to_dict()
 
-        # LoadStructure has unconnected particle, trajectory, cell outputs
-        # All should be connected to viewport
+        node_types = [n["type"] for n in result["nodes"]]
+        assert "viewport" in node_types
+        # Edge should connect structure to viewport
         viewport_edges = [
-            e for e in result["edges"]
-            if e["target"] == "viewport-auto"
+            e for e in result["edges"] if e["target"] == v._id
         ]
-        assert len(viewport_edges) >= 1  # at least particle
+        assert len(viewport_edges) == 1
+        assert viewport_edges[0]["sourceHandle"] == "particle"
+        assert viewport_edges[0]["targetHandle"] == "particle"
+
+    def test_viewport_serialization_params(self):
+        """Viewport parameters are serialized correctly."""
+        pipe = Pipeline()
+        v = pipe.add_node(Viewport(perspective=True, cell_axes_visible=False))
+        result = pipe.to_dict()
+
+        vp_node = next(n for n in result["nodes"] if n["type"] == "viewport")
+        assert vp_node["perspective"] is True
+        assert vp_node["cellAxesVisible"] is False
+
+    def test_viewport_port_resolution(self):
+        """add_edge resolves correct ports for various types → viewport."""
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        b = pipe.add_node(AddBonds(source="distance"))
+        lbl = pipe.add_node(AddLabels(source="element"))
+        v = pipe.add_node(Viewport())
+
+        pipe.add_edge(s, b)
+        pipe.add_edge(s, lbl)
+        pipe.add_edge(s, v)    # particle → particle
+        pipe.add_edge(b, v)    # bond → bond
+        pipe.add_edge(lbl, v)  # label → label
+
+        result = pipe.to_dict()
+        viewport_edges = [
+            e for e in result["edges"] if e["target"] == v._id
+        ]
+        handles = {(e["sourceHandle"], e["targetHandle"]) for e in viewport_edges}
+        assert ("particle", "particle") in handles
+        assert ("bond", "bond") in handles  # bond resolved via _SOURCE_OUTPUT_MAP
+        assert ("label", "label") in handles  # label resolved via _SOURCE_OUTPUT_MAP
 
     def test_filter_modify_chain(self):
         pipe = Pipeline()
@@ -279,17 +319,16 @@ class TestPipelineDAG:
         f1 = pipe.add_node(Filter(query="element == 'C'"))
         f2 = pipe.add_node(Filter(query="element == 'N'"))
         b = pipe.add_node(AddBonds(source="distance"))
+        v = pipe.add_node(Viewport())
         pipe.add_edge(s, f1)
         pipe.add_edge(s, f2)
         pipe.add_edge(s, b)
+        pipe.add_edge(f1, v)
+        pipe.add_edge(f2, v)
+        pipe.add_edge(b, v)
 
         result = pipe.to_dict()
-        # Should have 3 explicit edges + viewport auto-edges
-        explicit_edges = [
-            e for e in result["edges"]
-            if e["target"] != "viewport-auto"
-        ]
-        assert len(explicit_edges) == 3
+        assert len(result["edges"]) == 6
 
     def test_chain_filter_modify_labels(self):
         """Filter → Modify and Filter → Labels from same parent."""

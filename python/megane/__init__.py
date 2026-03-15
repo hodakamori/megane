@@ -16,6 +16,7 @@ from megane.pipeline import (
     Pipeline,
     Streaming,
     VectorOverlay,
+    Viewport,
 )
 from megane.widget import MolecularViewer
 
@@ -32,6 +33,7 @@ __all__ = [
     "Pipeline",
     "Streaming",
     "VectorOverlay",
+    "Viewport",
     "load_lammps_data",
     "load_pdb",
     "load_traj",

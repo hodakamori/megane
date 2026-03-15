@@ -253,9 +253,14 @@ protein = pipe.add_node(megane.LoadStructure("protein.pdb"))
 ligand = pipe.add_node(megane.LoadStructure("ligand.mol"))
 bonds_p = pipe.add_node(megane.AddBonds(source="distance"))
 bonds_l = pipe.add_node(megane.AddBonds(source="structure"))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(protein, bonds_p)
 pipe.add_edge(ligand, bonds_l)
+pipe.add_edge(protein, v)
+pipe.add_edge(bonds_p, v)
+pipe.add_edge(ligand, v)
+pipe.add_edge(bonds_l, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -278,15 +283,17 @@ Pipelines can be built programmatically in Python using the `Pipeline` class. Th
 import megane
 
 pipe = megane.Pipeline()
-node = pipe.add_node(...)   # add a node
-pipe.add_edge(src, tgt)     # connect nodes
+node = pipe.add_node(...)       # add a node
+v = pipe.add_node(megane.Viewport())  # add viewport
+pipe.add_edge(src, tgt)         # connect nodes
+pipe.add_edge(node, v)          # connect to viewport
 
 viewer = megane.MolecularViewer()
-viewer.set_pipeline(pipe)   # apply to viewer
-viewer                      # display in notebook
+viewer.set_pipeline(pipe)       # apply to viewer
+viewer                          # display in notebook
 ```
 
-The pipeline serializes to the `SerializedPipeline` v3 JSON format. A `Viewport` node is auto-generated and all unconnected outputs are automatically connected to it.
+The pipeline serializes to the `SerializedPipeline` v3 JSON format. A `Viewport` node must be explicitly added and connected for data to be rendered.
 
 ### Pipeline class
 
@@ -294,7 +301,7 @@ The pipeline serializes to the `SerializedPipeline` v3 JSON format. A `Viewport`
 |--------|-------------|
 | `add_node(node)` | Add a node to the pipeline. Returns the node for use in `add_edge()` |
 | `add_edge(source, target)` | Connect source → target. Port handles are auto-resolved |
-| `to_dict()` | Serialize to v3 JSON dict (auto-generates Viewport) |
+| `to_dict()` | Serialize to v3 JSON dict |
 
 ### Node classes
 
@@ -312,6 +319,7 @@ from megane import (
     AddLabels,
     AddPolyhedra,
     VectorOverlay,
+    Viewport,
     Pipeline,
 )
 ```
@@ -476,6 +484,22 @@ megane.VectorOverlay(*, scale: float = 1.0)
 **Inputs:** `vector`
 **Outputs:** `vector`
 
+#### Viewport
+
+3D rendering output node. All data to be rendered must be explicitly connected to this node.
+
+```python
+megane.Viewport(*, perspective: bool = False, cell_axes_visible: bool = True)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `perspective` | `bool` | `False` | Toggle perspective / orthographic projection |
+| `cell_axes_visible` | `bool` | `True` | Show simulation cell axes with labels |
+
+**Inputs:** `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, `vector`
+**Outputs:** —
+
 ### Port Resolution
 
 Edges are auto-resolved: `add_edge(source, target)` automatically picks the correct port handles based on node types. For example:
@@ -493,7 +517,11 @@ import megane
 pipe = megane.Pipeline()
 s = pipe.add_node(megane.LoadStructure("protein.pdb"))
 bonds = pipe.add_node(megane.AddBonds(source="distance"))
+v = pipe.add_node(megane.Viewport())
+
 pipe.add_edge(s, bonds)
+pipe.add_edge(s, v)
+pipe.add_edge(bonds, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -510,10 +538,13 @@ s = pipe.add_node(megane.LoadStructure("protein.pdb"))
 carbons = pipe.add_node(megane.Filter(query="element == 'C'"))
 big = pipe.add_node(megane.Modify(scale=1.5, opacity=0.8))
 bonds = pipe.add_node(megane.AddBonds(source="distance"))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(s, carbons)
 pipe.add_edge(carbons, big)
 pipe.add_edge(s, bonds)
+pipe.add_edge(big, v)
+pipe.add_edge(bonds, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -529,9 +560,13 @@ pipe = megane.Pipeline()
 s = pipe.add_node(megane.LoadStructure("protein.pdb"))
 t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
 bonds = pipe.add_node(megane.AddBonds(source="structure"))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(s, t)
 pipe.add_edge(s, bonds)
+pipe.add_edge(s, v)
+pipe.add_edge(t, v)
+pipe.add_edge(bonds, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -551,11 +586,14 @@ water = pipe.add_node(megane.Filter(query='resname == "HOH"'))
 transparent = pipe.add_node(megane.Modify(scale=0.5, opacity=0.2))
 
 bonds = pipe.add_node(megane.AddBonds(source="distance"))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(s, water)
 pipe.add_edge(water, transparent)
 pipe.add_edge(s, bonds)
-# Unconnected outputs (particle, cell from LoadStructure) auto-connect to Viewport
+pipe.add_edge(s, v)           # protein particle + cell
+pipe.add_edge(transparent, v) # translucent water
+pipe.add_edge(bonds, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -577,9 +615,13 @@ polyhedra = pipe.add_node(megane.AddPolyhedra(
     opacity=0.5,
     show_edges=True,
 ))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(s, bonds)
 pipe.add_edge(s, polyhedra)
+pipe.add_edge(s, v)
+pipe.add_edge(bonds, v)
+pipe.add_edge(polyhedra, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -599,11 +641,16 @@ carbon = pipe.add_node(megane.Filter(query="element == 'C'"))
 nitrogen = pipe.add_node(megane.Filter(query="element == 'N'"))
 labels = pipe.add_node(megane.AddLabels(source="element"))
 bonds = pipe.add_node(megane.AddBonds(source="distance"))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(s, carbon)
 pipe.add_edge(s, nitrogen)
 pipe.add_edge(s, labels)
 pipe.add_edge(s, bonds)
+pipe.add_edge(carbon, v)
+pipe.add_edge(nitrogen, v)
+pipe.add_edge(labels, v)
+pipe.add_edge(bonds, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -618,8 +665,11 @@ import megane
 pipe = megane.Pipeline()
 s = pipe.add_node(megane.LoadStructure("structure.pdb"))
 t = pipe.add_node(megane.LoadTrajectory(traj="simulation.traj"))
+v = pipe.add_node(megane.Viewport())
 
 pipe.add_edge(s, t)
+pipe.add_edge(s, v)
+pipe.add_edge(t, v)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)

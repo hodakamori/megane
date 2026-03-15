@@ -123,9 +123,11 @@ def test_event_callback_selection_change():
 
 
 def test_pipeline_load_structure():
-    """Pipeline API: LoadStructure + set_pipeline() enables pipeline mode."""
+    """Pipeline API: LoadStructure + Viewport + set_pipeline() enables pipeline mode."""
     pipe = megane.Pipeline()
     s = pipe.add_node(megane.LoadStructure(str(FIXTURES / "1crn.pdb")))
+    v = pipe.add_node(megane.Viewport())
+    pipe.add_edge(s, v)
 
     viewer = megane.MolecularViewer()
     viewer.set_pipeline(pipe)
@@ -135,13 +137,16 @@ def test_pipeline_load_structure():
 
 
 def test_pipeline_with_trajectory():
-    """Pipeline API: LoadStructure + LoadTrajectory provides frames."""
+    """Pipeline API: LoadStructure + LoadTrajectory + Viewport provides frames."""
     pipe = megane.Pipeline()
     s = pipe.add_node(megane.LoadStructure(str(FIXTURES / "caffeine_water.pdb")))
     t = pipe.add_node(megane.LoadTrajectory(
         xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
     ))
+    v = pipe.add_node(megane.Viewport())
     pipe.add_edge(s, t)
+    pipe.add_edge(s, v)
+    pipe.add_edge(t, v)
 
     viewer = megane.MolecularViewer()
     viewer.set_pipeline(pipe)
