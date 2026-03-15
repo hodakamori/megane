@@ -33712,20 +33712,7 @@ class kM {
     Tt(this, "nAtoms", 0);
     Tt(this, "capacity");
     this.capacity = t, this.geo = new ev();
-    const e = new Float32Array([
-      -1,
-      -1,
-      0,
-      1,
-      -1,
-      0,
-      1,
-      1,
-      0,
-      -1,
-      1,
-      0
-    ]), s = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    const e = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), s = new Uint16Array([0, 1, 2, 0, 2, 3]);
     this.geo.setAttribute("position", new dn(e, 3)), this.geo.setIndex(new dn(s, 1)), this.geo.instanceCount = 0, this.centerBuf = new Float32Array(t * 3), this.radiusBuf = new Float32Array(t), this.colorBuf = new Float32Array(t * 3), this.scaleOverrideBuf = new Float32Array(t).fill(1), this.opacityOverrideBuf = new Float32Array(t).fill(1), this.centerAttr = new Ln(this.centerBuf, 3), this.radiusAttr = new Ln(this.radiusBuf, 1), this.colorAttr = new Ln(this.colorBuf, 3), this.scaleOverrideAttr = new Ln(this.scaleOverrideBuf, 1), this.opacityOverrideAttr = new Ln(this.opacityOverrideBuf, 1), this.centerAttr.setUsage(Lo), this.radiusAttr.setUsage(za), this.colorAttr.setUsage(za), this.scaleOverrideAttr.setUsage(Lo), this.opacityOverrideAttr.setUsage(Lo), this.geo.setAttribute("instanceCenter", this.centerAttr), this.geo.setAttribute("instanceRadius", this.radiusAttr), this.geo.setAttribute("instanceColor", this.colorAttr), this.geo.setAttribute("instanceScaleOverride", this.scaleOverrideAttr), this.geo.setAttribute("instanceOpacityOverride", this.opacityOverrideAttr), this.material = new J0({
       glslVersion: Sd,
       vertexShader: dO,
@@ -33811,29 +33798,7 @@ class XM {
     Tt(this, "nAtoms", 0);
     Tt(this, "capacity");
     this.capacity = t, this.geo = new ev();
-    const e = new Float32Array([
-      -1,
-      -1,
-      0,
-      1,
-      -1,
-      0,
-      1,
-      1,
-      0,
-      -1,
-      1,
-      0
-    ]), s = new Float32Array([
-      -1,
-      -1,
-      1,
-      -1,
-      1,
-      1,
-      -1,
-      1
-    ]), a = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    const e = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), s = new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), a = new Uint16Array([0, 1, 2, 0, 2, 3]);
     this.geo.setAttribute("position", new dn(e, 3)), this.geo.setAttribute("uv", new dn(s, 2)), this.geo.setIndex(new dn(a, 1)), this.geo.instanceCount = 0, this.atomABuf = new Float32Array(t), this.atomBBuf = new Float32Array(t), this.offsetXBuf = new Float32Array(t), this.offsetYBuf = new Float32Array(t), this.colorBuf = new Float32Array(t * 3), this.radiusBuf = new Float32Array(t), this.dashedBuf = new Float32Array(t), this.positionTexData = new Float32Array(4), this.positionTex = new wd(
       this.positionTexData,
       1,
@@ -33890,53 +33855,9 @@ class XM {
         const D = [0, 2 * Math.PI / 3, 4 * Math.PI / 3];
         for (const T of D) {
           const O = Math.cos(T) * Rb, B = Math.sin(T) * Rb;
-          this.setTopology(
-            h,
-            p,
-            g,
-            O,
-            B,
-            aO,
-            M,
-            L,
-            C,
-            0
-          ), h++;
+          this.setTopology(h, p, g, O, B, aO, M, L, C, 0), h++;
         }
-      } else _ === Tb ? (this.setTopology(
-        h,
-        p,
-        g,
-        0,
-        0,
-        oO,
-        M,
-        L,
-        C,
-        0
-      ), h++, this.setTopology(
-        h,
-        p,
-        g,
-        Cb,
-        0,
-        lO,
-        M,
-        L,
-        C,
-        1
-      ), h++) : (this.setTopology(
-        h,
-        p,
-        g,
-        0,
-        0,
-        sO,
-        M,
-        L,
-        C,
-        0
-      ), h++);
+      } else _ === Tb ? (this.setTopology(h, p, g, 0, 0, oO, M, L, C, 0), h++, this.setTopology(h, p, g, Cb, 0, lO, M, L, C, 1), h++) : (this.setTopology(h, p, g, 0, 0, sO, M, L, C, 0), h++);
     }
     this.registerAttributes(), this.geo.instanceCount = h;
   }
@@ -33983,10 +33904,7 @@ class WM {
     Tt(this, "geometry");
     this.geometry = new In();
     const t = new Float32Array(72);
-    this.geometry.setAttribute(
-      "position",
-      new dn(t, 3)
-    );
+    this.geometry.setAttribute("position", new dn(t, 3));
     const e = new Xd({
       color: 6710886,
       transparent: !0,
@@ -34015,9 +33933,7 @@ class WM {
       [c, m],
       [u, p],
       [h, g]
-    ], x = this.geometry.getAttribute(
-      "position"
-    ), A = x.array;
+    ], x = this.geometry.getAttribute("position"), A = x.array;
     for (let b = 0; b < 12; b++) {
       const [y, E] = _[b];
       A[b * 6] = y.x, A[b * 6 + 1] = y.y, A[b * 6 + 2] = y.z, A[b * 6 + 3] = E.x, A[b * 6 + 4] = E.y, A[b * 6 + 5] = E.z;
@@ -34178,11 +34094,7 @@ class xO {
       return;
     const o = e / 2, c = s / 2, u = [];
     for (let h = 0; h < this.nAtoms; h++) {
-      if (!this.labels[h] || (this.tmpVec.set(
-        this.positions[h * 3],
-        this.positions[h * 3 + 1],
-        this.positions[h * 3 + 2]
-      ), this.tmpVec.project(t), this.tmpVec.z < -1 || this.tmpVec.z > 1)) continue;
+      if (!this.labels[h] || (this.tmpVec.set(this.positions[h * 3], this.positions[h * 3 + 1], this.positions[h * 3 + 2]), this.tmpVec.project(t), this.tmpVec.z < -1 || this.tmpVec.z > 1)) continue;
       const p = this.tmpVec.x * o + o, g = -(this.tmpVec.y * c) + c;
       p < -50 || p > e + 50 || g < -20 || g > s + 20 || u.push({ sx: p, sy: g, z: this.tmpVec.z, idx: h });
     }
@@ -34210,12 +34122,7 @@ class AO {
     Tt(this, "arrowScale", 1);
     Tt(this, "capacity");
     this.capacity = t, this.mesh = new ea(), this.mesh.visible = !1;
-    const e = new Wd(
-      Ub,
-      Ub,
-      1,
-      bO
-    );
+    const e = new Wd(Ub, Ub, 1, bO);
     e.translate(0, 0.5, 0);
     const s = new Yd(SO, ng, MO);
     s.translate(0, ng / 2, 0);
@@ -34251,11 +34158,7 @@ class AO {
       }
       Mc.set(c / h, u / h, d / h), ig.setFromUnitVectors(wO, Mc);
       const m = h * this.arrowScale, p = Math.max(m - ng, m * 0.7);
-      jf.set(s, a, o), qf.set(1, p, 1), Na.compose(jf, ig, qf), this.shaftMesh.setMatrixAt(e, Na), jf.set(
-        s + Mc.x * p,
-        a + Mc.y * p,
-        o + Mc.z * p
-      ), qf.set(1, 1, 1), Na.compose(jf, ig, qf), this.headMesh.setMatrixAt(e, Na);
+      jf.set(s, a, o), qf.set(1, p, 1), Na.compose(jf, ig, qf), this.shaftMesh.setMatrixAt(e, Na), jf.set(s + Mc.x * p, a + Mc.y * p, o + Mc.z * p), qf.set(1, 1, 1), Na.compose(jf, ig, qf), this.headMesh.setMatrixAt(e, Na);
     }
     this.shaftMesh.instanceMatrix.needsUpdate = !0, this.headMesh.instanceMatrix.needsUpdate = !0;
   }
@@ -35112,11 +35015,7 @@ class NO {
     t.box && t.box.some((s) => s !== 0) && (this.cellRenderer || (this.cellRenderer = new WM(), this.scene.add(this.cellRenderer.mesh)), this.cellRenderer.loadBox(t.box));
   }
   updateFrame(t) {
-    !this.snapshot || !this.atomRenderer || !this.bondRenderer || ((!this.currentPositions || this.currentPositions.length < t.positions.length) && (this.currentPositions = new Float32Array(t.positions.length)), this.currentPositions.set(t.positions), this.atomRenderer.updatePositions(t.positions), this.bondRenderer.updatePositions(
-      t.positions,
-      this.snapshot.bonds,
-      this.snapshot.nBonds
-    ));
+    !this.snapshot || !this.atomRenderer || !this.bondRenderer || ((!this.currentPositions || this.currentPositions.length < t.positions.length) && (this.currentPositions = new Float32Array(t.positions.length)), this.currentPositions.set(t.positions), this.atomRenderer.updatePositions(t.positions), this.bondRenderer.updatePositions(t.positions, this.snapshot.bonds, this.snapshot.nBonds));
   }
   updateBondsExt(t, e, s, a, o) {
     if (!this.snapshot || !this.bondRenderer) return;
@@ -35380,21 +35279,11 @@ class GO {
       const e = this.renderer.getPixelRatio();
       if (this.cellAxesRenderer)
         try {
-          this.cellAxesRenderer.render(
-            this.renderer,
-            this.camera,
-            t.x,
-            t.y
-          );
+          this.cellAxesRenderer.render(this.renderer, this.camera, t.x, t.y);
         } catch (s) {
           console.warn("CellAxesRenderer render error:", s), this.cellAxesRenderer = null;
         }
-      this.labelOverlay && this.labelOverlay.render(
-        this.camera,
-        t.x,
-        t.y,
-        e
-      );
+      this.labelOverlay && this.labelOverlay.render(this.camera, t.x, t.y, e);
     });
   }
   /** Mount the viewer into a DOM element. */
@@ -35445,11 +35334,7 @@ class GO {
   /** Update positions from a trajectory frame. */
   updateFrame(t) {
     var e, s;
-    !this.snapshot || !this.atomRenderer || !this.bondRenderer || ((!this.currentPositions || this.currentPositions.length < t.positions.length) && (this.currentPositions = new Float32Array(t.positions.length)), this.currentPositions.set(t.positions), this.atomRenderer.updatePositions(t.positions), (e = this.labelOverlay) == null || e.setPositions(t.positions), (s = this.arrowRenderer) == null || s.setAtomPositions(t.positions, t.nAtoms), this.bondRenderer.updatePositions(
-      t.positions,
-      this.snapshot.bonds,
-      this.snapshot.nBonds
-    ), this.selectedAtoms.length > 0 && this.updateSelectionVisuals());
+    !this.snapshot || !this.atomRenderer || !this.bondRenderer || ((!this.currentPositions || this.currentPositions.length < t.positions.length) && (this.currentPositions = new Float32Array(t.positions.length)), this.currentPositions.set(t.positions), this.atomRenderer.updatePositions(t.positions), (e = this.labelOverlay) == null || e.setPositions(t.positions), (s = this.arrowRenderer) == null || s.setAtomPositions(t.positions, t.nAtoms), this.bondRenderer.updatePositions(t.positions, this.snapshot.bonds, this.snapshot.nBonds), this.selectedAtoms.length > 0 && this.updateSelectionVisuals());
   }
   /**
    * Replace bond data and re-render bonds without resetting the camera.
@@ -35602,11 +35487,7 @@ class GO {
   // ── Axes inset drag API ───────────────────────────────────
   /** Returns true if the CSS-pixel coordinate hits the axes inset. */
   hitTestAxesInset(t, e) {
-    return !this.cellAxesRenderer || !this.container ? !1 : this.cellAxesRenderer.hitTest(
-      t,
-      e,
-      this.container.clientHeight
-    );
+    return !this.cellAxesRenderer || !this.container ? !1 : this.cellAxesRenderer.hitTest(t, e, this.container.clientHeight);
   }
   /** Begin an axes-inset drag at the given CSS coordinates. */
   startAxesDrag(t, e) {
@@ -35614,15 +35495,9 @@ class GO {
   }
   /** Continue an axes-inset drag. Returns true if currently dragging. */
   moveAxesDrag(t, e) {
-    if (!this.axesDragging || !this.cellAxesRenderer || !this.container)
-      return !1;
+    if (!this.axesDragging || !this.cellAxesRenderer || !this.container) return !1;
     const s = t - this.axesDragLastX, a = e - this.axesDragLastY;
-    return this.axesDragLastX = t, this.axesDragLastY = e, this.cellAxesRenderer.moveBy(
-      s,
-      a,
-      this.container.clientWidth,
-      this.container.clientHeight
-    ), !0;
+    return this.axesDragLastX = t, this.axesDragLastY = e, this.cellAxesRenderer.moveBy(s, a, this.container.clientWidth, this.container.clientHeight), !0;
   }
   /** End the axes-inset drag. */
   endAxesDrag() {
@@ -35792,11 +35667,7 @@ class GO {
         opacity: 0.35,
         depthWrite: !1
       }), u = new On(o, c);
-      u.position.set(
-        t[s * 3],
-        t[s * 3 + 1],
-        t[s * 3 + 2]
-      ), this.selectionGroup.add(u);
+      u.position.set(t[s * 3], t[s * 3 + 1], t[s * 3 + 2]), this.selectionGroup.add(u);
     }
     if (this.selectedAtoms.length >= 2) {
       const s = this.selectedAtoms.map(
@@ -35811,13 +35682,9 @@ class GO {
   setupDprListener() {
     const t = () => {
       var e;
-      this.onResize(), (e = this.dprMediaQuery) == null || e.removeEventListener("change", t), this.dprMediaQuery = window.matchMedia(
-        `(resolution: ${window.devicePixelRatio}dppx)`
-      ), this.dprChangeHandler = t, this.dprMediaQuery.addEventListener("change", t);
+      this.onResize(), (e = this.dprMediaQuery) == null || e.removeEventListener("change", t), this.dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`), this.dprChangeHandler = t, this.dprMediaQuery.addEventListener("change", t);
     };
-    this.dprMediaQuery = window.matchMedia(
-      `(resolution: ${window.devicePixelRatio}dppx)`
-    ), this.dprChangeHandler = t, this.dprMediaQuery.addEventListener("change", t);
+    this.dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`), this.dprChangeHandler = t, this.dprMediaQuery.addEventListener("change", t);
   }
   onResize() {
     var a;
@@ -36150,10 +36017,24 @@ function KM(n, t, e, s = kO, a = null) {
 }
 function y0(n, t, e, s, a, o) {
   if (!o || !o.some((T) => T !== 0))
-    return { bondIndices: n, bondOrders: t, nBonds: n.length / 2, positions: null, elements: null, nAtoms: 0 };
+    return {
+      bondIndices: n,
+      bondOrders: t,
+      nBonds: n.length / 2,
+      positions: null,
+      elements: null,
+      nAtoms: 0
+    };
   const c = av(o);
   if (!c)
-    return { bondIndices: n, bondOrders: t, nBonds: n.length / 2, positions: null, elements: null, nAtoms: 0 };
+    return {
+      bondIndices: n,
+      bondOrders: t,
+      nBonds: n.length / 2,
+      positions: null,
+      elements: null,
+      nAtoms: 0
+    };
   const u = Math.sqrt(o[0] * o[0] + o[1] * o[1] + o[2] * o[2]), d = Math.sqrt(o[3] * o[3] + o[4] * o[4] + o[5] * o[5]), h = Math.sqrt(o[6] * o[6] + o[7] * o[7] + o[8] * o[8]), m = Math.min(u, d, h) / 2, p = m * m, g = n.length / 2;
   let _ = 0, x = 0;
   for (let T = 0; T < g; T++) {
@@ -36161,7 +36042,14 @@ function y0(n, t, e, s, a, o) {
     R * R + z * z + H * H > p ? x++ : _++;
   }
   if (x === 0)
-    return { bondIndices: n, bondOrders: t, nBonds: g, positions: null, elements: null, nAtoms: 0 };
+    return {
+      bondIndices: n,
+      bondOrders: t,
+      nBonds: g,
+      positions: null,
+      elements: null,
+      nAtoms: 0
+    };
   const A = _ + x * 2, b = new Uint32Array(A * 2), y = t ? new Uint8Array(A) : null, E = [], w = [];
   let M = a, L = 0;
   for (let T = 0; T < g; T++) {
@@ -42727,12 +42615,8 @@ const Hd = {
     ]
   },
   load_trajectory: {
-    inputs: [
-      { name: "particle", dataType: "particle", label: "Particle" }
-    ],
-    outputs: [
-      { name: "trajectory", dataType: "trajectory", label: "Trajectory" }
-    ]
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "trajectory", dataType: "trajectory", label: "Trajectory" }]
   },
   streaming: {
     inputs: [],
@@ -42745,17 +42629,11 @@ const Hd = {
   },
   load_vector: {
     inputs: [],
-    outputs: [
-      { name: "vector", dataType: "vector", label: "Vector" }
-    ]
+    outputs: [{ name: "vector", dataType: "vector", label: "Vector" }]
   },
   add_bond: {
-    inputs: [
-      { name: "particle", dataType: "particle", label: "Particle" }
-    ],
-    outputs: [
-      { name: "bond", dataType: "bond", label: "Bond" }
-    ]
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "bond", dataType: "bond", label: "Bond" }]
   },
   viewport: {
     inputs: [
@@ -42944,11 +42822,7 @@ function QF(n, t, e, s, a) {
   if (o.set("particle", c), e && e.length > 0 && s) {
     const d = {
       type: "trajectory",
-      provider: new Bw(
-        e,
-        s,
-        t.positions
-      ),
+      provider: new Bw(e, s, t.positions),
       meta: s,
       source: "structure"
     };
@@ -43224,11 +43098,7 @@ function s5(n, t, e) {
     if (!n.query.trim())
       return s.set("out", c), s;
     try {
-      const u = n5(
-        n.query,
-        c.source,
-        e
-      );
+      const u = n5(n.query, c.source, e);
       if (u === null)
         s.set("out", c);
       else {
@@ -43320,11 +43190,7 @@ function a5(n, t, e) {
   return s.set("label", u), s;
 }
 function kw(n, t, e, s, a, o) {
-  return [
-    t * o - e * a,
-    e * s - n * o,
-    n * a - t * s
-  ];
+  return [t * o - e * a, e * s - n * o, n * a - t * s];
 }
 function Ac(n, t, e, s, a) {
   const o = s[n * 3], c = s[n * 3 + 1], u = s[n * 3 + 2], d = s[t * 3], h = s[t * 3 + 1], m = s[t * 3 + 2], p = s[e * 3], g = s[e * 3 + 1], _ = s[e * 3 + 2], x = d - o, A = h - c, b = m - u, y = p - o, E = g - c, w = _ - u;
@@ -43611,10 +43477,7 @@ function g5(n, t, e = {}) {
         break;
       }
       case "load_vector": {
-        const C = d5(
-          M.params,
-          e.fileVectors ?? null
-        );
+        const C = d5(M.params, e.fileVectors ?? null);
         o.set(E, C);
         break;
       }
@@ -43634,19 +43497,12 @@ function g5(n, t, e = {}) {
         break;
       }
       case "add_bond": {
-        const C = XO(
-          M.params,
-          L
-        );
+        const C = XO(M.params, L);
         o.set(E, C), (p = L.get("particle")) != null && p.length && !C.has("bond") ? u(E, { message: "No bonds found", severity: "warning" }) : (g = L.get("particle")) != null && g.length || u(E, { message: "No input data (check upstream nodes)", severity: "warning" });
         break;
       }
       case "filter": {
-        const C = s5(
-          M.params,
-          L,
-          e.atomLabels ?? null
-        );
+        const C = s5(M.params, L, e.atomLabels ?? null);
         o.set(E, C);
         const D = C.get("out");
         if (!((_ = L.get("in")) != null && _.length))
@@ -43658,10 +43514,7 @@ function g5(n, t, e = {}) {
         break;
       }
       case "modify": {
-        const C = r5(
-          M.params,
-          L
-        );
+        const C = r5(M.params, L);
         o.set(E, C), (x = L.get("in")) != null && x.length || u(E, { message: "No input data (check upstream nodes)", severity: "warning" });
         break;
       }
@@ -43683,18 +43536,12 @@ function g5(n, t, e = {}) {
         break;
       }
       case "vector_overlay": {
-        const C = h5(
-          M.params,
-          L
-        );
+        const C = h5(M.params, L);
         o.set(E, C), (y = L.get("vector")) != null && y.length || u(E, { message: "No input data (check upstream nodes)", severity: "warning" });
         break;
       }
       case "viewport": {
-        d = p5(
-          M.params,
-          L
-        );
+        d = p5(M.params, L);
         break;
       }
     }
@@ -43717,9 +43564,7 @@ function v5(n, t) {
     if (!g) continue;
     const _ = Hd[g];
     if (!_ || _.inputs.length === 0) continue;
-    const x = new Set(
-      (a.get(p.id) ?? []).map((b) => b.targetHandle)
-    );
+    const x = new Set((a.get(p.id) ?? []).map((b) => b.targetHandle));
     _.inputs.some((b) => x.has(b.name)) || s(p.id, { message: "No input connected", severity: "error" });
   }
   const o = n.filter((p) => p.type === "viewport").map((p) => p.id);
@@ -43992,19 +43837,97 @@ function S5() {
       }
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "filter-caf", sourceHandle: "particle", targetHandle: "in" },
-      { id: "e2", source: "loader-1", target: "filter-sol", sourceHandle: "particle", targetHandle: "in" },
-      { id: "e3", source: "filter-caf", target: "modify-caf", sourceHandle: "out", targetHandle: "in" },
-      { id: "e4", source: "filter-sol", target: "modify-sol", sourceHandle: "out", targetHandle: "in" },
-      { id: "e5", source: "modify-sol", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e6", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e7", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e8", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
-      { id: "e9", source: "loader-1", target: "traj-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e10", source: "traj-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" },
-      { id: "e11", source: "modify-caf", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e12", source: "filter-caf", target: "labels-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e13", source: "labels-1", target: "viewport-1", sourceHandle: "label", targetHandle: "label" }
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "filter-caf",
+        sourceHandle: "particle",
+        targetHandle: "in"
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "filter-sol",
+        sourceHandle: "particle",
+        targetHandle: "in"
+      },
+      {
+        id: "e3",
+        source: "filter-caf",
+        target: "modify-caf",
+        sourceHandle: "out",
+        targetHandle: "in"
+      },
+      {
+        id: "e4",
+        source: "filter-sol",
+        target: "modify-sol",
+        sourceHandle: "out",
+        targetHandle: "in"
+      },
+      {
+        id: "e5",
+        source: "modify-sol",
+        target: "viewport-1",
+        sourceHandle: "out",
+        targetHandle: "particle"
+      },
+      {
+        id: "e6",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e7",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond"
+      },
+      {
+        id: "e8",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell"
+      },
+      {
+        id: "e9",
+        source: "loader-1",
+        target: "traj-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e10",
+        source: "traj-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory"
+      },
+      {
+        id: "e11",
+        source: "modify-caf",
+        target: "viewport-1",
+        sourceHandle: "out",
+        targetHandle: "particle"
+      },
+      {
+        id: "e12",
+        source: "filter-caf",
+        target: "labels-1",
+        sourceHandle: "out",
+        targetHandle: "particle"
+      },
+      {
+        id: "e13",
+        source: "labels-1",
+        target: "viewport-1",
+        sourceHandle: "label",
+        targetHandle: "label"
+      }
     ]
   };
 }
@@ -44052,10 +43975,34 @@ function b5() {
       }
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e3", source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e4", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" }
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e2",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond"
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e4",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell"
+      }
     ]
   };
 }
@@ -44153,14 +44100,50 @@ function M5() {
       }
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "filter-1", sourceHandle: "particle", targetHandle: "in" },
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "filter-1",
+        sourceHandle: "particle",
+        targetHandle: "in"
+      },
       { id: "e2", source: "filter-1", target: "modify-1", sourceHandle: "out", targetHandle: "in" },
-      { id: "e3", source: "loader-1", target: "filter-2", sourceHandle: "particle", targetHandle: "in" },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "filter-2",
+        sourceHandle: "particle",
+        targetHandle: "in"
+      },
       { id: "e4", source: "filter-2", target: "modify-2", sourceHandle: "out", targetHandle: "in" },
-      { id: "e5", source: "modify-1", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e6", source: "modify-2", target: "viewport-1", sourceHandle: "out", targetHandle: "particle" },
-      { id: "e7", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e8", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" }
+      {
+        id: "e5",
+        source: "modify-1",
+        target: "viewport-1",
+        sourceHandle: "out",
+        targetHandle: "particle"
+      },
+      {
+        id: "e6",
+        source: "modify-2",
+        target: "viewport-1",
+        sourceHandle: "out",
+        targetHandle: "particle"
+      },
+      {
+        id: "e7",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e8",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond"
+      }
     ]
   };
 }
@@ -44220,12 +44203,48 @@ function E5() {
       }
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "loader-1", target: "traj-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e3", source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e4", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
-      { id: "e5", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e6", source: "traj-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" }
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "traj-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e4",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell"
+      },
+      {
+        id: "e5",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond"
+      },
+      {
+        id: "e6",
+        source: "traj-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory"
+      }
     ]
   };
 }
@@ -44293,12 +44312,48 @@ function w5() {
       }
     ],
     edges: [
-      { id: "e1", source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "loader-1", target: "polyhedron-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e3", source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e4", source: "loader-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
-      { id: "e5", source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e6", source: "polyhedron-1", target: "viewport-1", sourceHandle: "mesh", targetHandle: "mesh" }
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "polyhedron-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e4",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell"
+      },
+      {
+        id: "e5",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond"
+      },
+      {
+        id: "e6",
+        source: "polyhedron-1",
+        target: "viewport-1",
+        sourceHandle: "mesh",
+        targetHandle: "mesh"
+      }
     ]
   };
 }
@@ -44332,10 +44387,34 @@ function A5() {
       }
     ],
     edges: [
-      { id: "e1", source: "streaming-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-      { id: "e2", source: "streaming-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
-      { id: "e3", source: "streaming-1", target: "viewport-1", sourceHandle: "trajectory", targetHandle: "trajectory" },
-      { id: "e4", source: "streaming-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" }
+      {
+        id: "e1",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle"
+      },
+      {
+        id: "e2",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond"
+      },
+      {
+        id: "e3",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory"
+      },
+      {
+        id: "e4",
+        source: "streaming-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell"
+      }
     ]
   };
 }
@@ -46055,9 +46134,7 @@ function U0(n, t) {
     const h = e.node(d.id), m = Math.round(h.y);
     s.has(m) || s.set(m, []), s.get(m).push(d.id);
   }
-  const a = [...s.entries()].sort(([d], [h]) => d - h).map(
-    ([, d]) => d.sort((h, m) => e.node(h).x - e.node(m).x)
-  ), o = /* @__PURE__ */ new Map();
+  const a = [...s.entries()].sort(([d], [h]) => d - h).map(([, d]) => d.sort((h, m) => e.node(h).x - e.node(m).x)), o = /* @__PURE__ */ new Map();
   let c = 0;
   for (const d of a)
     for (let h = 0; h < d.length; h += tM) {
@@ -46231,7 +46308,20 @@ const eM = Ww(), nM = U0(eM.nodes, eM.edges), rr = qO((n, t) => ({
     })), t().execute();
   },
   execute: () => {
-    const { nodes: e, edges: s, snapshot: a, atomLabels: o, structureFrames: c, structureMeta: u, fileFrames: d, fileMeta: h, fileVectors: m, nodeSnapshots: p, nodeParseErrors: g, nodeStreamingData: _ } = t(), x = {
+    const {
+      nodes: e,
+      edges: s,
+      snapshot: a,
+      atomLabels: o,
+      structureFrames: c,
+      structureMeta: u,
+      fileFrames: d,
+      fileMeta: h,
+      fileVectors: m,
+      nodeSnapshots: p,
+      nodeParseErrors: g,
+      nodeStreamingData: _
+    } = t(), x = {
       snapshot: a,
       atomLabels: o,
       structureFrames: c,
@@ -46406,9 +46496,7 @@ const iM = 1313293645, Yw = 0, uH = 1, fH = 1, dH = 2;
 function P0(n) {
   const t = new DataView(n), e = t.getUint32(0, !0);
   if (e !== iM)
-    throw new Error(
-      `Invalid magic: 0x${e.toString(16)}, expected 0x${iM.toString(16)}`
-    );
+    throw new Error(`Invalid magic: 0x${e.toString(16)}, expected 0x${iM.toString(16)}`);
   return {
     msgType: t.getUint8(4),
     flags: t.getUint8(5)
@@ -46448,9 +46536,7 @@ function pH(n) {
 function sM(n) {
   if (!n || n.byteLength === 0) return null;
   const t = new ArrayBuffer(n.byteLength);
-  new Uint8Array(t).set(
-    new Uint8Array(n.buffer, n.byteOffset, n.byteLength)
-  );
+  new Uint8Array(t).set(new Uint8Array(n.buffer, n.byteOffset, n.byteLength));
   const { msgType: e } = P0(t);
   return e === Yw ? jw(t) : null;
 }
@@ -46665,9 +46751,7 @@ function vH({ model: n, el: t }) {
     const A = n.get("_snapshot_data");
     if (!A || A.byteLength === 0) return null;
     const b = new ArrayBuffer(A.byteLength);
-    new Uint8Array(b).set(
-      new Uint8Array(A.buffer, A.byteOffset, A.byteLength)
-    );
+    new Uint8Array(b).set(new Uint8Array(A.buffer, A.byteOffset, A.byteLength));
     const { msgType: y } = P0(b);
     return y === Yw ? jw(b) : null;
   }
@@ -46675,9 +46759,7 @@ function vH({ model: n, el: t }) {
     const A = n.get("_frame_data");
     if (!A || A.byteLength === 0) return null;
     const b = new ArrayBuffer(A.byteLength);
-    new Uint8Array(b).set(
-      new Uint8Array(A.buffer, A.byteOffset, A.byteLength)
-    );
+    new Uint8Array(b).set(new Uint8Array(A.buffer, A.byteOffset, A.byteLength));
     const { msgType: y } = P0(b);
     return y === uH ? hH(b) : null;
   }
