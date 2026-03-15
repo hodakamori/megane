@@ -74,7 +74,13 @@ export function useNodeLoadHandlers({
     return () => {
       setStructureLoadHandler(null);
     };
-  }, [onUploadStructure, setNodeSnapshot, updateNodeParams, setNodeParseError, clearNodeParseError]);
+  }, [
+    onUploadStructure,
+    setNodeSnapshot,
+    updateNodeParams,
+    setNodeParseError,
+    clearNodeParseError,
+  ]);
 
   // Wire up trajectory load handler
   useEffect(() => {
