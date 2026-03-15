@@ -16,7 +16,7 @@ def _make_pdb_pipeline(pdb_path: str) -> Pipeline:
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure(pdb_path))
     b = pipe.add_node(AddBonds(source="structure"))
-    pipe.add_edge(s, b)
+    pipe.add_edge(s.out.particle, b.inp.particle)
     return pipe
 
 

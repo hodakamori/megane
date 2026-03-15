@@ -124,3 +124,8 @@ replace = '__version__ = "{new_version}"'
 filename = "docs/scripts/prepare-notebooks.py"
 search = 'megane v{current_version}'
 replace = 'megane v{new_version}'
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

@@ -18,7 +18,10 @@ viewer = megane.MolecularViewer()
 pipe = megane.Pipeline()
 s = pipe.add_node(megane.LoadStructure("protein.pdb"))
 t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
-pipe.add_edge(s, t)
+v = pipe.add_node(megane.Viewport())
+pipe.add_edge(s.out.particle, t.inp.particle)
+pipe.add_edge(s.out.particle, v.inp.particle)
+pipe.add_edge(t.out.traj, v.inp.traj)
 viewer.set_pipeline(pipe)
 
 # Create a Plotly time-series chart
