@@ -103,7 +103,9 @@ class MolecularViewer(anywidget.AnyWidget):
                 are read from the .traj file.
         """
         warnings.warn(
-            "MolecularViewer.load() is deprecated. Use set_pipeline() with a Pipeline instead.",
+            "MolecularViewer.load() is deprecated and will be removed in a future major release. "
+            "Use set_pipeline() with a Pipeline instead. "
+            "See the megane documentation for migration examples.",
             DeprecationWarning,
             stacklevel=2,
         )

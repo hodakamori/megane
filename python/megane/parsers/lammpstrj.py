@@ -2,31 +2,57 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
 
+from megane.parsers.common import InMemoryTrajectory
+
+__all__ = ["load_lammpstrj", "InMemoryTrajectory"]
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass
-class InMemoryTrajectory:
-    """In-memory trajectory with frame-by-frame access.
+class _ColumnSpec:
+    """Column indices detected from the ATOMS header line."""
 
-    Compatible interface with :class:`megane.parsers.xtc.Trajectory`.
-    """
+    id_col: int
+    x_col: int
+    y_col: int
+    z_col: int
+    coord_type: str  # "unscaled", "scaled", or "unwrapped"
 
-    _frames: list[np.ndarray]  # list of (N, 3) float32 arrays
-    n_frames: int
-    n_atoms: int
-    timestep_ps: float
-    box: np.ndarray  # (3, 3) float32
 
-    def get_frame(self, index: int) -> np.ndarray:
-        """Get positions for a specific frame.
-
-        Returns:
-            (N, 3) float32 array of atom positions in Angstroms.
-        """
-        return self._frames[index]
+def _parse_column_spec(col_names: list[str]) -> _ColumnSpec:
+    """Detect coordinate column indices and type from LAMMPS ATOMS header."""
+    id_col = col_names.index("id")
+    if "x" in col_names:
+        return _ColumnSpec(
+            id_col=id_col,
+            x_col=col_names.index("x"),
+            y_col=col_names.index("y"),
+            z_col=col_names.index("z"),
+            coord_type="unscaled",
+        )
+    if "xs" in col_names:
+        return _ColumnSpec(
+            id_col=id_col,
+            x_col=col_names.index("xs"),
+            y_col=col_names.index("ys"),
+            z_col=col_names.index("zs"),
+            coord_type="scaled",
+        )
+    if "xu" in col_names:
+        return _ColumnSpec(
+            id_col=id_col,
+            x_col=col_names.index("xu"),
+            y_col=col_names.index("yu"),
+            z_col=col_names.index("zu"),
+            coord_type="unwrapped",
+        )
+    raise ValueError("Cannot find coordinate columns in ATOMS header")
 
 
 def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
@@ -38,6 +64,7 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
     Returns:
         InMemoryTrajectory with frame-by-frame access.
     """
+    logger.debug("Loading LAMMPS dump file: %s", dump_path)
     with open(dump_path) as f:
         lines = f.readlines()
 
@@ -64,6 +91,11 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
         frame_n_atoms = int(lines[i].strip())
         if not frames:
             n_atoms = frame_n_atoms
+        elif frame_n_atoms != n_atoms:
+            raise ValueError(
+                f"Atom count mismatch: frame {len(frames)} has {frame_n_atoms} atoms, "
+                f"but the first frame has {n_atoms} atoms."
+            )
 
         # BOX BOUNDS
         i += 1
@@ -107,24 +139,7 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
         header_parts = lines[i].split()
         # Skip "ITEM:" and "ATOMS"
         col_names = header_parts[2:]
-        id_col = col_names.index("id")
-
-        coord_type = "unscaled"
-        if "x" in col_names:
-            x_col = col_names.index("x")
-            y_col = col_names.index("y")
-            z_col = col_names.index("z")
-        elif "xs" in col_names:
-            x_col = col_names.index("xs")
-            y_col = col_names.index("ys")
-            z_col = col_names.index("zs")
-            coord_type = "scaled"
-        elif "xu" in col_names:
-            x_col = col_names.index("xu")
-            y_col = col_names.index("yu")
-            z_col = col_names.index("zu")
-        else:
-            raise ValueError("Cannot find coordinate columns in ATOMS header")
+        col_spec = _parse_column_spec(col_names)
 
         # Read atoms
         atoms = []
@@ -134,11 +149,11 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
         for _ in range(frame_n_atoms):
             i += 1
             parts = lines[i].split()
-            aid = int(parts[id_col])
-            x = float(parts[x_col])
-            y = float(parts[y_col])
-            z = float(parts[z_col])
-            if coord_type == "scaled":
+            aid = int(parts[col_spec.id_col])
+            x = float(parts[col_spec.x_col])
+            y = float(parts[col_spec.y_col])
+            z = float(parts[col_spec.z_col])
+            if col_spec.coord_type == "scaled":
                 x = x * lx_f + lo[0]
                 y = y * ly_f + lo[1]
                 z = z * lz_f + lo[2]
@@ -154,6 +169,7 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
     if len(timesteps) >= 2:
         timestep_ps = float(abs(timesteps[1] - timesteps[0]))
 
+    logger.info("Loaded LAMMPS dump: %d frames, %d atoms", len(frames), n_atoms)
     return InMemoryTrajectory(
         _frames=frames,
         n_frames=len(frames),

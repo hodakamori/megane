@@ -429,7 +429,7 @@ class Pipeline:
     """
 
     def __init__(self) -> None:
-        self._nodes: list[tuple[PipelineNode, dict]] = []
+        self._nodes: dict[str, tuple[PipelineNode, dict]] = {}
         self._edges: list[dict] = []
         self._node_data: dict[str, bytes] = {}
         self._trajectories: dict[str, object] = {}
@@ -451,7 +451,7 @@ class Pipeline:
         node._id = f"{node._node_type}-{self._counter}"
 
         config = self._serialize_node(node)
-        self._nodes.append((node, config))
+        self._nodes[node._id] = (node, config)
 
         if isinstance(node, LoadStructure):
             self._load_structure_data(node)
@@ -476,8 +476,7 @@ class Pipeline:
                 "Use node.out.<name> and node.inp.<name>, "
                 "e.g. pipe.add_edge(s.out.particle, f.inp.particle)."
             )
-        node_ids = {n._id for n, _ in self._nodes}
-        if source._node._id not in node_ids or target._node._id not in node_ids:
+        if source._node._id not in self._nodes or target._node._id not in self._nodes:
             raise ValueError("Both nodes must be added to this pipeline before connecting.")
         self._edges.append(
             {
@@ -497,7 +496,7 @@ class Pipeline:
 
     def to_dict(self) -> dict:
         """Serialize to ``SerializedPipeline`` v3 format."""
-        nodes = [config for _, config in self._nodes]
+        nodes = [config for _, config in self._nodes.values()]
         edges = list(self._edges)
         return {"version": 3, "nodes": nodes, "edges": edges}
 
@@ -505,7 +504,8 @@ class Pipeline:
 
     def _serialize_node(self, node: PipelineNode) -> dict:
         """Convert a node instance to the TS SerializedPipeline node dict."""
-        assert node._id is not None
+        if node._id is None:
+            raise ValueError("Node must be added to the pipeline before serialization.")
         base: dict = {
             "id": node._id,
             "type": node._node_type,
@@ -557,16 +557,14 @@ class Pipeline:
         """Load structure file and store binary snapshot data."""
         from megane.protocol import encode_snapshot
 
-        assert node._id is not None
+        if node._id is None:
+            raise ValueError("Node must be added to the pipeline before loading data.")
         structure = _load_structure_file(node.path)
         self._structures[node._id] = structure
         self._node_data[node._id] = encode_snapshot(structure)
 
         # Re-serialize to update hasCell
-        for i, (n, _) in enumerate(self._nodes):
-            if n._id == node._id:
-                self._nodes[i] = (n, self._serialize_node(n))
-                break
+        self._nodes[node._id] = (node, self._serialize_node(node))
 
     def _load_trajectory_data(
         self,
@@ -574,17 +572,16 @@ class Pipeline:
         source: LoadStructure,
     ) -> None:
         """Load trajectory object for lazy frame loading."""
-        assert node._id is not None
+        if node._id is None:
+            raise ValueError("Node must be added to the pipeline before loading data.")
         if node.xtc is not None:
             from megane.parsers.xtc import load_trajectory
 
             self._trajectories[node._id] = load_trajectory(source.path, node.xtc)
 
             # Update parent LoadStructure's hasTrajectory flag
-            for i, (n, config) in enumerate(self._nodes):
-                if n._id == source._id:
-                    config["hasTrajectory"] = True
-                    break
+            if source._id in self._nodes:
+                self._nodes[source._id][1]["hasTrajectory"] = True
         elif node.traj is not None:
             from megane.parsers.traj import load_traj
 
