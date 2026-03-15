@@ -66,10 +66,7 @@ class PortNamespace:
         node: PipelineNode = object.__getattribute__(self, "_node")
         if name not in port_map:
             available = ", ".join(sorted(port_map)) or "(none)"
-            raise AttributeError(
-                f"No port {name!r} on {node._node_type!r} node. "
-                f"Available: {available}"
-            )
+            raise AttributeError(f"No port {name!r} on {node._node_type!r} node. Available: {available}")
         return NodePort(node, port_map[name])
 
     def __dir__(self) -> list[str]:
