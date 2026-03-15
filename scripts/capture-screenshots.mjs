@@ -4,9 +4,11 @@
  * Usage:
  *   node scripts/capture-screenshots.mjs
  *
- * Starts a Vite dev server, opens a standalone renderer page that loads
- * the caffeine_water.json data (no WASM required), and captures a
- * high-quality screenshot.
+ * Starts a Vite dev server, opens the full app (which auto-loads
+ * caffeine_water with trajectory), and captures a high-quality screenshot
+ * including the 3D viewport, pipeline editor sidebar, and timeline bar.
+ *
+ * Requires: WASM must be built first (`npm run build:wasm` or `npm run build`).
  */
 
 import { spawn } from "child_process";
@@ -75,14 +77,15 @@ try {
     });
     const page = await context.newPage();
 
-    // Use the standalone screenshot page that loads JSON data directly
-    // (bypasses WASM — works even without Rust/wasm-pack)
-    await page.goto(`http://127.0.0.1:${PORT}/scripts/screenshot-page.html`, {
-      waitUntil: "networkidle",
+    // Load the full app — auto-loads caffeine_water with trajectory,
+    // rendering the complete UI (3D viewport, pipeline editor, timeline).
+    await page.goto(`http://127.0.0.1:${PORT}/`, {
+      waitUntil: "domcontentloaded",
       timeout: 30000,
     });
     await page.waitForSelector("canvas", { timeout: 15000 });
-    console.log("Canvas found (1280x720, DPR=2)");
+    await page.waitForSelector(".react-flow", { timeout: 15000 });
+    console.log("Full app loaded (canvas + pipeline editor) (1280x720, DPR=2)");
 
     // Wait for rendering to settle
     await page.waitForTimeout(3000);

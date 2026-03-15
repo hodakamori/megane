@@ -112,7 +112,9 @@ Confirm the README feature table ("Runs Everywhere" section) matches what is act
 ```bash
 node scripts/capture-screenshots.mjs
 ```
-Review generated screenshots visually for rendering regressions.
+Requires WASM to be built (covered by Phase 1.2 `npm run build`).
+The script opens the full app (3D viewport + pipeline editor + timeline) and saves
+`docs/public/screenshots/hero.png`. Review it visually for rendering regressions.
 
 ### 5.2 Live demo (AWS ECS) — health check and visual verification
 
