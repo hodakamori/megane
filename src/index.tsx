@@ -138,10 +138,10 @@ function App() {
       onFpsChange={handleFpsChange}
       onUploadStructure={handleUploadStructure}
       onUploadTrajectory={handleUploadTrajectory}
-      onBondSourceChange={ds.setBondSource as (s: string) => void}
-      onLabelSourceChange={ds.setLabelSource as (s: string) => void}
+      onBondSourceChange={ds.setBondSource}
+      onLabelSourceChange={ds.setLabelSource}
       onLoadLabelFile={ds.loadLabelFile}
-      onVectorSourceChange={ds.setVectorSource as (s: string) => void}
+      onVectorSourceChange={ds.setVectorSource}
       onLoadVectorFile={ds.loadVectorFile}
       onLoadDemoVectors={ds.loadDemoVectors}
     />
