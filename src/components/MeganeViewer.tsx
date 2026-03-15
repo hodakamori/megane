@@ -17,13 +17,8 @@ import { usePipelineStore } from "../pipeline/store";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
-import { setStructureLoadHandler } from "./nodes/LoadStructureNode";
-import { setTrajectoryLoadHandler } from "./nodes/LoadTrajectoryNode";
-import { setVectorLoadHandler } from "./nodes/LoadVectorNode";
-import { loadVectorFileData } from "../logic/vectorSourceLogic";
-import { parseStructureFile } from "../parsers/structure";
-import type { NodeSnapshotData } from "../pipeline/execute";
-import type { Snapshot, Frame, HoverInfo } from "../types";
+import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
+import type { Snapshot, Frame, HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
 interface MeganeViewerProps {
@@ -38,10 +33,10 @@ interface MeganeViewerProps {
   onFpsChange?: (fps: number) => void;
   onUploadStructure: (file: File) => void;
   onUploadTrajectory?: (file: File) => void;
-  onBondSourceChange?: (source: string) => void;
-  onLabelSourceChange?: (source: string) => void;
+  onBondSourceChange?: (source: BondSource) => void;
+  onLabelSourceChange?: (source: LabelSource) => void;
   onLoadLabelFile?: (file: File) => void;
-  onVectorSourceChange?: (source: string) => void;
+  onVectorSourceChange?: (source: VectorSource) => void;
   onLoadVectorFile?: (file: File) => void;
   onLoadDemoVectors?: () => void;
   width?: string | number;
@@ -88,18 +83,13 @@ export function MeganeViewer({
   // Subscribe to pipeline store's viewportState
   const viewportState = usePipelineStore((s) => s.viewportState);
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
-  const setNodeSnapshot = usePipelineStore((s) => s.setNodeSnapshot);
-  const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
-  const setNodeParseError = usePipelineStore((s) => s.setNodeParseError);
-  const clearNodeParseError = usePipelineStore((s) => s.clearNodeParseError);
 
-  // Track the "primary" load_structure node (the first one, for backward compat)
-  const pipelineNodes = usePipelineStore((s) => s.nodes);
-  const primaryNodeIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    const primary = pipelineNodes.find((n) => n.type === "load_structure");
-    primaryNodeIdRef.current = primary?.id ?? null;
-  }, [pipelineNodes]);
+  // Wire up node load handlers (structure, trajectory, vector) and track primary node
+  const primaryNodeIdRef = useNodeLoadHandlers({
+    snapshot,
+    onUploadStructure,
+    onUploadTrajectory,
+  });
 
   // Push snapshot to pipeline store for selection queries
   useEffect(() => {
@@ -113,70 +103,6 @@ export function MeganeViewer({
       prevViewportStateRef.current = vs;
     }
   }, [snapshot, setSnapshot]);
-
-  // Wire up node event handlers for per-node structure loading
-  useEffect(() => {
-    setStructureLoadHandler((nodeId, file) => {
-      // Parse file and store per-node snapshot
-      parseStructureFile(file)
-        .then((result) => {
-          clearNodeParseError(nodeId);
-          const data: NodeSnapshotData = {
-            snapshot: result.snapshot,
-            frames: result.frames.length > 0 ? result.frames : null,
-            meta: result.meta,
-            labels: result.labels,
-          };
-          setNodeSnapshot(nodeId, data);
-          // Update node port availability indicators
-          updateNodeParams(nodeId, {
-            hasTrajectory: result.frames.length > 0,
-            hasCell: !!result.snapshot.box,
-          });
-        })
-        .catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : String(err);
-          setNodeParseError(nodeId, `Failed to parse file: ${message}`);
-        });
-      // For the primary node, also trigger legacy load path for trajectory/label compat
-      if (nodeId === primaryNodeIdRef.current) {
-        onUploadStructure(file);
-      }
-    });
-    return () => {
-      setStructureLoadHandler(null);
-    };
-  }, [
-    onUploadStructure,
-    setNodeSnapshot,
-    updateNodeParams,
-    setNodeParseError,
-    clearNodeParseError,
-  ]);
-
-  useEffect(() => {
-    if (onUploadTrajectory) {
-      setTrajectoryLoadHandler((file) => onUploadTrajectory(file));
-    }
-    return () => {
-      setTrajectoryLoadHandler(null);
-    };
-  }, [onUploadTrajectory]);
-
-  // Wire up vector load handler
-  const setFileVectors = usePipelineStore((s) => s.setFileVectors);
-  useEffect(() => {
-    setVectorLoadHandler((file) => {
-      const nAtoms = snapshot?.nAtoms ?? 0;
-      if (nAtoms === 0) return;
-      loadVectorFileData(file, nAtoms).then(({ vectors }) => {
-        setFileVectors(vectors);
-      });
-    });
-    return () => {
-      setVectorLoadHandler(null);
-    };
-  }, [snapshot, setFileVectors]);
 
   // Apply viewportState changes to the renderer
   useEffect(() => {
