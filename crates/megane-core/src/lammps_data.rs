@@ -4,108 +4,11 @@
 /// Auto-detects style from comment hint (`Atoms # full`) or field count.
 use std::collections::{HashMap, HashSet};
 
+use crate::atomic::mass_to_atomic_num;
 use crate::bonds;
 use crate::parser::ParsedStructure;
 
-/// Map atomic mass (in amu) to atomic number.
-/// Uses closest match within tolerance of 0.5 amu.
-fn mass_to_atomic_num(mass: f32) -> u8 {
-    const TABLE: &[(f32, u8)] = &[
-        (1.008, 1),   // H
-        (4.003, 2),   // He
-        (6.941, 3),   // Li
-        (9.012, 4),   // Be
-        (10.81, 5),   // B
-        (12.011, 6),  // C
-        (14.007, 7),  // N
-        (15.999, 8),  // O
-        (18.998, 9),  // F
-        (20.180, 10), // Ne
-        (22.990, 11), // Na
-        (24.305, 12), // Mg
-        (26.982, 13), // Al
-        (28.086, 14), // Si
-        (30.974, 15), // P
-        (32.065, 16), // S
-        (35.453, 17), // Cl
-        (39.948, 18), // Ar
-        (39.098, 19), // K
-        (40.078, 20), // Ca
-        (44.956, 21), // Sc
-        (47.867, 22), // Ti
-        (50.942, 23), // V
-        (51.996, 24), // Cr
-        (54.938, 25), // Mn
-        (55.845, 26), // Fe
-        (58.933, 27), // Co
-        (58.693, 28), // Ni
-        (63.546, 29), // Cu
-        (65.380, 30), // Zn
-        (69.723, 31), // Ga
-        (72.630, 32), // Ge
-        (74.922, 33), // As
-        (78.971, 34), // Se
-        (79.904, 35), // Br
-        (83.798, 36), // Kr
-        (85.468, 37), // Rb
-        (87.620, 38), // Sr
-        (88.906, 39), // Y
-        (91.224, 40), // Zr
-        (95.950, 42), // Mo
-        (101.07, 44), // Ru
-        (102.91, 45), // Rh
-        (106.42, 46), // Pd
-        (107.87, 47), // Ag
-        (112.41, 48), // Cd
-        (114.82, 49), // In
-        (118.71, 50), // Sn
-        (121.76, 51), // Sb
-        (127.60, 52), // Te
-        (126.90, 53), // I
-        (131.29, 54), // Xe
-        (132.91, 55), // Cs
-        (137.33, 56), // Ba
-        (138.91, 57), // La
-        (140.12, 58), // Ce
-        (144.24, 60), // Nd
-        (150.36, 62), // Sm
-        (151.96, 63), // Eu
-        (157.25, 64), // Gd
-        (158.93, 65), // Tb
-        (162.50, 66), // Dy
-        (164.93, 67), // Ho
-        (167.26, 68), // Er
-        (173.05, 70), // Yb
-        (174.97, 71), // Lu
-        (178.49, 72), // Hf
-        (180.95, 73), // Ta
-        (183.84, 74), // W
-        (186.21, 75), // Re
-        (190.23, 76), // Os
-        (192.22, 77), // Ir
-        (195.08, 78), // Pt
-        (196.97, 79), // Au
-        (200.59, 80), // Hg
-        (204.38, 81), // Tl
-        (207.20, 82), // Pb
-        (208.98, 83), // Bi
-        (232.04, 90), // Th
-        (238.03, 92), // U
-    ];
-
-    let mut best_z: u8 = 0;
-    let mut best_diff = 0.5_f32;
-
-    for &(m, z) in TABLE {
-        let diff = (mass - m).abs();
-        if diff < best_diff {
-            best_diff = diff;
-            best_z = z;
-        }
-    }
-
-    best_z
-}
+// ── Atom style ────────────────────────────────────────────────────────────
 
 /// Detected atom_style for the Atoms section.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -141,128 +44,168 @@ fn detect_style_from_fields(n_fields: usize) -> Option<AtomStyle> {
     }
 }
 
-pub fn parse(text: &str) -> Result<ParsedStructure, String> {
-    let lines: Vec<&str> = text.lines().collect();
+// ── Header ────────────────────────────────────────────────────────────────
 
-    // --- Header parsing ---
-    let mut n_atoms: usize = 0;
-    let mut xlo: f32 = 0.0;
-    let mut xhi: f32 = 0.0;
-    let mut ylo: f32 = 0.0;
-    let mut yhi: f32 = 0.0;
-    let mut zlo: f32 = 0.0;
-    let mut zhi: f32 = 0.0;
-    let mut xy: f32 = 0.0;
-    let mut xz: f32 = 0.0;
-    let mut yz: f32 = 0.0;
-    let mut has_tilt = false;
-    let mut has_box = false;
+/// Parsed data from the header and section-start scan of a LAMMPS data file.
+struct HeaderData {
+    n_atoms: usize,
+    has_box: bool,
+    xlo: f32,
+    xhi: f32,
+    ylo: f32,
+    yhi: f32,
+    zlo: f32,
+    zhi: f32,
+    xy: f32,
+    xz: f32,
+    yz: f32,
+    has_tilt: bool,
+    masses_start: Option<usize>,
+    atoms_start: Option<usize>,
+    atoms_style_hint: Option<AtomStyle>,
+    bonds_start: Option<usize>,
+}
 
-    // Section start indices
-    let mut masses_start: Option<usize> = None;
-    let mut atoms_start: Option<usize> = None;
-    let mut atoms_style_hint: Option<AtomStyle> = None;
-    let mut bonds_start: Option<usize> = None;
-    let mut _n_bonds_expected: usize = 0;
+/// Scan all lines once to collect header counts, box bounds, and section positions.
+fn parse_header(lines: &[&str]) -> HeaderData {
+    let mut hd = HeaderData {
+        n_atoms: 0,
+        has_box: false,
+        xlo: 0.0,
+        xhi: 0.0,
+        ylo: 0.0,
+        yhi: 0.0,
+        zlo: 0.0,
+        zhi: 0.0,
+        xy: 0.0,
+        xz: 0.0,
+        yz: 0.0,
+        has_tilt: false,
+        masses_start: None,
+        atoms_start: None,
+        atoms_style_hint: None,
+        bonds_start: None,
+    };
 
     for (i, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-
         let tokens: Vec<&str> = trimmed.split_whitespace().collect();
 
-        // Header lines: "N atoms", "N bonds", "N atom types"
-        if tokens.len() >= 2 {
-            if tokens[1] == "atoms" && tokens.len() == 2 {
+        // "N atoms" / "N bonds"
+        if tokens.len() == 2 {
+            if tokens[1] == "atoms" {
                 if let Ok(n) = tokens[0].parse::<usize>() {
-                    n_atoms = n;
-                }
-            }
-            if tokens[1] == "bonds" && tokens.len() == 2 {
-                if let Ok(n) = tokens[0].parse::<usize>() {
-                    _n_bonds_expected = n;
+                    hd.n_atoms = n;
                 }
             }
         }
 
-        // Box bounds
-        if tokens.len() >= 4 && tokens[2] == "xlo" && tokens[3] == "xhi" {
-            xlo = tokens[0].parse().unwrap_or(0.0);
-            xhi = tokens[1].parse().unwrap_or(0.0);
-            has_box = true;
-        }
-        if tokens.len() >= 4 && tokens[2] == "ylo" && tokens[3] == "yhi" {
-            ylo = tokens[0].parse().unwrap_or(0.0);
-            yhi = tokens[1].parse().unwrap_or(0.0);
-        }
-        if tokens.len() >= 4 && tokens[2] == "zlo" && tokens[3] == "zhi" {
-            zlo = tokens[0].parse().unwrap_or(0.0);
-            zhi = tokens[1].parse().unwrap_or(0.0);
+        // Box bounds: "lo hi xlo xhi"
+        if tokens.len() >= 4 {
+            match (tokens[2], tokens[3]) {
+                ("xlo", "xhi") => {
+                    hd.xlo = tokens[0].parse().unwrap_or(0.0);
+                    hd.xhi = tokens[1].parse().unwrap_or(0.0);
+                    hd.has_box = true;
+                }
+                ("ylo", "yhi") => {
+                    hd.ylo = tokens[0].parse().unwrap_or(0.0);
+                    hd.yhi = tokens[1].parse().unwrap_or(0.0);
+                }
+                ("zlo", "zhi") => {
+                    hd.zlo = tokens[0].parse().unwrap_or(0.0);
+                    hd.zhi = tokens[1].parse().unwrap_or(0.0);
+                }
+                _ => {}
+            }
         }
 
-        // Tilt factors
+        // Tilt factors: "xy xz yz xy xz yz"
         if tokens.len() >= 6 && tokens[3] == "xy" && tokens[4] == "xz" && tokens[5] == "yz" {
-            xy = tokens[0].parse().unwrap_or(0.0);
-            xz = tokens[1].parse().unwrap_or(0.0);
-            yz = tokens[2].parse().unwrap_or(0.0);
-            has_tilt = true;
+            hd.xy = tokens[0].parse().unwrap_or(0.0);
+            hd.xz = tokens[1].parse().unwrap_or(0.0);
+            hd.yz = tokens[2].parse().unwrap_or(0.0);
+            hd.has_tilt = true;
         }
 
         // Section headers
         if trimmed == "Masses" || trimmed.starts_with("Masses ") {
-            masses_start = Some(i);
+            hd.masses_start = Some(i);
         }
         if trimmed == "Atoms" || trimmed.starts_with("Atoms ") {
-            atoms_start = Some(i);
-            atoms_style_hint = parse_style_hint(trimmed);
+            hd.atoms_start = Some(i);
+            hd.atoms_style_hint = parse_style_hint(trimmed);
         }
         if trimmed == "Bonds" || trimmed.starts_with("Bonds ") {
-            bonds_start = Some(i);
+            hd.bonds_start = Some(i);
         }
     }
 
-    if n_atoms == 0 {
-        return Err("LAMMPS data file contains no atoms".into());
-    }
+    hd
+}
 
-    let atoms_line = atoms_start.ok_or("No Atoms section found in LAMMPS data file")?;
+// ── Masses section ────────────────────────────────────────────────────────
 
-    // --- Parse Masses section ---
+/// Parse the Masses section and return a map from type_id → mass.
+fn parse_masses_section(lines: &[&str], start: usize) -> HashMap<u32, f32> {
     let mut type_to_mass: HashMap<u32, f32> = HashMap::new();
-    if let Some(start) = masses_start {
-        for line in lines.iter().skip(start + 1) {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            // Stop at next section header (non-numeric first token)
-            let tokens: Vec<&str> = trimmed.split_whitespace().collect();
-            if tokens.is_empty() {
-                continue;
-            }
-            let type_id: u32 = match tokens[0].parse() {
-                Ok(id) => id,
-                Err(_) => break, // section header
-            };
-            if tokens.len() >= 2 {
-                if let Ok(mass) = tokens[1].parse::<f32>() {
-                    type_to_mass.insert(type_id, mass);
-                }
+
+    for line in lines.iter().skip(start + 1) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        if tokens.is_empty() {
+            continue;
+        }
+        let type_id: u32 = match tokens[0].parse() {
+            Ok(id) => id,
+            Err(_) => break, // reached next section header
+        };
+        if tokens.len() >= 2 {
+            if let Ok(mass) = tokens[1].parse::<f32>() {
+                type_to_mass.insert(type_id, mass);
             }
         }
     }
 
-    // --- Parse Atoms section ---
-    // Skip blank lines after "Atoms" header
+    type_to_mass
+}
+
+// ── Atoms section ─────────────────────────────────────────────────────────
+
+/// Data extracted from the Atoms section.
+struct AtomsData {
+    positions: Vec<f32>,
+    elements: Vec<u8>,
+    labels: Vec<String>,
+    /// Maps LAMMPS 1-based atom IDs to 0-based indices.
+    id_to_index: HashMap<u32, usize>,
+    count: usize,
+}
+
+/// Parse the Atoms section.
+///
+/// `atoms_line` is the line index of the "Atoms" header.
+fn parse_atoms_section(
+    lines: &[&str],
+    atoms_line: usize,
+    style_hint: Option<AtomStyle>,
+    type_to_mass: &HashMap<u32, f32>,
+    n_atoms: usize,
+) -> Result<AtomsData, String> {
+    // Skip blank lines after the "Atoms" header
     let mut data_start = atoms_line + 1;
     while data_start < lines.len() && lines[data_start].trim().is_empty() {
         data_start += 1;
     }
 
-    // Detect style from first data line if no hint
-    let style = if let Some(hint) = atoms_style_hint {
+    // Resolve atom style: use hint if present, else detect from first data line
+    let style = if let Some(hint) = style_hint {
         hint
     } else if data_start < lines.len() {
         let first_tokens: Vec<&str> = lines[data_start].split_whitespace().collect();
@@ -275,21 +218,19 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut positions = Vec::with_capacity(n_atoms * 3);
     let mut elements = Vec::with_capacity(n_atoms);
     let mut labels = Vec::with_capacity(n_atoms);
-    // Map from LAMMPS atom_id (1-based) to 0-based index
     let mut id_to_index: HashMap<u32, usize> = HashMap::new();
-    let mut atom_count = 0usize;
+    let mut count = 0usize;
 
     for line in lines.iter().skip(data_start) {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        // Stop at next section header
         let tokens: Vec<&str> = trimmed.split_whitespace().collect();
         if tokens.is_empty() {
             continue;
         }
-        // If first token is not numeric, it's a section header
+        // Non-numeric first token signals a new section header
         if tokens[0].parse::<u32>().is_err() {
             break;
         }
@@ -314,7 +255,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 }
                 let aid: u32 = tokens[0].parse().map_err(|_| "bad atom_id")?;
                 let tid: u32 = tokens[1].parse().map_err(|_| "bad type")?;
-                // tokens[2] = charge (ignored for now)
+                // tokens[2] = charge (ignored)
                 let x: f32 = tokens[3].parse().map_err(|_| "bad x")?;
                 let y: f32 = tokens[4].parse().map_err(|_| "bad y")?;
                 let z: f32 = tokens[5].parse().map_err(|_| "bad z")?;
@@ -328,7 +269,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 let aid: u32 = tokens[0].parse().map_err(|_| "bad atom_id")?;
                 // tokens[1] = mol_id (ignored)
                 let tid: u32 = tokens[2].parse().map_err(|_| "bad type")?;
-                // tokens[3] = charge (ignored for now)
+                // tokens[3] = charge (ignored)
                 let x: f32 = tokens[4].parse().map_err(|_| "bad x")?;
                 let y: f32 = tokens[5].parse().map_err(|_| "bad y")?;
                 let z: f32 = tokens[6].parse().map_err(|_| "bad z")?;
@@ -336,92 +277,128 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
             }
         };
 
-        id_to_index.insert(atom_id, atom_count);
-        atom_count += 1;
+        id_to_index.insert(atom_id, count);
+        count += 1;
 
         positions.push(x);
         positions.push(y);
         positions.push(z);
 
-        // Resolve element from mass table
         let elem = type_to_mass
             .get(&type_id)
             .map(|&m| mass_to_atomic_num(m))
             .unwrap_or(0);
         elements.push(elem);
-
         labels.push(format!("{}", type_id));
     }
 
-    if atom_count == 0 {
-        return Err("No atoms parsed from Atoms section".into());
-    }
+    Ok(AtomsData {
+        positions,
+        elements,
+        labels,
+        id_to_index,
+        count,
+    })
+}
 
-    // --- Parse Bonds section ---
+// ── Bonds section ─────────────────────────────────────────────────────────
+
+/// Parse the Bonds section and return unique (a, b) index pairs (0-based).
+fn parse_bonds_section(
+    lines: &[&str],
+    start: usize,
+    id_to_index: &HashMap<u32, usize>,
+) -> Vec<(u32, u32)> {
     let mut file_bonds: Vec<(u32, u32)> = Vec::new();
     let mut bond_set: HashSet<(u32, u32)> = HashSet::new();
 
-    if let Some(start) = bonds_start {
-        let mut bond_data_start = start + 1;
-        while bond_data_start < lines.len() && lines[bond_data_start].trim().is_empty() {
-            bond_data_start += 1;
-        }
+    let mut bond_data_start = start + 1;
+    while bond_data_start < lines.len() && lines[bond_data_start].trim().is_empty() {
+        bond_data_start += 1;
+    }
 
-        for line in lines.iter().skip(bond_data_start) {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            let tokens: Vec<&str> = trimmed.split_whitespace().collect();
-            if tokens.is_empty() {
-                continue;
-            }
-            if tokens[0].parse::<u32>().is_err() {
-                break; // section header
-            }
-            // bond_id bond_type atom_i atom_j
-            if tokens.len() < 4 {
-                continue;
-            }
-            let ai: u32 = match tokens[2].parse() {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            let aj: u32 = match tokens[3].parse() {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            // Convert from LAMMPS 1-based atom IDs to 0-based indices
-            let idx_i = match id_to_index.get(&ai) {
-                Some(&idx) => idx as u32,
-                None => continue,
-            };
-            let idx_j = match id_to_index.get(&aj) {
-                Some(&idx) => idx as u32,
-                None => continue,
-            };
-            let a = idx_i.min(idx_j);
-            let b = idx_i.max(idx_j);
-            if bond_set.insert((a, b)) {
-                file_bonds.push((a, b));
-            }
+    for line in lines.iter().skip(bond_data_start) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        if tokens.is_empty() {
+            continue;
+        }
+        if tokens[0].parse::<u32>().is_err() {
+            break; // reached next section header
+        }
+        // bond_id bond_type atom_i atom_j
+        if tokens.len() < 4 {
+            continue;
+        }
+        let ai: u32 = match tokens[2].parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let aj: u32 = match tokens[3].parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        // Convert from LAMMPS 1-based IDs to 0-based indices
+        let idx_i = match id_to_index.get(&ai) {
+            Some(&idx) => idx as u32,
+            None => continue,
+        };
+        let idx_j = match id_to_index.get(&aj) {
+            Some(&idx) => idx as u32,
+            None => continue,
+        };
+        let a = idx_i.min(idx_j);
+        let b = idx_i.max(idx_j);
+        if bond_set.insert((a, b)) {
+            file_bonds.push((a, b));
         }
     }
 
+    file_bonds
+}
+
+// ── Public API ────────────────────────────────────────────────────────────
+
+pub fn parse(text: &str) -> Result<ParsedStructure, String> {
+    let lines: Vec<&str> = text.lines().collect();
+
+    let hd = parse_header(&lines);
+
+    if hd.n_atoms == 0 {
+        return Err("LAMMPS data file contains no atoms".into());
+    }
+    let atoms_line = hd.atoms_start.ok_or("No Atoms section found in LAMMPS data file")?;
+
+    let type_to_mass = hd
+        .masses_start
+        .map(|s| parse_masses_section(&lines, s))
+        .unwrap_or_default();
+
+    let atoms = parse_atoms_section(&lines, atoms_line, hd.atoms_style_hint, &type_to_mass, hd.n_atoms)?;
+
+    if atoms.count == 0 {
+        return Err("No atoms parsed from Atoms section".into());
+    }
+
+    let mut file_bonds = hd
+        .bonds_start
+        .map(|s| parse_bonds_section(&lines, s, &atoms.id_to_index))
+        .unwrap_or_default();
+
     let n_file_bonds = file_bonds.len();
+    let bond_set: HashSet<(u32, u32)> = file_bonds.iter().copied().collect();
+    let inferred = bonds::infer_bonds(&atoms.positions, &atoms.elements, atoms.count, &bond_set);
+    file_bonds.extend(inferred);
 
-    // Infer additional bonds
-    let inferred = bonds::infer_bonds(&positions, &elements, atom_count, &bond_set);
-    let mut all_bonds = file_bonds;
-    all_bonds.extend(inferred);
-
-    // --- Box matrix ---
-    let box_matrix = if has_box {
-        let lx = xhi - xlo;
-        let ly = yhi - ylo;
-        let lz = zhi - zlo;
-        if has_tilt {
-            Some([lx, 0.0, 0.0, xy, ly, 0.0, xz, yz, lz])
+    let box_matrix = if hd.has_box {
+        let lx = hd.xhi - hd.xlo;
+        let ly = hd.yhi - hd.ylo;
+        let lz = hd.zhi - hd.zlo;
+        if hd.has_tilt {
+            Some([lx, 0.0, 0.0, hd.xy, ly, 0.0, hd.xz, hd.yz, lz])
         } else {
             Some([lx, 0.0, 0.0, 0.0, ly, 0.0, 0.0, 0.0, lz])
         }
@@ -429,17 +406,17 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
-    let atom_labels = if labels.iter().any(|l| !l.is_empty()) {
-        Some(labels)
+    let atom_labels = if atoms.labels.iter().any(|l| !l.is_empty()) {
+        Some(atoms.labels)
     } else {
         None
     };
 
     Ok(ParsedStructure {
-        n_atoms: atom_count,
-        positions,
-        elements,
-        bonds: all_bonds,
+        n_atoms: atoms.count,
+        positions: atoms.positions,
+        elements: atoms.elements,
+        bonds: file_bonds,
         n_file_bonds,
         bond_orders: None,
         box_matrix,
@@ -451,17 +428,6 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_mass_to_atomic_num() {
-        assert_eq!(mass_to_atomic_num(1.008), 1); // H
-        assert_eq!(mass_to_atomic_num(12.011), 6); // C
-        assert_eq!(mass_to_atomic_num(14.007), 7); // N
-        assert_eq!(mass_to_atomic_num(15.999), 8); // O
-        assert_eq!(mass_to_atomic_num(55.845), 26); // Fe
-        assert_eq!(mass_to_atomic_num(196.97), 79); // Au
-        assert_eq!(mass_to_atomic_num(999.0), 0); // unknown
-    }
 
     #[test]
     fn test_parse_style_hint() {
@@ -577,7 +543,6 @@ Bonds
         assert_eq!(result.elements[0], 8); // O
         assert_eq!(result.elements[1], 1); // H
         assert_eq!(result.n_file_bonds, 1);
-        // Verify the bond exists
         assert!(result.bonds.contains(&(0, 1)));
     }
 
@@ -631,10 +596,10 @@ Atoms # atomic
         let result = parse(data).expect("parse failed");
         let bm = result.box_matrix.unwrap();
         assert!((bm[0] - 10.0).abs() < 1e-5); // lx
-        assert!((bm[3] - 1.0).abs() < 1e-5); // xy
+        assert!((bm[3] - 1.0).abs() < 1e-5);  // xy
         assert!((bm[4] - 10.0).abs() < 1e-5); // ly
-        assert!((bm[6] - 0.5).abs() < 1e-5); // xz
-        assert!((bm[7] - 0.0).abs() < 1e-5); // yz
+        assert!((bm[6] - 0.5).abs() < 1e-5);  // xz
+        assert!((bm[7] - 0.0).abs() < 1e-5);  // yz
         assert!((bm[8] - 10.0).abs() < 1e-5); // lz
     }
 

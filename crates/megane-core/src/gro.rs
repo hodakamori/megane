@@ -1,5 +1,3 @@
-use crate::bonds;
-use crate::parser::symbol_to_atomic_num;
 /// GROMACS GRO text format parser.
 ///
 /// Format:
@@ -16,38 +14,8 @@ use crate::parser::symbol_to_atomic_num;
 ///   Last line: box vectors (v1x v2y v3z [v1y v1z v2x v2z v3x v3y])
 use std::collections::HashSet;
 
-/// Guess atomic number from GRO atom name (e.g. "CA", "OW", "HW1").
-fn element_from_atom_name(name: &str) -> u8 {
-    let name = name.trim();
-    if name.is_empty() {
-        return 0;
-    }
-
-    // Try first non-digit character(s) as element symbol
-    let clean: String = name.chars().filter(|c| c.is_alphabetic()).collect();
-    if clean.is_empty() {
-        return 0;
-    }
-
-    // Try two-char symbol first (e.g. "CL", "BR", "FE")
-    let mut chars = clean.chars();
-    let first = match chars.next() {
-        Some(c) => c,
-        None => return 0,
-    };
-
-    if let Some(second) = chars.next() {
-        let two: String = first.to_uppercase().chain(second.to_lowercase()).collect();
-        let num = symbol_to_atomic_num(&two);
-        if num != 0 {
-            return num;
-        }
-    }
-
-    // Fall back to single-char
-    let one: String = first.to_uppercase().collect();
-    symbol_to_atomic_num(&one)
-}
+use crate::atomic::element_from_atom_name;
+use crate::bonds;
 
 pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
@@ -171,16 +139,6 @@ fn parse_box_line(line: &str) -> Option<[f32; 9]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_element_from_atom_name() {
-        assert_eq!(element_from_atom_name("CA"), 20); // Ca (Calcium) — GRO "CA" maps to two-char "Ca"
-        assert_eq!(element_from_atom_name("OW"), 8); // Oxygen (water)
-        assert_eq!(element_from_atom_name("HW1"), 1); // Hydrogen
-        assert_eq!(element_from_atom_name("N"), 7); // Nitrogen
-        assert_eq!(element_from_atom_name("  CL"), 17); // Chlorine
-        assert_eq!(element_from_atom_name(""), 0); // Empty
-    }
 
     #[test]
     fn test_parse_simple_gro() {
