@@ -98,7 +98,7 @@ Check at minimum:
 - Supported file formats table
 
 ### 4.2 Docs site builds
-Docs build is verified by the `release-dry-run.yml` workflow (the "Dry run: Docs build" job).
+Docs build is verified by the `release-dry-run.yml` workflow (the "Dry run: Docs" job).
 No manual step needed here — Phase 6 covers this.
 
 ### 4.4 Feature table alignment

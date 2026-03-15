@@ -490,6 +490,12 @@ try {
   process.exitCode = 1;
 } finally {
   if (browser) await browser.close();
-  if (server) server.kill();
-  process.exit(process.exitCode || 0);
+  if (server) {
+    server.kill();
+    server.stdout?.destroy();
+    server.stderr?.destroy();
+    server.unref();
+    // Fire-and-forget SIGKILL fallback; unref'd so it doesn't block exit.
+    setTimeout(() => { try { server.kill('SIGKILL'); } catch {} }, 3000).unref();
+  }
 }

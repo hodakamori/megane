@@ -69,7 +69,7 @@ try {
 
   browser = await chromium.launch({ headless: true });
 
-  // Hero screenshot: caffeine molecule rendered standalone (1280x720, DPR=2)
+  // Hero screenshot: full app UI with 3D viewport, pipeline editor, timeline (1280x720, DPR=2)
   {
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
