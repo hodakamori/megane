@@ -97,9 +97,13 @@ export function useNodeLoadHandlers({
     setVectorLoadHandler((file) => {
       const nAtoms = snapshot?.nAtoms ?? 0;
       if (nAtoms === 0) return;
-      loadVectorFileData(file, nAtoms).then(({ vectors }) => {
-        setFileVectors(vectors);
-      });
+      loadVectorFileData(file, nAtoms)
+        .then(({ vectors }) => {
+          setFileVectors(vectors);
+        })
+        .catch((err: unknown) => {
+          console.error("Failed to load vector file:", err);
+        });
     });
     return () => {
       setVectorLoadHandler(null);
