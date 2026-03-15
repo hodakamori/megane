@@ -36,7 +36,7 @@ bump-my-version bump minor   # new features
 bump-my-version bump major   # breaking changes
 ```
 
-### 2.2 Verify all 7 files are updated
+### 2.2 Verify all 8 files are updated
 Check that the new version appears in every file:
 ```bash
 grep -r "0\.4\.0" pyproject.toml package.json \
@@ -44,7 +44,8 @@ grep -r "0\.4\.0" pyproject.toml package.json \
   crates/megane-python/Cargo.toml \
   crates/megane-wasm/Cargo.toml \
   python/megane/__init__.py \
-  docs/scripts/prepare-notebooks.py
+  docs/scripts/prepare-notebooks.py \
+  vscode-megane/package.json
 ```
 Replace `0.4.0` with the old version — output should be empty (no stale references).
 
@@ -84,14 +85,14 @@ Check at minimum:
 
 ### 4.2 Docs site builds
 ```bash
-npm run build:docs 2>/dev/null || npx vitepress build docs
+cd docs && npm run build
 ```
-Must complete without errors.
+Must complete without errors. VitePress and its dependencies are managed under `docs/package.json` (separate from the root `package.json`).
 
 ### 4.3 API docs generate
 ```bash
-npx typedoc --out docs/api/ts src/index.ts 2>/dev/null || true
-pdoc python/megane -o docs/api/python 2>/dev/null || true
+npx typedoc --out docs/api/ts src/index.tsx 2>/dev/null || true
+uv run pdoc python/megane -o docs/api/python 2>/dev/null || true
 ```
 Check for unexpected errors (missing exports, broken references).
 
@@ -175,6 +176,7 @@ git add pyproject.toml package.json \
   Cargo.lock \
   python/megane/__init__.py \
   docs/scripts/prepare-notebooks.py \
+  vscode-megane/package.json \
   CHANGELOG.md
 git commit -m "chore: release vX.Y.Z"
 git push origin main

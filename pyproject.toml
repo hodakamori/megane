@@ -125,6 +125,11 @@ filename = "docs/scripts/prepare-notebooks.py"
 search = 'megane v{current_version}'
 replace = 'megane v{new_version}'
 
+[[tool.bumpversion.files]]
+filename = "vscode-megane/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
