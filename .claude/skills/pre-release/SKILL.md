@@ -10,9 +10,11 @@ Run this skill before creating a release tag. Complete every phase in order.
 
 ### 1.1 Run all tests
 ```bash
-make test-all
+uv sync --extra dev   # ensures jupyterlab is installed for E2E widget tests
+uv run make test-all
 ```
-All of TypeScript, Rust, Python, and E2E snapshot tests must pass.
+All of TypeScript, Rust, Python, E2E widget render, and E2E snapshot tests must pass.
+`uv run` adds `.venv/bin` to PATH so `python` and `jupyter` resolve to the venv.
 
 ### 1.2 Full build
 ```bash
