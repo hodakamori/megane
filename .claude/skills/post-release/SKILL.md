@@ -106,27 +106,39 @@ Search for "megane" in the VS Code Extensions panel
 
 ### 3.3 Update the draft release with generated notes
 ```bash
-gh release edit vX.Y.Z --notes "$(cat release-notes.md)"
-```
-Or write the notes inline using a heredoc:
-```bash
 gh release edit vX.Y.Z --notes "$(cat <<'EOF'
 ## What's Changed
-...
+
+### Added
+- ...
+
+### Changed
+- ...
+
+### Fixed
+- ...
+
+## Install
+
+### Python
+pip install megane==X.Y.Z
+
+### npm
+npm install megane-viewer@X.Y.Z
+
+### VS Code
+Search for "megane" in the VS Code Extensions panel
+
+**Full Changelog**: https://github.com/hodakamori/megane/compare/vPREV...vX.Y.Z
 EOF
 )"
 ```
 
-### 3.4 Publish the release
-After confirming the notes look correct:
-```bash
-gh release edit vX.Y.Z --draft=false
-```
-
-### 3.5 Confirm the release page
+### 3.4 Confirm the draft is ready
 ```bash
 gh release view vX.Y.Z
 ```
+Verify the notes look correct. The release remains as a **draft** — hand off to the user to review and publish it manually.
 
 ## Phase 4: Documentation
 
@@ -167,5 +179,5 @@ Once all phases are complete, the release is done. Key verification:
 | All CI workflows | `gh run list --limit 10` |
 | PyPI version | `pip index versions megane` |
 | npm version | `npm view megane-viewer version` |
-| GitHub release notes written & published | `gh release view vX.Y.Z` |
+| GitHub release draft with notes ready | `gh release view vX.Y.Z` |
 | Docs site updated | `gh run list --workflow=docs.yml` |

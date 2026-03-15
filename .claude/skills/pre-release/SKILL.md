@@ -127,7 +127,7 @@ gh run list --workflow=release-dry-run.yml --limit 1
 ```
 All three publish jobs (PyPI, npm, VSCode) must pass in dry-run mode.
 
-## Phase 7: Release Commit & Tag
+## Phase 7: Release Commit
 
 Only proceed here after all phases above are green.
 
@@ -148,12 +148,15 @@ git add pyproject.toml package.json \
   docs/scripts/prepare-notebooks.py \
   CHANGELOG.md
 git commit -m "chore: release vX.Y.Z"
+git push origin main
 ```
 
-### 7.3 Create and push tag
-```bash
+### 7.3 Hand off to user
+At this point, hand off to the user to create and push the tag manually:
+
+```
+# Run these commands yourself to trigger the publish workflows:
 git tag vX.Y.Z
-git push origin main
 git push origin vX.Y.Z
 ```
 
@@ -162,4 +165,4 @@ Pushing the tag triggers all publish workflows automatically:
 
 ## Next Step
 
-After pushing the tag, follow the **post-release** skill to verify the release landed correctly.
+After the user pushes the tag, follow the **post-release** skill to verify the release landed correctly.
