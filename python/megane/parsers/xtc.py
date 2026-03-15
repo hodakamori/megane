@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
 
 from megane.parsers.pdb import cell_params_to_matrix
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -59,6 +62,7 @@ def load_trajectory(pdb_path: str, xtc_path: str) -> Trajectory:
     n_atoms = len(universe.atoms)
     timestep_ps = universe.trajectory.dt
     box = _box_from_dimensions(universe.dimensions)
+    logger.info("Loaded XTC trajectory: %d frames, %d atoms", n_frames, n_atoms)
 
     return Trajectory(
         _universe=universe,
