@@ -5,6 +5,16 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (build only, skip deploy)"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      dry_run:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -76,13 +86,16 @@ jobs:
         working-directory: docs
         run: npx vitepress build
 
-      - uses: actions/configure-pages@v5
+      - if: ${{ !inputs.dry_run }}
+        uses: actions/configure-pages@v5
 
-      - uses: actions/upload-pages-artifact@v3
+      - if: ${{ !inputs.dry_run }}
+        uses: actions/upload-pages-artifact@v3
         with:
           path: docs/.vitepress/dist
 
   deploy:
+    if: ${{ !inputs.dry_run }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
