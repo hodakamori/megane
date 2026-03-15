@@ -56,19 +56,76 @@ gh run view --workflow=publish-vscode.yml --limit 1
 ```
 Confirm the extension version matches `X.Y.Z`.
 
-## Phase 3: GitHub Release
+## Phase 3: GitHub Release Notes & Publishing
 
-### 3.1 Publish the draft release
-The `release.yml` workflow creates a draft. Review and publish it:
+### 3.1 Find the previous release tag
 ```bash
-gh release view vX.Y.Z
+git tag --sort=-version:refname | grep '^v' | head -5
+```
+Identify the previous tag (e.g., `vX.Y.Z-1`).
+
+### 3.2 Generate release notes from diff
+Collect all commits between the previous tag and the new tag:
+```bash
+git log vPREV..vX.Y.Z --oneline --no-merges
+```
+
+Also read the CHANGELOG entry for the new version:
+```bash
+# Extract the section for vX.Y.Z from CHANGELOG.md
+awk '/^## \[X\.Y\.Z\]/,/^## \[/' CHANGELOG.md | head -50
+```
+
+Use these two sources to write human-readable release notes. Structure them as:
+
+```markdown
+## What's Changed
+
+### Added
+- ...
+
+### Changed
+- ...
+
+### Fixed
+- ...
+
+## Install
+
+### Python
+pip install megane==X.Y.Z
+
+### npm
+npm install megane-viewer@X.Y.Z
+
+### VS Code
+Search for "megane" in the VS Code Extensions panel
+
+**Full Changelog**: https://github.com/hodakamori/megane/compare/vPREV...vX.Y.Z
+```
+
+### 3.3 Update the draft release with generated notes
+```bash
+gh release edit vX.Y.Z --notes "$(cat release-notes.md)"
+```
+Or write the notes inline using a heredoc:
+```bash
+gh release edit vX.Y.Z --notes "$(cat <<'EOF'
+## What's Changed
+...
+EOF
+)"
+```
+
+### 3.4 Publish the release
+After confirming the notes look correct:
+```bash
 gh release edit vX.Y.Z --draft=false
 ```
-Verify the release notes are correct (auto-generated from git log).
 
-### 3.2 Confirm release page
+### 3.5 Confirm the release page
 ```bash
-gh release view vX.Y.Z --web
+gh release view vX.Y.Z
 ```
 
 ## Phase 4: Documentation
@@ -110,5 +167,5 @@ Once all phases are complete, the release is done. Key verification:
 | All CI workflows | `gh run list --limit 10` |
 | PyPI version | `pip index versions megane` |
 | npm version | `npm view megane-viewer version` |
-| GitHub release published | `gh release view vX.Y.Z` |
+| GitHub release notes written & published | `gh release view vX.Y.Z` |
 | Docs site updated | `gh run list --workflow=docs.yml` |
