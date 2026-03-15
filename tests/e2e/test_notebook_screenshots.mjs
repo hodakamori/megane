@@ -370,4 +370,5 @@ try {
 } finally {
   if (browser) await browser.close();
   if (server) server.kill();
+  process.exit(process.exitCode || 0);
 }

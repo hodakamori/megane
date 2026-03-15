@@ -31,11 +31,15 @@ Must produce a wheel without errors.
 ## Phase 2: Version Consistency
 
 ### 2.1 Run bumpversion
+Install if not already available:
+```bash
+uv tool install bump-my-version
+```
 Choose the appropriate bump level:
 ```bash
-bump-my-version bump patch   # bug fixes
-bump-my-version bump minor   # new features
-bump-my-version bump major   # breaking changes
+uv tool run bump-my-version bump patch   # bug fixes
+uv tool run bump-my-version bump minor   # new features
+uv tool run bump-my-version bump major   # breaking changes
 ```
 
 ### 2.2 Verify all 8 files are updated
@@ -58,6 +62,14 @@ cargo check
 Ensures `Cargo.lock` is in sync with the bumped Cargo.toml versions.
 
 ## Phase 3: CHANGELOG
+
+### 3.0 Pre-condition check
+Confirm that `CHANGELOG.md` has an `[Unreleased]` section at the top:
+```bash
+head -10 CHANGELOG.md
+```
+If `[Unreleased]` is missing, **stop here** — there are no staged changes to release.
+Create the section and populate it with changes before proceeding.
 
 ### 3.1 Verify CHANGELOG.md has a new entry
 - The `[Unreleased]` section must be renamed to `[X.Y.Z] - YYYY-MM-DD` with today's date.
