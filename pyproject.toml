@@ -41,7 +41,7 @@ Issues = "https://github.com/hodakamori/megane/issues"
 
 [project.optional-dependencies]
 traj = ["ase>=3.22"]
-dev = ["pytest>=7.0", "httpx>=0.24", "pytest-cov>=4.0", "nbconvert>=7.0", "ipykernel>=6.0"]
+dev = ["pytest>=7.0", "httpx>=0.24", "pytest-cov>=4.0", "nbconvert>=7.0", "ipykernel>=6.0", "jupyterlab>=4.0"]
 
 [project.scripts]
 megane = "megane.cli:main"
@@ -124,6 +124,11 @@ replace = '__version__ = "{new_version}"'
 filename = "docs/scripts/prepare-notebooks.py"
 search = 'megane v{current_version}'
 replace = 'megane v{new_version}'
+
+[[tool.bumpversion.files]]
+filename = "vscode-megane/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
 
 [dependency-groups]
 dev = [

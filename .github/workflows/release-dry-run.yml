@@ -26,9 +26,15 @@ jobs:
     with:
       dry_run: true
 
+  dry-run-docs:
+    name: "Dry run: Docs"
+    uses: ./.github/workflows/docs.yml
+    with:
+      dry_run: true
+
   summary:
     name: Dry run summary
-    needs: [dry-run-npm, dry-run-pypi, dry-run-vscode]
+    needs: [dry-run-npm, dry-run-pypi, dry-run-vscode, dry-run-docs]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -39,10 +45,12 @@ jobs:
           echo "- npm:    ${{ needs.dry-run-npm.result }}"
           echo "- PyPI:   ${{ needs.dry-run-pypi.result }}"
           echo "- VSCode: ${{ needs.dry-run-vscode.result }}"
+          echo "- Docs:   ${{ needs.dry-run-docs.result }}"
           echo ""
           if [ "${{ needs.dry-run-npm.result }}" != "success" ] || \
              [ "${{ needs.dry-run-pypi.result }}" != "success" ] || \
-             [ "${{ needs.dry-run-vscode.result }}" != "success" ]; then
+             [ "${{ needs.dry-run-vscode.result }}" != "success" ] || \
+             [ "${{ needs.dry-run-docs.result }}" != "success" ]; then
             echo "::error::One or more dry runs failed. Do not proceed with release."
             exit 1
           fi
