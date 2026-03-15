@@ -95,11 +95,9 @@ fn parse_header(lines: &[&str]) -> HeaderData {
         let tokens: Vec<&str> = trimmed.split_whitespace().collect();
 
         // "N atoms" / "N bonds"
-        if tokens.len() == 2 {
-            if tokens[1] == "atoms" {
-                if let Ok(n) = tokens[0].parse::<usize>() {
-                    hd.n_atoms = n;
-                }
+        if tokens.len() == 2 && tokens[1] == "atoms" {
+            if let Ok(n) = tokens[0].parse::<usize>() {
+                hd.n_atoms = n;
             }
         }
 

@@ -1,11 +1,11 @@
-/// Atomic data: element symbols, atomic numbers, masses, and radii.
-///
-/// Central module for all element-related lookups previously scattered across
-/// parser.rs, bonds.rs, lammps_data.rs, and gro.rs.
+//! Atomic data: element symbols, atomic numbers, masses, and radii.
+//!
+//! Central module for all element-related lookups previously scattered across
+//! parser.rs, bonds.rs, lammps_data.rs, and gro.rs.
 
 // ── Symbol ↔ atomic number ────────────────────────────────────────────────
 
-/// Element symbol → atomic number lookup.
+/// Maps element symbol strings (e.g. "Fe", "Na") to their atomic numbers.
 pub fn symbol_to_atomic_num(sym: &str) -> u8 {
     match sym {
         "H" => 1,
