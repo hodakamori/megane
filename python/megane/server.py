@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -16,12 +17,19 @@ from fastapi.staticfiles import StaticFiles
 from megane.parsers.pdb import Structure, load_pdb
 from megane.protocol import encode_frame, encode_metadata, encode_snapshot
 
+if TYPE_CHECKING:
+    from megane.parsers.common import InMemoryTrajectory
+    from megane.parsers.xtc import Trajectory
+
+__all__ = ["app", "configure"]
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="megane")
 
 # Track connected WebSocket clients for broadcasting
 _clients: set[WebSocket] = set()
+_clients_lock = asyncio.Lock()
 
 
 @dataclass
@@ -32,7 +40,7 @@ class ServerState:
     snapshot_bytes: bytes = b""
     pdb_path: str = ""
     xtc_path: Optional[str] = None
-    trajectory: object = None  # Optional[Trajectory] - lazy import
+    trajectory: Optional[Trajectory | InMemoryTrajectory] = None
 
 
 _state = ServerState()
@@ -104,12 +112,15 @@ def _build_metadata_bytes() -> bytes:
 async def _broadcast_snapshot() -> None:
     """Send snapshot and metadata to all connected clients."""
     meta_bytes = _build_metadata_bytes()
-    for ws in list(_clients):
+    async with _clients_lock:
+        clients_snapshot = list(_clients)
+    for ws in clients_snapshot:
         try:
             await ws.send_bytes(_state.snapshot_bytes)
             await ws.send_bytes(meta_bytes)
-        except Exception:
-            _clients.discard(ws)
+        except (WebSocketDisconnect, RuntimeError):
+            async with _clients_lock:
+                _clients.discard(ws)
 
 
 @app.get("/health")
@@ -151,7 +162,8 @@ async def upload_file(
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for streaming molecular data."""
     await websocket.accept()
-    _clients.add(websocket)
+    async with _clients_lock:
+        _clients.add(websocket)
     try:
         # Send snapshot and metadata immediately on connection
         if _state.structure is not None:
@@ -198,11 +210,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         logger.info("Client disconnected")
     finally:
-        _clients.discard(websocket)
+        async with _clients_lock:
+            _clients.discard(websocket)
 
 
-# Try to serve static files for the built web app
-_static_dir = Path(__file__).parent / "static" / "app"
+# Resolve static files directory: override via MEGANE_STATIC_DIR env var.
+# Empty or whitespace values are treated as unset to avoid accidentally
+# exposing the current working directory via StaticFiles.
+_default_static_dir = Path(__file__).parent / "static" / "app"
+_env_static_dir = os.environ.get("MEGANE_STATIC_DIR", "").strip()
+_static_dir = Path(_env_static_dir).resolve() if _env_static_dir else _default_static_dir
 if _static_dir.exists():
     app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="app")
 else:

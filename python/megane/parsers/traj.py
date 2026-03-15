@@ -2,34 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import logging
 
 import numpy as np
 
 from megane import megane_parser
+from megane.parsers.common import InMemoryTrajectory
 from megane.parsers.pdb import Structure
 
+__all__ = ["load_traj", "InMemoryTrajectory"]
 
-@dataclass
-class InMemoryTrajectory:
-    """In-memory trajectory with frame-by-frame access.
-
-    Compatible interface with :class:`megane.parsers.xtc.Trajectory`.
-    """
-
-    _frames: list[np.ndarray]  # list of (N, 3) float32 arrays
-    n_frames: int
-    n_atoms: int
-    timestep_ps: float
-    box: np.ndarray  # (3, 3) float32
-
-    def get_frame(self, index: int) -> np.ndarray:
-        """Get positions for a specific frame.
-
-        Returns:
-            (N, 3) float32 array of atom positions in Angstroms.
-        """
-        return self._frames[index]
+logger = logging.getLogger(__name__)
 
 
 def _atoms_to_xyz(positions: np.ndarray, symbols: list[str]) -> str:
@@ -55,6 +38,7 @@ def load_traj(path: str) -> tuple[Structure, InMemoryTrajectory]:
     """
     from ase.io import read as ase_read
 
+    logger.debug("Loading ASE .traj file: %s", path)
     frames = ase_read(path, index=":")
     if not isinstance(frames, list):
         frames = [frames]
@@ -93,4 +77,5 @@ def load_traj(path: str) -> tuple[Structure, InMemoryTrajectory]:
         box=box_matrix,
     )
 
+    logger.info("Loaded .traj: %d frames, %d atoms, %d bonds", len(frames), len(first), len(bonds))
     return structure, trajectory

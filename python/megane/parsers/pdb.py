@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
 
 from megane import megane_parser
+
+logger = logging.getLogger(__name__)
 
 # Bond order encoding: matches frontend constants
 BOND_SINGLE = 1
@@ -68,10 +71,12 @@ def load_pdb(path: str) -> Structure:
     Replaces the previous RDKit-based implementation for dramatically
     faster parsing. The same Rust code is used by the WASM frontend.
     """
+    logger.debug("Loading PDB file: %s", path)
     with open(path) as f:
         text = f.read()
 
     result = megane_parser.parse_pdb(text)
+    logger.info("Loaded PDB: %d atoms, %d bonds", result.n_atoms, len(result.bonds))
 
     return Structure(
         n_atoms=result.n_atoms,

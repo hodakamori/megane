@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 
 from megane import megane_parser
 from megane.parsers.pdb import Structure
+
+logger = logging.getLogger(__name__)
 
 
 def load_lammps_data(path: str) -> Structure:
@@ -14,10 +18,12 @@ def load_lammps_data(path: str) -> Structure:
     Supports atom_style: atomic, charge, and full (real).
     Auto-detects style from comment hint or field count.
     """
+    logger.debug("Loading LAMMPS data file: %s", path)
     with open(path) as f:
         text = f.read()
 
     result = megane_parser.parse_lammps_data(text)
+    logger.info("Loaded LAMMPS data: %d atoms, %d bonds", result.n_atoms, len(result.bonds))
 
     return Structure(
         n_atoms=result.n_atoms,

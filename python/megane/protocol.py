@@ -29,6 +29,16 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
+__all__ = [
+    "encode_snapshot",
+    "encode_frame",
+    "encode_metadata",
+    "StructureLike",
+    "MSG_SNAPSHOT",
+    "MSG_FRAME",
+    "MSG_METADATA",
+]
+
 MAGIC = b"MEGN"
 MSG_SNAPSHOT = 0
 MSG_FRAME = 1
