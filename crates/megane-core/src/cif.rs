@@ -4,8 +4,9 @@
 /// and atom sites (_atom_site loop) with fractional or Cartesian coordinates.
 use std::collections::HashSet;
 
+use crate::atomic::{capitalize, symbol_to_atomic_num};
 use crate::bonds;
-use crate::parser::{capitalize, cell_params_to_matrix, symbol_to_atomic_num, ParsedStructure};
+use crate::parser::{cell_params_to_matrix, ParsedStructure};
 
 /// Strip trailing parenthesized uncertainty from a CIF numeric value.
 /// e.g. "5.6402(1)" → "5.6402", "90.000(0)" → "90.000"

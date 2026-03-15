@@ -6,7 +6,7 @@
 ///   Lines 5..4+natoms: atom block (x y z symbol ...)
 ///   Lines 5+natoms..4+natoms+nbonds: bond block (atom1 atom2 bond_order ...)
 ///   M  END
-use crate::parser::symbol_to_atomic_num;
+use crate::atomic::symbol_to_atomic_num;
 
 pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
@@ -202,10 +202,14 @@ M  END
     #[test]
     fn error_too_short() {
         let mol = "line1\nline2\nline3\n";
-        match parse(mol) {
-            Err(e) => assert!(e.contains("too short"), "unexpected error: {}", e),
-            Ok(_) => panic!("expected error"),
-        }
+        let Err(msg) = parse(mol) else {
+            panic!("expected parse to fail for too-short input")
+        };
+        assert!(
+            msg.contains("too short"),
+            "expected 'too short' in error: {}",
+            msg
+        );
     }
 
     #[test]
@@ -217,10 +221,14 @@ comment
   0  0  0  0  0  0  0  0  0  0999 V2000
 M  END
 ";
-        match parse(mol) {
-            Err(e) => assert!(e.contains("zero atoms"), "unexpected error: {}", e),
-            Ok(_) => panic!("expected error"),
-        }
+        let Err(msg) = parse(mol) else {
+            panic!("expected parse to fail for zero atoms")
+        };
+        assert!(
+            msg.contains("zero atoms"),
+            "expected 'zero atoms' in error: {}",
+            msg
+        );
     }
 
     #[test]
@@ -257,14 +265,14 @@ comment
   1  0  0  0  0  0  0  0  0  0999 V2000
 bad
 ";
-        match parse(mol) {
-            Err(e) => assert!(
-                e.contains("atom line") || e.contains("bad"),
-                "unexpected error: {}",
-                e
-            ),
-            Ok(_) => panic!("expected error"),
-        }
+        let Err(msg) = parse(mol) else {
+            panic!("expected parse to fail for malformed atom line")
+        };
+        assert!(
+            msg.contains("atom line") || msg.contains("bad"),
+            "unexpected error message: {}",
+            msg
+        );
     }
 
     #[test]
