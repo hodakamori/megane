@@ -26,9 +26,70 @@ jobs:
     with:
       dry_run: true
 
+  dry-run-docs:
+    name: "Dry run: Docs build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install docs dependencies
+        working-directory: docs
+        run: npm ci
+
+      - name: Build WASM module
+        run: npm run build:wasm
+
+      - name: Build demo app for docs
+        run: npx vite build --config vite.docs-demo.config.ts
+
+      - name: Generate demo data
+        run: python3 docs/scripts/generate-demo-data.py
+
+      - name: Prepare notebook data
+        run: |
+          pip install markdown nbformat nbconvert
+          python3 docs/scripts/prepare-notebooks.py
+
+      - name: Create WASM type stubs (for TypeDoc)
+        run: |
+          cp docs/wasm-stub.d.ts crates/megane-wasm/pkg/index.d.ts
+
+      - name: Generate API references
+        working-directory: docs
+        run: |
+          npm run api:py
+          npm run api:ts
+
+      - name: Build docs
+        working-directory: docs
+        run: npx vitepress build
+
   summary:
     name: Dry run summary
-    needs: [dry-run-npm, dry-run-pypi, dry-run-vscode]
+    needs: [dry-run-npm, dry-run-pypi, dry-run-vscode, dry-run-docs]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -39,10 +100,12 @@ jobs:
           echo "- npm:    ${{ needs.dry-run-npm.result }}"
           echo "- PyPI:   ${{ needs.dry-run-pypi.result }}"
           echo "- VSCode: ${{ needs.dry-run-vscode.result }}"
+          echo "- Docs:   ${{ needs.dry-run-docs.result }}"
           echo ""
           if [ "${{ needs.dry-run-npm.result }}" != "success" ] || \
              [ "${{ needs.dry-run-pypi.result }}" != "success" ] || \
-             [ "${{ needs.dry-run-vscode.result }}" != "success" ]; then
+             [ "${{ needs.dry-run-vscode.result }}" != "success" ] || \
+             [ "${{ needs.dry-run-docs.result }}" != "success" ]; then
             echo "::error::One or more dry runs failed. Do not proceed with release."
             exit 1
           fi

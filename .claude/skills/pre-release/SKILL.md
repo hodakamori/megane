@@ -84,17 +84,8 @@ Check at minimum:
 - Supported file formats table
 
 ### 4.2 Docs site builds
-```bash
-cd docs && npm run build
-```
-Must complete without errors. VitePress and its dependencies are managed under `docs/package.json` (separate from the root `package.json`).
-
-### 4.3 API docs generate
-```bash
-npx typedoc --out docs/api/ts src/index.tsx 2>/dev/null || true
-uv run pdoc python/megane -o docs/api/python 2>/dev/null || true
-```
-Check for unexpected errors (missing exports, broken references).
+Docs build is verified by the `release-dry-run.yml` workflow (the "Dry run: Docs build" job).
+No manual step needed here — Phase 6 covers this.
 
 ### 4.4 Feature table alignment
 Confirm the README feature table ("Runs Everywhere" section) matches what is actually supported:
