@@ -385,6 +385,16 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       edges,
       viewportState: { ...DEFAULT_VIEWPORT_STATE },
       pendingTemplateId: templateId,
+      snapshot: null,
+      atomLabels: null,
+      structureFrames: null,
+      structureMeta: null,
+      fileFrames: null,
+      fileMeta: null,
+      fileVectors: null,
+      nodeSnapshots: {},
+      nodeParseErrors: {},
+      nodeStreamingData: {},
     });
     get().execute();
   },
