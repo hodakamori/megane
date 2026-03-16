@@ -458,6 +458,7 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
         timestep_ps,
         box_matrix: last_box,
         frame_positions,
+        vector_channels: vec![],
     })
 }
 

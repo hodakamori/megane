@@ -16,6 +16,7 @@ use std::collections::HashSet;
 
 use crate::atomic::element_from_atom_name;
 use crate::bonds;
+use crate::trajectory::{VectorChannel, VectorFrame};
 
 pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
@@ -40,6 +41,9 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let mut positions = Vec::with_capacity(n_atoms * 3);
     let mut elements = Vec::with_capacity(n_atoms);
     let mut labels = Vec::with_capacity(n_atoms);
+    // Velocity buffer: filled only when ALL atoms have velocity columns (line.len() >= 68).
+    let mut velocities: Vec<f32> = Vec::with_capacity(n_atoms * 3);
+    let mut has_velocities = true;
 
     for i in 0..n_atoms {
         let line = lines[i + 2];
@@ -81,6 +85,22 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         positions.push(x * 10.0);
         positions.push(y * 10.0);
         positions.push(z * 10.0);
+
+        // Optional velocity columns (nm/ps): cols 44-52, 52-60, 60-68
+        if has_velocities {
+            if line.len() >= 68 {
+                let vx: f32 = line[44..52].trim().parse().unwrap_or(0.0);
+                let vy: f32 = line[52..60].trim().parse().unwrap_or(0.0);
+                let vz: f32 = line[60..68].trim().parse().unwrap_or(0.0);
+                velocities.push(vx);
+                velocities.push(vy);
+                velocities.push(vz);
+            } else {
+                // This atom lacks velocity columns — disable the channel.
+                has_velocities = false;
+                velocities.clear();
+            }
+        }
     }
 
     // Last line: box vectors
@@ -97,6 +117,19 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         None
     };
 
+    // Build velocity channel when all atoms had valid velocity data.
+    let vector_channels = if has_velocities && !velocities.is_empty() {
+        vec![VectorChannel {
+            name: "velocity".to_string(),
+            frames: vec![VectorFrame {
+                frame: 0,
+                vectors: velocities,
+            }],
+        }]
+    } else {
+        vec![]
+    };
+
     Ok(crate::parser::ParsedStructure {
         n_atoms,
         positions,
@@ -107,6 +140,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         box_matrix,
         frame_positions: Vec::new(),
         atom_labels,
+        vector_channels,
     })
 }
 
@@ -178,5 +212,40 @@ mod tests {
         assert!((m[0] - 10.0).abs() < 0.01);
         assert!((m[4] - 20.0).abs() < 0.01);
         assert!((m[8] - 30.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_gro_no_velocities() {
+        // Lines without velocity columns → no vector channels.
+        let gro = "Water\n1\n    1SOL     OW    1   0.100   0.200   0.300\n   1.00000   1.00000   1.00000\n";
+        let result = parse(gro).expect("parse failed");
+        assert!(result.vector_channels.is_empty());
+    }
+
+    #[test]
+    fn test_parse_gro_with_velocities() {
+        // Atom line is exactly 68 chars or more → velocity channel produced.
+        // GRO format: resnum(5) resname(5) atomname(5) atomnum(5) x(8) y(8) z(8) vx(8) vy(8) vz(8)
+        let gro = "MD run\n2\n    1SOL     OW    1   0.100   0.200   0.300   0.010   0.020   0.030\n    1SOL    HW1    2   0.150   0.250   0.350  -0.005   0.015  -0.025\n   1.00000   1.00000   1.00000\n";
+        let result = parse(gro).expect("parse failed");
+        assert_eq!(result.vector_channels.len(), 1);
+        let ch = &result.vector_channels[0];
+        assert_eq!(ch.name, "velocity");
+        assert_eq!(ch.frames.len(), 1);
+        assert_eq!(ch.frames[0].frame, 0);
+        let v = &ch.frames[0].vectors;
+        assert_eq!(v.len(), 6); // 2 atoms × 3
+        assert!((v[0] - 0.010).abs() < 0.001); // vx of atom 0
+        assert!((v[1] - 0.020).abs() < 0.001); // vy of atom 0
+        assert!((v[2] - 0.030).abs() < 0.001); // vz of atom 0
+        assert!((v[3] - (-0.005)).abs() < 0.001); // vx of atom 1
+    }
+
+    #[test]
+    fn test_parse_gro_partial_velocities_ignored() {
+        // First atom has velocity columns, second does not → no channel emitted.
+        let gro = "test\n2\n    1SOL     OW    1   0.100   0.200   0.300   0.010   0.020   0.030\n    1SOL    HW1    2   0.150   0.250   0.350\n   1.00000   1.00000   1.00000\n";
+        let result = parse(gro).expect("parse failed");
+        assert!(result.vector_channels.is_empty());
     }
 }

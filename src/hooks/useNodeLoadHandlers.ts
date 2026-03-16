@@ -61,6 +61,10 @@ export function useNodeLoadHandlers({
             hasTrajectory: result.frames.length > 0,
             hasCell: !!result.snapshot.box,
           });
+          // Auto-load first embedded vector channel (e.g. GRO velocities) into pipeline.
+          if (result.vectorChannels.length > 0) {
+            setFileVectors(result.vectorChannels[0].frames);
+          }
         })
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
@@ -80,6 +84,7 @@ export function useNodeLoadHandlers({
     updateNodeParams,
     setNodeParseError,
     clearNodeParseError,
+    setFileVectors,
   ]);
 
   // Wire up trajectory load handler

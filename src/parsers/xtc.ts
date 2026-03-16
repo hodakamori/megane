@@ -4,11 +4,13 @@
  * and returns Frame[] + meta.
  */
 
-import type { Frame, TrajectoryMeta } from "../types";
+import type { Frame, TrajectoryMeta, VectorChannel, VectorFrame } from "../types";
 
 export interface XTCParseResult {
   frames: Frame[];
   meta: TrajectoryMeta;
+  /** Per-atom vector channels embedded in the file (e.g. LAMMPS dump vx/vy/vz). */
+  vectorChannels: VectorChannel[];
 }
 
 let initPromise: Promise<void> | null = null;
@@ -20,8 +22,11 @@ interface WasmXtcResult {
   n_frames: number;
   timestep_ps: number;
   has_box: boolean;
+  vector_channel_count: number;
+  vector_channel_meta: string;
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
+  vector_channel_data(): Float32Array;
   free(): void;
 }
 
@@ -41,7 +46,33 @@ async function ensureInit(): Promise<void> {
   await initPromise;
 }
 
-/** Convert a WasmXtcResult into Frame[] + TrajectoryMeta. */
+/** Deserialize embedded vector channels from a WASM trajectory result. */
+function deserializeVectorChannels(
+  nAtoms: number,
+  metaStr: string,
+  dataFn: () => Float32Array,
+): VectorChannel[] {
+  if (!metaStr || metaStr === "[]") return [];
+  const meta = JSON.parse(metaStr) as Array<{ name: string; n_frames: number }>;
+  if (meta.length === 0) return [];
+
+  const data = dataFn();
+  const stride = nAtoms * 3;
+  const channels: VectorChannel[] = [];
+  let offset = 0;
+
+  for (const ch of meta) {
+    const frames: VectorFrame[] = [];
+    for (let f = 0; f < ch.n_frames; f++) {
+      frames.push({ frame: f, vectors: data.slice(offset, offset + stride) });
+      offset += stride;
+    }
+    channels.push({ name: ch.name, frames });
+  }
+  return channels;
+}
+
+/** Convert a WasmXtcResult into Frame[] + TrajectoryMeta + VectorChannels. */
 function extractFrames(
   result: WasmXtcResult,
   expectedNAtoms: number,
@@ -71,8 +102,14 @@ function extractFrames(
     nAtoms: result.n_atoms,
   };
 
+  const vectorChannels = deserializeVectorChannels(
+    result.n_atoms,
+    result.vector_channel_meta,
+    () => result.vector_channel_data(),
+  );
+
   result.free();
-  return { frames, meta };
+  return { frames, meta, vectorChannels };
 }
 
 /**
