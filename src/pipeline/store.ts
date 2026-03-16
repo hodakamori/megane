@@ -105,6 +105,19 @@ function getInitialPipeline() {
 const rawDefault = getInitialPipeline();
 const defaultState = getLayoutedElements(rawDefault.nodes, rawDefault.edges);
 
+const CLEARED_EXECUTION_CONTEXT = {
+  snapshot: null,
+  atomLabels: null,
+  structureFrames: null,
+  structureMeta: null,
+  fileFrames: null,
+  fileMeta: null,
+  fileVectors: null,
+  nodeSnapshots: {} as Record<string, NodeSnapshotData>,
+  nodeParseErrors: {} as Record<string, string>,
+  nodeStreamingData: {} as Record<string, NodeStreamingData>,
+} as const;
+
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   nodes: defaultState.nodes,
   edges: defaultState.edges,
@@ -385,6 +398,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       edges,
       viewportState: { ...DEFAULT_VIEWPORT_STATE },
       pendingTemplateId: templateId,
+      ...CLEARED_EXECUTION_CONTEXT,
     });
     get().execute();
   },
@@ -405,6 +419,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       nodes: def.nodes,
       edges: def.edges,
       viewportState: { ...DEFAULT_VIEWPORT_STATE },
+      ...CLEARED_EXECUTION_CONTEXT,
     });
   },
 }));
