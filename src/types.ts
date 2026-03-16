@@ -33,6 +33,16 @@ export interface VectorFrame {
   vectors: Float32Array; // length = nAtoms * 3
 }
 
+/**
+ * A named channel of per-atom vector data embedded in a structure/trajectory file.
+ * A channel with one frame is "static" (same vectors for all playback frames).
+ * A channel with N frames advances in sync with the trajectory.
+ */
+export interface VectorChannel {
+  name: string; // e.g. "velocity", "force"
+  frames: VectorFrame[];
+}
+
 /** Decoded trajectory frame. */
 export interface Frame {
   frameId: number;

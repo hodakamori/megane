@@ -12,7 +12,7 @@ export function executeLoadVector(
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
 
-  if (!params.fileName || !fileVectors || fileVectors.length === 0) {
+  if (!fileVectors || fileVectors.length === 0) {
     return outputs;
   }
 

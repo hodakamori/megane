@@ -4,13 +4,16 @@
  * Supports PDB, GRO, XYZ, MOL/SDF, CIF, and LAMMPS data formats.
  */
 
-import type { Snapshot, Frame, TrajectoryMeta } from "../types";
+import type { Snapshot, Frame, TrajectoryMeta, VectorChannel } from "../types";
+import { deserializeVectorChannels } from "./vectorChannels";
 
 export interface StructureParseResult {
   snapshot: Snapshot;
   frames: Frame[];
   meta: TrajectoryMeta | null;
   labels: string[] | null;
+  /** Per-atom vector channels embedded in the file (e.g. GRO velocities). */
+  vectorChannels: VectorChannel[];
 }
 
 let initPromise: Promise<void> | null = null;
@@ -24,12 +27,15 @@ interface WasmParseResult {
   has_box: boolean;
   has_atom_labels: boolean;
   atom_labels: string;
+  vector_channel_count: number;
+  vector_channel_meta: string;
   positions(): Float32Array;
   elements(): Uint8Array;
   bonds(): Uint32Array;
   bond_orders(): Uint8Array;
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
+  vector_channel_data(): Float32Array;
   free(): void;
 }
 
@@ -163,6 +169,10 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
 
   const labels: string[] | null = result.has_atom_labels ? result.atom_labels.split("\n") : null;
 
+  const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
+    result.vector_channel_data(),
+  );
+
   result.free();
 
   const meta: TrajectoryMeta | null =
@@ -170,7 +180,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
       ? { nFrames: frames.length + 1, timestepPs: 1.0, nAtoms: snapshot.nAtoms }
       : null;
 
-  return { snapshot, frames, meta, labels };
+  return { snapshot, frames, meta, labels, vectorChannels };
 }
 
 /** Infer bonds using VDW radii (threshold = vdw_sum * 0.6). */

@@ -11,6 +11,7 @@ import { parseXTCFile, parseLammpstrjFile } from "../parsers/xtc";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
+import { usePipelineStore } from "../pipeline/store";
 import type {
   Snapshot,
   Frame,
@@ -176,7 +177,11 @@ export function useMeganeLocal(): MeganeLocalState {
       const ext = xtc.name.toLowerCase();
       const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
       const parseFn = isLammpstrj ? parseLammpstrjFile : parseXTCFile;
-      const { frames, meta: xtcMeta } = await parseFn(xtc, baseSnapshotRef.current.nAtoms);
+      const {
+        frames,
+        meta: xtcMeta,
+        vectorChannels,
+      } = await parseFn(xtc, baseSnapshotRef.current.nAtoms);
       fileFramesRef.current = frames;
       fileTrajMetaRef.current = xtcMeta;
       xtcFileNameRef.current = xtc.name;
@@ -187,6 +192,19 @@ export function useMeganeLocal(): MeganeLocalState {
       setMeta(xtcMeta);
       resetPlayback();
       setXtcFileName(xtc.name);
+
+      // Auto-load first embedded vector channel (e.g. LAMMPS dump vx/vy/vz) into pipeline.
+      if (vectorChannels.length > 0) {
+        const ch = vectorChannels[0];
+        const store = usePipelineStore.getState();
+        store.setFileVectors(ch.frames);
+        // Update all load_vector nodes so the UI shows the channel name.
+        for (const n of store.nodes) {
+          if (n.type === "load_vector") {
+            store.updateNodeParams(n.id, { fileName: `[embedded] ${ch.name}` });
+          }
+        }
+      }
     },
     [resetPlayback],
   );
