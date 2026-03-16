@@ -177,10 +177,11 @@ export function useMeganeLocal(): MeganeLocalState {
       const ext = xtc.name.toLowerCase();
       const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
       const parseFn = isLammpstrj ? parseLammpstrjFile : parseXTCFile;
-      const { frames, meta: xtcMeta, vectorChannels } = await parseFn(
-        xtc,
-        baseSnapshotRef.current.nAtoms,
-      );
+      const {
+        frames,
+        meta: xtcMeta,
+        vectorChannels,
+      } = await parseFn(xtc, baseSnapshotRef.current.nAtoms);
       fileFramesRef.current = frames;
       fileTrajMetaRef.current = xtcMeta;
       xtcFileNameRef.current = xtc.name;

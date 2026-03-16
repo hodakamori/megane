@@ -102,10 +102,8 @@ function extractFrames(
     nAtoms: result.n_atoms,
   };
 
-  const vectorChannels = deserializeVectorChannels(
-    result.n_atoms,
-    result.vector_channel_meta,
-    () => result.vector_channel_data(),
+  const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
+    result.vector_channel_data(),
   );
 
   result.free();

@@ -72,10 +72,20 @@ fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
     // Detect optional vector column groups.
     let mut vector_groups = Vec::new();
     if let (Some(vx), Some(vy), Some(vz)) = (find("vx"), find("vy"), find("vz")) {
-        vector_groups.push(VectorColumnGroup { name: "velocity", x_col: vx, y_col: vy, z_col: vz });
+        vector_groups.push(VectorColumnGroup {
+            name: "velocity",
+            x_col: vx,
+            y_col: vy,
+            z_col: vz,
+        });
     }
     if let (Some(fx), Some(fy), Some(fz)) = (find("fx"), find("fy"), find("fz")) {
-        vector_groups.push(VectorColumnGroup { name: "force", x_col: fx, y_col: fy, z_col: fz });
+        vector_groups.push(VectorColumnGroup {
+            name: "force",
+            x_col: fx,
+            y_col: fy,
+            z_col: fz,
+        });
     }
 
     Ok(ColumnLayout {
@@ -249,8 +259,11 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         // Read atom lines — accumulate both positions and per-group vector data.
         let mut atoms: Vec<(usize, f32, f32, f32)> = Vec::with_capacity(n_atoms);
         // Per-group unsorted vector buffer for this frame.
-        let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> =
-            layout.vector_groups.iter().map(|_| Vec::with_capacity(n_atoms)).collect();
+        let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> = layout
+            .vector_groups
+            .iter()
+            .map(|_| Vec::with_capacity(n_atoms))
+            .collect();
 
         for _ in 0..n_atoms {
             i += 1;
@@ -329,7 +342,10 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
                     flat.push(*vy);
                     flat.push(*vz);
                 }
-                vec_group_frames[g_idx].push(VectorFrame { frame: frame_idx, vectors: flat });
+                vec_group_frames[g_idx].push(VectorFrame {
+                    frame: frame_idx,
+                    vectors: flat,
+                });
             }
         }
 
@@ -357,7 +373,10 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         .into_iter()
         .zip(vec_group_frames.into_iter())
         .filter(|(_, frames)| frames.len() == n_frames)
-        .map(|(name, frames)| VectorChannel { name: name.to_string(), frames })
+        .map(|(name, frames)| VectorChannel {
+            name: name.to_string(),
+            frames,
+        })
         .collect();
 
     Ok(LammpstrjData {

@@ -21,7 +21,12 @@ fn serialize_vector_channels(
         if idx > 0 {
             meta.push(',');
         }
-        let _ = write!(meta, r#"{{"name":"{}", "n_frames":{}}}"#, ch.name, ch.frames.len());
+        let _ = write!(
+            meta,
+            r#"{{"name":"{}", "n_frames":{}}}"#,
+            ch.name,
+            ch.frames.len()
+        );
         for frame in &ch.frames {
             data.extend_from_slice(&frame.vectors);
         }

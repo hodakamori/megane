@@ -194,10 +194,8 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
 
   const labels: string[] | null = result.has_atom_labels ? result.atom_labels.split("\n") : null;
 
-  const vectorChannels = deserializeVectorChannels(
-    result.n_atoms,
-    result.vector_channel_meta,
-    () => result.vector_channel_data(),
+  const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
+    result.vector_channel_data(),
   );
 
   result.free();
