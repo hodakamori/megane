@@ -222,6 +222,8 @@ git remote set-url origin "$ORIG_REMOTE"
 ```
 Verify the notes look correct and the three screenshots are listed as assets. The release remains as a **draft** — hand off to the user to review and publish it manually.
 
+> **CRITICAL: Never publish the release.** Publishing (making the draft public) is a manual step performed exclusively by the user. Do NOT run `gh release edit vX.Y.Z --draft=false` or any equivalent command. Stop after confirming the draft looks correct.
+
 ## Phase 5: Documentation
 
 ### 5.1 GitHub Pages deployment
