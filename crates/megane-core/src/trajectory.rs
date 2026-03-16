@@ -1,8 +1,3 @@
-/// Common trajectory data returned by XTC and LAMMPS dump parsers.
-///
-/// Both formats provide multi-frame position data without topology;
-/// element and bond information comes from a separate structure file.
-
 /// A single frame of per-atom vector data (e.g. velocity or force).
 pub struct VectorFrame {
     /// Index of the trajectory frame this data corresponds to.

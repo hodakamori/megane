@@ -371,7 +371,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     // Assemble VectorChannel entries for groups that have data in every frame.
     let vector_channels: Vec<VectorChannel> = vec_group_names
         .into_iter()
-        .zip(vec_group_frames.into_iter())
+        .zip(vec_group_frames)
         .filter(|(_, frames)| frames.len() == n_frames)
         .map(|(name, frames)| VectorChannel {
             name: name.to_string(),
