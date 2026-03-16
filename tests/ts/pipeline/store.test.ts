@@ -134,6 +134,28 @@ describe("usePipelineStore", () => {
       usePipelineStore.getState().applyTemplate("nonexistent");
       expect(usePipelineStore.getState().nodes).toEqual(nodesBefore);
     });
+
+    it("clears execution context state when switching templates", () => {
+      const store = usePipelineStore.getState();
+      // Pre-populate execution context fields
+      store.setSnapshot({ positions: new Float32Array(3), elements: new Int32Array(1), nAtoms: 1, bonds: [], cell: null, pbc: [false, false, false] });
+      store.setNodeSnapshot("loader-1", { snapshot: { positions: new Float32Array(3), elements: new Int32Array(1), nAtoms: 1, bonds: [], cell: null, pbc: [false, false, false] }, atomLabels: null });
+      store.setNodeParseError("loader-1", "some error");
+
+      usePipelineStore.getState().applyTemplate("molecule");
+
+      const state = usePipelineStore.getState();
+      expect(state.snapshot).toBeNull();
+      expect(state.atomLabels).toBeNull();
+      expect(state.structureFrames).toBeNull();
+      expect(state.structureMeta).toBeNull();
+      expect(state.fileFrames).toBeNull();
+      expect(state.fileMeta).toBeNull();
+      expect(state.fileVectors).toBeNull();
+      expect(state.nodeSnapshots).toEqual({});
+      expect(state.nodeParseErrors).toEqual({});
+      expect(state.nodeStreamingData).toEqual({});
+    });
   });
 
   describe("autoLayout", () => {
