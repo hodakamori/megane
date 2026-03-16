@@ -44,6 +44,8 @@ export class ImpostorBondMesh {
   private colorBuf: Float32Array;
   private radiusBuf: Float32Array;
   private dashedBuf: Float32Array;
+  private opacityBuf: Float32Array; // per-visual-instance opacity override
+  private logicalBondIdx: Float32Array; // CPU-only: maps visual instance → logical bond index
 
   // Position DataTexture (updated per frame)
   private positionTex: THREE.DataTexture;
@@ -75,6 +77,8 @@ export class ImpostorBondMesh {
     this.colorBuf = new Float32Array(maxBonds * 3);
     this.radiusBuf = new Float32Array(maxBonds);
     this.dashedBuf = new Float32Array(maxBonds);
+    this.opacityBuf = new Float32Array(maxBonds).fill(1.0);
+    this.logicalBondIdx = new Float32Array(maxBonds);
 
     // Initial DataTexture (1x1 placeholder)
     this.positionTexData = new Float32Array(4);
@@ -102,6 +106,7 @@ export class ImpostorBondMesh {
         uBondScaleMultiplier: { value: 1.0 },
         uPositionTex: { value: this.positionTex },
         uPositionTexWidth: { value: 1 },
+        uUsePerBondOverrides: { value: 0 },
       },
       depthWrite: true,
       depthTest: true,
@@ -178,6 +183,8 @@ export class ImpostorBondMesh {
             cb,
             0,
           );
+          this.logicalBondIdx[idx] = i;
+          this.opacityBuf[idx] = 1.0;
           idx++;
         }
       } else if (order === BOND_TRIPLE) {
@@ -186,21 +193,32 @@ export class ImpostorBondMesh {
           const ox = Math.cos(angle) * TRIPLE_BOND_OFFSET;
           const oy = Math.sin(angle) * TRIPLE_BOND_OFFSET;
           this.setTopology(idx, ai, bi, ox, oy, TRIPLE_BOND_RADIUS, cr, cg, cb, 0);
+          this.logicalBondIdx[idx] = i;
+          this.opacityBuf[idx] = 1.0;
           idx++;
         }
       } else if (order === BOND_AROMATIC) {
         // Solid bond
         this.setTopology(idx, ai, bi, 0, 0, AROMATIC_BOND_RADIUS, cr, cg, cb, 0);
+        this.logicalBondIdx[idx] = i;
+        this.opacityBuf[idx] = 1.0;
         idx++;
         // Dashed offset bond
         this.setTopology(idx, ai, bi, DOUBLE_BOND_OFFSET, 0, AROMATIC_DASH_RADIUS, cr, cg, cb, 1);
+        this.logicalBondIdx[idx] = i;
+        this.opacityBuf[idx] = 1.0;
         idx++;
       } else {
         // Single bond
         this.setTopology(idx, ai, bi, 0, 0, BOND_RADIUS, cr, cg, cb, 0);
+        this.logicalBondIdx[idx] = i;
+        this.opacityBuf[idx] = 1.0;
         idx++;
       }
     }
+
+    // Reset per-bond override mode when loading a new snapshot
+    this.bondMaterial.uniforms.uUsePerBondOverrides.value = 0;
 
     // Recreate all InstancedBufferAttributes and re-register them.
     // This forces Three.js to create new GPU buffers, ensuring data
@@ -262,6 +280,7 @@ export class ImpostorBondMesh {
     const color = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
     const radius = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
     const dashed = new THREE.InstancedBufferAttribute(this.dashedBuf, 1);
+    const opacity = new THREE.InstancedBufferAttribute(this.opacityBuf, 1);
 
     this.geo.setAttribute("instanceAtomA", atomA);
     this.geo.setAttribute("instanceAtomB", atomB);
@@ -270,6 +289,7 @@ export class ImpostorBondMesh {
     this.geo.setAttribute("instanceColor", color);
     this.geo.setAttribute("instanceRadius", radius);
     this.geo.setAttribute("instanceDashed", dashed);
+    this.geo.setAttribute("instanceBondOpacity", opacity);
   }
 
   private grow(needed: number): void {
@@ -282,6 +302,8 @@ export class ImpostorBondMesh {
     const newColor = new Float32Array(this.capacity * 3);
     const newRadius = new Float32Array(this.capacity);
     const newDashed = new Float32Array(this.capacity);
+    const newOpacity = new Float32Array(this.capacity).fill(1.0);
+    const newLogical = new Float32Array(this.capacity);
 
     newAtomA.set(this.atomABuf);
     newAtomB.set(this.atomBBuf);
@@ -290,6 +312,8 @@ export class ImpostorBondMesh {
     newColor.set(this.colorBuf);
     newRadius.set(this.radiusBuf);
     newDashed.set(this.dashedBuf);
+    newOpacity.set(this.opacityBuf);
+    newLogical.set(this.logicalBondIdx);
 
     this.atomABuf = newAtomA;
     this.atomBBuf = newAtomB;
@@ -298,6 +322,8 @@ export class ImpostorBondMesh {
     this.colorBuf = newColor;
     this.radiusBuf = newRadius;
     this.dashedBuf = newDashed;
+    this.opacityBuf = newOpacity;
+    this.logicalBondIdx = newLogical;
 
     this.registerAttributes();
   }
@@ -307,6 +333,33 @@ export class ImpostorBondMesh {
     this.bondMaterial.uniforms.uOpacity.value = opacity;
     this.bondMaterial.transparent = opacity < 1;
     this.bondMaterial.depthWrite = opacity >= 1;
+    this.bondMaterial.needsUpdate = true;
+  }
+
+  /**
+   * Apply per-bond opacity overrides (one value per logical bond).
+   * Maps logical bond opacities to visual instances and activates per-bond mode.
+   */
+  setBondOpacityOverrides(logicalOpacities: Float32Array): void {
+    const count = this.geo.instanceCount;
+    for (let v = 0; v < count; v++) {
+      const li = this.logicalBondIdx[v];
+      this.opacityBuf[v] = logicalOpacities[li] ?? 1.0;
+    }
+    const attr = this.geo.getAttribute("instanceBondOpacity") as THREE.InstancedBufferAttribute;
+    if (attr) attr.needsUpdate = true;
+    this.bondMaterial.uniforms.uUsePerBondOverrides.value = 1;
+    this.bondMaterial.transparent = true;
+    this.bondMaterial.depthWrite = false;
+    this.bondMaterial.needsUpdate = true;
+  }
+
+  /** Clear per-bond opacity overrides, reverting to global opacity mode. */
+  clearBondOpacityOverrides(): void {
+    this.opacityBuf.fill(1.0);
+    const attr = this.geo.getAttribute("instanceBondOpacity") as THREE.InstancedBufferAttribute;
+    if (attr) attr.needsUpdate = true;
+    this.bondMaterial.uniforms.uUsePerBondOverrides.value = 0;
     this.bondMaterial.needsUpdate = true;
   }
 

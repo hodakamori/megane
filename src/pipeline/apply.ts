@@ -117,7 +117,12 @@ export function applyViewportState(
         bond.nAtoms,
       );
       layer.setBondScale(bond.scale);
-      layer.setBondOpacity(bond.opacity);
+      if (bond.bondOpacityOverrides) {
+        layer.setBondOpacityOverrides(bond.bondOpacityOverrides);
+      } else {
+        layer.clearBondOpacityOverrides();
+        layer.setBondOpacity(bond.opacity);
+      }
       layer.setBondsVisible(true);
     } else {
       layer.setBondsVisible(false);
@@ -316,7 +321,16 @@ function applyBondSettings(
   if (!prevBond || bond.scale !== prevBond.scale) {
     renderer.setBondScale(bond.scale);
   }
-  if (!prevBond || bond.opacity !== prevBond.opacity) {
+  if (!prevBond || bond.bondOpacityOverrides !== prevBond?.bondOpacityOverrides) {
+    if (bond.bondOpacityOverrides) {
+      renderer.setBondOpacityOverrides(bond.bondOpacityOverrides);
+    } else {
+      renderer.clearBondOpacityOverrides();
+      if (!prevBond || bond.opacity !== prevBond.opacity) {
+        renderer.setBondOpacity(bond.opacity);
+      }
+    }
+  } else if (!prevBond || bond.opacity !== prevBond.opacity) {
     renderer.setBondOpacity(bond.opacity);
   }
 }

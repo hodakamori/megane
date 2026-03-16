@@ -436,6 +436,16 @@ export class MoleculeRenderer {
     this.bondRenderer?.setOpacity?.(opacity);
   }
 
+  /** Apply per-bond opacity overrides (one value per logical bond). */
+  setBondOpacityOverrides(overrides: Float32Array): void {
+    this.bondRenderer?.setBondOpacityOverrides?.(overrides);
+  }
+
+  /** Clear per-bond opacity overrides, reverting to global opacity. */
+  clearBondOpacityOverrides(): void {
+    this.bondRenderer?.clearBondOpacityOverrides?.();
+  }
+
   /** Toggle atom visibility. */
   setAtomsVisible(visible: boolean): void {
     if (this.atomRenderer) {

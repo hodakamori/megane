@@ -203,9 +203,10 @@ class Filter(PipelineNode):
     _out_ports = {"particle": "out"}
     _inp_ports = {"particle": "in"}
 
-    def __init__(self, *, query: str) -> None:
+    def __init__(self, *, query: str = "all", bond_query: str = "") -> None:
         super().__init__()
         self.query = query
+        self.bond_query = bond_query
 
 
 class Modify(PipelineNode):
@@ -528,6 +529,7 @@ class Pipeline:
             base["connected"] = False
         elif isinstance(node, Filter):
             base["query"] = node.query
+            base["bond_query"] = node.bond_query
         elif isinstance(node, Modify):
             base["scale"] = node.scale
             base["opacity"] = node.opacity

@@ -52,12 +52,21 @@ export function executeModify(
     outputs.set("out", modified);
   } else if (inData.type === "bond") {
     const bond = inData as BondData;
-    const modified: BondData = {
-      ...bond,
-      scale: params.scale,
-      opacity: params.opacity,
-    };
-    outputs.set("out", modified);
+    if (bond.selectedBondIndices !== null) {
+      // Per-bond opacity: apply params.opacity only to selected bonds
+      const opacityArr = new Float32Array(bond.nBonds).fill(1.0);
+      for (const idx of bond.selectedBondIndices) {
+        opacityArr[idx] = params.opacity;
+      }
+      outputs.set("out", {
+        ...bond,
+        scale: params.scale,
+        bondOpacityOverrides: opacityArr,
+      });
+    } else {
+      // Global opacity (no bond selection active)
+      outputs.set("out", { ...bond, scale: params.scale, opacity: params.opacity });
+    }
   }
 
   return outputs;
