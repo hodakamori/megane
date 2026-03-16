@@ -105,7 +105,7 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         onChange={(e) => setLocalBondQuery(e.target.value)}
         onBlur={handleBondCommit}
         onKeyDown={handleBondKeyDown}
-        placeholder='both atom_index >= 24'
+        placeholder="both atom_index >= 24"
         style={{ ...(bondError ? inputErrorStyle : inputStyle), marginTop: 6 }}
       />
       {bondError && <div style={errorStyle}>{bondError}</div>}

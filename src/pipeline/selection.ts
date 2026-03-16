@@ -429,15 +429,50 @@ function tokenizeBond(query: string): BondToken[] {
   const tokens: BondToken[] = [];
   let i = 0;
   while (i < query.length) {
-    if (/\s/.test(query[i])) { i++; continue; }
-    if (query[i] === "(") { tokens.push({ type: "lparen", value: "(" }); i++; continue; }
-    if (query[i] === ")") { tokens.push({ type: "rparen", value: ")" }); i++; continue; }
-    if (query.startsWith("==", i)) { tokens.push({ type: "op", value: "==" }); i += 2; continue; }
-    if (query.startsWith("!=", i)) { tokens.push({ type: "op", value: "!=" }); i += 2; continue; }
-    if (query.startsWith(">=", i)) { tokens.push({ type: "op", value: ">=" }); i += 2; continue; }
-    if (query.startsWith("<=", i)) { tokens.push({ type: "op", value: "<=" }); i += 2; continue; }
-    if (query[i] === ">") { tokens.push({ type: "op", value: ">" }); i++; continue; }
-    if (query[i] === "<") { tokens.push({ type: "op", value: "<" }); i++; continue; }
+    if (/\s/.test(query[i])) {
+      i++;
+      continue;
+    }
+    if (query[i] === "(") {
+      tokens.push({ type: "lparen", value: "(" });
+      i++;
+      continue;
+    }
+    if (query[i] === ")") {
+      tokens.push({ type: "rparen", value: ")" });
+      i++;
+      continue;
+    }
+    if (query.startsWith("==", i)) {
+      tokens.push({ type: "op", value: "==" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith("!=", i)) {
+      tokens.push({ type: "op", value: "!=" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith(">=", i)) {
+      tokens.push({ type: "op", value: ">=" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith("<=", i)) {
+      tokens.push({ type: "op", value: "<=" });
+      i += 2;
+      continue;
+    }
+    if (query[i] === ">") {
+      tokens.push({ type: "op", value: ">" });
+      i++;
+      continue;
+    }
+    if (query[i] === "<") {
+      tokens.push({ type: "op", value: "<" });
+      i++;
+      continue;
+    }
     if (query[i] === '"' || query[i] === "'") {
       const quote = query[i];
       let j = i + 1;
@@ -447,7 +482,10 @@ function tokenizeBond(query: string): BondToken[] {
       i = j + 1;
       continue;
     }
-    if (/[\d.]/.test(query[i]) || (query[i] === "-" && i + 1 < query.length && /[\d.]/.test(query[i + 1]))) {
+    if (
+      /[\d.]/.test(query[i]) ||
+      (query[i] === "-" && i + 1 < query.length && /[\d.]/.test(query[i + 1]))
+    ) {
       let j = i;
       if (query[j] === "-") j++;
       while (j < query.length && /[\d.]/.test(query[j])) j++;
@@ -488,10 +526,16 @@ class BondParser {
   private tokens: BondToken[];
   private pos = 0;
 
-  constructor(tokens: BondToken[]) { this.tokens = tokens; }
+  constructor(tokens: BondToken[]) {
+    this.tokens = tokens;
+  }
 
-  private peek(): BondToken { return this.tokens[this.pos]; }
-  private advance(): BondToken { return this.tokens[this.pos++]; }
+  private peek(): BondToken {
+    return this.tokens[this.pos];
+  }
+  private advance(): BondToken {
+    return this.tokens[this.pos++];
+  }
 
   private expect(type: BondTokenType): BondToken {
     const t = this.peek();
@@ -533,8 +577,14 @@ class BondParser {
 
   private parseAtom(): BondASTNode {
     const t = this.peek();
-    if (t.type === "all") { this.advance(); return { kind: "all" }; }
-    if (t.type === "none") { this.advance(); return { kind: "none" }; }
+    if (t.type === "all") {
+      this.advance();
+      return { kind: "all" };
+    }
+    if (t.type === "none") {
+      this.advance();
+      return { kind: "none" };
+    }
     if (t.type === "lparen") {
       this.advance();
       const node = this.parseOr();
@@ -570,13 +620,20 @@ class BondParser {
 
 function applyOp(fieldValue: string | number, op: string, value: string | number): boolean {
   switch (op) {
-    case "==": return fieldValue === value;
-    case "!=": return fieldValue !== value;
-    case ">":  return fieldValue > value;
-    case "<":  return fieldValue < value;
-    case ">=": return fieldValue >= value;
-    case "<=": return fieldValue <= value;
-    default:   return false;
+    case "==":
+      return fieldValue === value;
+    case "!=":
+      return fieldValue !== value;
+    case ">":
+      return fieldValue > value;
+    case "<":
+      return fieldValue < value;
+    case ">=":
+      return fieldValue >= value;
+    case "<=":
+      return fieldValue <= value;
+    default:
+      return false;
   }
 }
 
@@ -586,8 +643,10 @@ function compileBondAST(
   elements: Uint8Array,
 ): (bondIdx: number) => boolean {
   switch (ast.kind) {
-    case "all":  return () => true;
-    case "none": return () => false;
+    case "all":
+      return () => true;
+    case "none":
+      return () => false;
     case "not": {
       const fn = compileBondAST(ast.operand, bondIndices, elements);
       return (i) => !fn(i);
