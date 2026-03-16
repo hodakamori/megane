@@ -5,7 +5,8 @@
 ///
 /// Supports coordinate columns: x/y/z (unscaled), xs/ys/zs (scaled),
 /// xu/yu/zu (unwrapped). Atoms are sorted by id within each frame.
-use crate::trajectory::TrajectoryData;
+/// Also detects and extracts named vector column groups (vx/vy/vz, fx/fy/fz).
+use crate::trajectory::{TrajectoryData, VectorChannel, VectorFrame};
 
 /// Type alias kept for backwards compatibility.
 pub type LammpstrjData = TrajectoryData;
@@ -21,6 +22,15 @@ enum CoordType {
     Unwrapped,
 }
 
+/// Column indices for a named per-atom vector quantity (e.g. velocity, force).
+#[derive(Clone)]
+struct VectorColumnGroup {
+    name: &'static str,
+    x_col: usize,
+    y_col: usize,
+    z_col: usize,
+}
+
 /// Column indices for atom data.
 struct ColumnLayout {
     id_col: usize,
@@ -28,6 +38,8 @@ struct ColumnLayout {
     y_col: usize,
     z_col: usize,
     coord_type: CoordType,
+    /// Optional extra per-atom vector column groups (velocity, force, …).
+    vector_groups: Vec<VectorColumnGroup>,
 }
 
 fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
@@ -57,12 +69,32 @@ fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
         return Err("Cannot find x/y/z, xs/ys/zs, or xu/yu/zu columns in ATOMS header".to_string());
     };
 
+    // Detect optional vector column groups.
+    let mut vector_groups = Vec::new();
+    if let (Some(vx), Some(vy), Some(vz)) = (find("vx"), find("vy"), find("vz")) {
+        vector_groups.push(VectorColumnGroup {
+            name: "velocity",
+            x_col: vx,
+            y_col: vy,
+            z_col: vz,
+        });
+    }
+    if let (Some(fx), Some(fy), Some(fz)) = (find("fx"), find("fy"), find("fz")) {
+        vector_groups.push(VectorColumnGroup {
+            name: "force",
+            x_col: fx,
+            y_col: fy,
+            z_col: fz,
+        });
+    }
+
     Ok(ColumnLayout {
         id_col,
         x_col,
         y_col,
         z_col,
         coord_type,
+        vector_groups,
     })
 }
 
@@ -79,6 +111,10 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     let mut n_atoms: usize = 0;
     let mut box_matrix: Option<[f32; 9]> = None;
     let mut i = 0;
+    // Accumulated vector frames keyed by channel name from the first frame's layout.
+    // Outer Vec = one entry per named group; inner Vec<VectorFrame> = one entry per frame.
+    let mut vec_group_names: Vec<&'static str> = Vec::new();
+    let mut vec_group_frames: Vec<Vec<VectorFrame>> = Vec::new();
 
     while i < n_lines {
         let line = lines[i].trim();
@@ -214,8 +250,21 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         }
         let layout = parse_column_layout(lines[i])?;
 
-        // Read atom lines
+        // On the first frame, initialise vector group tracking from the layout.
+        if frame_positions.is_empty() {
+            vec_group_names = layout.vector_groups.iter().map(|g| g.name).collect();
+            vec_group_frames = layout.vector_groups.iter().map(|_| Vec::new()).collect();
+        }
+
+        // Read atom lines — accumulate both positions and per-group vector data.
         let mut atoms: Vec<(usize, f32, f32, f32)> = Vec::with_capacity(n_atoms);
+        // Per-group unsorted vector buffer for this frame.
+        let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> = layout
+            .vector_groups
+            .iter()
+            .map(|_| Vec::with_capacity(n_atoms))
+            .collect();
+
         for _ in 0..n_atoms {
             i += 1;
             if i >= n_lines {
@@ -257,6 +306,32 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             }
 
             atoms.push((id, x, y, z));
+
+            // Collect per-group vector values for this atom.
+            // Groups are indexed by their slot in frame_vec_atoms, which mirrors
+            // vec_group_names (initialised from the first frame). Lookup by name
+            // guards against column reordering in later frames.
+            for group in layout.vector_groups.iter() {
+                let slot = vec_group_names.iter().position(|&n| n == group.name);
+                if let Some(slot) = slot {
+                    let max_vcol = group.x_col.max(group.y_col).max(group.z_col);
+                    if parts.len() > max_vcol {
+                        let vx: f32 = match parts[group.x_col].parse() {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        let vy: f32 = match parts[group.y_col].parse() {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        let vz: f32 = match parts[group.z_col].parse() {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        frame_vec_atoms[slot].push((id, vx, vy, vz));
+                    }
+                }
+            }
         }
 
         // Sort by atom id for consistent ordering
@@ -270,6 +345,25 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             positions.push(*z);
         }
         frame_positions.push(positions);
+
+        // Build a sorted, flat vector array for each group and append as a VectorFrame.
+        // Only emit a frame entry when all n_atoms parsed successfully.
+        let frame_idx = frame_positions.len() - 1;
+        for (slot, mut vatoms) in frame_vec_atoms.into_iter().enumerate() {
+            if vatoms.len() == n_atoms {
+                vatoms.sort_by_key(|a| a.0);
+                let mut flat = Vec::with_capacity(n_atoms * 3);
+                for (_, vx, vy, vz) in &vatoms {
+                    flat.push(*vx);
+                    flat.push(*vy);
+                    flat.push(*vz);
+                }
+                vec_group_frames[slot].push(VectorFrame {
+                    frame: frame_idx,
+                    vectors: flat,
+                });
+            }
+        }
 
         i += 1;
     }
@@ -290,12 +384,24 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
 
     let n_frames = frame_positions.len();
 
+    // Assemble VectorChannel entries for groups that have data in every frame.
+    let vector_channels: Vec<VectorChannel> = vec_group_names
+        .into_iter()
+        .zip(vec_group_frames)
+        .filter(|(_, frames)| frames.len() == n_frames)
+        .map(|(name, frames)| VectorChannel {
+            name: name.to_string(),
+            frames,
+        })
+        .collect();
+
     Ok(LammpstrjData {
         n_atoms,
         n_frames,
         timestep_ps,
         box_matrix,
         frame_positions,
+        vector_channels,
     })
 }
 
@@ -428,5 +534,50 @@ mod tests {
         let data = parse_lammpstrj(text).unwrap();
         assert_eq!(data.n_frames, 1);
         assert_eq!(data.timestep_ps, 0.0); // single frame → no dt
+        assert!(data.vector_channels.is_empty());
+    }
+
+    #[test]
+    fn test_vector_columns_velocity() {
+        let text = "ITEM: TIMESTEP\n\
+                    0\n\
+                    ITEM: NUMBER OF ATOMS\n\
+                    2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n\
+                    0.0 10.0\n\
+                    0.0 10.0\n\
+                    0.0 10.0\n\
+                    ITEM: ATOMS id type x y z vx vy vz\n\
+                    1 1 1.0 2.0 3.0 0.1 0.2 0.3\n\
+                    2 2 4.0 5.0 6.0 0.4 0.5 0.6\n\
+                    ITEM: TIMESTEP\n\
+                    100\n\
+                    ITEM: NUMBER OF ATOMS\n\
+                    2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n\
+                    0.0 10.0\n\
+                    0.0 10.0\n\
+                    0.0 10.0\n\
+                    ITEM: ATOMS id type x y z vx vy vz\n\
+                    1 1 1.1 2.1 3.1 0.11 0.21 0.31\n\
+                    2 2 4.1 5.1 6.1 0.41 0.51 0.61\n";
+        let data = parse_lammpstrj(text).unwrap();
+        assert_eq!(data.n_frames, 2);
+        assert_eq!(data.vector_channels.len(), 1);
+        let ch = &data.vector_channels[0];
+        assert_eq!(ch.name, "velocity");
+        assert_eq!(ch.frames.len(), 2);
+        // Frame 0, atom 1 (id=1 → index 0 after sort)
+        assert!((ch.frames[0].vectors[0] - 0.1).abs() < 1e-4);
+        assert!((ch.frames[0].vectors[1] - 0.2).abs() < 1e-4);
+        assert!((ch.frames[0].vectors[2] - 0.3).abs() < 1e-4);
+        // Frame 1, atom 1
+        assert!((ch.frames[1].vectors[0] - 0.11).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_no_vector_columns() {
+        let data = parse_lammpstrj(sample_dump()).unwrap();
+        assert!(data.vector_channels.is_empty());
     }
 }

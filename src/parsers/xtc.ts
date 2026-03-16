@@ -4,11 +4,14 @@
  * and returns Frame[] + meta.
  */
 
-import type { Frame, TrajectoryMeta } from "../types";
+import type { Frame, TrajectoryMeta, VectorChannel } from "../types";
+import { deserializeVectorChannels } from "./vectorChannels";
 
 export interface XTCParseResult {
   frames: Frame[];
   meta: TrajectoryMeta;
+  /** Per-atom vector channels embedded in the file (e.g. LAMMPS dump vx/vy/vz). */
+  vectorChannels: VectorChannel[];
 }
 
 let initPromise: Promise<void> | null = null;
@@ -20,8 +23,11 @@ interface WasmXtcResult {
   n_frames: number;
   timestep_ps: number;
   has_box: boolean;
+  vector_channel_count: number;
+  vector_channel_meta: string;
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
+  vector_channel_data(): Float32Array;
   free(): void;
 }
 
@@ -41,7 +47,7 @@ async function ensureInit(): Promise<void> {
   await initPromise;
 }
 
-/** Convert a WasmXtcResult into Frame[] + TrajectoryMeta. */
+/** Convert a WasmXtcResult into Frame[] + TrajectoryMeta + VectorChannels. */
 function extractFrames(
   result: WasmXtcResult,
   expectedNAtoms: number,
@@ -71,8 +77,12 @@ function extractFrames(
     nAtoms: result.n_atoms,
   };
 
+  const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
+    result.vector_channel_data(),
+  );
+
   result.free();
-  return { frames, meta };
+  return { frames, meta, vectorChannels };
 }
 
 /**

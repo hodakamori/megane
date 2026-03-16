@@ -26,6 +26,9 @@ pub struct ParsedStructure {
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
     pub atom_labels: Option<Vec<String>>,
+    /// Embedded vector channels (e.g. GRO velocities).
+    /// Empty for formats that carry no per-atom vector quantities.
+    pub vector_channels: Vec<crate::trajectory::VectorChannel>,
 }
 
 /// Parse the element from a PDB ATOM/HETATM line.
@@ -320,6 +323,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions,
         atom_labels,
+        vector_channels: vec![],
     })
 }
 

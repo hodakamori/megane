@@ -428,6 +428,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions: Vec::new(),
         atom_labels,
+        vector_channels: vec![],
     })
 }
 

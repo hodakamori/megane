@@ -3,6 +3,39 @@ use wasm_bindgen::prelude::*;
 
 use megane_core::{bonds, cif, gro, lammps_data, lammpstrj, mol, parser, top, traj, xtc, xyz};
 
+/// Serialize a slice of `VectorChannel`s into two parallel outputs:
+/// - A JSON string describing channel metadata (name, n_frames per channel).
+/// - A flat `Vec<f32>` with all channel/frame vectors concatenated in order.
+///
+/// Layout in the flat buffer: for each channel, for each frame in order,
+/// `n_atoms * 3` f32 values.
+fn serialize_vector_channels(
+    channels: &[megane_core::trajectory::VectorChannel],
+) -> (String, Vec<f32>) {
+    use std::fmt::Write as FmtWrite;
+
+    let mut meta = String::from("[");
+    let mut data: Vec<f32> = Vec::new();
+
+    for (idx, ch) in channels.iter().enumerate() {
+        if idx > 0 {
+            meta.push(',');
+        }
+        let _ = write!(
+            meta,
+            r#"{{"name":"{}", "n_frames":{}}}"#,
+            ch.name,
+            ch.frames.len()
+        );
+        for frame in &ch.frames {
+            data.extend_from_slice(&frame.vectors);
+        }
+    }
+    meta.push(']');
+
+    (meta, data)
+}
+
 /// Result of parsing a PDB file, exposed to JavaScript via wasm-bindgen.
 #[wasm_bindgen]
 pub struct ParseResult {
@@ -19,6 +52,9 @@ pub struct ParseResult {
     box_matrix: Vec<f32>,
     frame_data: Vec<f32>,
     atom_labels: String,
+    vector_channel_count: u32,
+    vector_channel_meta: String,
+    vector_channel_data: Vec<f32>,
 }
 
 #[wasm_bindgen]
@@ -59,6 +95,18 @@ impl ParseResult {
         self.atom_labels.clone()
     }
 
+    /// Number of embedded vector channels (0 when none).
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_count(&self) -> u32 {
+        self.vector_channel_count
+    }
+
+    /// JSON array describing each channel: `[{"name":"velocity","n_frames":1}, ...]`
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_meta(&self) -> String {
+        self.vector_channel_meta.clone()
+    }
+
     /// Atom positions as Float32Array [x0,y0,z0, x1,y1,z1, ...]
     pub fn positions(&self) -> Float32Array {
         Float32Array::from(&self.positions[..])
@@ -89,6 +137,13 @@ impl ParseResult {
     pub fn frame_data(&self) -> Float32Array {
         Float32Array::from(&self.frame_data[..])
     }
+
+    /// All vector channel data concatenated as Float32Array.
+    /// Layout: channel0_frame0, channel0_frame1, …, channel1_frame0, …
+    /// Each frame is n_atoms * 3 floats.
+    pub fn vector_channel_data(&self) -> Float32Array {
+        Float32Array::from(&self.vector_channel_data[..])
+    }
 }
 
 impl ParseResult {
@@ -113,6 +168,10 @@ impl ParseResult {
         let has_atom_labels = data.atom_labels.is_some();
         let atom_labels = data.atom_labels.map(|l| l.join("\n")).unwrap_or_default();
 
+        let vector_channel_count = data.vector_channels.len() as u32;
+        let (vector_channel_meta, vector_channel_data) =
+            serialize_vector_channels(&data.vector_channels);
+
         Self {
             n_atoms: data.n_atoms as u32,
             n_bonds,
@@ -127,6 +186,9 @@ impl ParseResult {
             box_matrix,
             frame_data,
             atom_labels,
+            vector_channel_count,
+            vector_channel_meta,
+            vector_channel_data,
         }
     }
 }
@@ -140,6 +202,9 @@ pub struct XtcParseResult {
     has_box: bool,
     box_matrix: Vec<f32>,
     frame_data: Vec<f32>,
+    vector_channel_count: u32,
+    vector_channel_meta: String,
+    vector_channel_data: Vec<f32>,
 }
 
 #[wasm_bindgen]
@@ -172,6 +237,23 @@ impl XtcParseResult {
     pub fn frame_data(&self) -> Float32Array {
         Float32Array::from(&self.frame_data[..])
     }
+
+    /// Number of embedded vector channels (0 when none).
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_count(&self) -> u32 {
+        self.vector_channel_count
+    }
+
+    /// JSON array describing each channel: `[{"name":"velocity","n_frames":N}, ...]`
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_meta(&self) -> String {
+        self.vector_channel_meta.clone()
+    }
+
+    /// All vector channel data concatenated as Float32Array.
+    pub fn vector_channel_data(&self) -> Float32Array {
+        Float32Array::from(&self.vector_channel_data[..])
+    }
 }
 
 /// Parse an XTC trajectory binary and return frame data.
@@ -190,6 +272,10 @@ pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
         frame_data.extend_from_slice(frame);
     }
 
+    let vector_channel_count = xtc_data.vector_channels.len() as u32;
+    let (vector_channel_meta, vector_channel_data) =
+        serialize_vector_channels(&xtc_data.vector_channels);
+
     Ok(XtcParseResult {
         n_atoms: xtc_data.n_atoms as u32,
         n_frames: xtc_data.n_frames as u32,
@@ -197,6 +283,9 @@ pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
         has_box,
         box_matrix,
         frame_data,
+        vector_channel_count,
+        vector_channel_meta,
+        vector_channel_data,
     })
 }
 
@@ -300,6 +389,10 @@ pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
         frame_data.extend_from_slice(frame);
     }
 
+    let vector_channel_count = data.vector_channels.len() as u32;
+    let (vector_channel_meta, vector_channel_data) =
+        serialize_vector_channels(&data.vector_channels);
+
     Ok(XtcParseResult {
         n_atoms: data.n_atoms as u32,
         n_frames: data.n_frames as u32,
@@ -307,6 +400,9 @@ pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
         has_box,
         box_matrix,
         frame_data,
+        vector_channel_count,
+        vector_channel_meta,
+        vector_channel_data,
     })
 }
 
