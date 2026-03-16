@@ -338,7 +338,7 @@ export interface ViewportParams {
 export interface FilterParams {
   type: "filter";
   query: string;
-  bond_query: string; // bond selection query (empty = no filtering)
+  bond_query?: string; // bond selection query (empty/undefined = no filtering)
 }
 
 export interface ModifyParams {
