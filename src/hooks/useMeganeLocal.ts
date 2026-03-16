@@ -193,10 +193,13 @@ export function useMeganeLocal(): MeganeLocalState {
       resetPlayback();
       setXtcFileName(xtc.name);
 
+      // Feed parsed frames into the pipeline store so executeLoadTrajectory produces output.
+      const store = usePipelineStore.getState();
+      store.setFileFrames(frames, xtcMeta ?? null);
+
       // Auto-load first embedded vector channel (e.g. LAMMPS dump vx/vy/vz) into pipeline.
       if (vectorChannels.length > 0) {
         const ch = vectorChannels[0];
-        const store = usePipelineStore.getState();
         store.setFileVectors(ch.frames);
         // Update all load_vector nodes so the UI shows the channel name.
         for (const n of store.nodes) {
