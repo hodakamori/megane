@@ -88,15 +88,20 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
 
         // Optional velocity columns (nm/ps): cols 44-52, 52-60, 60-68
         if has_velocities {
-            if line.len() >= 68 {
-                let vx: f32 = line[44..52].trim().parse().unwrap_or(0.0);
-                let vy: f32 = line[52..60].trim().parse().unwrap_or(0.0);
-                let vz: f32 = line[60..68].trim().parse().unwrap_or(0.0);
+            let parsed = if line.len() >= 68 {
+                let vx: Option<f32> = line[44..52].trim().parse().ok();
+                let vy: Option<f32> = line[52..60].trim().parse().ok();
+                let vz: Option<f32> = line[60..68].trim().parse().ok();
+                vx.zip(vy).zip(vz).map(|((x, y), z)| (x, y, z))
+            } else {
+                None
+            };
+            if let Some((vx, vy, vz)) = parsed {
                 velocities.push(vx);
                 velocities.push(vy);
                 velocities.push(vz);
             } else {
-                // This atom lacks velocity columns — disable the channel.
+                // Atom lacks velocity columns or has unparseable values — disable channel.
                 has_velocities = false;
                 velocities.clear();
             }

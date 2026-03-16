@@ -63,7 +63,15 @@ export function useNodeLoadHandlers({
           });
           // Auto-load first embedded vector channel (e.g. GRO velocities) into pipeline.
           if (result.vectorChannels.length > 0) {
-            setFileVectors(result.vectorChannels[0].frames);
+            const ch = result.vectorChannels[0];
+            setFileVectors(ch.frames);
+            // Update all load_vector nodes so executeLoadVector shows the channel name.
+            const nodes = usePipelineStore.getState().nodes;
+            for (const n of nodes) {
+              if (n.type === "load_vector") {
+                updateNodeParams(n.id, { fileName: `[embedded] ${ch.name}` });
+              }
+            }
           }
         })
         .catch((err: unknown) => {

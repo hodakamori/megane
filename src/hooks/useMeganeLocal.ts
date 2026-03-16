@@ -195,7 +195,15 @@ export function useMeganeLocal(): MeganeLocalState {
 
       // Auto-load first embedded vector channel (e.g. LAMMPS dump vx/vy/vz) into pipeline.
       if (vectorChannels.length > 0) {
-        usePipelineStore.getState().setFileVectors(vectorChannels[0].frames);
+        const ch = vectorChannels[0];
+        const store = usePipelineStore.getState();
+        store.setFileVectors(ch.frames);
+        // Update all load_vector nodes so the UI shows the channel name.
+        for (const n of store.nodes) {
+          if (n.type === "load_vector") {
+            store.updateNodeParams(n.id, { fileName: `[embedded] ${ch.name}` });
+          }
+        }
       }
     },
     [resetPlayback],

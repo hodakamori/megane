@@ -111,8 +111,8 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     let mut n_atoms: usize = 0;
     let mut box_matrix: Option<[f32; 9]> = None;
     let mut i = 0;
-    // Per-group accumulated vector frames: indexed by group position in the layout.
-    // Outer Vec = one entry per group; inner Vec<f32> = all frames concatenated.
+    // Accumulated vector frames keyed by channel name from the first frame's layout.
+    // Outer Vec = one entry per named group; inner Vec<VectorFrame> = one entry per frame.
     let mut vec_group_names: Vec<&'static str> = Vec::new();
     let mut vec_group_frames: Vec<Vec<VectorFrame>> = Vec::new();
 
@@ -307,14 +307,29 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
 
             atoms.push((id, x, y, z));
 
-            // Collect per-group vector values for this atom (ignore parse errors).
-            for (g_idx, group) in layout.vector_groups.iter().enumerate() {
-                let max_vcol = group.x_col.max(group.y_col).max(group.z_col);
-                if parts.len() > max_vcol {
-                    let vx = parts[group.x_col].parse().unwrap_or(0.0);
-                    let vy = parts[group.y_col].parse().unwrap_or(0.0);
-                    let vz = parts[group.z_col].parse().unwrap_or(0.0);
-                    frame_vec_atoms[g_idx].push((id, vx, vy, vz));
+            // Collect per-group vector values for this atom.
+            // Groups are indexed by their slot in frame_vec_atoms, which mirrors
+            // vec_group_names (initialised from the first frame). Lookup by name
+            // guards against column reordering in later frames.
+            for group in layout.vector_groups.iter() {
+                let slot = vec_group_names.iter().position(|&n| n == group.name);
+                if let Some(slot) = slot {
+                    let max_vcol = group.x_col.max(group.y_col).max(group.z_col);
+                    if parts.len() > max_vcol {
+                        let vx: f32 = match parts[group.x_col].parse() {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        let vy: f32 = match parts[group.y_col].parse() {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        let vz: f32 = match parts[group.z_col].parse() {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
+                        frame_vec_atoms[slot].push((id, vx, vy, vz));
+                    }
                 }
             }
         }
@@ -332,9 +347,10 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         frame_positions.push(positions);
 
         // Build a sorted, flat vector array for each group and append as a VectorFrame.
+        // Only emit a frame entry when all n_atoms parsed successfully.
         let frame_idx = frame_positions.len() - 1;
-        for (g_idx, mut vatoms) in frame_vec_atoms.into_iter().enumerate() {
-            if vatoms.len() == n_atoms && g_idx < vec_group_frames.len() {
+        for (slot, mut vatoms) in frame_vec_atoms.into_iter().enumerate() {
+            if vatoms.len() == n_atoms {
                 vatoms.sort_by_key(|a| a.0);
                 let mut flat = Vec::with_capacity(n_atoms * 3);
                 for (_, vx, vy, vz) in &vatoms {
@@ -342,7 +358,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
                     flat.push(*vy);
                     flat.push(*vz);
                 }
-                vec_group_frames[g_idx].push(VectorFrame {
+                vec_group_frames[slot].push(VectorFrame {
                     frame: frame_idx,
                     vectors: flat,
                 });

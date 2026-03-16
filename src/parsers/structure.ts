@@ -4,7 +4,8 @@
  * Supports PDB, GRO, XYZ, MOL/SDF, CIF, and LAMMPS data formats.
  */
 
-import type { Snapshot, Frame, TrajectoryMeta, VectorChannel, VectorFrame } from "../types";
+import type { Snapshot, Frame, TrajectoryMeta, VectorChannel } from "../types";
+import { deserializeVectorChannels } from "./vectorChannels";
 
 export interface StructureParseResult {
   snapshot: Snapshot;
@@ -137,32 +138,6 @@ export async function parseStructureFile(file: File): Promise<StructureParseResu
   const text = await file.text();
   const parseFn = getParserForExtension(ext);
   return parseWithFn(parseFn, text);
-}
-
-/** Deserialize embedded vector channels from a WASM parse result. */
-function deserializeVectorChannels(
-  nAtoms: number,
-  metaStr: string,
-  dataFn: () => Float32Array,
-): VectorChannel[] {
-  if (!metaStr || metaStr === "[]") return [];
-  const meta = JSON.parse(metaStr) as Array<{ name: string; n_frames: number }>;
-  if (meta.length === 0) return [];
-
-  const data = dataFn();
-  const stride = nAtoms * 3;
-  const channels: VectorChannel[] = [];
-  let offset = 0;
-
-  for (const ch of meta) {
-    const frames: VectorFrame[] = [];
-    for (let f = 0; f < ch.n_frames; f++) {
-      frames.push({ frame: f, vectors: data.slice(offset, offset + stride) });
-      offset += stride;
-    }
-    channels.push({ name: ch.name, frames });
-  }
-  return channels;
 }
 
 function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {

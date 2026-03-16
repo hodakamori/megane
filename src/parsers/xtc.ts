@@ -4,7 +4,8 @@
  * and returns Frame[] + meta.
  */
 
-import type { Frame, TrajectoryMeta, VectorChannel, VectorFrame } from "../types";
+import type { Frame, TrajectoryMeta, VectorChannel } from "../types";
+import { deserializeVectorChannels } from "./vectorChannels";
 
 export interface XTCParseResult {
   frames: Frame[];
@@ -44,32 +45,6 @@ async function ensureInit(): Promise<void> {
     })();
   }
   await initPromise;
-}
-
-/** Deserialize embedded vector channels from a WASM trajectory result. */
-function deserializeVectorChannels(
-  nAtoms: number,
-  metaStr: string,
-  dataFn: () => Float32Array,
-): VectorChannel[] {
-  if (!metaStr || metaStr === "[]") return [];
-  const meta = JSON.parse(metaStr) as Array<{ name: string; n_frames: number }>;
-  if (meta.length === 0) return [];
-
-  const data = dataFn();
-  const stride = nAtoms * 3;
-  const channels: VectorChannel[] = [];
-  let offset = 0;
-
-  for (const ch of meta) {
-    const frames: VectorFrame[] = [];
-    for (let f = 0; f < ch.n_frames; f++) {
-      frames.push({ frame: f, vectors: data.slice(offset, offset + stride) });
-      offset += stride;
-    }
-    channels.push({ name: ch.name, frames });
-  }
-  return channels;
 }
 
 /** Convert a WasmXtcResult into Frame[] + TrajectoryMeta + VectorChannels. */
