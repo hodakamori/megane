@@ -7,6 +7,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { parseStructureFile, parseStructureText } from "../parsers/structure";
+import type { StructureParseResult } from "../parsers/structure";
 import { parseXTCFile, parseLammpstrjFile } from "../parsers/xtc";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
@@ -32,7 +33,7 @@ export interface MeganeLocalState {
   pdbFileName: string | null;
   xtcFileName: string | null;
   loadFile: (pdb: File) => Promise<void>;
-  loadText: (text: string, fileName?: string) => Promise<void>;
+  loadText: (text: string, fileName?: string) => Promise<StructureParseResult>;
   loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
   bondSource: BondSource;
@@ -165,6 +166,7 @@ export function useMeganeLocal(): MeganeLocalState {
       applyResult(result);
       setPdbFileName(fileName ?? "caffeine_water.pdb");
       setXtcFileName(result.meta ? "PDB models" : null);
+      return result;
     },
     [applyResult],
   );
