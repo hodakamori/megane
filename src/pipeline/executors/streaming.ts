@@ -52,6 +52,9 @@ export function executeStreaming(
       positions: null,
       elements: null,
       nAtoms: snapshot.nAtoms,
+      atomElements: snapshot.elements,
+      selectedBondIndices: null,
+      bondOpacityOverrides: null,
     };
     outputs.set("bond", bond);
   }

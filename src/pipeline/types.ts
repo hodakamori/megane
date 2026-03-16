@@ -52,6 +52,12 @@ export interface BondData {
   positions: Float32Array | null; // null = use particle positions
   elements: Uint8Array | null; // null = use particle elements
   nAtoms: number; // total atoms including ghosts (0 = use particle nAtoms)
+  // Base atom elements (non-ghost), used by bond filter for element/atom_index queries
+  atomElements: Uint8Array | null;
+  // Bond selection (set by filter node with bond_query)
+  selectedBondIndices: Uint32Array | null; // null = all bonds selected
+  // Per-bond opacity overrides (set by modify node when selectedBondIndices is non-null)
+  bondOpacityOverrides: Float32Array | null; // length = nBonds
 }
 
 /** Simulation cell data. */
@@ -332,6 +338,7 @@ export interface ViewportParams {
 export interface FilterParams {
   type: "filter";
   query: string;
+  bond_query?: string; // bond selection query (empty/undefined = no filtering)
 }
 
 export interface ModifyParams {
@@ -396,7 +403,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "viewport":
       return { type, perspective: false, cellAxesVisible: true };
     case "filter":
-      return { type, query: "" };
+      return { type, query: "", bond_query: "" };
     case "modify":
       return { type, scale: 1.0, opacity: 1.0 };
     case "label_generator":

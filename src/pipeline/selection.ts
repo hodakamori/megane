@@ -382,3 +382,351 @@ export function validateQuery(query: string): { valid: boolean; error?: string }
     return { valid: false, error: (e as Error).message };
   }
 }
+
+// ─── Bond Selection Query ──────────────────────────────────────────────────────
+//
+// Grammar:
+//   Query      := OrExpr
+//   OrExpr     := AndExpr ("or" AndExpr)*
+//   AndExpr    := NotExpr ("and" NotExpr)*
+//   NotExpr    := "not" NotExpr | Atom
+//   Atom       := "both" Comparison | Comparison | "(" OrExpr ")" | "all" | "none"
+//   Comparison := Field Op Value
+//   Field      := "bond_index" | "atom_index" | "element"
+//   Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
+//   Value      := QuotedString | Number
+//
+// Semantics:
+//   "both" prefix: both atoms of the bond must satisfy the condition
+//   Without "both": either atom satisfies the condition (OR semantics)
+//   "bond_index": the 0-based sequential index of the bond
+//   "atom_index": index of an atom endpoint
+//   "element": element symbol of an atom endpoint
+
+const BOND_FIELDS = new Set(["bond_index", "atom_index", "element"]);
+
+type BondTokenType =
+  | "bond_field"
+  | "op"
+  | "number"
+  | "string"
+  | "and"
+  | "or"
+  | "not"
+  | "both"
+  | "lparen"
+  | "rparen"
+  | "all"
+  | "none"
+  | "eof";
+
+interface BondToken {
+  type: BondTokenType;
+  value: string;
+}
+
+function tokenizeBond(query: string): BondToken[] {
+  const tokens: BondToken[] = [];
+  let i = 0;
+  while (i < query.length) {
+    if (/\s/.test(query[i])) {
+      i++;
+      continue;
+    }
+    if (query[i] === "(") {
+      tokens.push({ type: "lparen", value: "(" });
+      i++;
+      continue;
+    }
+    if (query[i] === ")") {
+      tokens.push({ type: "rparen", value: ")" });
+      i++;
+      continue;
+    }
+    if (query.startsWith("==", i)) {
+      tokens.push({ type: "op", value: "==" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith("!=", i)) {
+      tokens.push({ type: "op", value: "!=" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith(">=", i)) {
+      tokens.push({ type: "op", value: ">=" });
+      i += 2;
+      continue;
+    }
+    if (query.startsWith("<=", i)) {
+      tokens.push({ type: "op", value: "<=" });
+      i += 2;
+      continue;
+    }
+    if (query[i] === ">") {
+      tokens.push({ type: "op", value: ">" });
+      i++;
+      continue;
+    }
+    if (query[i] === "<") {
+      tokens.push({ type: "op", value: "<" });
+      i++;
+      continue;
+    }
+    if (query[i] === '"' || query[i] === "'") {
+      const quote = query[i];
+      let j = i + 1;
+      while (j < query.length && query[j] !== quote) j++;
+      if (j >= query.length) throw new Error(`Unterminated string at position ${i}`);
+      tokens.push({ type: "string", value: query.slice(i + 1, j) });
+      i = j + 1;
+      continue;
+    }
+    if (
+      /[\d.]/.test(query[i]) ||
+      (query[i] === "-" && i + 1 < query.length && /[\d.]/.test(query[i + 1]))
+    ) {
+      let j = i;
+      if (query[j] === "-") j++;
+      while (j < query.length && /[\d.]/.test(query[j])) j++;
+      tokens.push({ type: "number", value: query.slice(i, j) });
+      i = j;
+      continue;
+    }
+    if (/[a-zA-Z_]/.test(query[i])) {
+      let j = i;
+      while (j < query.length && /[a-zA-Z_0-9]/.test(query[j])) j++;
+      const word = query.slice(i, j);
+      if (word === "and") tokens.push({ type: "and", value: word });
+      else if (word === "or") tokens.push({ type: "or", value: word });
+      else if (word === "not") tokens.push({ type: "not", value: word });
+      else if (word === "all") tokens.push({ type: "all", value: word });
+      else if (word === "none") tokens.push({ type: "none", value: word });
+      else if (word === "both") tokens.push({ type: "both", value: word });
+      else if (BOND_FIELDS.has(word)) tokens.push({ type: "bond_field", value: word });
+      else throw new Error(`Unknown identifier: "${word}"`);
+      i = j;
+      continue;
+    }
+    throw new Error(`Unexpected character: "${query[i]}" at position ${i}`);
+  }
+  tokens.push({ type: "eof", value: "" });
+  return tokens;
+}
+
+type BondASTNode =
+  | { kind: "comparison"; field: string; op: string; value: string | number; both: boolean }
+  | { kind: "and"; left: BondASTNode; right: BondASTNode }
+  | { kind: "or"; left: BondASTNode; right: BondASTNode }
+  | { kind: "not"; operand: BondASTNode }
+  | { kind: "all" }
+  | { kind: "none" };
+
+class BondParser {
+  private tokens: BondToken[];
+  private pos = 0;
+
+  constructor(tokens: BondToken[]) {
+    this.tokens = tokens;
+  }
+
+  private peek(): BondToken {
+    return this.tokens[this.pos];
+  }
+  private advance(): BondToken {
+    return this.tokens[this.pos++];
+  }
+
+  private expect(type: BondTokenType): BondToken {
+    const t = this.peek();
+    if (t.type !== type) throw new Error(`Expected ${type}, got ${t.type} ("${t.value}")`);
+    return this.advance();
+  }
+
+  parse(): BondASTNode {
+    const node = this.parseOr();
+    if (this.peek().type !== "eof") throw new Error(`Unexpected token: "${this.peek().value}"`);
+    return node;
+  }
+
+  private parseOr(): BondASTNode {
+    let left = this.parseAnd();
+    while (this.peek().type === "or") {
+      this.advance();
+      left = { kind: "or", left, right: this.parseAnd() };
+    }
+    return left;
+  }
+
+  private parseAnd(): BondASTNode {
+    let left = this.parseNot();
+    while (this.peek().type === "and") {
+      this.advance();
+      left = { kind: "and", left, right: this.parseNot() };
+    }
+    return left;
+  }
+
+  private parseNot(): BondASTNode {
+    if (this.peek().type === "not") {
+      this.advance();
+      return { kind: "not", operand: this.parseNot() };
+    }
+    return this.parseAtom();
+  }
+
+  private parseAtom(): BondASTNode {
+    const t = this.peek();
+    if (t.type === "all") {
+      this.advance();
+      return { kind: "all" };
+    }
+    if (t.type === "none") {
+      this.advance();
+      return { kind: "none" };
+    }
+    if (t.type === "lparen") {
+      this.advance();
+      const node = this.parseOr();
+      this.expect("rparen");
+      return node;
+    }
+    if (t.type === "both") {
+      this.advance();
+      return this.parseComparison(true);
+    }
+    if (t.type === "bond_field") {
+      return this.parseComparison(false);
+    }
+    throw new Error(`Unexpected token: "${t.value}" (${t.type})`);
+  }
+
+  private parseComparison(both: boolean): BondASTNode {
+    const field = this.expect("bond_field").value;
+    const op = this.expect("op").value;
+    const valToken = this.peek();
+    let value: string | number;
+    if (valToken.type === "string") {
+      value = this.advance().value;
+    } else if (valToken.type === "number") {
+      value = parseFloat(this.advance().value);
+      if (isNaN(value as number)) throw new Error("Invalid number");
+    } else {
+      throw new Error(`Expected value after operator, got ${valToken.type}`);
+    }
+    return { kind: "comparison", field, op, value, both };
+  }
+}
+
+function applyOp(fieldValue: string | number, op: string, value: string | number): boolean {
+  switch (op) {
+    case "==":
+      return fieldValue === value;
+    case "!=":
+      return fieldValue !== value;
+    case ">":
+      return fieldValue > value;
+    case "<":
+      return fieldValue < value;
+    case ">=":
+      return fieldValue >= value;
+    case "<=":
+      return fieldValue <= value;
+    default:
+      return false;
+  }
+}
+
+function compileBondAST(
+  ast: BondASTNode,
+  bondIndices: Uint32Array,
+  elements: Uint8Array,
+): (bondIdx: number) => boolean {
+  switch (ast.kind) {
+    case "all":
+      return () => true;
+    case "none":
+      return () => false;
+    case "not": {
+      const fn = compileBondAST(ast.operand, bondIndices, elements);
+      return (i) => !fn(i);
+    }
+    case "and": {
+      const left = compileBondAST(ast.left, bondIndices, elements);
+      const right = compileBondAST(ast.right, bondIndices, elements);
+      return (i) => left(i) && right(i);
+    }
+    case "or": {
+      const left = compileBondAST(ast.left, bondIndices, elements);
+      const right = compileBondAST(ast.right, bondIndices, elements);
+      return (i) => left(i) || right(i);
+    }
+    case "comparison": {
+      const { field, op, value, both } = ast;
+      return (i) => {
+        const atomA = bondIndices[i * 2];
+        const atomB = bondIndices[i * 2 + 1];
+        switch (field) {
+          case "bond_index":
+            return applyOp(i, op, value);
+          case "atom_index":
+            if (both) return applyOp(atomA, op, value) && applyOp(atomB, op, value);
+            return applyOp(atomA, op, value) || applyOp(atomB, op, value);
+          case "element": {
+            const elemA = getElementSymbol(elements[atomA] ?? 0);
+            const elemB = getElementSymbol(elements[atomB] ?? 0);
+            if (both) return applyOp(elemA, op, value) && applyOp(elemB, op, value);
+            return applyOp(elemA, op, value) || applyOp(elemB, op, value);
+          }
+          default:
+            return false;
+        }
+      };
+    }
+  }
+}
+
+/**
+ * Evaluate a bond selection query.
+ * Returns null for empty/"all" (all bonds selected).
+ * Returns a Set of matching bond indices (0-based) otherwise.
+ */
+export function evaluateBondSelection(
+  query: string,
+  bondIndices: Uint32Array,
+  elements: Uint8Array,
+  nBonds: number,
+): Set<number> | null {
+  const trimmed = query.trim();
+  if (trimmed === "" || trimmed === "all") return null;
+
+  const tokens = tokenizeBond(trimmed);
+  const parser = new BondParser(tokens);
+  const ast = parser.parse();
+
+  if (ast.kind === "all") return null;
+  if (ast.kind === "none") return new Set();
+
+  const predicate = compileBondAST(ast, bondIndices, elements);
+  const result = new Set<number>();
+  for (let i = 0; i < nBonds; i++) {
+    if (predicate(i)) result.add(i);
+  }
+  return result;
+}
+
+/**
+ * Validate a bond query string without evaluating it.
+ */
+export function validateBondQuery(query: string): { valid: boolean; error?: string } {
+  const trimmed = query.trim();
+  if (trimmed === "" || trimmed === "all" || trimmed === "none") return { valid: true };
+  try {
+    const tokens = tokenizeBond(trimmed);
+    const parser = new BondParser(tokens);
+    parser.parse();
+    return { valid: true };
+  } catch (e) {
+    return { valid: false, error: (e as Error).message };
+  }
+}

@@ -91,7 +91,8 @@ describe("defaultParams", () => {
     expect(params).toEqual({
       type: "filter",
       query: "",
-    });
+      bond_query: "",
+    }); // bond_query is included in defaults
   });
 
   it("returns correct defaults for modify", () => {

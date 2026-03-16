@@ -136,10 +136,12 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   in vec3 instanceColor;
   in float instanceRadius;
   in float instanceDashed;
+  in float instanceBondOpacity;
 
   out vec3 vColor;
   out vec2 vCylUv;
   out float vDashed;
+  out float vBondOpacity;
 
   vec3 getAtomPos(int idx) {
     int tx = idx % uPositionTexWidth;
@@ -151,6 +153,7 @@ export const bondVertexShader = /* glsl */ `precision highp float;
     vColor = instanceColor;
     vCylUv = uv;
     vDashed = instanceDashed;
+    vBondOpacity = instanceBondOpacity;
 
     int atomA = int(instanceAtomA + 0.5);
     int atomB = int(instanceAtomB + 0.5);
@@ -197,8 +200,10 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
   in vec3 vColor;
   in vec2 vCylUv;
   in float vDashed;
+  in float vBondOpacity;
 
   uniform float uOpacity;
+  uniform int uUsePerBondOverrides;
 
   out vec4 fragColor;
 
@@ -236,6 +241,10 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     vec3 color = vColor * (ambient + diffuse)
                + vec3(1.0) * spec * 0.2
                + vec3(0.1) * fresnel;
-    fragColor = vec4(color, uOpacity);
+    float finalOpacity = uOpacity;
+    if (uUsePerBondOverrides == 1) {
+      finalOpacity *= vBondOpacity;
+    }
+    fragColor = vec4(color, finalOpacity);
   }
 `;

@@ -138,6 +138,14 @@ export class StructureLayer {
     this.bondRenderer?.setOpacity?.(opacity);
   }
 
+  setBondOpacityOverrides(overrides: Float32Array): void {
+    this.bondRenderer?.setBondOpacityOverrides?.(overrides);
+  }
+
+  clearBondOpacityOverrides(): void {
+    this.bondRenderer?.clearBondOpacityOverrides?.();
+  }
+
   setAtomsVisible(visible: boolean): void {
     if (this.atomRenderer) {
       this.atomRenderer.mesh.visible = visible;
