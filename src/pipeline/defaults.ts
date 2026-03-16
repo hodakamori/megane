@@ -122,6 +122,32 @@ export function createDefaultPipeline(): {
           enabled: true,
         },
       },
+      {
+        id: "filter-bond-sol",
+        type: "filter",
+        position: { x: 255, y: 615 },
+        data: {
+          params: {
+            type: "filter",
+            query: "",
+            bond_query: "both atom_index >= 24",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "modify-bond-sol",
+        type: "modify",
+        position: { x: 255, y: 920 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 1.0,
+            opacity: 0.15,
+          },
+          enabled: true,
+        },
+      },
       // Row 3: Sink
       {
         id: "viewport-1",
@@ -183,8 +209,22 @@ export function createDefaultPipeline(): {
       {
         id: "e7",
         source: "addbond-1",
-        target: "viewport-1",
+        target: "filter-bond-sol",
         sourceHandle: "bond",
+        targetHandle: "in",
+      },
+      {
+        id: "e7b",
+        source: "filter-bond-sol",
+        target: "modify-bond-sol",
+        sourceHandle: "out",
+        targetHandle: "in",
+      },
+      {
+        id: "e7c",
+        source: "modify-bond-sol",
+        target: "viewport-1",
+        sourceHandle: "out",
         targetHandle: "bond",
       },
       {

@@ -69,6 +69,8 @@ export interface BondRenderer {
   updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void;
   setOpacity?(opacity: number): void;
   setScale?(scale: number, snapshot: Snapshot): void;
+  setBondOpacityOverrides?(overrides: Float32Array): void;
+  clearBondOpacityOverrides?(): void;
   dispose(): void;
 }
 

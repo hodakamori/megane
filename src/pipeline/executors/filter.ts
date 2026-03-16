@@ -1,5 +1,5 @@
-import type { PipelineData, ParticleData, FilterParams } from "../types";
-import { evaluateSelection } from "../selection";
+import type { PipelineData, ParticleData, BondData, FilterParams } from "../types";
+import { evaluateSelection, evaluateBondSelection } from "../selection";
 
 export function executeFilter(
   params: FilterParams,
@@ -44,7 +44,28 @@ export function executeFilter(
       outputs.set("out", particle);
     }
   } else if (inData.type === "bond") {
-    outputs.set("out", inData);
+    const bond = inData as BondData;
+    const bondQuery = params.bond_query?.trim() ?? "";
+    if (bondQuery && bond.atomElements) {
+      try {
+        const selectedSet = evaluateBondSelection(
+          bondQuery,
+          bond.bondIndices,
+          bond.atomElements,
+          bond.nBonds,
+        );
+        if (selectedSet !== null) {
+          outputs.set("out", {
+            ...bond,
+            selectedBondIndices: new Uint32Array(selectedSet),
+          });
+          return outputs;
+        }
+      } catch {
+        // Invalid query: pass through unchanged
+      }
+    }
+    outputs.set("out", bond);
   }
 
   return outputs;

@@ -229,6 +229,9 @@ export function executeAddBond(
           positions: extPositions,
           elements: extElements,
           nAtoms: extNAtoms,
+          atomElements: snapshot.elements,
+          selectedBondIndices: null,
+          bondOpacityOverrides: null,
         };
         outputs.set("bond", bond);
       }
@@ -274,6 +277,9 @@ export function executeAddBond(
           positions: extPositions,
           elements: extElements,
           nAtoms: extNAtoms,
+          atomElements: snapshot.elements,
+          selectedBondIndices: null,
+          bondOpacityOverrides: null,
         };
         outputs.set("bond", bond);
       }

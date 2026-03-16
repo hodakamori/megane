@@ -91,6 +91,7 @@ describe("defaultParams", () => {
     expect(params).toEqual({
       type: "filter",
       query: "",
+      bond_query: "",
     });
   });
 

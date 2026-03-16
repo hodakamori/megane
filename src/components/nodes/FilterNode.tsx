@@ -10,7 +10,7 @@ import type { NodeProps, Node } from "@xyflow/react";
 import type { PipelineNodeData } from "../../pipeline/execute";
 import type { FilterParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
-import { validateQuery } from "../../pipeline/selection";
+import { validateQuery, validateBondQuery } from "../../pipeline/selection";
 import { NodeShell } from "./NodeShell";
 
 const inputStyle: React.CSSProperties = {
@@ -50,11 +50,17 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
   const params = data.params as FilterParams;
   const [localQuery, setLocalQuery] = useState(params.query);
+  const [localBondQuery, setLocalBondQuery] = useState(params.bond_query ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [bondError, setBondError] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalQuery(params.query);
   }, [params.query]);
+
+  useEffect(() => {
+    setLocalBondQuery(params.bond_query ?? "");
+  }, [params.bond_query]);
 
   const handleCommit = useCallback(() => {
     const result = validateQuery(localQuery);
@@ -62,13 +68,24 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
     updateNodeParams(id, { query: localQuery });
   }, [id, localQuery, updateNodeParams]);
 
+  const handleBondCommit = useCallback(() => {
+    const result = validateBondQuery(localBondQuery);
+    setBondError(result.valid ? null : (result.error ?? "Invalid bond query"));
+    updateNodeParams(id, { bond_query: localBondQuery });
+  }, [id, localBondQuery, updateNodeParams]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        handleCommit();
-      }
+      if (e.key === "Enter") handleCommit();
     },
     [handleCommit],
+  );
+
+  const handleBondKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") handleBondCommit();
+    },
+    [handleBondCommit],
   );
 
   return (
@@ -83,6 +100,18 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
       />
       {error && <div style={errorStyle}>{error}</div>}
       {!error && !localQuery && <div style={hintStyle}>element, index, x, y, z, resname, mass</div>}
+      <input
+        value={localBondQuery}
+        onChange={(e) => setLocalBondQuery(e.target.value)}
+        onBlur={handleBondCommit}
+        onKeyDown={handleBondKeyDown}
+        placeholder='both atom_index >= 24'
+        style={{ ...(bondError ? inputErrorStyle : inputStyle), marginTop: 6 }}
+      />
+      {bondError && <div style={errorStyle}>{bondError}</div>}
+      {!bondError && !localBondQuery && (
+        <div style={hintStyle}>bond_index, atom_index, element · "both" for AND</div>
+      )}
     </NodeShell>
   );
 }
