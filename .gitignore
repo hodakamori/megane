@@ -4,6 +4,10 @@ __pycache__/
 *.pyc
 *.egg-info/
 .venv/
+pyvenv.cfg
+/bin/
+/lib/
+/lib64
 .vite/
 *.whl
 tests/fixtures/.*.npz
