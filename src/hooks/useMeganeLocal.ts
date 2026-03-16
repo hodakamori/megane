@@ -32,7 +32,7 @@ export interface MeganeLocalState {
   pdbFileName: string | null;
   xtcFileName: string | null;
   loadFile: (pdb: File) => Promise<void>;
-  loadText: (text: string, fileName?: string) => Promise<void>;
+  loadText: (text: string, fileName?: string) => Promise<{ snapshot: Snapshot; frames: Frame[]; meta: TrajectoryMeta | null; labels: string[] | null }>;
   loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
   bondSource: BondSource;
@@ -165,6 +165,7 @@ export function useMeganeLocal(): MeganeLocalState {
       applyResult(result);
       setPdbFileName(fileName ?? "caffeine_water.pdb");
       setXtcFileName(result.meta ? "PDB models" : null);
+      return result;
     },
     [applyResult],
   );

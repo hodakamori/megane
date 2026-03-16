@@ -15,7 +15,6 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
-import { parseStructureText } from "./parsers/structure";
 import { parseXTCFile } from "./parsers/xtc";
 import { MemoryFrameProvider } from "./pipeline/types";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
@@ -66,8 +65,8 @@ function App() {
       } else if (pendingTemplateId === "solid") {
         await ds.local.loadText(perovskiteXYZ, "perovskite_srtio3_3x3x3.xyz");
       } else if (pendingTemplateId === "streaming") {
-        // Simulate streaming by parsing local data and populating nodeStreamingData
-        const result = await parseStructureText(defaultPDB, "caffeine_water.pdb");
+        // Load via ds.local so ds.snapshot updates → Viewport.loadSnapshot uses caffeine atoms
+        const result = await ds.local.loadText(defaultPDB, "caffeine_water.pdb");
         const resp = await fetch(defaultXtcUrl);
         const blob = await resp.blob();
         const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
