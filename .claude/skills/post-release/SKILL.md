@@ -56,11 +56,11 @@ gh run view --workflow=publish-vscode.yml --limit 1
 ```
 Confirm the extension version matches `X.Y.Z`.
 
-## Phase 2.5: Clean Environment Rendering Verification
+## Phase 3: Clean Environment Rendering Verification
 
 Verify that the published packages actually work in a clean environment — not just that they exist, but that molecular structures render correctly.
 
-### 2.5.1 Python + npm: widget rendering in fresh virtualenv
+### 3.1 Python + npm: widget rendering in fresh virtualenv
 
 Install from PyPI into an isolated virtualenv (no local source files), then run the existing E2E widget test against it. This covers both the Python package (PyO3 native extension, parsers) and the npm package (megane-viewer WASM loaded by anywidget in the browser).
 
@@ -75,14 +75,14 @@ $VENV/bin/pip install megane==X.Y.Z jupyterlab
 PATH=$VENV/bin:$PATH node tests/e2e/test_widget_render.mjs
 ```
 
-Expected: all assertions pass — canvas created, non-white pixels rendered (atoms visible), no critical JS errors.
+Expected: all assertions pass — canvas created, non-white pixels rendered (atoms visible), no critical JS errors. Screenshots saved to `tests/e2e/screenshot_1crn.png` and `tests/e2e/screenshot_water_100k.png`.
 
 This test verifies:
 - PyPI install succeeds and PyO3 native extension loads
 - megane-viewer (npm) WASM is bundled correctly and loads in browser
 - Molecule rendering pipeline works end-to-end
 
-### 2.5.2 VS Code extension: rendering via code-server
+### 3.2 VS Code extension: rendering via code-server
 
 Download the VSIX from the VS Code Marketplace (the same artifact users install), run it in code-server, and verify the megane custom editor renders a molecule.
 
@@ -101,15 +101,15 @@ This test verifies:
 - Extension installs and activates correctly in code-server
 - Webview loads WASM and renders the molecular structure
 
-## Phase 3: GitHub Release Notes & Publishing
+## Phase 4: GitHub Release Notes & Publishing
 
-### 3.1 Find the previous release tag
+### 4.1 Find the previous release tag
 ```bash
 git tag --sort=-version:refname | grep '^v' | head -5
 ```
 Identify the previous tag (e.g., `vX.Y.Z-1`).
 
-### 3.2 Generate release notes from diff
+### 4.2 Generate release notes from diff
 Collect all commits between the previous tag and the new tag:
 ```bash
 git log vPREV..vX.Y.Z --oneline --no-merges
@@ -149,7 +149,7 @@ Search for "megane" in the VS Code Extensions panel
 **Full Changelog**: https://github.com/hodakamori/megane/compare/vPREV...vX.Y.Z
 ```
 
-### 3.3 Update the draft release with generated notes
+### 4.3 Update the draft release with generated notes
 ```bash
 gh release edit vX.Y.Z --notes "$(cat <<'EOF'
 ## What's Changed
@@ -179,15 +179,26 @@ EOF
 )"
 ```
 
-### 3.4 Confirm the draft is ready
+### 4.4 Upload rendering verification screenshots
+
+Attach the screenshots captured in Phase 3 to the release as visual proof that rendering works correctly after install.
+
+```bash
+gh release upload vX.Y.Z \
+  tests/e2e/screenshot_1crn.png \
+  tests/e2e/screenshot_water_100k.png \
+  tests/e2e/screenshot_vscode_render.png
+```
+
+### 4.5 Confirm the draft is ready
 ```bash
 gh release view vX.Y.Z
 ```
-Verify the notes look correct. The release remains as a **draft** — hand off to the user to review and publish it manually.
+Verify the notes look correct and the screenshots are attached. The release remains as a **draft** — hand off to the user to review and publish it manually.
 
-## Phase 4: Documentation
+## Phase 5: Documentation
 
-### 4.1 GitHub Pages deployment
+### 5.1 GitHub Pages deployment
 Confirm `docs.yml` workflow succeeded:
 ```bash
 gh run list --workflow=docs.yml --limit 1
@@ -197,16 +208,16 @@ Visit the docs site and verify the version shown matches `X.Y.Z`:
 - Check the version badge or footer
 - Verify new features/APIs mentioned in the release are documented
 
-## Phase 5: Live Demo
+## Phase 6: Live Demo
 
-### 5.1 AWS ECS demo health
+### 6.1 AWS ECS demo health
 After a release, the `deploy.yml` workflow may re-deploy. Check:
 ```bash
 gh run list --workflow=deploy.yml --limit 1
 ```
 If the demo was updated, verify it loads correctly in the browser.
 
-## Phase 6: Announcement Checklist (manual)
+## Phase 7: Announcement Checklist (manual)
 
 These items require manual action outside of automated workflows:
 
@@ -224,7 +235,8 @@ Once all phases are complete, the release is done. Key verification:
 | All CI workflows | `gh run list --limit 10` |
 | PyPI version | `pip index versions megane` |
 | npm version | `npm view megane-viewer version` |
-| Python + npm rendering (clean venv) | See Phase 2.5.1 — install from PyPI, then `node tests/e2e/test_widget_render.mjs` |
+| Python + npm rendering (clean venv) | See Phase 3.1 — install from PyPI, then `node tests/e2e/test_widget_render.mjs` |
 | VS Code rendering (code-server) | `node tests/e2e/test_vscode_render.mjs X.Y.Z` |
+| Screenshots uploaded to release | `gh release view vX.Y.Z` |
 | GitHub release draft with notes ready | `gh release view vX.Y.Z` |
 | Docs site updated | `gh run list --workflow=docs.yml` |
