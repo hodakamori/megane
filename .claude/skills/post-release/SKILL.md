@@ -67,7 +67,7 @@ Expected output: `X.Y.Z`
 ```bash
 ORIG_REMOTE=$(git remote get-url origin)
 git remote set-url origin https://github.com/hodakamori/megane.git
-gh run view --workflow=publish-vscode.yml --limit 1
+gh run list --workflow=publish-vscode.yml --limit 1
 git remote set-url origin "$ORIG_REMOTE"
 ```
 Confirm the extension version matches `X.Y.Z`.

@@ -23,7 +23,6 @@ import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { createWriteStream } from "fs";
 import { get as httpsGet } from "https";
-import { randomBytes } from "crypto";
 
 // Playwright is installed globally; resolve it explicitly.
 const _require = createRequire("/opt/node22/lib/node_modules/");
@@ -33,6 +32,10 @@ const VERSION = process.argv[2];
 if (!VERSION) {
   console.error("Usage: node test_vscode_render.mjs <version>");
   console.error("Example: node test_vscode_render.mjs 0.4.0");
+  process.exit(1);
+}
+if (!/^\d+\.\d+\.\d+$/.test(VERSION)) {
+  console.error(`Invalid version format: ${VERSION}. Expected semver (e.g. 0.4.0)`);
   process.exit(1);
 }
 
@@ -115,7 +118,7 @@ async function downloadVsixAsync(url, destPath) {
 
 function installExtension(vsixPath) {
   console.log(`Installing extension from ${vsixPath}...`);
-  execSync(`code-server --install-extension "${vsixPath}"`, { stdio: "inherit" });
+  execFileSync("code-server", ["--install-extension", vsixPath], { stdio: "inherit" });
   console.log("Extension installed");
 }
 
@@ -165,46 +168,6 @@ async function startCodeServer() {
       reject(err);
     });
   });
-}
-
-/**
- * Check if a WebGL canvas contains non-white pixels (i.e., something was rendered).
- */
-async function checkCanvasHasContent(page, canvasSelector) {
-  return page.evaluate((sel) => {
-    const canvas = document.querySelector(sel);
-    if (!canvas) return { hasContent: false, totalPixels: 0, nonWhitePixels: 0 };
-
-    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-    if (!gl) {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return { hasContent: false, totalPixels: 0, nonWhitePixels: 0 };
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      let nonWhite = 0;
-      for (let i = 0; i < imageData.data.length; i += 4) {
-        if (imageData.data[i] < 250 || imageData.data[i + 1] < 250 || imageData.data[i + 2] < 250) {
-          nonWhite++;
-        }
-      }
-      const total = canvas.width * canvas.height;
-      return { hasContent: nonWhite > total * 0.001, totalPixels: total, nonWhitePixels: nonWhite };
-    }
-
-    const width = gl.drawingBufferWidth;
-    const height = gl.drawingBufferHeight;
-    const pixels = new Uint8Array(width * height * 4);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-    let nonWhite = 0;
-    const total = width * height;
-    for (let i = 0; i < pixels.length; i += 4) {
-      if (pixels[i] < 250 || pixels[i + 1] < 250 || pixels[i + 2] < 250) {
-        nonWhite++;
-      }
-    }
-
-    return { hasContent: nonWhite > total * 0.001, totalPixels: total, nonWhitePixels: nonWhite };
-  }, canvasSelector);
 }
 
 // ---- Main ----
