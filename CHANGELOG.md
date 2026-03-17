@@ -6,11 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-17
+
 ### Added
 
 - **Bond selection** — Filter node now accepts a `bond_query` for selecting bonds by index or connected atoms. Supports `bond_index`, `atom_index`, and `element` fields with a `both` modifier for requiring both endpoints to match. Example: `both atom_index >= 24` selects bonds where both atoms are solvent.
 - **Per-bond opacity** — Modify node applies per-bond opacity when bonds are filtered, enabling selective transparency (e.g., semi-transparent solvent bonds)
 - Default caffeine-water pipeline now renders solvent bonds semi-transparent to match solvent atom opacity
+
+### Fixed
+
+- Wrong atoms rendered when switching from solid to streaming template
+- Trajectory controls broken on streaming template
+- `loadText` return type now uses `StructureParseResult` for improved type safety
 
 ## [0.4.0] - 2026-03-14
 
