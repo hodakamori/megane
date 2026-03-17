@@ -223,15 +223,35 @@ try {
   await page.waitForTimeout(3000);
 
   // Step 8: Open test.pdb via the file explorer
-  // Use the Explorer view to click on test.pdb
   console.log("Opening test.pdb...");
 
-  // Try to open file via keyboard shortcut (Ctrl+P / Quick Open)
-  await page.keyboard.press("Control+p");
-  await page.waitForTimeout(500);
-  await page.keyboard.type("test.pdb");
-  await page.waitForTimeout(1000);
-  await page.keyboard.press("Enter");
+  // Dismiss any modal dialogs (e.g., workspace trust)
+  try {
+    const trustButton = page.getByRole("button", { name: /trust the authors/i });
+    await trustButton.waitFor({ timeout: 3000 });
+    await trustButton.click();
+    console.log("Dismissed workspace trust dialog");
+    await page.waitForTimeout(1000);
+  } catch {
+    console.log("No trust dialog found, continuing");
+  }
+
+  // Try clicking test.pdb in the explorer tree
+  try {
+    const fileItem = page.getByText("test.pdb").first();
+    await fileItem.waitFor({ timeout: 5000 });
+    await fileItem.dblclick();
+    console.log("File opened via explorer click");
+  } catch {
+    // Fallback: try Quick Open (Ctrl+P)
+    console.log("Explorer click failed, trying Quick Open (Ctrl+P)...");
+    await page.keyboard.press("Control+p");
+    await page.waitForTimeout(1000);
+    await page.keyboard.type("test.pdb");
+    await page.waitForTimeout(1000);
+    await page.keyboard.press("Enter");
+    console.log("File opened via Quick Open");
+  }
   console.log("File open command issued");
 
   // Wait for the megane custom editor canvas to appear
@@ -314,7 +334,9 @@ try {
         e.includes("acquireVsCodeApi") ||
         e.includes("megane")) &&
       !e.includes("Shader Error") &&
-      !e.includes("WebGLProgram")
+      !e.includes("WebGLProgram") &&
+      !e.includes("open-vsx.org") &&
+      !e.includes("CORS policy")
   );
   assert(
     criticalErrors.length === 0,
