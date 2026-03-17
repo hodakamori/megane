@@ -32,6 +32,7 @@ function App() {
   // Playback store state
   const playing = usePlaybackStore((s) => s.playing);
   const fps = usePlaybackStore((s) => s.fps);
+  const totalFrames = usePlaybackStore((s) => s.totalFrames);
   const togglePlayPause = usePlaybackStore((s) => s.togglePlayPause);
   const setFps = usePlaybackStore((s) => s.setFps);
   const seekFrame = usePlaybackStore((s) => s.seekFrame);
@@ -129,7 +130,7 @@ function App() {
       snapshot={ds.snapshot}
       frame={ds.frame}
       currentFrame={ds.currentFrame}
-      totalFrames={ds.meta?.nFrames ?? 0}
+      totalFrames={totalFrames}
       playing={playing}
       fps={fps}
       onSeek={handleSeek}
