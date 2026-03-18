@@ -598,7 +598,9 @@ class Pipeline:
         pipe = cls()
         node_by_id: dict[str, PipelineNode] = {}
 
-        for nd in d.get("nodes", []):
+        for i, nd in enumerate(d.get("nodes", [])):
+            if "id" not in nd:
+                raise ValueError(f"Node at index {i} is missing required field 'id'.")
             node = cls._build_node_from_dict(nd)
             node._id = nd["id"]
             pipe._nodes[node._id] = (node, pipe._serialize_node(node))
@@ -607,6 +609,10 @@ class Pipeline:
             if isinstance(node, LoadStructure) and node.path:
                 pipe._load_structure_data(node)
 
+        for i, e in enumerate(d.get("edges", [])):
+            for field in ("source", "target", "sourceHandle", "targetHandle"):
+                if field not in e:
+                    raise ValueError(f"Edge at index {i} is missing required field {field!r}.")
         pipe._edges = [dict(e) for e in d.get("edges", [])]
 
         # Trigger trajectory loading for LoadStructure → LoadTrajectory edges.

@@ -16,6 +16,7 @@ import {
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
+import { downloadBlob } from "../renderer/RenderCapture";
 import type { PipelineNodeType } from "../pipeline/types";
 import {
   NODE_TYPE_LABELS,
@@ -353,14 +354,7 @@ function PipelineEditorInner({
   const handleExport = useCallback(() => {
     const serialized = usePipelineStore.getState().serialize();
     const blob = new Blob([JSON.stringify(serialized, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "pipeline.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, "pipeline.json");
   }, []);
 
   const handleImportClick = useCallback(() => {
@@ -385,6 +379,10 @@ function PipelineEditorInner({
         } catch (err) {
           window.alert("Failed to load pipeline: " + (err as Error).message);
         }
+        e.target.value = "";
+      };
+      reader.onerror = () => {
+        window.alert("Failed to read file: " + (reader.error?.message ?? "unknown error"));
         e.target.value = "";
       };
       reader.readAsText(file);
