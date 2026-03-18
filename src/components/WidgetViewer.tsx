@@ -188,13 +188,16 @@ function WidgetViewerPipeline({
     }
   }, [pipelineJson]);
 
-  const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
-    rendererRef.current = renderer;
-    applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
-    prevViewportStateRef.current = usePipelineStore.getState().viewportState;
-    // Apply initial selectedAtoms that may have arrived before the renderer was ready
-    setExternalSelection(selectedAtomsRef.current ?? []);
-  }, [setExternalSelection]);
+  const handleRendererReady = useCallback(
+    (renderer: MoleculeRenderer) => {
+      rendererRef.current = renderer;
+      applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
+      prevViewportStateRef.current = usePipelineStore.getState().viewportState;
+      // Apply initial selectedAtoms that may have arrived before the renderer was ready
+      setExternalSelection(selectedAtomsRef.current ?? []);
+    },
+    [setExternalSelection],
+  );
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
@@ -314,11 +317,14 @@ function WidgetViewerSimple({
     setExternalSelection(selectedAtoms ?? []);
   }, [selectedAtoms, setExternalSelection]);
 
-  const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
-    rendererRef.current = renderer;
-    // Apply initial selectedAtoms that may have arrived before the renderer was ready
-    setExternalSelection(selectedAtomsRef.current ?? []);
-  }, [setExternalSelection]);
+  const handleRendererReady = useCallback(
+    (renderer: MoleculeRenderer) => {
+      rendererRef.current = renderer;
+      // Apply initial selectedAtoms that may have arrived before the renderer was ready
+      setExternalSelection(selectedAtomsRef.current ?? []);
+    },
+    [setExternalSelection],
+  );
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
