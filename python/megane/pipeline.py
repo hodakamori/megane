@@ -501,6 +501,162 @@ class Pipeline:
         edges = list(self._edges)
         return {"version": 3, "nodes": nodes, "edges": edges}
 
+    def to_json(self, *, indent: int | None = 2) -> str:
+        """Serialize to a JSON string (SerializedPipeline v3).
+
+        Args:
+            indent: JSON indentation level (default 2). Pass ``None`` for compact output.
+
+        Returns:
+            JSON string representation of the pipeline.
+        """
+        import json
+
+        return json.dumps(self.to_dict(), indent=indent)
+
+    def save(self, path) -> None:
+        """Save the pipeline to a JSON file.
+
+        Args:
+            path: Destination file path (``str`` or :class:`pathlib.Path`).
+                  Creates or overwrites the file.
+        """
+        import pathlib
+
+        pathlib.Path(path).write_text(self.to_json(), encoding="utf-8")
+
+    @staticmethod
+    def _build_node_from_dict(nd: dict) -> "PipelineNode":
+        """Instantiate the correct PipelineNode subclass from a v3 node dict."""
+        ntype = nd.get("type")
+        if ntype == "load_structure":
+            return LoadStructure(nd.get("fileName") or "")
+        elif ntype == "load_trajectory":
+            import pathlib
+
+            fname = nd.get("fileName") or ""
+            ext = pathlib.Path(fname).suffix.lower()
+            return LoadTrajectory(
+                xtc=fname if ext == ".xtc" else None,
+                traj=fname if ext != ".xtc" and fname else None,
+            )
+        elif ntype == "filter":
+            return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
+        elif ntype == "modify":
+            return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0))
+        elif ntype == "add_bond":
+            return AddBonds(source=nd.get("bondSource", "distance"))
+        elif ntype == "label_generator":
+            return AddLabels(source=nd.get("source", "element"))
+        elif ntype == "polyhedron_generator":
+            return AddPolyhedra(
+                center_elements=nd.get("centerElements", []),
+                ligand_elements=nd.get("ligandElements", [8]),
+                max_distance=nd.get("maxDistance", 2.5),
+                opacity=nd.get("opacity", 0.5),
+                show_edges=nd.get("showEdges", False),
+                edge_color=nd.get("edgeColor", "#dddddd"),
+                edge_width=nd.get("edgeWidth", 3.0),
+            )
+        elif ntype == "vector_overlay":
+            return VectorOverlay(scale=nd.get("scale", 1.0))
+        elif ntype == "viewport":
+            return Viewport(
+                perspective=nd.get("perspective", False),
+                cell_axes_visible=nd.get("cellAxesVisible", True),
+            )
+        elif ntype == "streaming":
+            return Streaming()
+        elif ntype == "load_vector":
+            return LoadVector(nd.get("fileName") or "")
+        else:
+            raise ValueError(f"Unknown node type {ntype!r}")
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Pipeline":
+        """Reconstruct a Pipeline from a SerializedPipeline v3 dict.
+
+        ``LoadStructure`` file paths in the JSON must still be accessible.
+        Relative paths are resolved from the current working directory at call
+        time.
+
+        Args:
+            d: A dict in ``SerializedPipeline`` v3 format (e.g. from
+               :meth:`to_dict`).
+
+        Returns:
+            A new :class:`Pipeline` instance ready to pass to
+            ``MolecularViewer.set_pipeline()``.
+
+        Raises:
+            ValueError: If the dict is not version 3 or contains an unknown
+                        node type.
+        """
+        if d.get("version") != 3:
+            raise ValueError(
+                f"Unsupported pipeline version: {d.get('version')!r}. Expected 3."
+            )
+
+        pipe = cls()
+        node_by_id: dict[str, PipelineNode] = {}
+
+        for nd in d.get("nodes", []):
+            node = cls._build_node_from_dict(nd)
+            node._id = nd["id"]
+            pipe._nodes[node._id] = (node, pipe._serialize_node(node))
+            node_by_id[node._id] = node
+
+            if isinstance(node, LoadStructure) and node.path:
+                pipe._load_structure_data(node)
+
+        pipe._edges = [dict(e) for e in d.get("edges", [])]
+
+        # Trigger trajectory loading for LoadStructure → LoadTrajectory edges.
+        for edge in pipe._edges:
+            target = node_by_id.get(edge["target"])
+            source = node_by_id.get(edge["source"])
+            if isinstance(target, LoadTrajectory) and isinstance(source, LoadStructure):
+                pipe._load_trajectory_data(target, source)
+
+        # Advance counter past any imported IDs to avoid future collisions.
+        max_counter = 0
+        for nid in pipe._nodes:
+            parts = nid.rsplit("-", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                max_counter = max(max_counter, int(parts[1]))
+        pipe._counter = max_counter
+
+        return pipe
+
+    @classmethod
+    def from_json(cls, s: str) -> "Pipeline":
+        """Reconstruct a Pipeline from a JSON string.
+
+        Args:
+            s: JSON string in ``SerializedPipeline`` v3 format.
+
+        Returns:
+            A new :class:`Pipeline` instance.
+        """
+        import json
+
+        return cls.from_dict(json.loads(s))
+
+    @classmethod
+    def load(cls, path) -> "Pipeline":
+        """Load a Pipeline from a JSON file saved with :meth:`save`.
+
+        Args:
+            path: Path to a JSON file in ``SerializedPipeline`` v3 format
+                  (``str`` or :class:`pathlib.Path`).
+
+        Returns:
+            A new :class:`Pipeline` instance.
+        """
+        import pathlib
+
+        return cls.from_json(pathlib.Path(path).read_text(encoding="utf-8"))
+
     # ── Internal ────────────────────────────────────────────
 
     def _serialize_node(self, node: PipelineNode) -> dict:

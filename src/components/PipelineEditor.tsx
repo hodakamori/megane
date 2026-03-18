@@ -137,6 +137,28 @@ const layoutBtnStyle: React.CSSProperties = {
   color: "#10b981",
 };
 
+const exportBtnStyle: React.CSSProperties = {
+  background: "rgba(6, 182, 212, 0.08)",
+  border: "1px solid rgba(6, 182, 212, 0.25)",
+  borderRadius: 6,
+  padding: "4px 12px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#06b6d4",
+};
+
+const importBtnStyle: React.CSSProperties = {
+  background: "rgba(99, 102, 241, 0.08)",
+  border: "1px solid rgba(99, 102, 241, 0.25)",
+  borderRadius: 6,
+  padding: "4px 12px",
+  cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#6366f1",
+};
+
 const renderBtnStyle: React.CSSProperties = {
   background: "rgba(245, 158, 11, 0.08)",
   border: "1px solid rgba(245, 158, 11, 0.25)",
@@ -213,6 +235,7 @@ function PipelineEditorInner({
   const addNode = usePipelineStore((s) => s.addNode);
   const applyTemplate = usePipelineStore((s) => s.applyTemplate);
   const autoLayout = usePipelineStore((s) => s.autoLayout);
+  const deserialize = usePipelineStore((s) => s.deserialize);
   const { fitView } = useReactFlow();
 
   const { screenToFlowPosition } = useReactFlow();
@@ -222,6 +245,7 @@ function PipelineEditorInner({
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   // Resize drag handling
   const handleResizeMouseDown = useCallback(
@@ -326,6 +350,48 @@ function PipelineEditorInner({
     });
   }, [autoLayout, fitView]);
 
+  const handleExport = useCallback(() => {
+    const serialized = usePipelineStore.getState().serialize();
+    const blob = new Blob([JSON.stringify(serialized, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pipeline.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click();
+  }, []);
+
+  const handleImportFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result as string);
+          if (parsed.version !== 3) {
+            throw new Error("Not a valid megane pipeline JSON (version 3 required)");
+          }
+          deserialize(parsed);
+          window.requestAnimationFrame(() => {
+            fitView({ padding: 0.1, maxZoom: 1.95, duration: 300 });
+          });
+        } catch (err) {
+          window.alert("Failed to load pipeline: " + (err as Error).message);
+        }
+        e.target.value = "";
+      };
+      reader.readAsText(file);
+    },
+    [deserialize, fitView],
+  );
+
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
   const headerExtra = (
@@ -335,6 +401,12 @@ function PipelineEditorInner({
       </button>
       <button onClick={handleAutoLayout} style={layoutBtnStyle}>
         Auto Layout
+      </button>
+      <button onClick={handleExport} style={exportBtnStyle}>
+        Export
+      </button>
+      <button onClick={handleImportClick} style={importBtnStyle}>
+        Import
       </button>
       <button
         onClick={() => {
@@ -483,6 +555,13 @@ function PipelineEditorInner({
             fitView({ padding: 0.1, maxZoom: 1.95, duration: 300 });
           });
         }}
+      />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: "none" }}
+        onChange={handleImportFile}
       />
       <RenderModal
         open={showRenderModal}
