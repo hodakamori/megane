@@ -85,12 +85,14 @@ function WidgetViewerPipeline({
     setExternalSelection,
   } = useAtomSelection(rendererRef, onMeasurementChange);
 
+  // Keep a ref so handleRendererReady can apply the initial selection
+  const selectedAtomsRef = useRef(selectedAtoms);
+  selectedAtomsRef.current = selectedAtoms;
+
   // Sync external atom selection from Python
   useEffect(() => {
     setExternalSelection(selectedAtoms ?? []);
   }, [selectedAtoms, setExternalSelection]);
-
-  // Subscribe to pipeline store
   const viewportState = usePipelineStore((s) => s.viewportState);
   const storeSnapshot = usePipelineStore((s) => s.snapshot);
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
@@ -190,7 +192,9 @@ function WidgetViewerPipeline({
     rendererRef.current = renderer;
     applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
     prevViewportStateRef.current = usePipelineStore.getState().viewportState;
-  }, []);
+    // Apply initial selectedAtoms that may have arrived before the renderer was ready
+    setExternalSelection(selectedAtomsRef.current ?? []);
+  }, [setExternalSelection]);
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
@@ -302,13 +306,19 @@ function WidgetViewerSimple({
     setExternalSelection,
   } = useAtomSelection(rendererRef, onMeasurementChange);
 
+  // Keep a ref so handleRendererReady can apply the initial selection
+  const selectedAtomsRef = useRef(selectedAtoms);
+  selectedAtomsRef.current = selectedAtoms;
+
   useEffect(() => {
     setExternalSelection(selectedAtoms ?? []);
   }, [selectedAtoms, setExternalSelection]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
-  }, []);
+    // Apply initial selectedAtoms that may have arrived before the renderer was ready
+    setExternalSelection(selectedAtomsRef.current ?? []);
+  }, [setExternalSelection]);
 
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
