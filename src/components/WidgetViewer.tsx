@@ -10,7 +10,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { Timeline } from "./Timeline";
+import { Tooltip } from "./Tooltip";
+import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
+import { useAtomSelection } from "../hooks/useAtomSelection";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
@@ -18,7 +21,7 @@ import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 import type { NodeSnapshotData } from "../pipeline/execute";
-import type { Snapshot, Frame, Measurement } from "../types";
+import type { Snapshot, Frame, Measurement, HoverInfo } from "../types";
 
 interface WidgetViewerProps {
   snapshot: Snapshot | null;
@@ -61,6 +64,8 @@ function WidgetViewerPipeline({
   currentFrame,
   totalFrames,
   onSeek,
+  selectedAtoms,
+  onMeasurementChange,
   pipelineJson,
   nodeSnapshotsData,
 }: WidgetViewerProps) {
@@ -68,7 +73,22 @@ function WidgetViewerPipeline({
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+
+  const {
+    selection,
+    measurement,
+    handleAtomRightClick,
+    handleClearSelection,
+    handleFrameUpdated,
+    setExternalSelection,
+  } = useAtomSelection(rendererRef, onMeasurementChange);
+
+  // Sync external atom selection from Python
+  useEffect(() => {
+    setExternalSelection(selectedAtoms ?? []);
+  }, [selectedAtoms, setExternalSelection]);
 
   // Subscribe to pipeline store
   const viewportState = usePipelineStore((s) => s.viewportState);
@@ -229,9 +249,9 @@ function WidgetViewerPipeline({
         snapshot={storeSnapshot ?? snapshot}
         frame={frame}
         onRendererReady={handleRendererReady}
-        onHover={() => {}}
-        onAtomRightClick={() => {}}
-        onFrameUpdated={() => {}}
+        onHover={setHoverInfo}
+        onAtomRightClick={handleAtomRightClick}
+        onFrameUpdated={handleFrameUpdated}
       />
 
       {totalFrames > 1 && (
@@ -245,6 +265,13 @@ function WidgetViewerPipeline({
           onFpsChange={handleFpsChange}
         />
       )}
+      <Tooltip info={hoverInfo} />
+      <MeasurementPanel
+        selection={selection}
+        measurement={measurement}
+        elements={storeSnapshot?.elements ?? snapshot?.elements ?? null}
+        onClear={handleClearSelection}
+      />
     </div>
   );
 }
@@ -257,11 +284,27 @@ function WidgetViewerSimple({
   currentFrame,
   totalFrames,
   onSeek,
+  selectedAtoms,
+  onMeasurementChange,
 }: WidgetViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+
+  const {
+    selection,
+    measurement,
+    handleAtomRightClick,
+    handleClearSelection,
+    handleFrameUpdated,
+    setExternalSelection,
+  } = useAtomSelection(rendererRef, onMeasurementChange);
+
+  useEffect(() => {
+    setExternalSelection(selectedAtoms ?? []);
+  }, [selectedAtoms, setExternalSelection]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -324,9 +367,9 @@ function WidgetViewerSimple({
         snapshot={snapshot}
         frame={frame}
         onRendererReady={handleRendererReady}
-        onHover={() => {}}
-        onAtomRightClick={() => {}}
-        onFrameUpdated={() => {}}
+        onHover={setHoverInfo}
+        onAtomRightClick={handleAtomRightClick}
+        onFrameUpdated={handleFrameUpdated}
       />
 
       {totalFrames > 1 && (
@@ -340,6 +383,13 @@ function WidgetViewerSimple({
           onFpsChange={handleFpsChange}
         />
       )}
+      <Tooltip info={hoverInfo} />
+      <MeasurementPanel
+        selection={selection}
+        measurement={measurement}
+        elements={snapshot?.elements ?? null}
+        onClear={handleClearSelection}
+      />
     </div>
   );
 }
