@@ -86,6 +86,8 @@ export class MoleculeRenderer {
     duration: number;
   } | null = null;
 
+  private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
+
   /** Structure layers for multi-structure overlay rendering. */
   private layers = new Map<string, StructureLayer>();
 
@@ -156,6 +158,7 @@ export class MoleculeRenderer {
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
     this.attachPivotCancelListener();
+    this.attachWheelZoomListener();
 
     // Lighting - hemisphere + 3-point
     const hemi = new THREE.HemisphereLight(0xddeeff, 0x997744, 0.4);
@@ -616,6 +619,48 @@ export class MoleculeRenderer {
     });
   }
 
+  /** Zoom orthographic camera centered on controls.target using mouse wheel.
+   *
+   * Registered on the container in capture phase so it fires before
+   * OrbitControls' bubble-phase wheel listener, letting us intercept only
+   * wheel events for orthographic cameras while leaving touch/pinch dolly
+   * (handled by OrbitControls' pointer events) fully intact.
+   */
+  private attachWheelZoomListener(): void {
+    const el = this.container!;
+    if (this.wheelZoomHandler) {
+      el.removeEventListener("wheel", this.wheelZoomHandler, true);
+    }
+    this.wheelZoomHandler = (e: WheelEvent) => {
+      if (!(this.camera instanceof THREE.OrthographicCamera)) return;
+      e.preventDefault();
+      e.stopPropagation(); // prevent OrbitControls from also processing this
+      this.pivotAnim = null;
+
+      // Normalize deltaY across deltaMode (pixel / line / page)
+      let delta = e.deltaY;
+      if (e.deltaMode === 1 /* DOM_DELTA_LINE */) delta *= 40;
+      else if (e.deltaMode === 2 /* DOM_DELTA_PAGE */) delta *= 800;
+
+      // Mirror OrbitControls' getZoomScale: exponential ramp with zoomSpeed
+      const scale = Math.pow(0.95, this.controls.zoomSpeed * Math.abs(delta) * 0.01);
+      const zoomFactor = delta < 0 ? 1 / scale : scale;
+
+      const targetWorld = this.controls.target.clone();
+      const ndcBefore = targetWorld.clone().project(this.camera);
+
+      this.camera.zoom = Math.max(0.01, this.camera.zoom * zoomFactor);
+      this.camera.updateProjectionMatrix();
+
+      const desiredWorld = ndcBefore.clone().unproject(this.camera);
+      const shift = desiredWorld.sub(targetWorld);
+      this.camera.position.add(shift);
+      this.controls.target.add(shift);
+      this.controls.update();
+    };
+    el.addEventListener("wheel", this.wheelZoomHandler, { capture: true, passive: false });
+  }
+
   /** Set pixel insets for overlay panels that occlude viewport edges. */
   setViewInsets(left: number, right: number): void {
     this.viewInsetLeft = left;
@@ -666,6 +711,7 @@ export class MoleculeRenderer {
     this.controls.target.copy(target);
     this.controls.update();
     this.attachPivotCancelListener();
+    this.attachWheelZoomListener();
 
     if (this.snapshot) {
       this.fitToView(this.snapshot);
@@ -1015,6 +1061,10 @@ export class MoleculeRenderer {
     this.layers.clear();
     if (this.dprMediaQuery && this.dprChangeHandler) {
       this.dprMediaQuery.removeEventListener("change", this.dprChangeHandler);
+    }
+    if (this.wheelZoomHandler && this.container) {
+      this.container.removeEventListener("wheel", this.wheelZoomHandler, true);
+      this.wheelZoomHandler = null;
     }
     this.controls.dispose();
     this.renderer.dispose();
