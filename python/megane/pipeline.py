@@ -593,9 +593,7 @@ class Pipeline:
                         node type.
         """
         if d.get("version") != 3:
-            raise ValueError(
-                f"Unsupported pipeline version: {d.get('version')!r}. Expected 3."
-            )
+            raise ValueError(f"Unsupported pipeline version: {d.get('version')!r}. Expected 3.")
 
         pipe = cls()
         node_by_id: dict[str, PipelineNode] = {}
