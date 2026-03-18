@@ -74,6 +74,15 @@ export class MoleculeRenderer {
   private lastContainerW = 0;
   private lastContainerH = 0;
   private lastDpr = 1;
+  /** Smooth pivot animation state (set by setRotationCenter). */
+  private pivotAnim: {
+    startTarget: THREE.Vector3;
+    endTarget: THREE.Vector3;
+    startCameraPos: THREE.Vector3;
+    endCameraPos: THREE.Vector3;
+    startTime: number;
+    duration: number;
+  } | null = null;
 
   /** Structure layers for multi-structure overlay rendering. */
   private layers = new Map<string, StructureLayer>();
@@ -570,10 +579,24 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Set the rotation center (orbit target) to the given world coordinates. */
+  /** Set the rotation center (orbit target) to the given world coordinates.
+   *  Animates smoothly: the clicked atom pans to screen-center without a visual jump.
+   */
   setRotationCenter(x: number, y: number, z: number): void {
-    this.controls.target.set(x, y, z);
-    this.controls.update();
+    const endTarget = new THREE.Vector3(x, y, z);
+    const startTarget = this.controls.target.clone();
+    const delta = endTarget.clone().sub(startTarget);
+    const startCameraPos = this.camera.position.clone();
+    const endCameraPos = startCameraPos.clone().add(delta);
+
+    this.pivotAnim = {
+      startTarget,
+      endTarget,
+      startCameraPos,
+      endCameraPos,
+      startTime: performance.now(),
+      duration: 400,
+    };
   }
 
   /** Set pixel insets for overlay panels that occlude viewport edges. */
@@ -900,6 +923,24 @@ export class MoleculeRenderer {
         this.lastDpr = dpr;
         this.onResize();
       }
+    }
+
+    // Tick smooth pivot animation (set by setRotationCenter).
+    // Moving target and camera.position by the same delta each frame keeps
+    // the camera–target offset constant, so there is no visual jump.
+    if (this.pivotAnim) {
+      const t = Math.min(
+        (performance.now() - this.pivotAnim.startTime) / this.pivotAnim.duration,
+        1,
+      );
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      this.controls.target.lerpVectors(this.pivotAnim.startTarget, this.pivotAnim.endTarget, ease);
+      this.camera.position.lerpVectors(
+        this.pivotAnim.startCameraPos,
+        this.pivotAnim.endCameraPos,
+        ease,
+      );
+      if (t >= 1) this.pivotAnim = null;
     }
 
     this.controls.update();
