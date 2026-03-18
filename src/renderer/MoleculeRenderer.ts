@@ -74,6 +74,8 @@ export class MoleculeRenderer {
   private lastContainerW = 0;
   private lastContainerH = 0;
   private lastDpr = 1;
+  /** Duration of the smooth pivot animation in milliseconds. */
+  private static readonly PIVOT_ANIM_DURATION_MS = 400;
   /** Smooth pivot animation state (set by setRotationCenter). */
   private pivotAnim: {
     startTarget: THREE.Vector3;
@@ -153,6 +155,7 @@ export class MoleculeRenderer {
     this.controls.dampingFactor = 0.1;
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
+    this.attachPivotCancelListener();
 
     // Lighting - hemisphere + 3-point
     const hemi = new THREE.HemisphereLight(0xddeeff, 0x997744, 0.4);
@@ -580,10 +583,17 @@ export class MoleculeRenderer {
   }
 
   /** Set the rotation center (orbit target) to the given world coordinates.
-   *  Animates smoothly: the clicked atom pans to screen-center without a visual jump.
+   * @param animate - When true (default), smoothly animates the transition over
+   *   PIVOT_ANIM_DURATION_MS.  Pass false to update synchronously (legacy behaviour).
    */
-  setRotationCenter(x: number, y: number, z: number): void {
+  setRotationCenter(x: number, y: number, z: number, animate = true): void {
     const endTarget = new THREE.Vector3(x, y, z);
+    if (!animate) {
+      this.pivotAnim = null;
+      this.controls.target.copy(endTarget);
+      this.controls.update();
+      return;
+    }
     const startTarget = this.controls.target.clone();
     const delta = endTarget.clone().sub(startTarget);
     const startCameraPos = this.camera.position.clone();
@@ -595,8 +605,15 @@ export class MoleculeRenderer {
       startCameraPos,
       endCameraPos,
       startTime: performance.now(),
-      duration: 400,
+      duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
     };
+  }
+
+  /** Cancel any in-progress pivot animation when the user begins interacting. */
+  private attachPivotCancelListener(): void {
+    this.controls.addEventListener("start", () => {
+      this.pivotAnim = null;
+    });
   }
 
   /** Set pixel insets for overlay panels that occlude viewport edges. */
@@ -648,6 +665,7 @@ export class MoleculeRenderer {
     this.controls.zoomSpeed = oldZoomSpeed;
     this.controls.target.copy(target);
     this.controls.update();
+    this.attachPivotCancelListener();
 
     if (this.snapshot) {
       this.fitToView(this.snapshot);
