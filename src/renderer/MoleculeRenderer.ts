@@ -74,6 +74,17 @@ export class MoleculeRenderer {
   private lastContainerW = 0;
   private lastContainerH = 0;
   private lastDpr = 1;
+  /** Duration of the smooth pivot animation in milliseconds. */
+  private static readonly PIVOT_ANIM_DURATION_MS = 400;
+  /** Smooth pivot animation state (set by setRotationCenter). */
+  private pivotAnim: {
+    startTarget: THREE.Vector3;
+    endTarget: THREE.Vector3;
+    startCameraPos: THREE.Vector3;
+    endCameraPos: THREE.Vector3;
+    startTime: number;
+    duration: number;
+  } | null = null;
 
   /** Structure layers for multi-structure overlay rendering. */
   private layers = new Map<string, StructureLayer>();
@@ -144,6 +155,7 @@ export class MoleculeRenderer {
     this.controls.dampingFactor = 0.1;
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
+    this.attachPivotCancelListener();
 
     // Lighting - hemisphere + 3-point
     const hemi = new THREE.HemisphereLight(0xddeeff, 0x997744, 0.4);
@@ -570,10 +582,38 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Set the rotation center (orbit target) to the given world coordinates. */
-  setRotationCenter(x: number, y: number, z: number): void {
-    this.controls.target.set(x, y, z);
-    this.controls.update();
+  /** Set the rotation center (orbit target) to the given world coordinates.
+   * @param animate - When true (default), smoothly animates the transition over
+   *   PIVOT_ANIM_DURATION_MS.  Pass false to update synchronously (legacy behaviour).
+   */
+  setRotationCenter(x: number, y: number, z: number, animate = true): void {
+    const endTarget = new THREE.Vector3(x, y, z);
+    if (!animate) {
+      this.pivotAnim = null;
+      this.controls.target.copy(endTarget);
+      this.controls.update();
+      return;
+    }
+    const startTarget = this.controls.target.clone();
+    const delta = endTarget.clone().sub(startTarget);
+    const startCameraPos = this.camera.position.clone();
+    const endCameraPos = startCameraPos.clone().add(delta);
+
+    this.pivotAnim = {
+      startTarget,
+      endTarget,
+      startCameraPos,
+      endCameraPos,
+      startTime: performance.now(),
+      duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
+    };
+  }
+
+  /** Cancel any in-progress pivot animation when the user begins interacting. */
+  private attachPivotCancelListener(): void {
+    this.controls.addEventListener("start", () => {
+      this.pivotAnim = null;
+    });
   }
 
   /** Set pixel insets for overlay panels that occlude viewport edges. */
@@ -625,6 +665,7 @@ export class MoleculeRenderer {
     this.controls.zoomSpeed = oldZoomSpeed;
     this.controls.target.copy(target);
     this.controls.update();
+    this.attachPivotCancelListener();
 
     if (this.snapshot) {
       this.fitToView(this.snapshot);
@@ -900,6 +941,24 @@ export class MoleculeRenderer {
         this.lastDpr = dpr;
         this.onResize();
       }
+    }
+
+    // Tick smooth pivot animation (set by setRotationCenter).
+    // Moving target and camera.position by the same delta each frame keeps
+    // the camera–target offset constant, so there is no visual jump.
+    if (this.pivotAnim) {
+      const t = Math.min(
+        (performance.now() - this.pivotAnim.startTime) / this.pivotAnim.duration,
+        1,
+      );
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      this.controls.target.lerpVectors(this.pivotAnim.startTarget, this.pivotAnim.endTarget, ease);
+      this.camera.position.lerpVectors(
+        this.pivotAnim.startCameraPos,
+        this.pivotAnim.endCameraPos,
+        ease,
+      );
+      if (t >= 1) this.pivotAnim = null;
     }
 
     this.controls.update();
