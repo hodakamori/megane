@@ -80,8 +80,6 @@ export class MoleculeRenderer {
   private pivotAnim: {
     startTarget: THREE.Vector3;
     endTarget: THREE.Vector3;
-    startCameraPos: THREE.Vector3;
-    endCameraPos: THREE.Vector3;
     startTime: number;
     duration: number;
   } | null = null;
@@ -598,16 +596,14 @@ export class MoleculeRenderer {
       return;
     }
     const startTarget = this.controls.target.clone();
-    const startCameraPos = this.camera.position.clone();
 
     // Only animate controls.target — keep camera.position fixed so the
-    // clicked atom stays at its current screen position rather than
-    // panning to the (inset-shifted) frustum centre.
+    // camera does not pan to the (inset-shifted) frustum center.
+    // OrbitControls will rotate the view to face the new target, which is
+    // expected: the atom becomes the new orbit pivot.
     this.pivotAnim = {
       startTarget,
       endTarget,
-      startCameraPos,
-      endCameraPos: startCameraPos.clone(),
       startTime: performance.now(),
       duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
     };
@@ -991,8 +987,8 @@ export class MoleculeRenderer {
     }
 
     // Tick smooth pivot animation (set by setRotationCenter).
-    // Moving target and camera.position by the same delta each frame keeps
-    // the camera–target offset constant, so there is no visual jump.
+    // Only controls.target is interpolated; camera.position stays fixed so
+    // the camera does not pan during the transition.
     if (this.pivotAnim) {
       const t = Math.min(
         (performance.now() - this.pivotAnim.startTime) / this.pivotAnim.duration,
@@ -1000,11 +996,6 @@ export class MoleculeRenderer {
       );
       const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
       this.controls.target.lerpVectors(this.pivotAnim.startTarget, this.pivotAnim.endTarget, ease);
-      this.camera.position.lerpVectors(
-        this.pivotAnim.startCameraPos,
-        this.pivotAnim.endCameraPos,
-        ease,
-      );
       if (t >= 1) this.pivotAnim = null;
     }
 
