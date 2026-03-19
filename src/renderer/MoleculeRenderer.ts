@@ -80,6 +80,8 @@ export class MoleculeRenderer {
   private pivotAnim: {
     startTarget: THREE.Vector3;
     endTarget: THREE.Vector3;
+    startCameraPos: THREE.Vector3;
+    endCameraPos: THREE.Vector3;
     startTime: number;
     duration: number;
   } | null = null;
@@ -596,14 +598,19 @@ export class MoleculeRenderer {
       return;
     }
     const startTarget = this.controls.target.clone();
+    const delta = endTarget.clone().sub(startTarget);
+    const startCameraPos = this.camera.position.clone();
+    const endCameraPos = startCameraPos.clone().add(delta);
 
-    // Only animate controls.target — keep camera.position fixed so the
-    // camera does not pan to the (inset-shifted) frustum center.
-    // OrbitControls will rotate the view to face the new target, which is
-    // expected: the atom becomes the new orbit pivot.
+    // Translate both controls.target and camera.position by the same delta
+    // so the scene pans smoothly and the clicked atom lands at the visual
+    // center.  Damping is disabled during animation frames (see render loop)
+    // to prevent residual sphericalDelta from adding unwanted rotation.
     this.pivotAnim = {
       startTarget,
       endTarget,
+      startCameraPos,
+      endCameraPos,
       startTime: performance.now(),
       duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
     };
@@ -987,8 +994,10 @@ export class MoleculeRenderer {
     }
 
     // Tick smooth pivot animation (set by setRotationCenter).
-    // Only controls.target is interpolated; camera.position stays fixed so
-    // the camera does not pan during the transition.
+    // Both controls.target and camera.position are translated by the same
+    // delta so the scene pans (not rotates) and the atom lands at the visual
+    // center.  Damping is temporarily disabled so the residual sphericalDelta
+    // from prior user interaction does not add unwanted rotation.
     if (this.pivotAnim) {
       const t = Math.min(
         (performance.now() - this.pivotAnim.startTime) / this.pivotAnim.duration,
@@ -996,10 +1005,21 @@ export class MoleculeRenderer {
       );
       const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
       this.controls.target.lerpVectors(this.pivotAnim.startTarget, this.pivotAnim.endTarget, ease);
+      this.camera.position.lerpVectors(
+        this.pivotAnim.startCameraPos,
+        this.pivotAnim.endCameraPos,
+        ease,
+      );
       if (t >= 1) this.pivotAnim = null;
+      // Update with damping off so sphericalDelta is zeroed and cannot
+      // override the manually-set camera position.
+      const wasDamping = this.controls.enableDamping;
+      this.controls.enableDamping = false;
+      this.controls.update();
+      this.controls.enableDamping = wasDamping;
+    } else {
+      this.controls.update();
     }
-
-    this.controls.update();
 
     // Sync LineMaterial resolution for polyhedron fat edges
     if (this.polyhedronRenderer && this.container) {
