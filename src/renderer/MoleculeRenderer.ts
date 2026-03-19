@@ -80,9 +80,25 @@ export class MoleculeRenderer {
   private pivotAnim: {
     startTarget: THREE.Vector3;
     endTarget: THREE.Vector3;
+    startCameraPos: THREE.Vector3;
+    endCameraPos: THREE.Vector3;
+    /** Frustum shift at animation start (= -(camera.left + camera.right) / 2). */
+    startShift: number;
+    /** Frustum shift at animation end (places controls.target at the cursor pixel). */
+    endShift: number;
+    /** Half-width of the frustum, fixed for the duration of the animation. */
+    startHalfW: number;
     startTime: number;
     duration: number;
   } | null = null;
+
+  /**
+   * Fractional X position [0, 1] where controls.target should appear on screen
+   * after the user sets a rotation center by double-clicking.
+   * null = use the inset-computed visual center (default).
+   * Reset to null on fit-to-view.
+   */
+  private pivotFracX: number | null = null;
 
   private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
 
@@ -570,6 +586,7 @@ export class MoleculeRenderer {
 
   /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
+    this.pivotFracX = null; // Reset pivot so the inset-based visual center is used.
     this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot);
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.doApplyFrustumInsets();
@@ -584,10 +601,23 @@ export class MoleculeRenderer {
   }
 
   /** Set the rotation center (orbit target) to the given world coordinates.
-   * @param animate - When true (default), smoothly animates the transition over
+   * @param animate  - When true (default), smoothly animates the transition over
    *   PIVOT_ANIM_DURATION_MS.  Pass false to update synchronously (legacy behaviour).
+   * @param screenX  - Container-relative X pixel of the cursor that triggered the
+   *   pivot change (optional).  When provided the animation also shifts the frustum
+   *   so the clicked atom arrives under the cursor instead of at the inset-shifted
+   *   visual center.
+   * @param screenY  - Container-relative Y pixel of the cursor (optional, paired
+   *   with screenX).
    */
-  setRotationCenter(x: number, y: number, z: number, animate = true): void {
+  setRotationCenter(
+    x: number,
+    y: number,
+    z: number,
+    animate = true,
+    screenX?: number,
+    screenY?: number,
+  ): void {
     const endTarget = new THREE.Vector3(x, y, z);
     if (!animate) {
       this.pivotAnim = null;
@@ -596,14 +626,47 @@ export class MoleculeRenderer {
       return;
     }
     const startTarget = this.controls.target.clone();
+    const delta = endTarget.clone().sub(startTarget);
+    const startCameraPos = this.camera.position.clone();
+    const endCameraPos = startCameraPos.clone().add(delta);
 
-    // Only animate controls.target — keep camera.position fixed so the
-    // camera does not pan to the (inset-shifted) frustum center.
-    // OrbitControls will rotate the view to face the new target, which is
-    // expected: the atom becomes the new orbit pivot.
+    // Compute frustum-shift animation so the atom arrives at the cursor
+    // position (screenX, screenY) instead of the inset-shifted visual center.
+    // For orthographic cameras only; ignored for perspective.
+    let startShift = 0;
+    let endShift = 0;
+    let startHalfW = 0;
+    if (
+      this.camera instanceof THREE.OrthographicCamera &&
+      this.container &&
+      screenX !== undefined &&
+      screenY !== undefined
+    ) {
+      const W = this.container.clientWidth;
+      startHalfW = (this.camera.right - this.camera.left) / 2;
+      startShift = -(this.camera.left + this.camera.right) / 2;
+      endShift = ((2 * screenX) / W - 1) * startHalfW;
+      // Store as fraction so doApplyFrustumInsets can maintain the position
+      // after resize / zoom.
+      this.pivotFracX = screenX / W;
+    } else if (this.camera instanceof THREE.OrthographicCamera) {
+      startHalfW = (this.camera.right - this.camera.left) / 2;
+      startShift = -(this.camera.left + this.camera.right) / 2;
+      endShift = startShift; // no frustum change
+    }
+
+    // Translate both controls.target and camera.position by the same delta
+    // so the scene pans smoothly.  Damping is disabled during animation frames
+    // (see render loop) to prevent residual sphericalDelta from adding
+    // unwanted rotation.
     this.pivotAnim = {
       startTarget,
       endTarget,
+      startCameraPos,
+      endCameraPos,
+      startShift,
+      endShift,
+      startHalfW,
       startTime: performance.now(),
       duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
     };
@@ -677,6 +740,15 @@ export class MoleculeRenderer {
       this.viewInsetRight,
       this.lastExtent,
     );
+    // If the user set a rotation center by double-clicking, override the
+    // inset-based shift to keep controls.target at the cursor position.
+    if (this.pivotFracX !== null) {
+      const halfW = (this.camera.right - this.camera.left) / 2;
+      const pivotShift = (2 * this.pivotFracX - 1) * halfW;
+      this.camera.left = -halfW - pivotShift;
+      this.camera.right = halfW - pivotShift;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -987,8 +1059,12 @@ export class MoleculeRenderer {
     }
 
     // Tick smooth pivot animation (set by setRotationCenter).
-    // Only controls.target is interpolated; camera.position stays fixed so
-    // the camera does not pan during the transition.
+    // Both controls.target and camera.position are translated by the same
+    // delta so the scene pans (not rotates).  The frustum shift is also
+    // interpolated so the clicked atom arrives at the cursor position rather
+    // than the inset-shifted visual center.  Damping is temporarily disabled
+    // so residual sphericalDelta from prior interaction does not add
+    // unwanted rotation.
     if (this.pivotAnim) {
       const t = Math.min(
         (performance.now() - this.pivotAnim.startTime) / this.pivotAnim.duration,
@@ -996,10 +1072,33 @@ export class MoleculeRenderer {
       );
       const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
       this.controls.target.lerpVectors(this.pivotAnim.startTarget, this.pivotAnim.endTarget, ease);
+      this.camera.position.lerpVectors(
+        this.pivotAnim.startCameraPos,
+        this.pivotAnim.endCameraPos,
+        ease,
+      );
+      // Interpolate the frustum shift so the atom drifts to the cursor pixel.
+      if (this.camera instanceof THREE.OrthographicCamera && this.pivotAnim.startHalfW > 0) {
+        const shiftLerped = THREE.MathUtils.lerp(
+          this.pivotAnim.startShift,
+          this.pivotAnim.endShift,
+          ease,
+        );
+        const hw = this.pivotAnim.startHalfW;
+        this.camera.left = -hw - shiftLerped;
+        this.camera.right = hw - shiftLerped;
+        this.camera.updateProjectionMatrix();
+      }
       if (t >= 1) this.pivotAnim = null;
+      // Update with damping off so sphericalDelta is zeroed and cannot
+      // override the manually-set camera position.
+      const wasDamping = this.controls.enableDamping;
+      this.controls.enableDamping = false;
+      this.controls.update();
+      this.controls.enableDamping = wasDamping;
+    } else {
+      this.controls.update();
     }
-
-    this.controls.update();
 
     // Sync LineMaterial resolution for polyhedron fat edges
     if (this.polyhedronRenderer && this.container) {
