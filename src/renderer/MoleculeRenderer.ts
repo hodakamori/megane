@@ -598,15 +598,16 @@ export class MoleculeRenderer {
       return;
     }
     const startTarget = this.controls.target.clone();
-    const delta = endTarget.clone().sub(startTarget);
     const startCameraPos = this.camera.position.clone();
-    const endCameraPos = startCameraPos.clone().add(delta);
 
+    // Only animate controls.target — keep camera.position fixed so the
+    // clicked atom stays at its current screen position rather than
+    // panning to the (inset-shifted) frustum centre.
     this.pivotAnim = {
       startTarget,
       endTarget,
       startCameraPos,
-      endCameraPos,
+      endCameraPos: startCameraPos.clone(),
       startTime: performance.now(),
       duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
     };
