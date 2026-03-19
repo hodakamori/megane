@@ -82,6 +82,21 @@ export function Viewport({
       onHoverRef.current?.(null);
     };
 
+    const handleDblClick = (e: MouseEvent) => {
+      const info = renderer.raycastAtPixel(e.clientX, e.clientY);
+      if (info && info.kind === "atom") {
+        const positions = renderer.getCurrentPositionsCopy();
+        if (positions) {
+          const idx = info.atomIndex;
+          renderer.setRotationCenter(
+            positions[idx * 3],
+            positions[idx * 3 + 1],
+            positions[idx * 3 + 2],
+          );
+        }
+      }
+    };
+
     // ── Axes-inset drag handlers (pointer events for mouse+touch) ──
 
     const containerEl = containerRef.current!;
@@ -114,6 +129,7 @@ export function Viewport({
     canvas.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("contextmenu", handleContextMenu);
     canvas.addEventListener("mouseleave", handleMouseLeave);
+    canvas.addEventListener("dblclick", handleDblClick);
     canvas.addEventListener("pointerdown", handlePointerDown);
     canvas.addEventListener("pointermove", handlePointerMove);
     canvas.addEventListener("pointerup", handlePointerUp);
@@ -123,6 +139,7 @@ export function Viewport({
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("contextmenu", handleContextMenu);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
+      canvas.removeEventListener("dblclick", handleDblClick);
       canvas.removeEventListener("pointerdown", handlePointerDown);
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
