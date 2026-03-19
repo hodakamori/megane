@@ -764,12 +764,6 @@ export class MoleculeRenderer {
     };
   }
 
-  /** Set the rotation and zoom center (orbit target) to the given world coordinates. */
-  setRotationCenter(x: number, y: number, z: number): void {
-    this.controls.target.set(x, y, z);
-    this.controls.update();
-  }
-
   /** Get a copy of current atom positions (public, for external use). */
   getCurrentPositionsCopy(): Float32Array | null {
     if (!this.snapshot) return null;
