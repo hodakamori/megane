@@ -645,7 +645,7 @@ export class MoleculeRenderer {
       const W = this.container.clientWidth;
       startHalfW = (this.camera.right - this.camera.left) / 2;
       startShift = -(this.camera.left + this.camera.right) / 2;
-      endShift = (2 * screenX / W - 1) * startHalfW;
+      endShift = ((2 * screenX) / W - 1) * startHalfW;
       // Store as fraction so doApplyFrustumInsets can maintain the position
       // after resize / zoom.
       this.pivotFracX = screenX / W;
