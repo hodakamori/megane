@@ -354,7 +354,7 @@ function PipelineEditorInner({
   const handleExport = useCallback(() => {
     const serialized = usePipelineStore.getState().serialize();
     const blob = new Blob([JSON.stringify(serialized, null, 2)], { type: "application/json" });
-    downloadBlob(blob, "pipeline.json");
+    downloadBlob(blob, "pipeline.megane.json");
   }, []);
 
   const handleImportClick = useCallback(() => {
@@ -557,7 +557,7 @@ function PipelineEditorInner({
       <input
         ref={importInputRef}
         type="file"
-        accept=".json,application/json"
+        accept=".megane.json,.json,application/json"
         style={{ display: "none" }}
         onChange={handleImportFile}
       />

@@ -37,6 +37,84 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
+class MeganePipelineEditorProvider {
+    context;
+    static viewType = "megane.pipelineViewer";
+    constructor(context) {
+        this.context = context;
+    }
+    static register(context) {
+        const provider = new MeganePipelineEditorProvider(context);
+        return vscode.window.registerCustomEditorProvider(MeganePipelineEditorProvider.viewType, provider, {
+            webviewOptions: { retainContextWhenHidden: true },
+            supportsMultipleEditorsPerDocument: false,
+        });
+    }
+    openCustomDocument(uri, _openContext, _token) {
+        return { uri, dispose: () => { } };
+    }
+    async resolveCustomEditor(document, webviewPanel, _token) {
+        const webview = webviewPanel.webview;
+        const mediaDir = vscode.Uri.joinPath(this.context.extensionUri, "media");
+        webview.options = {
+            enableScripts: true,
+            localResourceRoots: [mediaDir],
+        };
+        webview.html = getHtmlForWebview(webview, mediaDir);
+        const pipelineData = await vscode.workspace.fs.readFile(document.uri);
+        const pipeline = JSON.parse(new TextDecoder("utf-8").decode(pipelineData));
+        if (pipeline.version !== 3) {
+            throw new Error(`Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`);
+        }
+        const dir = path.dirname(document.uri.fsPath);
+        // Read structure files referenced by load_structure nodes
+        const structureFiles = [];
+        // Read trajectory files referenced by load_trajectory nodes (binary as ArrayBuffer)
+        const trajectoryFiles = [];
+        for (const node of pipeline.nodes) {
+            if (!node.fileName)
+                continue;
+            const filePath = String(node.fileName);
+            // Reject absolute paths and paths that escape the pipeline file's directory
+            if (path.isAbsolute(filePath)) {
+                continue;
+            }
+            const resolvedPath = path.resolve(dir, filePath);
+            if (!(resolvedPath === dir || resolvedPath.startsWith(dir + path.sep))) {
+                continue;
+            }
+            const fileUri = vscode.Uri.file(resolvedPath);
+            const filename = path.basename(filePath);
+            try {
+                if (node.type === "load_structure") {
+                    const raw = await vscode.workspace.fs.readFile(fileUri);
+                    structureFiles.push({
+                        nodeId: node.id,
+                        content: new TextDecoder("utf-8").decode(raw),
+                        filename,
+                    });
+                }
+                else if (node.type === "load_trajectory") {
+                    const raw = await vscode.workspace.fs.readFile(fileUri);
+                    trajectoryFiles.push({ nodeId: node.id, content: raw.buffer, filename });
+                }
+            }
+            catch {
+                // File not found — skip silently; webview will show a warning on the node
+            }
+        }
+        webview.onDidReceiveMessage((message) => {
+            if (message.type === "ready") {
+                webview.postMessage({
+                    type: "loadPipeline",
+                    pipeline,
+                    structureFiles,
+                    trajectoryFiles,
+                });
+            }
+        });
+    }
+}
 class MeganeEditorProvider {
     context;
     static viewType = "megane.structureViewer";
@@ -60,7 +138,7 @@ class MeganeEditorProvider {
             enableScripts: true,
             localResourceRoots: [mediaDir],
         };
-        webview.html = this.getHtmlForWebview(webview, mediaDir);
+        webview.html = getHtmlForWebview(webview, mediaDir);
         // Read the file and send its content to the webview
         const fileData = await vscode.workspace.fs.readFile(document.uri);
         const text = new TextDecoder("utf-8").decode(fileData);
@@ -72,12 +150,13 @@ class MeganeEditorProvider {
             }
         });
     }
-    getHtmlForWebview(webview, mediaDir) {
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "webview.js"));
-        const wasmUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm"));
-        const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "main.css"));
-        const nonce = getNonce();
-        return `<!DOCTYPE html>
+}
+function getHtmlForWebview(webview, mediaDir) {
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "webview.js"));
+    const wasmUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm"));
+    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "main.css"));
+    const nonce = getNonce();
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -109,7 +188,6 @@ class MeganeEditorProvider {
   <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
-    }
 }
 function getNonce() {
     let text = "";
@@ -121,6 +199,7 @@ function getNonce() {
 }
 function activate(context) {
     context.subscriptions.push(MeganeEditorProvider.register(context));
+    context.subscriptions.push(MeganePipelineEditorProvider.register(context));
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

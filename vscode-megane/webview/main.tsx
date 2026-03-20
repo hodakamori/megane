@@ -9,6 +9,9 @@ import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
+import { parseStructureFile } from "../../src/parsers/structure";
+import { parseXTCFile, parseLammpstrjFile } from "../../src/parsers/xtc";
+import type { SerializedPipeline } from "../../src/pipeline/types";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -34,6 +37,75 @@ function App() {
             updateNodeParams(loaderNode.id, { fileName: filename });
           }
         });
+      } else if (message.type === "loadPipeline") {
+        const { pipeline, structureFiles, trajectoryFiles } = message as {
+          pipeline: SerializedPipeline;
+          structureFiles: Array<{ nodeId: string; content: string; filename: string }>;
+          trajectoryFiles: Array<{ nodeId: string; content: ArrayBuffer; filename: string }>;
+        };
+
+        (async () => {
+          const store = usePipelineStore.getState();
+
+          // Restore the full pipeline configuration (nodes, edges, viewport settings, etc.)
+          store.deserialize(pipeline);
+
+          // Parse all structure files first, collect results
+          let firstFile: File | null = null;
+          const parsed: Array<{
+            sf: (typeof structureFiles)[0];
+            file: File;
+            result: Awaited<ReturnType<typeof parseStructureFile>>;
+          }> = [];
+          for (const sf of structureFiles) {
+            const file = new File([sf.content], sf.filename, { type: "text/plain" });
+            const result = await parseStructureFile(file);
+            parsed.push({ sf, file, result });
+            if (!firstFile) firstFile = file;
+          }
+
+          // Populate useMeganeLocal for the primary structure so MeganeViewer
+          // props (atom selection, measurements) work. local.loadFile triggers
+          // execute() before per-node snapshots are set, so we apply them after.
+          if (firstFile) {
+            await local.loadFile(firstFile);
+          }
+
+          // Apply all per-node snapshots after local.loadFile
+          let firstSnapshot = null;
+          for (const { sf, result } of parsed) {
+            store.setNodeSnapshot(sf.nodeId, {
+              snapshot: result.snapshot,
+              frames: result.frames.length > 0 ? result.frames : null,
+              meta: result.meta,
+              labels: result.labels,
+            });
+            store.updateNodeParams(sf.nodeId, {
+              fileName: sf.filename,
+              hasTrajectory: result.frames.length > 0,
+              hasCell: !!result.snapshot.box,
+            });
+            if (!firstSnapshot) firstSnapshot = result.snapshot;
+          }
+
+          // Load only the first trajectory file (store supports a single global trajectory)
+          if (firstSnapshot && trajectoryFiles.length > 0) {
+            const tf = trajectoryFiles[0];
+            const bytes = new Uint8Array(tf.content);
+            const file = new File([bytes], tf.filename);
+            const ext = tf.filename.toLowerCase();
+            const isLammps = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
+            const parseFn = isLammps ? parseLammpstrjFile : parseXTCFile;
+            const { frames, meta } = await parseFn(file, firstSnapshot.nAtoms);
+            store.setFileFrames(frames, meta ?? null);
+            store.updateNodeParams(tf.nodeId, { fileName: tf.filename });
+          }
+
+          setLoaded(true);
+        })().catch((err) => {
+          console.error("Failed to load pipeline:", err);
+          setLoaded(true); // Show viewer even on error so user can recover manually
+        });
       }
     };
 
@@ -49,7 +121,7 @@ function App() {
     (file: File) => {
       local.loadFile(file);
     },
-    [local.loadFile]
+    [local.loadFile],
   );
 
   if (!loaded) {
@@ -80,13 +152,9 @@ function App() {
       onBondSourceChange={(s) =>
         local.setBondSource(s as "structure" | "file" | "distance" | "none")
       }
-      onLabelSourceChange={(s) =>
-        local.setLabelSource(s as "none" | "structure" | "file")
-      }
+      onLabelSourceChange={(s) => local.setLabelSource(s as "none" | "structure" | "file")}
       onLoadLabelFile={(f) => local.loadLabelFile(f)}
-      onVectorSourceChange={(s) =>
-        local.setVectorSource(s as "none" | "file" | "demo")
-      }
+      onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
       onLoadVectorFile={(f) => local.loadVectorFile(f)}
       onLoadDemoVectors={() => local.loadDemoVectors()}
     />
@@ -103,5 +171,5 @@ declare function acquireVsCodeApi(): {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
-  </StrictMode>
+  </StrictMode>,
 );

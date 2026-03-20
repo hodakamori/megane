@@ -40,6 +40,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "megane.pipelineViewer",
+        "displayName": "megane Pipeline Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.megane.json"
+          }
+        ],
+        "priority": "default"
       }
     ]
   },
