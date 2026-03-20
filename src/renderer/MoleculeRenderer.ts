@@ -84,33 +84,9 @@ export class MoleculeRenderer {
     endTarget: THREE.Vector3;
     startCameraPos: THREE.Vector3;
     endCameraPos: THREE.Vector3;
-    /** Frustum shift at animation start (= -(camera.left + camera.right) / 2). */
-    startShift: number;
-    /** Frustum shift at animation end (places controls.target at the cursor pixel). */
-    endShift: number;
-    /** Half-width of the frustum, fixed for the duration of the animation. */
-    startHalfW: number;
     startTime: number;
     duration: number;
   } | null = null;
-
-  /**
-   * Fractional X position [0, 1] where controls.target should appear on screen
-   * after the user sets a rotation center by double-clicking.
-   * null = use the inset-computed visual center (default).
-   * Reset to null on fit-to-view.
-   */
-  private pivotFracX: number | null = null;
-
-  /**
-   * Accumulated frustum pan offset in camera-local world units.
-   * Applied on top of the base frustum in doApplyFrustumInsets().
-   * Negative X = panned right (frustum shifted left).
-   * Positive Y = panned up.
-   * Reset to 0 on fit-to-view or when a new rotation center is set.
-   */
-  private frustumPanX = 0;
-  private frustumPanY = 0;
 
   /** Custom pan handler state (right-mouse drag, replaces OrbitControls pan). */
   private customPanActive = false;
@@ -118,6 +94,10 @@ export class MoleculeRenderer {
   private customPanLastY = 0;
   private customPanPointerId: number | null = null;
   private customPanCleanup: (() => void) | null = null;
+  // Reusable temp vectors for applyCustomPan to avoid per-frame allocations.
+  private readonly _panRight = new THREE.Vector3();
+  private readonly _panUp = new THREE.Vector3();
+  private readonly _panDelta = new THREE.Vector3();
 
   private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
 
@@ -190,9 +170,9 @@ export class MoleculeRenderer {
     this.controls.dampingFactor = 0.1;
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
-    // Disable built-in pan so that right-drag/touch pan does not move
-    // controls.target (the rotation center).  Custom pan is handled by
-    // attachCustomPanListener() via frustum shift (ortho) or camera position (perspective).
+    // Disable built-in pan and handle right-drag via attachCustomPanListener(),
+    // which translates both camera.position and controls.target together so the
+    // rotation pivot always stays at the screen center.
     this.controls.enablePan = false;
     this.attachPivotCancelListener();
     this.attachWheelZoomListener();
@@ -619,9 +599,6 @@ export class MoleculeRenderer {
 
   /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
-    this.pivotFracX = null; // Reset pivot so the inset-based visual center is used.
-    this.frustumPanX = 0;
-    this.frustumPanY = 0;
     this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot);
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.doApplyFrustumInsets();
@@ -638,84 +615,30 @@ export class MoleculeRenderer {
   /** Set the rotation center (orbit target) to the given world coordinates.
    * @param animate  - When true (default), smoothly animates the transition over
    *   PIVOT_ANIM_DURATION_MS.  Pass false to update synchronously (legacy behaviour).
-   * @param screenX  - Container-relative X pixel of the cursor that triggered the
-   *   pivot change (optional).  When provided the animation also shifts the frustum
-   *   so the clicked atom arrives under the cursor instead of at the inset-shifted
-   *   visual center.
-   * @param screenY  - Container-relative Y pixel of the cursor (optional, paired
-   *   with screenX).
+   * The clicked atom is animated to the screen center.
    */
-  setRotationCenter(
-    x: number,
-    y: number,
-    z: number,
-    animate = true,
-    screenX?: number,
-    screenY?: number,
-  ): void {
+  setRotationCenter(x: number, y: number, z: number, animate = true): void {
     const endTarget = new THREE.Vector3(x, y, z);
     if (!animate) {
       this.pivotAnim = null;
-      this.frustumPanX = 0;
-      this.frustumPanY = 0;
-      if (this.camera instanceof THREE.OrthographicCamera) {
-        this.doApplyFrustumInsets();
-      }
       this.controls.target.copy(endTarget);
       this.controls.update();
       return;
-    }
-    // Clear accumulated pan offset so the rotation-center animation has full
-    // control over the frustum shift.  The animation computes startShift from
-    // the current camera.left/right, so we must apply the clear before reading
-    // those values below.
-    this.frustumPanX = 0;
-    this.frustumPanY = 0;
-    if (this.camera instanceof THREE.OrthographicCamera) {
-      this.doApplyFrustumInsets();
     }
     const startTarget = this.controls.target.clone();
     const delta = endTarget.clone().sub(startTarget);
     const startCameraPos = this.camera.position.clone();
     const endCameraPos = startCameraPos.clone().add(delta);
 
-    // Compute frustum-shift animation so the atom arrives at the cursor
-    // position (screenX, screenY) instead of the inset-shifted visual center.
-    // For orthographic cameras only; ignored for perspective.
-    let startShift = 0;
-    let endShift = 0;
-    let startHalfW = 0;
-    if (
-      this.camera instanceof THREE.OrthographicCamera &&
-      this.container &&
-      screenX !== undefined &&
-      screenY !== undefined
-    ) {
-      const W = this.container.clientWidth;
-      startHalfW = (this.camera.right - this.camera.left) / 2;
-      startShift = -(this.camera.left + this.camera.right) / 2;
-      endShift = ((2 * screenX) / W - 1) * startHalfW;
-      // Store as fraction so doApplyFrustumInsets can maintain the position
-      // after resize / zoom.
-      this.pivotFracX = screenX / W;
-    } else if (this.camera instanceof THREE.OrthographicCamera) {
-      startHalfW = (this.camera.right - this.camera.left) / 2;
-      startShift = -(this.camera.left + this.camera.right) / 2;
-      endShift = startShift; // no frustum change
-    }
-
     // Translate both controls.target and camera.position by the same delta
-    // so the scene pans smoothly.  Damping is disabled during animation frames
-    // (see render loop) to prevent residual sphericalDelta from adding
-    // unwanted rotation.
+    // so the scene pans smoothly to center the clicked atom on screen.
+    // Damping is disabled during animation frames (see render loop) to
+    // prevent residual sphericalDelta from adding unwanted rotation.
     this.pivotAnim = {
       startTarget,
       endTarget,
       startCameraPos,
       endCameraPos,
-      startShift,
-      endShift,
-      startHalfW,
       startTime: performance.now(),
       duration: MoleculeRenderer.PIVOT_ANIM_DURATION_MS,
     };
@@ -729,12 +652,6 @@ export class MoleculeRenderer {
     if (!this.pivotAnim) return;
     this.controls.target.copy(this.pivotAnim.endTarget);
     this.camera.position.copy(this.pivotAnim.endCameraPos);
-    if (this.camera instanceof THREE.OrthographicCamera && this.pivotAnim.startHalfW > 0) {
-      const hw = this.pivotAnim.startHalfW;
-      this.camera.left = -hw - this.pivotAnim.endShift;
-      this.camera.right = hw - this.pivotAnim.endShift;
-      this.camera.updateProjectionMatrix();
-    }
     this.pivotAnim = null;
     // Sync camera world matrices and OrbitControls internal state so that
     // subsequent project()/unproject() calls and interaction math use the
@@ -850,38 +767,37 @@ export class MoleculeRenderer {
     };
   }
 
-  /** Apply a screen-space pan delta without moving controls.target. */
+  /** Apply a screen-space pan delta, translating both camera and target together
+   * so the rotation center follows the screen center. */
   private applyCustomPan(screenDx: number, screenDy: number): void {
     if (!this.container) return;
     const W = this.container.clientWidth;
     const H = this.container.clientHeight;
     if (W === 0 || H === 0) return;
 
+    const right = this._panRight.setFromMatrixColumn(this.camera.matrix, 0);
+    const up = this._panUp.setFromMatrixColumn(this.camera.matrix, 1);
+
     if (this.camera instanceof THREE.OrthographicCamera) {
-      // Shift the frustum rather than moving the camera so the view direction
-      // (and therefore controls.target's apparent position) stays unchanged.
-      // The shift is in camera-local world units.
       const frustumW = (this.camera.right - this.camera.left) / this.camera.zoom;
       const frustumH = (this.camera.top - this.camera.bottom) / this.camera.zoom;
       const worldDx = -screenDx * (frustumW / W);
       const worldDy = screenDy * (frustumH / H);
-      this.frustumPanX += worldDx;
-      this.frustumPanY += worldDy;
-      this.camera.left += worldDx;
-      this.camera.right += worldDx;
-      this.camera.top += worldDy;
-      this.camera.bottom += worldDy;
-      this.camera.updateProjectionMatrix();
+      const delta = this._panDelta.copy(right).multiplyScalar(worldDx).addScaledVector(up, worldDy);
+      this.camera.position.add(delta);
+      this.controls.target.add(delta);
+      this.camera.updateMatrixWorld(true);
     } else if (this.camera instanceof THREE.PerspectiveCamera) {
-      // For perspective cameras move the camera in its local XY plane.
       const distance = this.camera.position.distanceTo(this.controls.target);
       const vFov = (this.camera.fov * Math.PI) / 180;
       const worldH = 2 * Math.tan(vFov / 2) * distance;
       const worldW = worldH * (W / H);
-      const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
-      const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
-      this.camera.position.addScaledVector(right, -screenDx * (worldW / W));
-      this.camera.position.addScaledVector(up, screenDy * (worldH / H));
+      const delta = this._panDelta
+        .copy(right)
+        .multiplyScalar(-screenDx * (worldW / W))
+        .addScaledVector(up, screenDy * (worldH / H));
+      this.camera.position.add(delta);
+      this.controls.target.add(delta);
       this.camera.updateMatrixWorld(true);
     }
   }
@@ -905,24 +821,6 @@ export class MoleculeRenderer {
       this.viewInsetRight,
       this.lastExtent,
     );
-    // If the user set a rotation center by double-clicking, override the
-    // inset-based shift to keep controls.target at the cursor position.
-    if (this.pivotFracX !== null) {
-      const halfW = (this.camera.right - this.camera.left) / 2;
-      const pivotShift = (2 * this.pivotFracX - 1) * halfW;
-      this.camera.left = -halfW - pivotShift;
-      this.camera.right = halfW - pivotShift;
-      this.camera.updateProjectionMatrix();
-    }
-    // Re-apply accumulated frustum pan so the view position is preserved
-    // across resize and inset changes.
-    if (this.frustumPanX !== 0 || this.frustumPanY !== 0) {
-      this.camera.left += this.frustumPanX;
-      this.camera.right += this.frustumPanX;
-      this.camera.top += this.frustumPanY;
-      this.camera.bottom += this.frustumPanY;
-      this.camera.updateProjectionMatrix();
-    }
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -1235,11 +1133,9 @@ export class MoleculeRenderer {
 
     // Tick smooth pivot animation (set by setRotationCenter).
     // Both controls.target and camera.position are translated by the same
-    // delta so the scene pans (not rotates).  The frustum shift is also
-    // interpolated so the clicked atom arrives at the cursor position rather
-    // than the inset-shifted visual center.  Damping is temporarily disabled
-    // so residual sphericalDelta from prior interaction does not add
-    // unwanted rotation.
+    // delta so the scene pans to center the clicked atom on screen.
+    // Damping is temporarily disabled so residual sphericalDelta from prior
+    // interaction does not add unwanted rotation.
     if (this.pivotAnim) {
       const t = Math.min(
         (performance.now() - this.pivotAnim.startTime) / this.pivotAnim.duration,
@@ -1252,18 +1148,6 @@ export class MoleculeRenderer {
         this.pivotAnim.endCameraPos,
         ease,
       );
-      // Interpolate the frustum shift so the atom drifts to the cursor pixel.
-      if (this.camera instanceof THREE.OrthographicCamera && this.pivotAnim.startHalfW > 0) {
-        const shiftLerped = THREE.MathUtils.lerp(
-          this.pivotAnim.startShift,
-          this.pivotAnim.endShift,
-          ease,
-        );
-        const hw = this.pivotAnim.startHalfW;
-        this.camera.left = -hw - shiftLerped;
-        this.camera.right = hw - shiftLerped;
-        this.camera.updateProjectionMatrix();
-      }
       if (t >= 1) this.pivotAnim = null;
       // Update with damping off so sphericalDelta is zeroed and cannot
       // override the manually-set camera position.

@@ -88,14 +88,10 @@ export function Viewport({
         const positions = renderer.getCurrentPositionsCopy();
         if (positions) {
           const idx = info.atomIndex;
-          const rect = containerRef.current!.getBoundingClientRect();
           renderer.setRotationCenter(
             positions[idx * 3],
             positions[idx * 3 + 1],
             positions[idx * 3 + 2],
-            true,
-            e.clientX - rect.left,
-            e.clientY - rect.top,
           );
         }
       }
