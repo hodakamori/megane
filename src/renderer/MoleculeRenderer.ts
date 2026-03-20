@@ -94,13 +94,14 @@ export class MoleculeRenderer {
   private customPanLastY = 0;
   private customPanPointerId: number | null = null;
   private customPanCleanup: (() => void) | null = null;
-  // Reusable temp vectors for applyCustomPan to avoid per-frame allocations.
+  // Reusable temp vectors for applyCustomPan perspective branch.
   private readonly _panRight = new THREE.Vector3();
   private readonly _panUp = new THREE.Vector3();
   private readonly _panDelta = new THREE.Vector3();
-  // Accumulated screen-space pan offset applied after controls.update() each
-  // frame so controls.target (the rotation center) stays fixed in world space.
-  private readonly _panOffset = new THREE.Vector3();
+  // Accumulated frustum shift for orthographic pan (camera.left/right/top/bottom units).
+  // Re-applied after doApplyFrustumInsets; reset when a new rotation center is set.
+  private _frustumPanX = 0;
+  private _frustumPanY = 0;
 
   private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
 
@@ -621,9 +622,13 @@ export class MoleculeRenderer {
    * The clicked atom is animated to the screen center.
    */
   setRotationCenter(x: number, y: number, z: number, animate = true): void {
-    // Clear any accumulated pan offset so the new rotation center is truly
-    // centered in the viewport after the animation completes.
-    this._panOffset.setScalar(0);
+    // Clear accumulated frustum pan so the new rotation center is centered in
+    // the viewport after the animation completes.
+    this._frustumPanX = 0;
+    this._frustumPanY = 0;
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      this.doApplyFrustumInsets(); // snap frustum back to clean state
+    }
     const endTarget = new THREE.Vector3(x, y, z);
     if (!animate) {
       this.pivotAnim = null;
@@ -705,16 +710,13 @@ export class MoleculeRenderer {
       const scale = Math.pow(0.95, this.controls.zoomSpeed * Math.abs(delta) * 0.01);
       const zoomFactor = delta < 0 ? 1 / scale : scale;
 
-      const targetWorld = this.controls.target.clone();
-      const ndcBefore = targetWorld.clone().project(this.camera);
-
+      // For orthographic cameras, changing camera.zoom is a pure linear scale of
+      // the visible frustum.  All world-to-NDC mappings are preserved (the ratio
+      // (zoom * px - L) / (R - L) is independent of zoom for fixed px, L, R),
+      // so controls.target stays at its current screen position without any
+      // camera.position shift or controls.update() call.
       this.camera.zoom = Math.max(0.01, this.camera.zoom * zoomFactor);
       this.camera.updateProjectionMatrix();
-
-      const desiredWorld = ndcBefore.clone().unproject(this.camera);
-      const shift = desiredWorld.sub(targetWorld);
-      this.camera.position.add(shift);
-      this.controls.update();
     };
     el.addEventListener("wheel", this.wheelZoomHandler, { capture: true, passive: false });
   }
@@ -772,27 +774,32 @@ export class MoleculeRenderer {
     };
   }
 
-  /** Translate the camera in its local right/up directions based on a
-   * screen-space pointer delta, while keeping controls.target (the rotation
-   * center) fixed in world space. This approximates a pan near the target but
-   * is not a pure screen-space pan of the entire image. */
+  /** Apply a screen-space pan delta.
+   * For OrthographicCamera: shifts the projection frustum (camera.left/right/top/bottom),
+   * giving a true screen-space pan without touching camera.position or controls.target.
+   * For PerspectiveCamera: translates both camera.position and controls.target together
+   * (standard OrbitControls pan). */
   private applyCustomPan(screenDx: number, screenDy: number): void {
     if (!this.container) return;
     const W = this.container.clientWidth;
     const H = this.container.clientHeight;
     if (W === 0 || H === 0) return;
 
-    const right = this._panRight.setFromMatrixColumn(this.camera.matrix, 0);
-    const up = this._panUp.setFromMatrixColumn(this.camera.matrix, 1);
-
     if (this.camera instanceof THREE.OrthographicCamera) {
       const frustumW = (this.camera.right - this.camera.left) / this.camera.zoom;
       const frustumH = (this.camera.top - this.camera.bottom) / this.camera.zoom;
       const worldDx = -screenDx * (frustumW / W);
       const worldDy = screenDy * (frustumH / H);
-      const delta = this._panDelta.copy(right).multiplyScalar(worldDx).addScaledVector(up, worldDy);
-      this._panOffset.add(delta);
+      this.camera.left += worldDx;
+      this.camera.right += worldDx;
+      this.camera.top += worldDy;
+      this.camera.bottom += worldDy;
+      this._frustumPanX += worldDx;
+      this._frustumPanY += worldDy;
+      this.camera.updateProjectionMatrix();
     } else if (this.camera instanceof THREE.PerspectiveCamera) {
+      const right = this._panRight.setFromMatrixColumn(this.camera.matrix, 0);
+      const up = this._panUp.setFromMatrixColumn(this.camera.matrix, 1);
       const distance = this.camera.position.distanceTo(this.controls.target);
       const vFov = (this.camera.fov * Math.PI) / 180;
       const worldH = 2 * Math.tan(vFov / 2) * distance;
@@ -801,7 +808,8 @@ export class MoleculeRenderer {
         .copy(right)
         .multiplyScalar(-screenDx * (worldW / W))
         .addScaledVector(up, screenDy * (worldH / H));
-      this._panOffset.add(delta);
+      this.camera.position.add(delta);
+      this.controls.target.add(delta);
     }
   }
 
@@ -824,6 +832,14 @@ export class MoleculeRenderer {
       this.viewInsetRight,
       this.lastExtent,
     );
+    // Re-apply accumulated frustum pan so the view doesn't jump on resize.
+    if (this._frustumPanX !== 0 || this._frustumPanY !== 0) {
+      this.camera.left += this._frustumPanX;
+      this.camera.right += this._frustumPanX;
+      this.camera.top += this._frustumPanY;
+      this.camera.bottom += this._frustumPanY;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   /** Switch between orthographic and perspective projection. */
@@ -893,10 +909,7 @@ export class MoleculeRenderer {
    * Used for image/video capture outside the rAF loop.
    */
   renderSingleFrame(): void {
-    this.camera.position.sub(this._panOffset);
     this.controls.update();
-    this.camera.position.add(this._panOffset);
-    this.camera.updateMatrixWorld(true);
 
     if (this.polyhedronRenderer && this.container) {
       const sz = new THREE.Vector2();
@@ -1162,13 +1175,7 @@ export class MoleculeRenderer {
       this.controls.update();
       this.controls.enableDamping = wasDamping;
     } else {
-      // Remove panOffset before update so OrbitControls sees the canonical
-      // camera position; re-apply after so the view is offset without
-      // disturbing the internal spherical state or controls.target.
-      this.camera.position.sub(this._panOffset);
       this.controls.update();
-      this.camera.position.add(this._panOffset);
-      this.camera.updateMatrixWorld(true);
     }
 
     // Update pivot marker position and scale
