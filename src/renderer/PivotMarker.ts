@@ -63,16 +63,17 @@ export class PivotMarker {
    * Update the marker position and scale each frame.
    *
    * For orthographic cameras the visible world width equals
-   * `camera.right - camera.left`, so we take a fixed fraction of that.
-   * For perspective cameras we use the distance to the target and the FOV.
+   * `(camera.right - camera.left) / camera.zoom`, so we take a fixed
+   * fraction of that. For perspective cameras we use the distance to the
+   * target and the FOV.
    */
   update(target: THREE.Vector3, camera: THREE.Camera): void {
     this.group.position.copy(target);
 
     let size: number;
     if (camera instanceof THREE.OrthographicCamera) {
-      // World-space width of the frustum (independent of the frustum shift)
-      const frustumWidth = camera.right - camera.left;
+      // World-space width of the visible frustum, accounting for zoom
+      const frustumWidth = (camera.right - camera.left) / camera.zoom;
       size = frustumWidth * 0.04;
     } else if (camera instanceof THREE.PerspectiveCamera) {
       const distance = camera.position.distanceTo(target);
