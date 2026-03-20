@@ -363,10 +363,12 @@ class Viewport(PipelineNode):
         *,
         perspective: bool = False,
         cell_axes_visible: bool = True,
+        pivot_marker_visible: bool = True,
     ) -> None:
         super().__init__()
         self.perspective = perspective
         self.cell_axes_visible = cell_axes_visible
+        self.pivot_marker_visible = pivot_marker_visible
 
 
 # ─── Pipeline ───────────────────────────────────────────────────────
@@ -564,6 +566,7 @@ class Pipeline:
             return Viewport(
                 perspective=nd.get("perspective", False),
                 cell_axes_visible=nd.get("cellAxesVisible", True),
+                pivot_marker_visible=nd.get("pivotMarkerVisible", True),
             )
         elif ntype == "streaming":
             return Streaming()
@@ -712,6 +715,7 @@ class Pipeline:
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible
+            base["pivotMarkerVisible"] = node.pivot_marker_visible
 
         return base
 

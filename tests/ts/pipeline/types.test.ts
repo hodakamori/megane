@@ -110,6 +110,7 @@ describe("defaultParams", () => {
       type: "viewport",
       perspective: false,
       cellAxesVisible: true,
+      pivotMarkerVisible: true,
     });
   });
 

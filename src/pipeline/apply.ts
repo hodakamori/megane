@@ -149,6 +149,9 @@ export function applyViewportState(
   if (!previous || current.cellAxesVisible !== previous.cellAxesVisible) {
     renderer.setCellAxesVisible(current.cellAxesVisible);
   }
+  if (!previous || current.pivotMarkerVisible !== previous.pivotMarkerVisible) {
+    renderer.setPivotMarkerVisible(current.pivotMarkerVisible);
+  }
 
   // ─── Labels (primary structure only for now) ───────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);

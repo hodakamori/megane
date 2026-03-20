@@ -41,6 +41,7 @@ export function executeViewport(
     vectors,
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
+    pivotMarkerVisible: params.pivotMarkerVisible ?? true,
   };
 }
 

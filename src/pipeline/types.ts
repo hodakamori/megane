@@ -333,6 +333,7 @@ export interface ViewportParams {
   type: "viewport";
   perspective: boolean;
   cellAxesVisible: boolean;
+  pivotMarkerVisible: boolean;
 }
 
 export interface FilterParams {
@@ -401,7 +402,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "add_bond":
       return { type, bondSource: "distance" };
     case "viewport":
-      return { type, perspective: false, cellAxesVisible: true };
+      return { type, perspective: false, cellAxesVisible: true, pivotMarkerVisible: true };
     case "filter":
       return { type, query: "", bond_query: "" };
     case "modify":
@@ -479,6 +480,7 @@ export interface ViewportState {
   vectors: VectorData[];
   perspective: boolean;
   cellAxesVisible: boolean;
+  pivotMarkerVisible: boolean;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -491,6 +493,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   vectors: [],
   perspective: false,
   cellAxesVisible: true,
+  pivotMarkerVisible: true,
 };
 
 // ─── Node Errors ──────────────────────────────────────────────────────
