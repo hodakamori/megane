@@ -1,6 +1,88 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
+interface MeganePreset {
+  structure: string;
+  trajectory?: string;
+  settings?: {
+    bondSource?: "structure" | "file" | "distance" | "none";
+    labelSource?: "none" | "structure" | "file";
+    vectorSource?: "none" | "file" | "demo";
+  };
+}
+
+class MeganePresetEditorProvider implements vscode.CustomReadonlyEditorProvider {
+  private static readonly viewType = "megane.presetViewer";
+
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
+  static register(context: vscode.ExtensionContext): vscode.Disposable {
+    const provider = new MeganePresetEditorProvider(context);
+    return vscode.window.registerCustomEditorProvider(
+      MeganePresetEditorProvider.viewType,
+      provider,
+      {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+      }
+    );
+  }
+
+  openCustomDocument(
+    uri: vscode.Uri,
+    _openContext: vscode.CustomDocumentOpenContext,
+    _token: vscode.CancellationToken
+  ): vscode.CustomDocument {
+    return { uri, dispose: () => {} };
+  }
+
+  async resolveCustomEditor(
+    document: vscode.CustomDocument,
+    webviewPanel: vscode.WebviewPanel,
+    _token: vscode.CancellationToken
+  ): Promise<void> {
+    const webview = webviewPanel.webview;
+    const mediaDir = vscode.Uri.joinPath(this.context.extensionUri, "media");
+
+    webview.options = {
+      enableScripts: true,
+      localResourceRoots: [mediaDir],
+    };
+
+    webview.html = getHtmlForWebview(webview, mediaDir);
+
+    const presetData = await vscode.workspace.fs.readFile(document.uri);
+    const preset = JSON.parse(new TextDecoder("utf-8").decode(presetData)) as MeganePreset;
+    const dir = path.dirname(document.uri.fsPath);
+
+    const structureUri = vscode.Uri.file(path.resolve(dir, preset.structure));
+    const structureData = await vscode.workspace.fs.readFile(structureUri);
+    const structureText = new TextDecoder("utf-8").decode(structureData);
+    const structureFilename = path.basename(preset.structure);
+
+    let trajectoryPayload: { content: number[]; filename: string } | null = null;
+    if (preset.trajectory) {
+      const trajUri = vscode.Uri.file(path.resolve(dir, preset.trajectory));
+      const trajData = await vscode.workspace.fs.readFile(trajUri);
+      trajectoryPayload = {
+        content: Array.from(trajData),
+        filename: path.basename(preset.trajectory),
+      };
+    }
+
+    webview.onDidReceiveMessage((message) => {
+      if (message.type === "ready") {
+        webview.postMessage({
+          type: "loadPreset",
+          structure: { content: structureText, filename: structureFilename },
+          trajectory: trajectoryPayload,
+          settings: preset.settings ?? {},
+        });
+      }
+    });
+  }
+}
+
 class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
   private static readonly viewType = "megane.structureViewer";
 
@@ -39,7 +121,7 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
       localResourceRoots: [mediaDir],
     };
 
-    webview.html = this.getHtmlForWebview(webview, mediaDir);
+    webview.html = getHtmlForWebview(webview, mediaDir);
 
     // Read the file and send its content to the webview
     const fileData = await vscode.workspace.fs.readFile(document.uri);
@@ -53,23 +135,21 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
       }
     });
   }
+}
 
-  private getHtmlForWebview(
-    webview: vscode.Webview,
-    mediaDir: vscode.Uri
-  ): string {
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(mediaDir, "webview.js")
-    );
-    const wasmUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")
-    );
-    const cssUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(mediaDir, "main.css")
-    );
-    const nonce = getNonce();
+function getHtmlForWebview(webview: vscode.Webview, mediaDir: vscode.Uri): string {
+  const scriptUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(mediaDir, "webview.js")
+  );
+  const wasmUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")
+  );
+  const cssUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(mediaDir, "main.css")
+  );
+  const nonce = getNonce();
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -101,7 +181,6 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
   <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
-  }
 }
 
 function getNonce(): string {
@@ -116,6 +195,7 @@ function getNonce(): string {
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(MeganeEditorProvider.register(context));
+  context.subscriptions.push(MeganePresetEditorProvider.register(context));
 }
 
 export function deactivate() {}

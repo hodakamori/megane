@@ -34,6 +34,35 @@ function App() {
             updateNodeParams(loaderNode.id, { fileName: filename });
           }
         });
+      } else if (message.type === "loadPreset") {
+        const { structure, trajectory, settings } = message as {
+          structure: { content: string; filename: string };
+          trajectory: { content: number[]; filename: string } | null;
+          settings: {
+            bondSource?: "structure" | "file" | "distance" | "none";
+            labelSource?: "none" | "structure" | "file";
+            vectorSource?: "none" | "file" | "demo";
+          };
+        };
+        const structureFile = new File([structure.content], structure.filename, {
+          type: "text/plain",
+        });
+        local.loadFile(structureFile).then(async () => {
+          if (trajectory) {
+            const trajBytes = new Uint8Array(trajectory.content);
+            const trajFile = new File([trajBytes], trajectory.filename);
+            await local.loadXtc(trajFile);
+          }
+          if (settings.bondSource) local.setBondSource(settings.bondSource);
+          if (settings.labelSource) local.setLabelSource(settings.labelSource);
+          if (settings.vectorSource) local.setVectorSource(settings.vectorSource);
+          setLoaded(true);
+          const { nodes, updateNodeParams } = usePipelineStore.getState();
+          const loaderNode = nodes.find((n) => n.type === "load_structure");
+          if (loaderNode) {
+            updateNodeParams(loaderNode.id, { fileName: structure.filename });
+          }
+        });
       }
     };
 
