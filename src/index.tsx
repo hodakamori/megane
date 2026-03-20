@@ -16,7 +16,7 @@ import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
 import { parseStructureFile } from "./parsers/structure";
-import { parseXTCFile, parseLammpstrjFile } from "./parsers/xtc";
+import { parseXTCFile } from "./parsers/xtc";
 import { MemoryFrameProvider } from "./pipeline/types";
 import type { SerializedPipeline } from "./pipeline/types";
 import type { MeganeLocalState } from "./hooks/useMeganeLocal";

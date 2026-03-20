@@ -37,15 +37,15 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
-class MeganePresetEditorProvider {
+class MeganePipelineEditorProvider {
     context;
-    static viewType = "megane.presetViewer";
+    static viewType = "megane.pipelineViewer";
     constructor(context) {
         this.context = context;
     }
     static register(context) {
-        const provider = new MeganePresetEditorProvider(context);
-        return vscode.window.registerCustomEditorProvider(MeganePresetEditorProvider.viewType, provider, {
+        const provider = new MeganePipelineEditorProvider(context);
+        return vscode.window.registerCustomEditorProvider(MeganePipelineEditorProvider.viewType, provider, {
             webviewOptions: { retainContextWhenHidden: true },
             supportsMultipleEditorsPerDocument: false,
         });
@@ -69,22 +69,34 @@ class MeganePresetEditorProvider {
         const dir = path.dirname(document.uri.fsPath);
         // Read structure files referenced by load_structure nodes
         const structureFiles = [];
-        // Read trajectory files referenced by load_trajectory nodes
+        // Read trajectory files referenced by load_trajectory nodes (binary as ArrayBuffer)
         const trajectoryFiles = [];
         for (const node of pipeline.nodes) {
             if (!node.fileName)
                 continue;
             const filePath = String(node.fileName);
-            const fileUri = vscode.Uri.file(path.resolve(dir, filePath));
+            // Reject absolute paths and paths that escape the pipeline file's directory
+            if (path.isAbsolute(filePath)) {
+                continue;
+            }
+            const resolvedPath = path.resolve(dir, filePath);
+            if (!(resolvedPath === dir || resolvedPath.startsWith(dir + path.sep))) {
+                continue;
+            }
+            const fileUri = vscode.Uri.file(resolvedPath);
             const filename = path.basename(filePath);
             try {
                 if (node.type === "load_structure") {
                     const raw = await vscode.workspace.fs.readFile(fileUri);
-                    structureFiles.push({ nodeId: node.id, content: new TextDecoder("utf-8").decode(raw), filename });
+                    structureFiles.push({
+                        nodeId: node.id,
+                        content: new TextDecoder("utf-8").decode(raw),
+                        filename,
+                    });
                 }
                 else if (node.type === "load_trajectory") {
                     const raw = await vscode.workspace.fs.readFile(fileUri);
-                    trajectoryFiles.push({ nodeId: node.id, content: Array.from(raw), filename });
+                    trajectoryFiles.push({ nodeId: node.id, content: raw.buffer, filename });
                 }
             }
             catch {
@@ -187,7 +199,7 @@ function getNonce() {
 }
 function activate(context) {
     context.subscriptions.push(MeganeEditorProvider.register(context));
-    context.subscriptions.push(MeganePresetEditorProvider.register(context));
+    context.subscriptions.push(MeganePipelineEditorProvider.register(context));
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

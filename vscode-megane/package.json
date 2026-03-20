@@ -42,8 +42,8 @@
         "priority": "default"
       },
       {
-        "viewType": "megane.presetViewer",
-        "displayName": "megane Preset Viewer",
+        "viewType": "megane.pipelineViewer",
+        "displayName": "megane Pipeline Viewer",
         "selector": [
           {
             "filenamePattern": "*.megane.json"
