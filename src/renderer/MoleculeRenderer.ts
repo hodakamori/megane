@@ -788,7 +788,9 @@ export class MoleculeRenderer {
       const vFov = (this.camera.fov * Math.PI) / 180;
       const worldH = 2 * Math.tan(vFov / 2) * distance;
       const worldW = worldH * (W / H);
-      const delta = right.clone().multiplyScalar(-screenDx * (worldW / W))
+      const delta = right
+        .clone()
+        .multiplyScalar(-screenDx * (worldW / W))
         .addScaledVector(up, screenDy * (worldH / H));
       this.camera.position.add(delta);
       this.controls.target.add(delta);
