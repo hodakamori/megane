@@ -708,7 +708,6 @@ export class MoleculeRenderer {
       const desiredWorld = ndcBefore.clone().unproject(this.camera);
       const shift = desiredWorld.sub(targetWorld);
       this.camera.position.add(shift);
-      this.controls.target.add(shift);
       this.controls.update();
     };
     el.addEventListener("wheel", this.wheelZoomHandler, { capture: true, passive: false });
@@ -767,8 +766,8 @@ export class MoleculeRenderer {
     };
   }
 
-  /** Apply a screen-space pan delta, translating both camera and target together
-   * so the rotation center follows the screen center. */
+  /** Apply a screen-space pan delta by translating only the camera position,
+   * keeping controls.target (the rotation center) fixed in world space. */
   private applyCustomPan(screenDx: number, screenDy: number): void {
     if (!this.container) return;
     const W = this.container.clientWidth;
@@ -785,7 +784,6 @@ export class MoleculeRenderer {
       const worldDy = screenDy * (frustumH / H);
       const delta = this._panDelta.copy(right).multiplyScalar(worldDx).addScaledVector(up, worldDy);
       this.camera.position.add(delta);
-      this.controls.target.add(delta);
       this.camera.updateMatrixWorld(true);
     } else if (this.camera instanceof THREE.PerspectiveCamera) {
       const distance = this.camera.position.distanceTo(this.controls.target);
@@ -797,7 +795,6 @@ export class MoleculeRenderer {
         .multiplyScalar(-screenDx * (worldW / W))
         .addScaledVector(up, screenDy * (worldH / H));
       this.camera.position.add(delta);
-      this.controls.target.add(delta);
       this.camera.updateMatrixWorld(true);
     }
   }
