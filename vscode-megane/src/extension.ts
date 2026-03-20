@@ -1,14 +1,17 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-interface MeganePreset {
-  structure: string;
-  trajectory?: string;
-  settings?: {
-    bondSource?: "structure" | "file" | "distance" | "none";
-    labelSource?: "none" | "structure" | "file";
-    vectorSource?: "none" | "file" | "demo";
-  };
+interface SerializedPipelineNode {
+  id: string;
+  type: string;
+  fileName?: string | null;
+  [key: string]: unknown;
+}
+
+interface SerializedPipeline {
+  version: number;
+  nodes: SerializedPipelineNode[];
+  edges: unknown[];
 }
 
 class MeganePresetEditorProvider implements vscode.CustomReadonlyEditorProvider {
@@ -51,32 +54,49 @@ class MeganePresetEditorProvider implements vscode.CustomReadonlyEditorProvider 
 
     webview.html = getHtmlForWebview(webview, mediaDir);
 
-    const presetData = await vscode.workspace.fs.readFile(document.uri);
-    const preset = JSON.parse(new TextDecoder("utf-8").decode(presetData)) as MeganePreset;
+    const pipelineData = await vscode.workspace.fs.readFile(document.uri);
+    const pipeline = JSON.parse(
+      new TextDecoder("utf-8").decode(pipelineData)
+    ) as SerializedPipeline;
+
+    if (pipeline.version !== 3) {
+      throw new Error(
+        `Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`
+      );
+    }
+
     const dir = path.dirname(document.uri.fsPath);
 
-    const structureUri = vscode.Uri.file(path.resolve(dir, preset.structure));
-    const structureData = await vscode.workspace.fs.readFile(structureUri);
-    const structureText = new TextDecoder("utf-8").decode(structureData);
-    const structureFilename = path.basename(preset.structure);
+    // Read structure files referenced by load_structure nodes
+    const structureFiles: Array<{ nodeId: string; content: string; filename: string }> = [];
+    // Read trajectory files referenced by load_trajectory nodes
+    const trajectoryFiles: Array<{ nodeId: string; content: number[]; filename: string }> = [];
 
-    let trajectoryPayload: { content: number[]; filename: string } | null = null;
-    if (preset.trajectory) {
-      const trajUri = vscode.Uri.file(path.resolve(dir, preset.trajectory));
-      const trajData = await vscode.workspace.fs.readFile(trajUri);
-      trajectoryPayload = {
-        content: Array.from(trajData),
-        filename: path.basename(preset.trajectory),
-      };
+    for (const node of pipeline.nodes) {
+      if (!node.fileName) continue;
+      const filePath = String(node.fileName);
+      const fileUri = vscode.Uri.file(path.resolve(dir, filePath));
+      const filename = path.basename(filePath);
+      try {
+        if (node.type === "load_structure") {
+          const raw = await vscode.workspace.fs.readFile(fileUri);
+          structureFiles.push({ nodeId: node.id, content: new TextDecoder("utf-8").decode(raw), filename });
+        } else if (node.type === "load_trajectory") {
+          const raw = await vscode.workspace.fs.readFile(fileUri);
+          trajectoryFiles.push({ nodeId: node.id, content: Array.from(raw), filename });
+        }
+      } catch {
+        // File not found — skip silently; webview will show a warning on the node
+      }
     }
 
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
         webview.postMessage({
-          type: "loadPreset",
-          structure: { content: structureText, filename: structureFilename },
-          trajectory: trajectoryPayload,
-          settings: preset.settings ?? {},
+          type: "loadPipeline",
+          pipeline,
+          structureFiles,
+          trajectoryFiles,
         });
       }
     });

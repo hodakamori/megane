@@ -9,6 +9,9 @@ import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
+import { parseStructureFile } from "../../src/parsers/structure";
+import { parseXTCFile, parseLammpstrjFile } from "../../src/parsers/xtc";
+import type { SerializedPipeline } from "../../src/pipeline/types";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -34,35 +37,63 @@ function App() {
             updateNodeParams(loaderNode.id, { fileName: filename });
           }
         });
-      } else if (message.type === "loadPreset") {
-        const { structure, trajectory, settings } = message as {
-          structure: { content: string; filename: string };
-          trajectory: { content: number[]; filename: string } | null;
-          settings: {
-            bondSource?: "structure" | "file" | "distance" | "none";
-            labelSource?: "none" | "structure" | "file";
-            vectorSource?: "none" | "file" | "demo";
-          };
+      } else if (message.type === "loadPipeline") {
+        const { pipeline, structureFiles, trajectoryFiles } = message as {
+          pipeline: SerializedPipeline;
+          structureFiles: Array<{ nodeId: string; content: string; filename: string }>;
+          trajectoryFiles: Array<{ nodeId: string; content: number[]; filename: string }>;
         };
-        const structureFile = new File([structure.content], structure.filename, {
-          type: "text/plain",
-        });
-        local.loadFile(structureFile).then(async () => {
-          if (trajectory) {
-            const trajBytes = new Uint8Array(trajectory.content);
-            const trajFile = new File([trajBytes], trajectory.filename);
-            await local.loadXtc(trajFile);
+
+        (async () => {
+          const store = usePipelineStore.getState();
+
+          // Restore the full pipeline configuration (nodes, edges, viewport settings, etc.)
+          store.deserialize(pipeline);
+
+          // Parse and load each structure file into its corresponding node snapshot
+          let firstSnapshot = null;
+          for (const sf of structureFiles) {
+            const file = new File([sf.content], sf.filename, { type: "text/plain" });
+            const result = await parseStructureFile(file);
+            store.setNodeSnapshot(sf.nodeId, {
+              snapshot: result.snapshot,
+              frames: result.frames.length > 0 ? result.frames : null,
+              meta: result.meta,
+              labels: result.labels,
+            });
+            store.updateNodeParams(sf.nodeId, { fileName: sf.filename });
+            if (!firstSnapshot) {
+              firstSnapshot = result.snapshot;
+              // Also populate useMeganeLocal so MeganeViewer props (atom selection etc.) work
+              await local.loadFile(file);
+              // Re-deserialize to restore the saved pipeline config (loadFile resets pipeline)
+              store.deserialize(pipeline);
+              store.setNodeSnapshot(sf.nodeId, {
+                snapshot: result.snapshot,
+                frames: result.frames.length > 0 ? result.frames : null,
+                meta: result.meta,
+                labels: result.labels,
+              });
+              store.updateNodeParams(sf.nodeId, { fileName: sf.filename });
+            }
           }
-          if (settings.bondSource) local.setBondSource(settings.bondSource);
-          if (settings.labelSource) local.setLabelSource(settings.labelSource);
-          if (settings.vectorSource) local.setVectorSource(settings.vectorSource);
+
+          // Parse and load trajectory files
+          if (firstSnapshot && trajectoryFiles.length > 0) {
+            for (const tf of trajectoryFiles) {
+              const bytes = new Uint8Array(tf.content);
+              const file = new File([bytes], tf.filename);
+              const ext = tf.filename.toLowerCase();
+              const isLammps = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
+              const parseFn = isLammps ? parseLammpstrjFile : parseXTCFile;
+              const { frames, meta } = await parseFn(file, firstSnapshot.nAtoms);
+              store.setFileFrames(frames, meta ?? null);
+              store.updateNodeParams(tf.nodeId, { fileName: tf.filename });
+            }
+          }
+
           setLoaded(true);
-          const { nodes, updateNodeParams } = usePipelineStore.getState();
-          const loaderNode = nodes.find((n) => n.type === "load_structure");
-          if (loaderNode) {
-            updateNodeParams(loaderNode.id, { fileName: structure.filename });
-          }
-        });
+        })();
       }
     };
 
