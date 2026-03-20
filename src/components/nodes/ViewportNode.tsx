@@ -49,6 +49,15 @@ export function ViewportNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
             style={toggleStyle}
           />
         </label>
+        <label style={toggleRowStyle}>
+          Pivot marker
+          <input
+            type="checkbox"
+            checked={params.pivotMarkerVisible}
+            onChange={(e) => updateNodeParams(id, { pivotMarkerVisible: e.target.checked })}
+            style={toggleStyle}
+          />
+        </label>
       </div>
     </NodeShell>
   );

@@ -27,6 +27,7 @@ import { LabelOverlay } from "./LabelOverlay";
 import { ArrowRenderer } from "./ArrowRenderer";
 import { PolyhedronRenderer } from "./PolyhedronRenderer";
 import { StructureLayer } from "./StructureLayer";
+import { PivotMarker } from "./PivotMarker";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel } from "./Picking";
@@ -53,6 +54,7 @@ export class MoleculeRenderer {
   private labelOverlay: LabelOverlay | null = null;
   private arrowRenderer: ArrowRenderer | null = null;
   private polyhedronRenderer: PolyhedronRenderer | null = null;
+  private pivotMarker: PivotMarker | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
   private snapshot: Snapshot | null = null;
@@ -192,6 +194,10 @@ export class MoleculeRenderer {
 
     // Selection overlay group
     this.scene.add(this.selectionGroup);
+
+    // Pivot marker (3D crosshair at rotation center)
+    this.pivotMarker = new PivotMarker();
+    this.scene.add(this.pivotMarker.group);
 
     // Resize observer
     const resizeObserver = new ResizeObserver(() => this.onResize());
@@ -506,6 +512,11 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) {
       this.cellAxesRenderer.setVisible(visible);
     }
+  }
+
+  /** Toggle rotation-center marker visibility. */
+  setPivotMarkerVisible(visible: boolean): void {
+    this.pivotMarker?.setVisible(visible);
   }
 
   // ── Axes inset drag API ───────────────────────────────────
@@ -1127,6 +1138,11 @@ export class MoleculeRenderer {
       this.controls.update();
     }
 
+    // Update pivot marker position and scale
+    if (this.pivotMarker) {
+      this.pivotMarker.update(this.controls.target, this.camera);
+    }
+
     // Sync LineMaterial resolution for polyhedron fat edges
     if (this.polyhedronRenderer && this.container) {
       this.polyhedronRenderer.updateResolution(
@@ -1171,6 +1187,7 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
+    if (this.pivotMarker) this.pivotMarker.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     // Dispose all structure layers
     for (const layer of this.layers.values()) {

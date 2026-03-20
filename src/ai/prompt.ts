@@ -113,7 +113,7 @@ Visualizes per-atom vectors (forces, velocities) as arrows.
 
 ### viewport
 The final rendering sink. Every pipeline MUST have exactly one viewport node. All data flows into this node.
-- Parameters: \`{ type: "viewport", perspective: boolean, cellAxesVisible: boolean }\`
+- Parameters: \`{ type: "viewport", perspective: boolean, cellAxesVisible: boolean, pivotMarkerVisible: boolean }\`
 - Inputs: \`particle\`, \`bond\`, \`cell\`, \`trajectory\`, \`label\`, \`mesh\`, \`vector\` (each accepts its respective data type)
 - No outputs
 
@@ -165,6 +165,7 @@ User request: "Show a molecule with bonds and trajectory"
       "position": { "x": 425, "y": 615 },
       "perspective": false,
       "cellAxesVisible": true,
+      "pivotMarkerVisible": true,
       "enabled": true
     }
   ],
