@@ -102,6 +102,23 @@ export class MoleculeRenderer {
    */
   private pivotFracX: number | null = null;
 
+  /**
+   * Accumulated frustum pan offset in camera-local world units.
+   * Applied on top of the base frustum in doApplyFrustumInsets().
+   * Negative X = panned right (frustum shifted left).
+   * Positive Y = panned up.
+   * Reset to 0 on fit-to-view or when a new rotation center is set.
+   */
+  private frustumPanX = 0;
+  private frustumPanY = 0;
+
+  /** Custom pan handler state (right-mouse drag, replaces OrbitControls pan). */
+  private customPanActive = false;
+  private customPanLastX = 0;
+  private customPanLastY = 0;
+  private customPanPointerId: number | null = null;
+  private customPanCleanup: (() => void) | null = null;
+
   private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
 
   /** Structure layers for multi-structure overlay rendering. */
@@ -173,8 +190,13 @@ export class MoleculeRenderer {
     this.controls.dampingFactor = 0.1;
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
+    // Disable built-in pan so that right-drag/touch pan does not move
+    // controls.target (the rotation center).  Custom pan is handled by
+    // attachCustomPanListener() via frustum shift (ortho) or camera position (perspective).
+    this.controls.enablePan = false;
     this.attachPivotCancelListener();
     this.attachWheelZoomListener();
+    this.attachCustomPanListener();
 
     // Lighting - hemisphere + 3-point
     const hemi = new THREE.HemisphereLight(0xddeeff, 0x997744, 0.4);
@@ -598,6 +620,8 @@ export class MoleculeRenderer {
   /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
     this.pivotFracX = null; // Reset pivot so the inset-based visual center is used.
+    this.frustumPanX = 0;
+    this.frustumPanY = 0;
     this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot);
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.doApplyFrustumInsets();
@@ -632,9 +656,23 @@ export class MoleculeRenderer {
     const endTarget = new THREE.Vector3(x, y, z);
     if (!animate) {
       this.pivotAnim = null;
+      this.frustumPanX = 0;
+      this.frustumPanY = 0;
+      if (this.camera instanceof THREE.OrthographicCamera) {
+        this.doApplyFrustumInsets();
+      }
       this.controls.target.copy(endTarget);
       this.controls.update();
       return;
+    }
+    // Clear accumulated pan offset so the rotation-center animation has full
+    // control over the frustum shift.  The animation computes startShift from
+    // the current camera.left/right, so we must apply the clear before reading
+    // those values below.
+    this.frustumPanX = 0;
+    this.frustumPanY = 0;
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      this.doApplyFrustumInsets();
     }
     const startTarget = this.controls.target.clone();
     const delta = endTarget.clone().sub(startTarget);
@@ -759,6 +797,95 @@ export class MoleculeRenderer {
     el.addEventListener("wheel", this.wheelZoomHandler, { capture: true, passive: false });
   }
 
+  /**
+   * Attach a custom right-mouse-drag pan listener that translates only the
+   * camera (not controls.target) so the rotation center remains fixed in
+   * world space.
+   *
+   * For orthographic cameras the pan is implemented as a frustum shift so
+   * the view direction never changes.  For perspective cameras the camera
+   * position is moved directly (the camera tilts slightly to keep looking at
+   * the fixed target, which is imperceptible for typical pan magnitudes).
+   */
+  private attachCustomPanListener(): void {
+    const el = this.renderer.domElement;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 2) return;
+      if (this.customPanActive) return;
+      this.snapPivotAnimToEnd();
+      this.customPanActive = true;
+      this.customPanLastX = e.clientX;
+      this.customPanLastY = e.clientY;
+      this.customPanPointerId = e.pointerId;
+      el.setPointerCapture(e.pointerId);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!this.customPanActive || e.pointerId !== this.customPanPointerId) return;
+      const dx = e.clientX - this.customPanLastX;
+      const dy = e.clientY - this.customPanLastY;
+      this.customPanLastX = e.clientX;
+      this.customPanLastY = e.clientY;
+      this.applyCustomPan(dx, dy);
+    };
+
+    const onPointerEnd = (e: PointerEvent) => {
+      if (e.pointerId === this.customPanPointerId) {
+        this.customPanActive = false;
+        this.customPanPointerId = null;
+      }
+    };
+
+    el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("pointermove", onPointerMove);
+    el.addEventListener("pointerup", onPointerEnd);
+    el.addEventListener("pointercancel", onPointerEnd);
+
+    this.customPanCleanup = () => {
+      el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("pointermove", onPointerMove);
+      el.removeEventListener("pointerup", onPointerEnd);
+      el.removeEventListener("pointercancel", onPointerEnd);
+    };
+  }
+
+  /** Apply a screen-space pan delta without moving controls.target. */
+  private applyCustomPan(screenDx: number, screenDy: number): void {
+    if (!this.container) return;
+    const W = this.container.clientWidth;
+    const H = this.container.clientHeight;
+    if (W === 0 || H === 0) return;
+
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      // Shift the frustum rather than moving the camera so the view direction
+      // (and therefore controls.target's apparent position) stays unchanged.
+      // The shift is in camera-local world units.
+      const frustumW = (this.camera.right - this.camera.left) / this.camera.zoom;
+      const frustumH = (this.camera.top - this.camera.bottom) / this.camera.zoom;
+      const worldDx = -screenDx * (frustumW / W);
+      const worldDy = screenDy * (frustumH / H);
+      this.frustumPanX += worldDx;
+      this.frustumPanY += worldDy;
+      this.camera.left += worldDx;
+      this.camera.right += worldDx;
+      this.camera.top += worldDy;
+      this.camera.bottom += worldDy;
+      this.camera.updateProjectionMatrix();
+    } else if (this.camera instanceof THREE.PerspectiveCamera) {
+      // For perspective cameras move the camera in its local XY plane.
+      const distance = this.camera.position.distanceTo(this.controls.target);
+      const vFov = (this.camera.fov * Math.PI) / 180;
+      const worldH = 2 * Math.tan(vFov / 2) * distance;
+      const worldW = worldH * (W / H);
+      const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
+      const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
+      this.camera.position.addScaledVector(right, -screenDx * (worldW / W));
+      this.camera.position.addScaledVector(up, screenDy * (worldH / H));
+      this.camera.updateMatrixWorld(true);
+    }
+  }
+
   /** Set pixel insets for overlay panels that occlude viewport edges. */
   setViewInsets(left: number, right: number): void {
     this.viewInsetLeft = left;
@@ -785,6 +912,15 @@ export class MoleculeRenderer {
       const pivotShift = (2 * this.pivotFracX - 1) * halfW;
       this.camera.left = -halfW - pivotShift;
       this.camera.right = halfW - pivotShift;
+      this.camera.updateProjectionMatrix();
+    }
+    // Re-apply accumulated frustum pan so the view position is preserved
+    // across resize and inset changes.
+    if (this.frustumPanX !== 0 || this.frustumPanY !== 0) {
+      this.camera.left += this.frustumPanX;
+      this.camera.right += this.frustumPanX;
+      this.camera.top += this.frustumPanY;
+      this.camera.bottom += this.frustumPanY;
       this.camera.updateProjectionMatrix();
     }
   }
@@ -815,6 +951,7 @@ export class MoleculeRenderer {
     this.controls.dampingFactor = oldDampingFactor;
     this.controls.rotateSpeed = oldRotateSpeed;
     this.controls.zoomSpeed = oldZoomSpeed;
+    this.controls.enablePan = false;
     this.controls.target.copy(target);
     this.controls.update();
     this.attachPivotCancelListener();
@@ -1201,6 +1338,8 @@ export class MoleculeRenderer {
       this.container.removeEventListener("wheel", this.wheelZoomHandler, true);
       this.wheelZoomHandler = null;
     }
+    this.customPanCleanup?.();
+    this.customPanCleanup = null;
     this.controls.dispose();
     this.renderer.dispose();
     if (this.container && this.renderer.domElement.parentNode) {
