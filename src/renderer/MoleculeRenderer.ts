@@ -658,6 +658,9 @@ export class MoleculeRenderer {
       this.pivotAnim = null;
       this.frustumPanX = 0;
       this.frustumPanY = 0;
+      if (this.camera instanceof THREE.OrthographicCamera) {
+        this.doApplyFrustumInsets();
+      }
       this.controls.target.copy(endTarget);
       this.controls.update();
       return;
@@ -668,6 +671,9 @@ export class MoleculeRenderer {
     // those values below.
     this.frustumPanX = 0;
     this.frustumPanY = 0;
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      this.doApplyFrustumInsets();
+    }
     const startTarget = this.controls.target.clone();
     const delta = endTarget.clone().sub(startTarget);
     const startCameraPos = this.camera.position.clone();
