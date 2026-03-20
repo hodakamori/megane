@@ -45,7 +45,9 @@ async function loadMeganeFile(
   const text = await meganeFile.text();
   const pipeline = JSON.parse(text) as SerializedPipeline;
   if (pipeline.version !== 3) {
-    throw new Error(`Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`);
+    throw new Error(
+      `Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`,
+    );
   }
 
   const store = usePipelineStore.getState();
@@ -226,30 +228,26 @@ function App() {
   );
 
   return (
-    <div
-      style={{ width: "100%", height: "100%" }}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-    <MeganeViewer
-      snapshot={ds.snapshot}
-      frame={ds.frame}
-      currentFrame={ds.currentFrame}
-      totalFrames={totalFrames}
-      playing={playing}
-      fps={fps}
-      onSeek={handleSeek}
-      onPlayPause={handlePlayPause}
-      onFpsChange={handleFpsChange}
-      onUploadStructure={handleUploadStructure}
-      onUploadTrajectory={handleUploadTrajectory}
-      onBondSourceChange={ds.setBondSource}
-      onLabelSourceChange={ds.setLabelSource}
-      onLoadLabelFile={ds.loadLabelFile}
-      onVectorSourceChange={ds.setVectorSource}
-      onLoadVectorFile={ds.loadVectorFile}
-      onLoadDemoVectors={ds.loadDemoVectors}
-    />
+    <div style={{ width: "100%", height: "100%" }} onDragOver={handleDragOver} onDrop={handleDrop}>
+      <MeganeViewer
+        snapshot={ds.snapshot}
+        frame={ds.frame}
+        currentFrame={ds.currentFrame}
+        totalFrames={totalFrames}
+        playing={playing}
+        fps={fps}
+        onSeek={handleSeek}
+        onPlayPause={handlePlayPause}
+        onFpsChange={handleFpsChange}
+        onUploadStructure={handleUploadStructure}
+        onUploadTrajectory={handleUploadTrajectory}
+        onBondSourceChange={ds.setBondSource}
+        onLabelSourceChange={ds.setLabelSource}
+        onLoadLabelFile={ds.loadLabelFile}
+        onVectorSourceChange={ds.setVectorSource}
+        onLoadVectorFile={ds.loadVectorFile}
+        onLoadDemoVectors={ds.loadDemoVectors}
+      />
     </div>
   );
 }
