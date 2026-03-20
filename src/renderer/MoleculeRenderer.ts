@@ -672,10 +672,34 @@ export class MoleculeRenderer {
     };
   }
 
-  /** Cancel any in-progress pivot animation when the user begins interacting. */
+  /** Immediately snap any in-progress pivot animation to its final state.
+   * Called before zoom or rotation so the interaction always starts from the
+   * atom position rather than an intermediate mid-animation position.
+   */
+  private snapPivotAnimToEnd(): void {
+    if (!this.pivotAnim) return;
+    this.controls.target.copy(this.pivotAnim.endTarget);
+    this.camera.position.copy(this.pivotAnim.endCameraPos);
+    if (this.camera instanceof THREE.OrthographicCamera && this.pivotAnim.startHalfW > 0) {
+      const hw = this.pivotAnim.startHalfW;
+      this.camera.left = -hw - this.pivotAnim.endShift;
+      this.camera.right = hw - this.pivotAnim.endShift;
+      this.camera.updateProjectionMatrix();
+    }
+    this.pivotAnim = null;
+    // Sync camera world matrices and OrbitControls internal state so that
+    // subsequent project()/unproject() calls and interaction math use the
+    // snapped end pose rather than the mid-animation matrices.
+    this.camera.updateMatrixWorld(true);
+    const wasDamping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = wasDamping;
+  }
+
   private attachPivotCancelListener(): void {
     this.controls.addEventListener("start", () => {
-      this.pivotAnim = null;
+      this.snapPivotAnimToEnd();
     });
   }
 
@@ -695,7 +719,10 @@ export class MoleculeRenderer {
       if (!(this.camera instanceof THREE.OrthographicCamera)) return;
       e.preventDefault();
       e.stopPropagation(); // prevent OrbitControls from also processing this
-      this.pivotAnim = null;
+
+      // Snap pivot animation to its end state so zoom is always centered on
+      // the clicked atom, not on an intermediate position mid-animation.
+      this.snapPivotAnimToEnd();
 
       // Normalize deltaY across deltaMode (pixel / line / page)
       let delta = e.deltaY;
