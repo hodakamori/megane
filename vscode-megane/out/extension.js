@@ -61,29 +61,43 @@ class MeganePresetEditorProvider {
             localResourceRoots: [mediaDir],
         };
         webview.html = getHtmlForWebview(webview, mediaDir);
-        const presetData = await vscode.workspace.fs.readFile(document.uri);
-        const preset = JSON.parse(new TextDecoder("utf-8").decode(presetData));
+        const pipelineData = await vscode.workspace.fs.readFile(document.uri);
+        const pipeline = JSON.parse(new TextDecoder("utf-8").decode(pipelineData));
+        if (pipeline.version !== 3) {
+            throw new Error(`Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`);
+        }
         const dir = path.dirname(document.uri.fsPath);
-        const structureUri = vscode.Uri.file(path.resolve(dir, preset.structure));
-        const structureData = await vscode.workspace.fs.readFile(structureUri);
-        const structureText = new TextDecoder("utf-8").decode(structureData);
-        const structureFilename = path.basename(preset.structure);
-        let trajectoryPayload = null;
-        if (preset.trajectory) {
-            const trajUri = vscode.Uri.file(path.resolve(dir, preset.trajectory));
-            const trajData = await vscode.workspace.fs.readFile(trajUri);
-            trajectoryPayload = {
-                content: Array.from(trajData),
-                filename: path.basename(preset.trajectory),
-            };
+        // Read structure files referenced by load_structure nodes
+        const structureFiles = [];
+        // Read trajectory files referenced by load_trajectory nodes
+        const trajectoryFiles = [];
+        for (const node of pipeline.nodes) {
+            if (!node.fileName)
+                continue;
+            const filePath = String(node.fileName);
+            const fileUri = vscode.Uri.file(path.resolve(dir, filePath));
+            const filename = path.basename(filePath);
+            try {
+                if (node.type === "load_structure") {
+                    const raw = await vscode.workspace.fs.readFile(fileUri);
+                    structureFiles.push({ nodeId: node.id, content: new TextDecoder("utf-8").decode(raw), filename });
+                }
+                else if (node.type === "load_trajectory") {
+                    const raw = await vscode.workspace.fs.readFile(fileUri);
+                    trajectoryFiles.push({ nodeId: node.id, content: Array.from(raw), filename });
+                }
+            }
+            catch {
+                // File not found — skip silently; webview will show a warning on the node
+            }
         }
         webview.onDidReceiveMessage((message) => {
             if (message.type === "ready") {
                 webview.postMessage({
-                    type: "loadPreset",
-                    structure: { content: structureText, filename: structureFilename },
-                    trajectory: trajectoryPayload,
-                    settings: preset.settings ?? {},
+                    type: "loadPipeline",
+                    pipeline,
+                    structureFiles,
+                    trajectoryFiles,
                 });
             }
         });
