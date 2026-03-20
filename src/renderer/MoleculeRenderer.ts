@@ -710,13 +710,29 @@ export class MoleculeRenderer {
       const scale = Math.pow(0.95, this.controls.zoomSpeed * Math.abs(delta) * 0.01);
       const zoomFactor = delta < 0 ? 1 / scale : scale;
 
-      // For orthographic cameras, changing camera.zoom is a pure linear scale of
-      // the visible frustum.  All world-to-NDC mappings are preserved (the ratio
-      // (zoom * px - L) / (R - L) is independent of zoom for fixed px, L, R),
-      // so controls.target stays at its current screen position without any
-      // camera.position shift or controls.update() call.
+      // Project controls.target to NDC before the zoom change so we can
+      // compensate any drift afterward with a frustum shift.
+      const ndcBefore = this.controls.target.clone().project(this.camera);
+
       this.camera.zoom = Math.max(0.01, this.camera.zoom * zoomFactor);
       this.camera.updateProjectionMatrix();
+
+      // Re-project to find how much the target drifted in NDC space.
+      // In steady-state the camera looks directly at controls.target, so
+      // camera-space px = py = 0 and there is no drift.  This compensation
+      // handles edge cases (e.g. mid-animation) where px or py is non-zero.
+      const ndcAfter = this.controls.target.clone().project(this.camera);
+      const shiftX = (ndcAfter.x - ndcBefore.x) * (this.camera.right - this.camera.left) / 2;
+      const shiftY = (ndcAfter.y - ndcBefore.y) * (this.camera.top - this.camera.bottom) / 2;
+      if (Math.abs(shiftX) > 1e-9 || Math.abs(shiftY) > 1e-9) {
+        this.camera.left += shiftX;
+        this.camera.right += shiftX;
+        this.camera.top += shiftY;
+        this.camera.bottom += shiftY;
+        this._frustumPanX += shiftX;
+        this._frustumPanY += shiftY;
+        this.camera.updateProjectionMatrix();
+      }
     };
     el.addEventListener("wheel", this.wheelZoomHandler, { capture: true, passive: false });
   }
