@@ -94,6 +94,10 @@ export class MoleculeRenderer {
   private customPanLastY = 0;
   private customPanPointerId: number | null = null;
   private customPanCleanup: (() => void) | null = null;
+  // Reusable temp vectors for applyCustomPan to avoid per-frame allocations.
+  private readonly _panRight = new THREE.Vector3();
+  private readonly _panUp = new THREE.Vector3();
+  private readonly _panDelta = new THREE.Vector3();
 
   private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
 
@@ -166,9 +170,9 @@ export class MoleculeRenderer {
     this.controls.dampingFactor = 0.1;
     this.controls.rotateSpeed = 0.8;
     this.controls.zoomSpeed = 1.2;
-    // Disable built-in pan so that right-drag/touch pan does not move
-    // controls.target (the rotation center).  Custom pan is handled by
-    // attachCustomPanListener() via frustum shift (ortho) or camera position (perspective).
+    // Disable built-in pan and handle right-drag via attachCustomPanListener(),
+    // which translates both camera.position and controls.target together so the
+    // rotation pivot always stays at the screen center.
     this.controls.enablePan = false;
     this.attachPivotCancelListener();
     this.attachWheelZoomListener();
@@ -771,15 +775,15 @@ export class MoleculeRenderer {
     const H = this.container.clientHeight;
     if (W === 0 || H === 0) return;
 
-    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
-    const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
+    const right = this._panRight.setFromMatrixColumn(this.camera.matrix, 0);
+    const up = this._panUp.setFromMatrixColumn(this.camera.matrix, 1);
 
     if (this.camera instanceof THREE.OrthographicCamera) {
       const frustumW = (this.camera.right - this.camera.left) / this.camera.zoom;
       const frustumH = (this.camera.top - this.camera.bottom) / this.camera.zoom;
       const worldDx = -screenDx * (frustumW / W);
       const worldDy = screenDy * (frustumH / H);
-      const delta = right.clone().multiplyScalar(worldDx).addScaledVector(up, worldDy);
+      const delta = this._panDelta.copy(right).multiplyScalar(worldDx).addScaledVector(up, worldDy);
       this.camera.position.add(delta);
       this.controls.target.add(delta);
       this.camera.updateMatrixWorld(true);
@@ -788,8 +792,8 @@ export class MoleculeRenderer {
       const vFov = (this.camera.fov * Math.PI) / 180;
       const worldH = 2 * Math.tan(vFov / 2) * distance;
       const worldW = worldH * (W / H);
-      const delta = right
-        .clone()
+      const delta = this._panDelta
+        .copy(right)
         .multiplyScalar(-screenDx * (worldW / W))
         .addScaledVector(up, screenDy * (worldH / H));
       this.camera.position.add(delta);
