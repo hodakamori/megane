@@ -722,8 +722,8 @@ export class MoleculeRenderer {
       // camera-space px = py = 0 and there is no drift.  This compensation
       // handles edge cases (e.g. mid-animation) where px or py is non-zero.
       const ndcAfter = this.controls.target.clone().project(this.camera);
-      const shiftX = (ndcAfter.x - ndcBefore.x) * (this.camera.right - this.camera.left) / 2;
-      const shiftY = (ndcAfter.y - ndcBefore.y) * (this.camera.top - this.camera.bottom) / 2;
+      const shiftX = ((ndcAfter.x - ndcBefore.x) * (this.camera.right - this.camera.left)) / 2;
+      const shiftY = ((ndcAfter.y - ndcBefore.y) * (this.camera.top - this.camera.bottom)) / 2;
       if (Math.abs(shiftX) > 1e-9 || Math.abs(shiftY) > 1e-9) {
         this.camera.left += shiftX;
         this.camera.right += shiftX;
