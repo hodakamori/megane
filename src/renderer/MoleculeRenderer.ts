@@ -687,6 +687,14 @@ export class MoleculeRenderer {
       this.camera.updateProjectionMatrix();
     }
     this.pivotAnim = null;
+    // Sync camera world matrices and OrbitControls internal state so that
+    // subsequent project()/unproject() calls and interaction math use the
+    // snapped end pose rather than the mid-animation matrices.
+    this.camera.updateMatrixWorld(true);
+    const wasDamping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = wasDamping;
   }
 
   private attachPivotCancelListener(): void {
