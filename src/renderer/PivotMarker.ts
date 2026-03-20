@@ -17,16 +17,29 @@ export class PivotMarker {
 
     // Each axis: two vertices at ±0.5 in local space.
     const positions = new Float32Array([
-      -0.5, 0, 0,  0.5, 0, 0, // X axis
-       0, -0.5, 0,  0, 0.5, 0, // Y axis
-       0, 0, -0.5,  0, 0, 0.5, // Z axis
+      -0.5,
+      0,
+      0,
+      0.5,
+      0,
+      0, // X axis
+      0,
+      -0.5,
+      0,
+      0,
+      0.5,
+      0, // Y axis
+      0,
+      0,
+      -0.5,
+      0,
+      0,
+      0.5, // Z axis
     ]);
 
     // Vertex colors: X = red, Y = green, Z = blue
     const colors = new Float32Array([
-      0.9, 0.2, 0.2,  0.9, 0.2, 0.2,
-      0.2, 0.8, 0.2,  0.2, 0.8, 0.2,
-      0.2, 0.5, 1.0,  0.2, 0.5, 1.0,
+      0.9, 0.2, 0.2, 0.9, 0.2, 0.2, 0.2, 0.8, 0.2, 0.2, 0.8, 0.2, 0.2, 0.5, 1.0, 0.2, 0.5, 1.0,
     ]);
 
     const geo = new THREE.BufferGeometry();
