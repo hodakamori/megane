@@ -176,9 +176,16 @@ import { PipelineViewer } from "megane-viewer";
 ### `SerializedPipeline` format
 
 ```ts
+import type { PipelineNodeParams, SerializedPipeline } from "megane-viewer";
+
+// SerializedPipeline (exported from megane-viewer):
 interface SerializedPipeline {
   version: 3;
-  nodes: Array<NodeParams & { id: string; position: { x: number; y: number } }>;
+  nodes: Array<PipelineNodeParams & {
+    id: string;
+    position: { x: number; y: number };
+    enabled?: boolean;   // false = node is bypassed (default: true)
+  }>;
   edges: Array<{
     source: string;
     target: string;
@@ -187,6 +194,8 @@ interface SerializedPipeline {
   }>;
 }
 ```
+
+`PipelineNodeParams` is a discriminated union exported by `megane-viewer`. The `type` field on each node determines which parameters are required — see [Node Reference](/guide/pipeline#node-reference) for the full list.
 
 Each node's `type` field determines which parameters are required. See [Node Reference](/guide/pipeline#node-reference) for the full list.
 
