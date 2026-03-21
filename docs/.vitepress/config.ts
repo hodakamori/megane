@@ -22,6 +22,7 @@ export default defineConfig({
 
     nav: [
       { text: "Guide", link: "/getting-started" },
+      { text: "Gallery", link: "/gallery/" },
       { text: "Demo", link: "/demo" },
       { text: "API", link: "/api/" },
       {
@@ -55,6 +56,12 @@ export default defineConfig({
           { text: "CLI Server", link: "/guide/cli" },
           { text: "Web / React", link: "/guide/web" },
           { text: "Integrations", link: "/guide/integrations" },
+        ],
+      },
+      {
+        text: "Gallery",
+        items: [
+          { text: "Gallery", link: "/gallery/" },
         ],
       },
       {
