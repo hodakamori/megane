@@ -19,6 +19,7 @@ The following skills must be available in the system reminder:
 7. **pre-release** — Pre-release checklist (tests, versioning, dry-run, tag)
 8. **post-release** — Post-release checklist (verify packages, docs, live demo)
 9. **validate-skills** — This skill (self-check)
+10. **copilot-review** — Copilot review request and fix loop
 
 ## Validation Steps
 
@@ -41,5 +42,6 @@ Skills validation: OK
   - pre-release: loaded
   - post-release: loaded
   - validate-skills: loaded
-All 9 skills are available. Ready to proceed.
+  - copilot-review: loaded
+All 10 skills are available. Ready to proceed.
 ```

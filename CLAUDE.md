@@ -54,7 +54,7 @@ Project-specific skills are defined in `.claude/skills/`. Each skill provides in
 
 - **At the start of a task**, run the `validate-skills` skill to confirm all skills are loaded.
 - **Always follow the instructions** in each skill when performing the corresponding workflow.
-- Skills cover: committing (`commit`), GitHub CLI usage (`github-cli`), dev environment setup (`dev-setup`), building (`build`), testing (`testing`), preview capture (`preview`), and skill validation (`validate-skills`).
+- Skills cover: committing (`commit`), GitHub CLI usage (`github-cli`), dev environment setup (`dev-setup`), building (`build`), testing (`testing`), preview capture (`preview`), skill validation (`validate-skills`), and Copilot PR review (`copilot-review`).
 
 ## Architecture
 
