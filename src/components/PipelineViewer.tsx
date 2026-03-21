@@ -233,8 +233,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     const renderer = rendererRef.current;
     if (!renderer) return;
     const hasDistanceBond = nodes.some(
-      (n) =>
-        n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
+      (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
     );
     if (!hasDistanceBond) return;
 
