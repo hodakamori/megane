@@ -1,3 +1,7 @@
+---
+sidebar_position: 1
+---
+
 # Visual Pipeline Editor
 
 megane's pipeline editor lets you build visualization workflows by wiring nodes — no code required. Open the pipeline panel from the sidebar to start building.

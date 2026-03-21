@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Jupyter Widget
 
 megane provides an [anywidget](https://anywidget.dev/)-based Jupyter widget for interactive molecular visualization directly in notebooks. Works in JupyterLab, Jupyter Notebook, VS Code, and Google Colab.

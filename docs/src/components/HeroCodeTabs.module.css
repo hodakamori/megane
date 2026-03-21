@@ -1,0 +1,136 @@
+.heroCodeTabs {
+  margin-top: 24px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+}
+
+.installBar {
+  background: var(--ifm-color-emphasis-100);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+}
+
+.installTabs {
+  display: flex;
+  gap: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.installTab {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ifm-color-emphasis-600);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.installTab:hover {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.installTab.active {
+  color: var(--ifm-color-emphasis-900);
+  border-bottom-color: var(--ifm-color-emphasis-900);
+}
+
+.installCommand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 14px;
+}
+
+.installPrompt {
+  color: var(--ifm-color-emphasis-600);
+  user-select: none;
+}
+
+.installText {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.tabButtons {
+  display: flex;
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.tabButton {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ifm-color-emphasis-700);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tabButton:hover {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.tabButton.active {
+  color: var(--ifm-color-primary);
+  border-bottom-color: var(--ifm-color-primary);
+}
+
+.tabContent {
+  background: var(--ifm-color-emphasis-100);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
+.tabContent pre {
+  margin: 0;
+  padding: 16px 20px;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 13px;
+  line-height: 1.7;
+  min-height: 165px;
+  overflow-x: auto;
+  text-align: left;
+  background: transparent;
+}
+
+.tabContent code {
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Syntax highlighting - light */
+.kn { color: #008000; font-weight: bold; }
+.nn { color: #0000ff; font-weight: bold; }
+.nc { color: #0000ff; font-weight: bold; }
+.na { color: #687822; }
+.n  { color: var(--ifm-font-color-base); }
+.o  { color: #666666; }
+.p  { color: var(--ifm-font-color-base); }
+.s  { color: #ba2121; }
+.c  { color: #3d7b7b; }
+
+/* Syntax highlighting - dark */
+[data-theme="dark"] .kn { color: #c586c0; font-weight: normal; }
+[data-theme="dark"] .nn { color: #4ec9b0; font-weight: normal; }
+[data-theme="dark"] .nc { color: #4ec9b0; font-weight: normal; }
+[data-theme="dark"] .na { color: #9cdcfe; }
+[data-theme="dark"] .n  { color: #d4d4d4; }
+[data-theme="dark"] .o  { color: #d4d4d4; }
+[data-theme="dark"] .p  { color: #d4d4d4; }
+[data-theme="dark"] .s  { color: #ce9178; }
+[data-theme="dark"] .c  { color: #6a9955; }

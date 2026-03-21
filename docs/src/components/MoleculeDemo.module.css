@@ -1,0 +1,16 @@
+.moleculeDemo {
+  margin: 16px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.moleculeContainer {
+  width: 100%;
+  position: relative;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+[data-theme="dark"] .moleculeContainer {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}

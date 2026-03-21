@@ -1,3 +1,7 @@
+---
+sidebar_position: 4
+---
+
 # Web / React
 
 megane can be embedded in React applications as a component library. It provides both high-level React components and a framework-agnostic imperative renderer.

@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # CLI Server
 
 megane includes a command-line tool to serve molecular structures in a local web viewer.

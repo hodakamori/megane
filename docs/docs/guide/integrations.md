@@ -1,3 +1,7 @@
+---
+sidebar_position: 5
+---
+
 # Integrations
 
 megane integrates with your existing tools and workflows. This guide covers Plotly event-driven control, MDX embedding, ipywidgets events, and framework-agnostic rendering.
