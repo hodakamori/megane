@@ -66,7 +66,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 0, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {
@@ -182,7 +182,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 0, y: 0 },
       fileName: "perovskite_srtio3_3x3x3.xyz",
-      fileUrl: "/path/to/perovskite_srtio3_3x3x3.xyz",
+      fileUrl: "/megane/structures/perovskite_srtio3_3x3x3.xyz",
       hasTrajectory: false, hasCell: true,
     },
     {
@@ -317,7 +317,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 0, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {
@@ -455,7 +455,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 340, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {
@@ -622,7 +622,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 0, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {
@@ -746,7 +746,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 0, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {
@@ -874,7 +874,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 340, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {
@@ -1002,7 +1002,7 @@ const pipeline: SerializedPipeline = {
       id: "s1", type: "load_structure",
       position: { x: 340, y: 0 },
       fileName: "caffeine_water.pdb",
-      fileUrl: "/path/to/caffeine_water.pdb",
+      fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
     {

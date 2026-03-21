@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import type { GalleryExample } from "../gallery/types";
+import type { NodeSnapshotData } from "../../../src/pipeline/execute";
 
 const props = defineProps<{ example: GalleryExample }>();
 
@@ -36,7 +37,8 @@ onMounted(async () => {
     if (unmounted) return;
     const data = await res.json();
     if (unmounted) return;
-    renderer.loadSnapshot({
+
+    const snapshot = {
       nAtoms: data.nAtoms,
       nBonds: data.nBonds,
       nFileBonds: data.nFileBonds,
@@ -45,7 +47,30 @@ onMounted(async () => {
       bonds: new Uint32Array(data.bonds),
       bondOrders: data.bondOrders ? new Uint8Array(data.bondOrders) : null,
       box: data.box ? new Float32Array(data.box) : null,
-    });
+    };
+
+    // Load base structure first
+    renderer.loadSnapshot(snapshot);
+
+    // Execute the pipeline defined in the vscode code snippet
+    const { deserializePipeline } = await import("../../../src/pipeline/serialize");
+    const { executePipeline } = await import("../../../src/pipeline/execute");
+    const { applyViewportState } = await import("../../../src/pipeline/apply");
+    if (unmounted) return;
+
+    const pipeline = JSON.parse(props.example.code.vscode);
+    const { nodes, edges } = deserializePipeline(pipeline);
+
+    // Map all load_structure nodes to the fetched snapshot
+    const nodeSnapshots: Record<string, NodeSnapshotData> = {};
+    for (const node of nodes) {
+      if (node.type === "load_structure") {
+        nodeSnapshots[node.id] = { snapshot, frames: null, meta: null, labels: null };
+      }
+    }
+
+    const { viewportState } = executePipeline(nodes, edges, { nodeSnapshots });
+    applyViewportState(renderer, viewportState, null);
   } catch (error) {
     console.error(
       "Error loading gallery snapshot:",
