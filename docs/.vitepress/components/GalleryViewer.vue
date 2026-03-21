@@ -9,8 +9,9 @@ const props = defineProps<{ example: GalleryExample }>();
 const container = ref<HTMLElement | null>(null);
 let renderer: any = null;
 let unmounted = false;
+let observer: IntersectionObserver | null = null;
 
-onMounted(async () => {
+async function initPreview() {
   if (!container.value) return;
 
   const { MoleculeRenderer } = await import(
@@ -33,7 +34,6 @@ onMounted(async () => {
       );
       return;
     }
-    // Guard again after the fetch await
     if (unmounted) return;
     const data = await res.json();
     if (unmounted) return;
@@ -78,10 +78,31 @@ onMounted(async () => {
       error,
     );
   }
+}
+
+onMounted(() => {
+  if (!container.value) return;
+
+  // Defer heavy work (renderer init, fetch, pipeline execution) until the
+  // card actually enters the viewport — avoids blocking the main thread for
+  // all examples on initial page load.
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) {
+        observer!.disconnect();
+        observer = null;
+        initPreview();
+      }
+    },
+    { rootMargin: "200px" }, // start loading slightly before it scrolls in
+  );
+  observer.observe(container.value);
 });
 
 onBeforeUnmount(() => {
   unmounted = true;
+  observer?.disconnect();
+  observer = null;
   if (renderer) {
     renderer.dispose();
     renderer = null;
