@@ -53,9 +53,7 @@ function makePortNamespace(node: PipelineNode, portMap: Record<string, string>):
       if (typeof prop !== "string" || prop.startsWith("__") || prop === "then") return undefined;
       if (prop in portMap) return new NodePort(node, portMap[prop]);
       const available = Object.keys(portMap).sort().join(", ") || "(none)";
-      throw new Error(
-        `No port "${prop}" on "${node.nodeType}" node. Available: ${available}`,
-      );
+      throw new Error(`No port "${prop}" on "${node.nodeType}" node. Available: ${available}`);
     },
     has(_, prop: string) {
       return prop in portMap;
