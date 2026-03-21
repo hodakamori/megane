@@ -117,7 +117,7 @@ Requires a connection from a LoadStructure node. Frames are loaded lazily when `
 
 Both input fields validate your query in real time — invalid syntax is highlighted in red.
 
-The **Query** field filters which atoms pass through (particle output). The **Bond query** field filters which bonds are selected for the downstream Modify node to apply per-bond opacity overrides — it does not remove bonds from the scene.
+The **Query** field filters which atoms pass through when the Filter node is connected to a particle stream (particle input/output). The **Bond query** field filters which bonds are selected when the Filter node is connected to a bond stream; this selection is used by downstream nodes (for example, Modify) to apply per-bond opacity overrides — it does not remove bonds from the scene. Because a Filter node has a single generic `in → out` port and only one data type flows through it at a time, using both atom and bond queries in the same workflow typically means adding two Filter nodes: one on the particle edge and one on the bond edge.
 
 ### Modify
 
@@ -238,7 +238,7 @@ The **Bond query** field in the Filter node accepts expressions to select bonds.
 
 - `all` — select all bonds (default when query is empty)
 - `none` — select no bonds
-- `both` — prefix on a comparison to require **both** atoms satisfy it (default: either atom, OR semantics)
+- `both` — prefix on a comparison involving `atom_index` or `element` to require **both** atoms of the bond to satisfy the condition (default: either atom, OR semantics). Has no effect on `bond_index` comparisons.
 
 ### Examples
 
