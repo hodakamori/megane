@@ -309,6 +309,8 @@ export const GENERIC_NODE_ACCEPTS: Record<string, PipelineDataType[]> = {
 export interface LoadStructureParams {
   type: "load_structure";
   fileName: string | null;
+  /** URL for PipelineViewer to fetch (relative or absolute). Not used by the execution engine. */
+  fileUrl?: string;
   /** Which output ports have data (determined by the loaded file). */
   hasTrajectory: boolean;
   hasCell: boolean;

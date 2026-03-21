@@ -5,6 +5,7 @@
 
 // React components
 export { MeganeViewer } from "./components/MeganeViewer";
+export { PipelineViewer } from "./components/PipelineViewer";
 export { Viewport } from "./components/Viewport";
 export { Sidebar } from "./components/Sidebar";
 export { Timeline } from "./components/Timeline";
