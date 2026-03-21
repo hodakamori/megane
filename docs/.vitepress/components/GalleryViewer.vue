@@ -10,6 +10,7 @@ const container = ref<HTMLElement | null>(null);
 let renderer: any = null;
 let unmounted = false;
 let observer: IntersectionObserver | null = null;
+let animTimerId: ReturnType<typeof setTimeout> | null = null;
 
 async function initPreview() {
   if (!container.value) return;
@@ -69,8 +70,36 @@ async function initPreview() {
       }
     }
 
-    const { viewportState } = executePipeline(nodes, edges, { nodeSnapshots });
+    // Inject embedded trajectory frames and vector data when present in snapshot JSON
+    const fileFrames = data.frames?.map((f: any, i: number) => ({
+      frameId: i,
+      nAtoms: f.nAtoms,
+      positions: new Float32Array(f.positions),
+    })) ?? undefined;
+    const fileMeta = data.meta ?? undefined;
+    const fileVectors = data.vectors
+      ? [{ frame: 0, vectors: new Float32Array(data.vectors) }]
+      : undefined;
+
+    const { viewportState } = executePipeline(nodes, edges, {
+      nodeSnapshots,
+      fileFrames,
+      fileMeta,
+      fileVectors,
+    });
     applyViewportState(renderer, viewportState, null);
+
+    // If snapshot has embedded frames, animate via renderer.updateFrame (lightweight position update)
+    if (fileFrames && fileFrames.length > 0) {
+      let idx = 0;
+      const loop = () => {
+        if (unmounted) return;
+        renderer.updateFrame(fileFrames[idx % fileFrames.length]);
+        idx++;
+        animTimerId = setTimeout(loop, 1000 / 15);
+      };
+      loop();
+    }
   } catch (error) {
     console.error(
       "Error loading gallery snapshot:",
@@ -101,6 +130,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true;
+  if (animTimerId !== null) {
+    clearTimeout(animTimerId);
+    animTimerId = null;
+  }
   observer?.disconnect();
   observer = null;
   if (renderer) {
@@ -112,10 +145,10 @@ onBeforeUnmount(() => {
 
 // ── Code tabs ─────────────────────────────────────────────────────────────────
 type TabId = "jupyter" | "react" | "vscode";
-const tabs: { id: TabId; label: string; lang: string }[] = [
-  { id: "jupyter", label: "Jupyter",  lang: "python"     },
-  { id: "react",   label: "React",    lang: "typescript" },
-  { id: "vscode",  label: "VSCode",   lang: "json"       },
+const tabs: { id: TabId; label: string }[] = [
+  { id: "jupyter", label: "Jupyter"  },
+  { id: "react",   label: "React"    },
+  { id: "vscode",  label: "VSCode"   },
 ];
 const activeTab = ref<TabId>("jupyter");
 
@@ -197,12 +230,7 @@ async function copyCode() {
             {{ copied ? "Copied!" : "Copy" }}
           </button>
         </div>
-        <pre
-          v-for="tab in tabs"
-          v-show="activeTab === tab.id"
-          :key="tab.id"
-          class="code-block"
-        ><code>{{ example.code[tab.id] }}</code></pre>
+        <pre class="code-block"><code>{{ example.code[activeTab] }}</code></pre>
       </div>
     </div>
   </div>

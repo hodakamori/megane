@@ -1,9 +1,14 @@
 <script setup>
+import { computed } from "vue";
+import { useRoute } from "vitepress";
 import DefaultTheme from "vitepress/theme";
 import HeroCodeTabs from "../components/HeroCodeTabs.vue";
 import FullViewerDemo from "../components/FullViewerDemo.vue";
+import GalleryOutline from "../components/GalleryOutline.vue";
 
 const { Layout } = DefaultTheme;
+const route = useRoute();
+const isGallery = computed(() => route.path.includes("/gallery"));
 </script>
 
 <template>
@@ -24,6 +29,9 @@ const { Layout } = DefaultTheme;
           </div>
         </div>
       </div>
+    </template>
+    <template #aside-outline-before>
+      <GalleryOutline v-if="isGallery" />
     </template>
   </Layout>
 </template>
