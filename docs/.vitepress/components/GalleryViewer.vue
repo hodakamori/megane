@@ -18,6 +18,7 @@ let previewFrames: PreviewFrame[] | null = null;
 const playing      = ref(false);
 const currentFrame = ref(0);
 const totalFrames  = ref(0);
+const fps          = ref(30);
 
 async function initPreview() {
   if (!container.value) return;
@@ -126,13 +127,24 @@ function startAnimation() {
     if (unmounted || !playing.value) return;
     currentFrame.value = (currentFrame.value + 1) % previewFrames!.length;
     renderer.updateFrame(previewFrames![currentFrame.value]);
-    animTimerId = setTimeout(tick, 1000 / 15);
+    animTimerId = setTimeout(tick, 1000 / fps.value);
   };
-  animTimerId = setTimeout(tick, 1000 / 15);
+  animTimerId = setTimeout(tick, 1000 / fps.value);
 }
 
 function togglePlay() {
   if (playing.value) stopAnimation(); else startAnimation();
+}
+
+function seekFrame(frame: number) {
+  if (!previewFrames) return;
+  currentFrame.value = frame;
+  renderer.updateFrame(previewFrames[frame]);
+}
+
+function setFps(newFps: number) {
+  fps.value = newFps;
+  if (playing.value) { stopAnimation(); startAnimation(); }
 }
 
 onMounted(() => {
@@ -240,15 +252,36 @@ async function copyCode() {
         ref="container"
         :style="{ height: example.height ?? '380px' }"
       >
-        <!-- Playback controls (only shown when trajectory frames are loaded) -->
-        <div v-if="totalFrames > 0" class="anim-controls">
+        <!-- Timeline (only shown when trajectory frames are loaded, matching Timeline.tsx) -->
+        <div v-if="totalFrames > 1" class="anim-timeline">
           <button
             type="button"
-            class="anim-btn"
+            class="anim-playpause"
             :title="playing ? 'Pause' : 'Play'"
             @click="togglePlay"
-          >{{ playing ? '⏸' : '▶' }}</button>
+          >{{ playing ? '\u23F8' : '\u25B6' }}</button>
+
           <span class="anim-counter">{{ currentFrame + 1 }} / {{ totalFrames }}</span>
+
+          <input
+            type="range"
+            class="anim-seek"
+            :min="0"
+            :max="totalFrames - 1"
+            :value="currentFrame"
+            @input="seekFrame(parseInt(($event.target as HTMLInputElement).value, 10))"
+          />
+
+          <select
+            class="anim-fps"
+            :value="fps"
+            @change="setFps(parseInt(($event.target as HTMLSelectElement).value, 10))"
+          >
+            <option value="10">10 fps</option>
+            <option value="20">20 fps</option>
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
         </div>
       </div>
 
@@ -440,36 +473,69 @@ async function copyCode() {
   padding: 0;
 }
 
-/* ── Animation controls overlay ────────────────────────────────────────────── */
-.anim-controls {
+/* ── Timeline (matches Timeline.tsx exactly) ────────────────────────────────── */
+.anim-timeline {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 20px 14px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 20px;
-  padding: 4px 10px 4px 6px;
-  backdrop-filter: blur(4px);
+  gap: 12px;
   z-index: 10;
+  font-size: 13px;
+  color: #64748b;
 }
 
-.anim-btn {
+.anim-playpause {
   background: none;
-  border: none;
-  color: #fff;
-  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  padding: 2px 4px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: all 0.15s;
 }
 
 .anim-counter {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  min-width: 80px;
+  text-align: center;
   font-variant-numeric: tabular-nums;
-  font-family: var(--vp-font-family-mono);
-  white-space: nowrap;
+  font-weight: 500;
+  color: #64748b;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.anim-seek {
+  flex: 1;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.anim-fps {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 </style>
