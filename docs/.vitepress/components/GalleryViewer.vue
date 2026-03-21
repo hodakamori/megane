@@ -380,6 +380,7 @@ async function copyCode() {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   border-right: 1px solid var(--vp-c-divider);
   position: relative;
+  overflow: hidden;
 }
 
 :root.dark .gallery-preview {
