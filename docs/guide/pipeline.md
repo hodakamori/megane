@@ -112,9 +112,12 @@ Requires a connection from a LoadStructure node. Frames are loaded lazily when `
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| Query | string | `""` (all) | Selection query expression (see [Filter DSL](#filter-dsl)) |
+| Query | string | `""` (all) | Atom selection query expression (see [Filter DSL](#filter-dsl)) |
+| Bond query | string | `""` (all) | Bond selection query expression (see [Bond Selection DSL](#bond-selection-dsl)) |
 
-The input field validates your query in real time — invalid syntax is highlighted in red.
+Both input fields validate your query in real time — invalid syntax is highlighted in red.
+
+The **Query** field filters which atoms pass through (particle output). The **Bond query** field filters which bonds are selected for the downstream Modify node to apply per-bond opacity overrides — it does not remove bonds from the scene.
 
 ### Modify
 
@@ -155,6 +158,7 @@ The input field validates your query in real time — invalid syntax is highligh
 |-----------|---------|-------------|
 | Perspective | off | Toggle perspective / orthographic projection |
 | Cell axes visible | on | Show simulation cell axes with labels |
+| Pivot marker visible | on | Show the rotation pivot marker at the camera target |
 
 A **Render Export** button is available in the pipeline editor toolbar. Click it to export the current viewport as a PNG image (or other formats such as EPS, GIF, and MP4 via the render modal).
 
@@ -209,6 +213,44 @@ element == "O" or element == "N"       # Oxygen or nitrogen
 (x > 0 and x < 10) and element == "C" # Carbons in x range
 mass > 32                              # Atoms heavier than sulfur
 ```
+
+## Bond Selection DSL
+
+The **Bond query** field in the Filter node accepts expressions to select bonds.
+
+### Available Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bond_index` | number | 0-based sequential bond index |
+| `atom_index` | number | Atom endpoint index |
+| `element` | string | Element symbol of an atom endpoint (e.g., `"C"`, `"O"`) |
+
+### Operators
+
+`==`, `!=`, `>`, `<`, `>=`, `<=`
+
+### Logical Operators
+
+`and`, `or`, `not`, parentheses `()`
+
+### Special Keywords
+
+- `all` — select all bonds (default when query is empty)
+- `none` — select no bonds
+- `both` — prefix on a comparison to require **both** atoms satisfy it (default: either atom, OR semantics)
+
+### Examples
+
+```
+element == "C"                         # Bonds where either atom is carbon
+both element != "H"                    # Bonds where neither atom is hydrogen
+atom_index >= 24                       # Bonds involving atom 24 or higher
+bond_index < 10                        # First 10 bonds only
+both atom_index >= 0 and bond_index < 50  # First 50 bonds (all-atom filter)
+```
+
+The bond query selects which bonds a downstream **Modify** node applies opacity overrides to. This lets you selectively fade specific bonds without removing them from the scene.
 
 ## Example: TiO₆ Octahedra in SrTiO₃
 
@@ -271,7 +313,9 @@ Each layer is processed independently through its own chain of Filter, Modify, a
 
 ## Serialization
 
-Pipelines serialize to JSON (v3 format) and can be saved, loaded, and version-controlled. The serialization format includes node types, parameters, positions, and edge connections.
+Pipelines serialize to JSON (v3 format) and can be saved, loaded, and version-controlled. The serialization format includes node types, parameters, positions, edge connections, and an optional `enabled` flag per node.
+
+Each node entry can include `"enabled": false` to bypass that node (equivalent to deleting it from the execution graph while keeping it in the editor). Omitting `enabled` or setting it to `true` is the default active state.
 
 ## Python Pipeline API
 

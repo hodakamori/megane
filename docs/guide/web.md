@@ -178,7 +178,11 @@ import { PipelineViewer } from "megane-viewer";
 ```ts
 interface SerializedPipeline {
   version: 3;
-  nodes: Array<NodeParams & { id: string; position: { x: number; y: number } }>;
+  nodes: Array<NodeParams & {
+    id: string;
+    position: { x: number; y: number };
+    enabled?: boolean;   // false = node is bypassed (default: true)
+  }>;
   edges: Array<{
     source: string;
     target: string;
