@@ -210,7 +210,7 @@ The component fetches all `fileUrl` values in parallel at mount time using the b
 
 ### Trajectory playback
 
-When the pipeline produces a trajectory (from an XTC or `.traj` file embedded in the structure), `PipelineViewer` automatically shows the Timeline bar at the bottom. Files with built-in frames (e.g. XYZ files with multiple frames) are also supported.
+When the pipeline includes time-dependent data — by loading a multi-frame structure file (such as a multi-frame XYZ or ASE `.traj`) — `PipelineViewer` automatically shows the Timeline bar at the bottom.
 
 ```tsx
 <PipelineViewer
@@ -221,18 +221,11 @@ When the pipeline produces a trajectory (from an XTC or `.traj` file embedded in
       {
         id: "s1",
         type: "load_structure",
-        fileName: "caffeine_water.pdb",
-        fileUrl: "/structures/caffeine_water.pdb",
-        hasTrajectory: false,
+        fileName: "simulation.traj",
+        fileUrl: "/structures/simulation.traj",
+        hasTrajectory: true,
         hasCell: false,
         position: { x: 0, y: 0 },
-      },
-      {
-        id: "t1",
-        type: "load_trajectory",
-        fileName: "caffeine_water_vibration.xtc",
-        fileUrl: "/structures/caffeine_water_vibration.xtc",
-        position: { x: 0, y: 150 },
       },
       {
         id: "v1",
@@ -244,13 +237,14 @@ When the pipeline produces a trajectory (from an XTC or `.traj` file embedded in
       },
     ],
     edges: [
-      { source: "s1", target: "t1", sourceHandle: "particle",   targetHandle: "particle" },
       { source: "s1", target: "v1", sourceHandle: "particle",   targetHandle: "particle" },
-      { source: "t1", target: "v1", sourceHandle: "trajectory", targetHandle: "trajectory" },
+      { source: "s1", target: "v1", sourceHandle: "trajectory", targetHandle: "trajectory" },
     ],
   }}
 />
 ```
+
+> **Note:** `PipelineViewer` does not currently support `load_trajectory` nodes. Trajectories must be embedded in the structure file (e.g. ASE `.traj`, multi-frame XYZ). External XTC trajectories require a `MeganeViewer` with a server-side pipeline.
 
 ### Usage in MDX (Next.js / VitePress)
 

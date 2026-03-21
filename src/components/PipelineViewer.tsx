@@ -36,14 +36,17 @@ import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { deserializePipeline } from "../pipeline/serialize";
 import { executePipeline } from "../pipeline/execute";
-import { applyViewportState } from "../pipeline/apply";
+import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { parseStructureFile } from "../parsers/structure";
+import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { processPbcBonds } from "../pipeline/executors/addBond";
 import type { PipelineNodeData, NodeSnapshotData } from "../pipeline/execute";
 import type {
   SerializedPipeline,
   ViewportState,
   LoadStructureParams,
   FrameProvider,
+  AddBondParams,
 } from "../pipeline/types";
 import { DEFAULT_VIEWPORT_STATE } from "../pipeline/types";
 import type { Snapshot, Frame, HoverInfo } from "../types";
@@ -103,16 +106,27 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
 
   // ─── Initialization: fetch files + parse + execute pipeline ──────
 
-  const pipelineRef = useRef(pipeline);
-
   useEffect(() => {
-    let cancelled = false;
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
+    // Reset state for each pipeline prop change
+    setStatus("loading");
+    setErrorMessage(null);
+    setNodes([]);
+    setEdges([]);
+    setViewportState(DEFAULT_VIEWPORT_STATE);
+    setPrimarySnapshot(null);
+    setProvider(null);
+    setTotalFrames(0);
+    currentFrameRef.current = 0;
+    setCurrentFrame(0);
+    setCurrentFrameData(null);
 
     async function init() {
       try {
-        const { nodes: deserializedNodes, edges: deserializedEdges } = deserializePipeline(
-          pipelineRef.current,
-        );
+        const { nodes: deserializedNodes, edges: deserializedEdges } =
+          deserializePipeline(pipeline);
 
         // Find load_structure nodes with fileUrl
         const loadNodes = deserializedNodes.filter(
@@ -127,7 +141,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
             const url = params.fileUrl!;
             const fileName = params.fileName ?? basenameFromUrl(url);
 
-            const response = await fetch(url);
+            const response = await fetch(url, { signal });
             if (!response.ok) {
               throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
             }
@@ -144,7 +158,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
           }),
         );
 
-        if (cancelled) return;
+        if (signal.aborted) return;
 
         // Execute pipeline with parsed snapshots
         const { viewportState: vs } = executePipeline(deserializedNodes, deserializedEdges, {
@@ -171,7 +185,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
         setCurrentFrameData(frame0);
         setStatus("ready");
       } catch (err) {
-        if (cancelled) return;
+        if (signal.aborted) return;
         setErrorMessage(err instanceof Error ? err.message : String(err));
         setStatus("error");
       }
@@ -180,10 +194,9 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     init();
 
     return () => {
-      cancelled = true;
+      abortController.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pipeline]);
 
   // ─── Apply viewportState to renderer when ready ──────────────────
 
@@ -202,6 +215,52 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     applyViewportState(renderer, viewportState, prevViewportStateRef.current);
     prevViewportStateRef.current = viewportState;
   }, [viewportState]);
+
+  // ─── Per-frame vector update ─────────────────────────────────────
+
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    if (viewportState.vectors.length > 0) {
+      applyVectorsForFrame(renderer, viewportState.vectors, currentFrame);
+    }
+  }, [currentFrame, viewportState.vectors]);
+
+  // ─── Per-frame bond recalculation (distance mode) ────────────────
+
+  useEffect(() => {
+    if (!currentFrameData || !primarySnapshot) return;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    const hasDistanceBond = nodes.some(
+      (n) =>
+        n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
+    );
+    if (!hasDistanceBond) return;
+
+    const newBonds = inferBondsVdwJS(
+      currentFrameData.positions,
+      primarySnapshot.elements,
+      primarySnapshot.nAtoms,
+      0.6,
+      primarySnapshot.box,
+    );
+    const result = processPbcBonds(
+      newBonds,
+      null,
+      currentFrameData.positions,
+      primarySnapshot.elements,
+      primarySnapshot.nAtoms,
+      primarySnapshot.box,
+    );
+    renderer.updateBondsExt(
+      result.bondIndices,
+      result.bondOrders,
+      result.positions,
+      result.elements,
+      result.nAtoms,
+    );
+  }, [currentFrameData, primarySnapshot, nodes]);
 
   // ─── Playback ────────────────────────────────────────────────────
 
