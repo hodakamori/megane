@@ -27,6 +27,7 @@ const filtered = computed(() =>
     <div v-if="allTags.length" class="tag-filter">
       <button
         :class="['filter-btn', { active: activeTag === null }]"
+        :aria-pressed="activeTag === null"
         @click="activeTag = null"
       >
         All
@@ -35,6 +36,7 @@ const filtered = computed(() =>
         v-for="tag in allTags"
         :key="tag"
         :class="['filter-btn', { active: activeTag === tag }]"
+        :aria-pressed="activeTag === tag"
         @click="activeTag = activeTag === tag ? null : tag"
       >
         {{ tag }}

@@ -7,34 +7,61 @@ const props = defineProps<{ example: GalleryExample }>();
 // ── 3D preview ────────────────────────────────────────────────────────────────
 const container = ref<HTMLElement | null>(null);
 let renderer: any = null;
+let unmounted = false;
 
 onMounted(async () => {
   if (!container.value) return;
+
   const { MoleculeRenderer } = await import(
     "../../../src/renderer/MoleculeRenderer"
   );
+  // Guard: component may have unmounted during the dynamic import await
+  if (unmounted || !container.value) return;
+
   renderer = new MoleculeRenderer();
   renderer.mount(container.value);
 
-  const res = await fetch(props.example.snapshotUrl);
-  const data = await res.json();
-  renderer.loadSnapshot({
-    nAtoms: data.nAtoms,
-    nBonds: data.nBonds,
-    nFileBonds: data.nFileBonds,
-    positions: new Float32Array(data.positions),
-    elements: new Uint8Array(data.elements),
-    bonds: new Uint32Array(data.bonds),
-    bondOrders: data.bondOrders ? new Uint8Array(data.bondOrders) : null,
-    box: data.box ? new Float32Array(data.box) : null,
-  });
+  try {
+    const res = await fetch(props.example.snapshotUrl);
+    if (!res.ok) {
+      console.error(
+        "Failed to load gallery snapshot:",
+        props.example.snapshotUrl,
+        "status:",
+        res.status,
+      );
+      return;
+    }
+    // Guard again after the fetch await
+    if (unmounted) return;
+    const data = await res.json();
+    if (unmounted) return;
+    renderer.loadSnapshot({
+      nAtoms: data.nAtoms,
+      nBonds: data.nBonds,
+      nFileBonds: data.nFileBonds,
+      positions: new Float32Array(data.positions),
+      elements: new Uint8Array(data.elements),
+      bonds: new Uint32Array(data.bonds),
+      bondOrders: data.bondOrders ? new Uint8Array(data.bondOrders) : null,
+      box: data.box ? new Float32Array(data.box) : null,
+    });
+  } catch (error) {
+    console.error(
+      "Error loading gallery snapshot:",
+      props.example.snapshotUrl,
+      error,
+    );
+  }
 });
 
 onBeforeUnmount(() => {
+  unmounted = true;
   if (renderer) {
     renderer.dispose();
     renderer = null;
   }
+  clearCopyTimer();
 });
 
 // ── Code tabs ─────────────────────────────────────────────────────────────────
@@ -48,11 +75,40 @@ const activeTab = ref<TabId>("jupyter");
 
 // ── Copy to clipboard ─────────────────────────────────────────────────────────
 const copied = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearCopyTimer() {
+  if (copyTimer !== null) {
+    clearTimeout(copyTimer);
+    copyTimer = null;
+  }
+}
+
 async function copyCode() {
   const code = props.example.code[activeTab.value];
-  await navigator.clipboard.writeText(code);
+  try {
+    await navigator.clipboard.writeText(code);
+  } catch {
+    // Fallback for non-secure contexts or denied permissions
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = code;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch {
+      return; // silent — copy just won't show feedback
+    }
+  }
+  clearCopyTimer();
   copied.value = true;
-  setTimeout(() => (copied.value = false), 1500);
+  copyTimer = setTimeout(() => {
+    copied.value = false;
+    copyTimer = null;
+  }, 1500);
 }
 </script>
 

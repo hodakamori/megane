@@ -5,8 +5,9 @@
  * HOW TO ADD A NEW EXAMPLE
  * ─────────────────────────────────────────────────
  * 1. Add a snapshot JSON to docs/public/data/  (or reuse an existing one).
- *    A snapshot can be generated with:
- *      python -c "import megane, json; v = megane.MolecularViewer(); v.load('your.pdb'); print(json.dumps(v._snapshot()))" > docs/public/data/your.json
+ *    Snapshots are JSON-serialized atom/bond data (see existing files in docs/public/data/).
+ *    To create a new snapshot, copy a similar JSON file in that directory and adapt it,
+ *    or follow the same SerializedPipeline schema used by the viewer.
  *
  * 2. Add a new GalleryExample object to the `galleryExamples` array below.
  *    Fill in:
