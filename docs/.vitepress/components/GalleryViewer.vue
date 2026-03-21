@@ -10,6 +10,15 @@ const container = ref<HTMLElement | null>(null);
 let renderer: any = null;
 let unmounted = false;
 let observer: IntersectionObserver | null = null;
+let animTimerId: ReturnType<typeof setTimeout> | null = null;
+
+// Animation state — populated when frames are available in the snapshot
+type PreviewFrame = { frameId: number; nAtoms: number; positions: Float32Array };
+let previewFrames: PreviewFrame[] | null = null;
+const playing      = ref(false);
+const currentFrame = ref(0);
+const totalFrames  = ref(0);
+const fps          = ref(30);
 
 async function initPreview() {
   if (!container.value) return;
@@ -69,8 +78,33 @@ async function initPreview() {
       }
     }
 
-    const { viewportState } = executePipeline(nodes, edges, { nodeSnapshots });
+    // Inject embedded trajectory frames and vector data when present in snapshot JSON
+    const fileFrames = data.frames?.map((f: any, i: number) => ({
+      frameId: i,
+      nAtoms: f.nAtoms,
+      positions: new Float32Array(f.positions),
+    })) ?? undefined;
+    const fileMeta = data.meta ?? undefined;
+    const fileVectors = data.vectors
+      ? [{ frame: 0, vectors: new Float32Array(data.vectors) }]
+      : undefined;
+
+    const { viewportState } = executePipeline(nodes, edges, {
+      nodeSnapshots,
+      fileFrames,
+      fileMeta,
+      fileVectors,
+    });
     applyViewportState(renderer, viewportState, null);
+
+    // If snapshot has embedded frames, wire up animation
+    if (fileFrames && fileFrames.length > 0) {
+      previewFrames      = fileFrames;
+      totalFrames.value  = fileFrames.length;
+      currentFrame.value = 0;
+      renderer.updateFrame(fileFrames[0]); // show frame 0 immediately
+      startAnimation();                     // auto-play
+    }
   } catch (error) {
     console.error(
       "Error loading gallery snapshot:",
@@ -78,6 +112,39 @@ async function initPreview() {
       error,
     );
   }
+}
+
+// ── Animation controls ────────────────────────────────────────────────────────
+function stopAnimation() {
+  if (animTimerId !== null) { clearTimeout(animTimerId); animTimerId = null; }
+  playing.value = false;
+}
+
+function startAnimation() {
+  if (!previewFrames || previewFrames.length === 0 || unmounted) return;
+  playing.value = true;
+  const tick = () => {
+    if (unmounted || !playing.value) return;
+    currentFrame.value = (currentFrame.value + 1) % previewFrames!.length;
+    renderer.updateFrame(previewFrames![currentFrame.value]);
+    animTimerId = setTimeout(tick, 1000 / fps.value);
+  };
+  animTimerId = setTimeout(tick, 1000 / fps.value);
+}
+
+function togglePlay() {
+  if (playing.value) stopAnimation(); else startAnimation();
+}
+
+function seekFrame(frame: number) {
+  if (!previewFrames) return;
+  currentFrame.value = frame;
+  renderer.updateFrame(previewFrames[frame]);
+}
+
+function setFps(newFps: number) {
+  fps.value = newFps;
+  if (playing.value) { stopAnimation(); startAnimation(); }
 }
 
 onMounted(() => {
@@ -101,6 +168,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true;
+  if (animTimerId !== null) {
+    clearTimeout(animTimerId);
+    animTimerId = null;
+  }
   observer?.disconnect();
   observer = null;
   if (renderer) {
@@ -112,10 +183,10 @@ onBeforeUnmount(() => {
 
 // ── Code tabs ─────────────────────────────────────────────────────────────────
 type TabId = "jupyter" | "react" | "vscode";
-const tabs: { id: TabId; label: string; lang: string }[] = [
-  { id: "jupyter", label: "Jupyter",  lang: "python"     },
-  { id: "react",   label: "React",    lang: "typescript" },
-  { id: "vscode",  label: "VSCode",   lang: "json"       },
+const tabs: { id: TabId; label: string }[] = [
+  { id: "jupyter", label: "Jupyter"  },
+  { id: "react",   label: "React"    },
+  { id: "vscode",  label: "VSCode"   },
 ];
 const activeTab = ref<TabId>("jupyter");
 
@@ -180,7 +251,39 @@ async function copyCode() {
         class="gallery-preview"
         ref="container"
         :style="{ height: example.height ?? '380px' }"
-      />
+      >
+        <!-- Timeline (only shown when trajectory frames are loaded, matching Timeline.tsx) -->
+        <div v-if="totalFrames > 1" class="anim-timeline">
+          <button
+            type="button"
+            class="anim-playpause"
+            :title="playing ? 'Pause' : 'Play'"
+            @click="togglePlay"
+          >{{ playing ? '\u23F8' : '\u25B6' }}</button>
+
+          <span class="anim-counter">{{ currentFrame + 1 }} / {{ totalFrames }}</span>
+
+          <input
+            type="range"
+            class="anim-seek"
+            :min="0"
+            :max="totalFrames - 1"
+            :value="currentFrame"
+            @input="seekFrame(parseInt(($event.target as HTMLInputElement).value, 10))"
+          />
+
+          <select
+            class="anim-fps"
+            :value="fps"
+            @change="setFps(parseInt(($event.target as HTMLSelectElement).value, 10))"
+          >
+            <option value="10">10 fps</option>
+            <option value="20">20 fps</option>
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </div>
+      </div>
 
       <!-- Code panel -->
       <div class="gallery-code">
@@ -197,12 +300,7 @@ async function copyCode() {
             {{ copied ? "Copied!" : "Copy" }}
           </button>
         </div>
-        <pre
-          v-for="tab in tabs"
-          v-show="activeTab === tab.id"
-          :key="tab.id"
-          class="code-block"
-        ><code>{{ example.code[tab.id] }}</code></pre>
+        <pre class="code-block"><code>{{ example.code[activeTab] }}</code></pre>
       </div>
     </div>
   </div>
@@ -282,6 +380,7 @@ async function copyCode() {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   border-right: 1px solid var(--vp-c-divider);
   position: relative;
+  overflow: hidden;
 }
 
 :root.dark .gallery-preview {
@@ -373,5 +472,71 @@ async function copyCode() {
   font-size: inherit;
   background: none;
   padding: 0;
+}
+
+/* ── Timeline (matches Timeline.tsx exactly) ────────────────────────────────── */
+.anim-timeline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 20px 14px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.anim-playpause {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.anim-counter {
+  min-width: 80px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: #64748b;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.anim-seek {
+  flex: 1;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.anim-fps {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 </style>

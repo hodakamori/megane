@@ -283,7 +283,7 @@ export default function App() {
     id: "atom-filter",
     title: "Atom Filter",
     description:
-      "Select a subset of atoms using a query expression, then enlarge them with a modify node.",
+      "Select solute atoms with a query and enlarge them 3× while fading solvent to 15% opacity, making the selection immediately obvious.",
     tags: ["filter", "small-molecule", "selection"],
     snapshotUrl: "/megane/data/caffeine_water.json",
     code: {
@@ -293,14 +293,24 @@ from megane.pipeline import Pipeline, LoadStructure, Filter, Modify, Viewport
 
 pipe = Pipeline()
 s = pipe.add_node(LoadStructure("caffeine_water.pdb"))
-# Select only the solute molecule (first 24 atoms = caffeine)
-f = pipe.add_node(Filter(query="index < 24"))
-m = pipe.add_node(Modify(scale=1.5, opacity=1.0))
+
+# Branch A: enlarge the solute (caffeine = first 24 atoms)
+fc = pipe.add_node(Filter(query="index < 24"))
+mc = pipe.add_node(Modify(scale=3.0, opacity=1.0))
+
+# Branch B: fade the solvent (water = remaining atoms)
+fw = pipe.add_node(Filter(query="index >= 24"))
+mw = pipe.add_node(Modify(scale=1.0, opacity=0.15))
+
 v = pipe.add_node(Viewport())
 
-pipe.add_edge(s.out.particle, f.inp.particle)
-pipe.add_edge(f.out.particle, m.inp.particle)
-pipe.add_edge(m.out.particle, v.inp.particle)
+pipe.add_edge(s.out.particle, fc.inp.particle)
+pipe.add_edge(fc.out.particle, mc.inp.particle)
+pipe.add_edge(mc.out.particle, v.inp.particle)
+
+pipe.add_edge(s.out.particle, fw.inp.particle)
+pipe.add_edge(fw.out.particle, mw.inp.particle)
+pipe.add_edge(mw.out.particle, v.inp.particle)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -315,35 +325,48 @@ const pipeline: SerializedPipeline = {
   nodes: [
     {
       id: "s1", type: "load_structure",
-      position: { x: 0, y: 0 },
+      position: { x: 170, y: 0 },
       fileName: "caffeine_water.pdb",
       fileUrl: "/megane/structures/caffeine_water.pdb",
       hasTrajectory: false, hasCell: false,
     },
+    // Branch A: solute (caffeine, index < 24) — enlarged 3×
     {
-      // Select only the solute molecule (first 24 atoms = caffeine)
-      id: "f1", type: "filter",
+      id: "fc1", type: "filter",
       position: { x: 0, y: 150 },
       query: "index < 24",
     },
     {
-      // Enlarge the selected atoms
-      id: "m1", type: "modify",
+      id: "mc1", type: "modify",
       position: { x: 0, y: 300 },
-      scale: 1.5, opacity: 1.0,
+      scale: 3.0, opacity: 1.0,
+    },
+    // Branch B: solvent (water, index >= 24) — faded to 15% opacity
+    {
+      id: "fw1", type: "filter",
+      position: { x: 340, y: 150 },
+      query: "index >= 24",
+    },
+    {
+      id: "mw1", type: "modify",
+      position: { x: 340, y: 300 },
+      scale: 1.0, opacity: 0.15,
     },
     {
       id: "v1", type: "viewport",
-      position: { x: 0, y: 450 },
+      position: { x: 170, y: 450 },
       perspective: false,
       cellAxesVisible: false,
       pivotMarkerVisible: false,
     },
   ],
   edges: [
-    { source: "s1", target: "f1", sourceHandle: "particle", targetHandle: "in"       },
-    { source: "f1", target: "m1", sourceHandle: "out",      targetHandle: "in"       },
-    { source: "m1", target: "v1", sourceHandle: "out",      targetHandle: "particle" },
+    { source: "s1",  target: "fc1", sourceHandle: "particle", targetHandle: "in"       },
+    { source: "fc1", target: "mc1", sourceHandle: "out",      targetHandle: "in"       },
+    { source: "mc1", target: "v1",  sourceHandle: "out",      targetHandle: "particle" },
+    { source: "s1",  target: "fw1", sourceHandle: "particle", targetHandle: "in"       },
+    { source: "fw1", target: "mw1", sourceHandle: "out",      targetHandle: "in"       },
+    { source: "mw1", target: "v1",  sourceHandle: "out",      targetHandle: "particle" },
   ],
 };
 
@@ -358,38 +381,54 @@ export default function App() {
     {
       "id": "s1",
       "type": "load_structure",
-      "position": { "x": 0, "y": 0 },
+      "position": { "x": 170, "y": 0 },
       "fileName": "caffeine_water.pdb",
       "fileUrl": "caffeine_water.pdb",
       "hasTrajectory": false,
       "hasCell": false
     },
     {
-      "id": "f1",
+      "id": "fc1",
       "type": "filter",
       "position": { "x": 0, "y": 150 },
       "query": "index < 24"
     },
     {
-      "id": "m1",
+      "id": "mc1",
       "type": "modify",
       "position": { "x": 0, "y": 300 },
-      "scale": 1.5,
+      "scale": 3.0,
       "opacity": 1.0
+    },
+    {
+      "id": "fw1",
+      "type": "filter",
+      "position": { "x": 340, "y": 150 },
+      "query": "index >= 24"
+    },
+    {
+      "id": "mw1",
+      "type": "modify",
+      "position": { "x": 340, "y": 300 },
+      "scale": 1.0,
+      "opacity": 0.15
     },
     {
       "id": "v1",
       "type": "viewport",
-      "position": { "x": 0, "y": 450 },
+      "position": { "x": 170, "y": 450 },
       "perspective": false,
       "cellAxesVisible": false,
       "pivotMarkerVisible": false
     }
   ],
   "edges": [
-    { "source": "s1", "target": "f1", "sourceHandle": "particle", "targetHandle": "in"       },
-    { "source": "f1", "target": "m1", "sourceHandle": "out",      "targetHandle": "in"       },
-    { "source": "m1", "target": "v1", "sourceHandle": "out",      "targetHandle": "particle" }
+    { "source": "s1",  "target": "fc1", "sourceHandle": "particle", "targetHandle": "in"       },
+    { "source": "fc1", "target": "mc1", "sourceHandle": "out",      "targetHandle": "in"       },
+    { "source": "mc1", "target": "v1",  "sourceHandle": "out",      "targetHandle": "particle" },
+    { "source": "s1",  "target": "fw1", "sourceHandle": "particle", "targetHandle": "in"       },
+    { "source": "fw1", "target": "mw1", "sourceHandle": "out",      "targetHandle": "in"       },
+    { "source": "mw1", "target": "v1",  "sourceHandle": "out",      "targetHandle": "particle" }
   ]
 }`,
     },
@@ -708,28 +747,31 @@ export default function App() {
     id: "bond-filter",
     title: "Bond Filter",
     description:
-      "Use a bond query to show only intramolecular solute bonds while keeping all atoms visible.",
+      "Use a bond query to hide solvent bonds: select bonds touching a water atom and set their opacity to 0, leaving only intramolecular solute bonds visible.",
     tags: ["filter", "bond", "small-molecule", "selection"],
     snapshotUrl: "/megane/data/caffeine_water.json",
     code: {
       jupyter: `\
 import megane
-from megane.pipeline import Pipeline, LoadStructure, AddBonds, Filter, Viewport
+from megane.pipeline import Pipeline, LoadStructure, AddBonds, Filter, Modify, Viewport
 
 pipe = Pipeline()
 s  = pipe.add_node(LoadStructure("caffeine_water.pdb"))
 ab = pipe.add_node(AddBonds(source="distance"))
 
-# Keep only bonds where BOTH atoms belong to the solute (index < 24)
-fb = pipe.add_node(Filter(bond_query="both atom_index < 24"))
+# Select bonds that touch a water atom (atom_index >= 24) — these will be hidden
+fb = pipe.add_node(Filter(bond_query="atom_index >= 24"))
+# Set opacity=0 on the selected (water) bonds to hide them
+mb = pipe.add_node(Modify(opacity=0.0))
 
 v  = pipe.add_node(Viewport())
 
-pipe.add_edge(s.out.particle,   ab.inp.particle)
-pipe.add_edge(ab.out.bond,      fb.inp.particle)   # bond → generic "in"
-pipe.add_edge(fb.out.particle,  v.inp.bond)         # generic "out" → bond
+pipe.add_edge(s.out.particle,    ab.inp.particle)
+pipe.add_edge(ab.out.bond,       fb.inp.particle)  # bond → filter "in" port
+pipe.add_edge(fb.out.particle,   mb.inp.particle)  # filter "out" → modify "in"
+pipe.add_edge(mb.out.particle,   v.inp.bond)       # modify "out" → viewport bond
 
-pipe.add_edge(s.out.particle,   v.inp.particle)
+pipe.add_edge(s.out.particle,    v.inp.particle)
 
 viewer = megane.MolecularViewer()
 viewer.set_pipeline(pipe)
@@ -755,15 +797,21 @@ const pipeline: SerializedPipeline = {
       bondSource: "distance",
     },
     {
-      // "both atom_index < 24" keeps bonds where both endpoints are in the solute
+      // Select bonds touching a water atom (index >= 24) — these get hidden
       id: "fb1", type: "filter",
       position: { x: 0, y: 300 },
       query: "",
-      bond_query: "both atom_index < 24",
+      bond_query: "atom_index >= 24",
+    },
+    {
+      // opacity=0 hides the selected (water) bonds
+      id: "mb1", type: "modify",
+      position: { x: 0, y: 450 },
+      scale: 1.0, opacity: 0.0,
     },
     {
       id: "v1", type: "viewport",
-      position: { x: 0, y: 450 },
+      position: { x: 0, y: 600 },
       perspective: false,
       cellAxesVisible: false,
       pivotMarkerVisible: false,
@@ -772,9 +820,10 @@ const pipeline: SerializedPipeline = {
   edges: [
     { source: "s1",  target: "ab1", sourceHandle: "particle", targetHandle: "particle" },
     { source: "s1",  target: "v1",  sourceHandle: "particle", targetHandle: "particle" },
-    // Bond path: add_bond → bond filter → viewport
-    { source: "ab1", target: "fb1", sourceHandle: "bond",     targetHandle: "in"       },
-    { source: "fb1", target: "v1",  sourceHandle: "out",      targetHandle: "bond"     },
+    // Bond path: add_bond → filter (select water bonds) → modify (hide them) → viewport
+    { source: "ab1", target: "fb1", sourceHandle: "bond", targetHandle: "in"      },
+    { source: "fb1", target: "mb1", sourceHandle: "out",  targetHandle: "in"      },
+    { source: "mb1", target: "v1",  sourceHandle: "out",  targetHandle: "bond"    },
   ],
 };
 
@@ -806,12 +855,19 @@ export default function App() {
       "type": "filter",
       "position": { "x": 0, "y": 300 },
       "query": "",
-      "bond_query": "both atom_index < 24"
+      "bond_query": "atom_index >= 24"
+    },
+    {
+      "id": "mb1",
+      "type": "modify",
+      "position": { "x": 0, "y": 450 },
+      "scale": 1.0,
+      "opacity": 0.0
     },
     {
       "id": "v1",
       "type": "viewport",
-      "position": { "x": 0, "y": 450 },
+      "position": { "x": 0, "y": 600 },
       "perspective": false,
       "cellAxesVisible": false,
       "pivotMarkerVisible": false
@@ -820,8 +876,9 @@ export default function App() {
   "edges": [
     { "source": "s1",  "target": "ab1", "sourceHandle": "particle", "targetHandle": "particle" },
     { "source": "s1",  "target": "v1",  "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "ab1", "target": "fb1", "sourceHandle": "bond",     "targetHandle": "in"       },
-    { "source": "fb1", "target": "v1",  "sourceHandle": "out",      "targetHandle": "bond"     }
+    { "source": "ab1", "target": "fb1", "sourceHandle": "bond", "targetHandle": "in"   },
+    { "source": "fb1", "target": "mb1", "sourceHandle": "out",  "targetHandle": "in"   },
+    { "source": "mb1", "target": "v1",  "sourceHandle": "out",  "targetHandle": "bond" }
   ]
 }`,
     },
@@ -834,9 +891,9 @@ export default function App() {
     id: "trajectory-animation",
     title: "Trajectory Animation",
     description:
-      "Load an XTC trajectory file alongside the structure to animate molecular vibrations frame by frame.",
+      "Load an XTC trajectory file alongside the structure to animate molecular vibrations frame by frame. The gallery preview auto-plays a built-in vibration demo.",
     tags: ["trajectory", "animation", "small-molecule", "xtc"],
-    snapshotUrl: "/megane/data/caffeine_water.json",
+    snapshotUrl: "/megane/data/caffeine_traj.json",
     code: {
       jupyter: `\
 import megane
@@ -960,9 +1017,9 @@ export default function App() {
     id: "vector-arrows",
     title: "Vector Arrows",
     description:
-      "Overlay per-atom vector data (forces or velocities) as arrows using load_vector and vector_overlay nodes.",
+      "Overlay per-atom vector data (forces or velocities) as arrows using load_vector and vector_overlay nodes. The gallery preview shows synthetic radial arrows.",
     tags: ["vector", "forces", "small-molecule"],
-    snapshotUrl: "/megane/data/caffeine_water.json",
+    snapshotUrl: "/megane/data/caffeine_vectors.json",
     code: {
       jupyter: `\
 import megane
