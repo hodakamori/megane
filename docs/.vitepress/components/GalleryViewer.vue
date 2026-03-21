@@ -12,6 +12,13 @@ let unmounted = false;
 let observer: IntersectionObserver | null = null;
 let animTimerId: ReturnType<typeof setTimeout> | null = null;
 
+// Animation state — populated when frames are available in the snapshot
+type PreviewFrame = { frameId: number; nAtoms: number; positions: Float32Array };
+let previewFrames: PreviewFrame[] | null = null;
+const playing      = ref(false);
+const currentFrame = ref(0);
+const totalFrames  = ref(0);
+
 async function initPreview() {
   if (!container.value) return;
 
@@ -89,16 +96,13 @@ async function initPreview() {
     });
     applyViewportState(renderer, viewportState, null);
 
-    // If snapshot has embedded frames, animate via renderer.updateFrame (lightweight position update)
+    // If snapshot has embedded frames, wire up animation
     if (fileFrames && fileFrames.length > 0) {
-      let idx = 0;
-      const loop = () => {
-        if (unmounted) return;
-        renderer.updateFrame(fileFrames[idx % fileFrames.length]);
-        idx++;
-        animTimerId = setTimeout(loop, 1000 / 15);
-      };
-      loop();
+      previewFrames      = fileFrames;
+      totalFrames.value  = fileFrames.length;
+      currentFrame.value = 0;
+      renderer.updateFrame(fileFrames[0]); // show frame 0 immediately
+      startAnimation();                     // auto-play
     }
   } catch (error) {
     console.error(
@@ -107,6 +111,28 @@ async function initPreview() {
       error,
     );
   }
+}
+
+// ── Animation controls ────────────────────────────────────────────────────────
+function stopAnimation() {
+  if (animTimerId !== null) { clearTimeout(animTimerId); animTimerId = null; }
+  playing.value = false;
+}
+
+function startAnimation() {
+  if (!previewFrames || previewFrames.length === 0 || unmounted) return;
+  playing.value = true;
+  const tick = () => {
+    if (unmounted || !playing.value) return;
+    currentFrame.value = (currentFrame.value + 1) % previewFrames!.length;
+    renderer.updateFrame(previewFrames![currentFrame.value]);
+    animTimerId = setTimeout(tick, 1000 / 15);
+  };
+  animTimerId = setTimeout(tick, 1000 / 15);
+}
+
+function togglePlay() {
+  if (playing.value) stopAnimation(); else startAnimation();
 }
 
 onMounted(() => {
@@ -213,7 +239,18 @@ async function copyCode() {
         class="gallery-preview"
         ref="container"
         :style="{ height: example.height ?? '380px' }"
-      />
+      >
+        <!-- Playback controls (only shown when trajectory frames are loaded) -->
+        <div v-if="totalFrames > 0" class="anim-controls">
+          <button
+            type="button"
+            class="anim-btn"
+            :title="playing ? 'Pause' : 'Play'"
+            @click="togglePlay"
+          >{{ playing ? '⏸' : '▶' }}</button>
+          <span class="anim-counter">{{ currentFrame + 1 }} / {{ totalFrames }}</span>
+        </div>
+      </div>
 
       <!-- Code panel -->
       <div class="gallery-code">
@@ -401,5 +438,38 @@ async function copyCode() {
   font-size: inherit;
   background: none;
   padding: 0;
+}
+
+/* ── Animation controls overlay ────────────────────────────────────────────── */
+.anim-controls {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 20px;
+  padding: 4px 10px 4px 6px;
+  backdrop-filter: blur(4px);
+  z-index: 10;
+}
+
+.anim-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.anim-counter {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--vp-font-family-mono);
+  white-space: nowrap;
 }
 </style>

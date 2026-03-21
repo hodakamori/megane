@@ -760,7 +760,7 @@ s  = pipe.add_node(LoadStructure("caffeine_water.pdb"))
 ab = pipe.add_node(AddBonds(source="distance"))
 
 # Select bonds that touch a water atom (atom_index >= 24) — these will be hidden
-fb = pipe.add_node(Filter(bond_query="any atom_index >= 24"))
+fb = pipe.add_node(Filter(bond_query="atom_index >= 24"))
 # Set opacity=0 on the selected (water) bonds to hide them
 mb = pipe.add_node(Modify(opacity=0.0))
 
@@ -801,7 +801,7 @@ const pipeline: SerializedPipeline = {
       id: "fb1", type: "filter",
       position: { x: 0, y: 300 },
       query: "",
-      bond_query: "any atom_index >= 24",
+      bond_query: "atom_index >= 24",
     },
     {
       // opacity=0 hides the selected (water) bonds
@@ -855,7 +855,7 @@ export default function App() {
       "type": "filter",
       "position": { "x": 0, "y": 300 },
       "query": "",
-      "bond_query": "any atom_index >= 24"
+      "bond_query": "atom_index >= 24"
     },
     {
       "id": "mb1",
