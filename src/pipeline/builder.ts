@@ -47,22 +47,27 @@ export interface PortAccessor {
   [portName: string]: NodePort;
 }
 
+const hasOwn = (obj: Record<string, string>, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(obj, key);
+
 function makePortNamespace(node: PipelineNode, portMap: Record<string, string>): PortAccessor {
   return new Proxy({} as PortAccessor, {
     get(_, prop: string) {
       if (typeof prop !== "string" || prop.startsWith("__") || prop === "then") return undefined;
-      if (prop in portMap) return new NodePort(node, portMap[prop]);
+      if (hasOwn(portMap, prop)) return new NodePort(node, portMap[prop]);
       const available = Object.keys(portMap).sort().join(", ") || "(none)";
       throw new Error(`No port "${prop}" on "${node.nodeType}" node. Available: ${available}`);
     },
     has(_, prop: string) {
-      return prop in portMap;
+      return typeof prop === "string" && hasOwn(portMap, prop);
     },
     ownKeys() {
       return Object.keys(portMap);
     },
     getOwnPropertyDescriptor(_, prop: string) {
-      if (prop in portMap) return { configurable: true, enumerable: true };
+      if (typeof prop === "string" && hasOwn(portMap, prop)) {
+        return { configurable: true, enumerable: true };
+      }
       return undefined;
     },
   });
@@ -477,6 +482,12 @@ export class Pipeline {
    *   pipe.addEdge(s.out.particle, ...)
    */
   addNode<T extends PipelineNode>(node: T): T {
+    if (node._id !== null && this._nodes.has(node._id)) {
+      throw new Error(
+        `Node "${node._id}" has already been added to this pipeline. ` +
+          "Create a new node instance instead of reusing the same one.",
+      );
+    }
     this._counter++;
     node._id = `${node.nodeType}-${this._counter}`;
     const params = node._toSerializedParams();

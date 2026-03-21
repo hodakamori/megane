@@ -60,6 +60,15 @@ describe("PortAccessor", () => {
     const node = new Viewport();
     expect(() => node.inp.nonexistent).toThrow(/No port "nonexistent" on "viewport"/);
   });
+
+  it("does not produce a NodePort for prototype-chain keys (toString, valueOf)", () => {
+    const node = new LoadStructure("x.pdb");
+    // Before the hasOwn fix, "toString" in portMap was true (via prototype chain),
+    // which caused new NodePort(node, Object.prototype.toString) — handle as a function.
+    // After the fix, these throw "No port" instead of silently returning a broken NodePort.
+    expect(() => (node.out as any).toString).toThrow(/No port "toString"/);
+    expect(() => (node.out as any).valueOf).toThrow(/No port "valueOf"/);
+  });
 });
 
 // ─── Node Classes ─────────────────────────────────────────────────────
@@ -136,7 +145,11 @@ describe("Streaming", () => {
 describe("Filter", () => {
   it("uses default query 'all'", () => {
     const node = new Filter();
-    expect(node._toSerializedParams()).toMatchObject({ type: "filter", query: "all", bond_query: "" });
+    expect(node._toSerializedParams()).toMatchObject({
+      type: "filter",
+      query: "all",
+      bond_query: "",
+    });
   });
 
   it("accepts custom query", () => {
@@ -178,12 +191,19 @@ describe("AddBonds", () => {
 describe("AddLabels", () => {
   it("defaults to source 'element'", () => {
     const node = new AddLabels();
-    expect(node._toSerializedParams()).toMatchObject({ type: "label_generator", source: "element" });
+    expect(node._toSerializedParams()).toMatchObject({
+      type: "label_generator",
+      source: "element",
+    });
   });
 
   it("accepts 'resname' and 'index'", () => {
-    expect(new AddLabels({ source: "resname" })._toSerializedParams()).toMatchObject({ source: "resname" });
-    expect(new AddLabels({ source: "index" })._toSerializedParams()).toMatchObject({ source: "index" });
+    expect(new AddLabels({ source: "resname" })._toSerializedParams()).toMatchObject({
+      source: "resname",
+    });
+    expect(new AddLabels({ source: "index" })._toSerializedParams()).toMatchObject({
+      source: "index",
+    });
   });
 });
 
@@ -271,6 +291,12 @@ describe("Pipeline.addNode", () => {
     const pipe = new Pipeline();
     const node = new LoadStructure("x.pdb");
     expect(pipe.addNode(node)).toBe(node);
+  });
+
+  it("throws when the same node instance is added twice", () => {
+    const pipe = new Pipeline();
+    const node = pipe.addNode(new LoadStructure("x.pdb"));
+    expect(() => pipe.addNode(node)).toThrow(/already been added/);
   });
 
   it("increments counter across different node types", () => {
@@ -399,9 +425,7 @@ describe("Pipeline full example", () => {
     expect(obj.edges).toHaveLength(5);
 
     // Verify filter → modify edge uses the correct handles
-    const fmEdge = obj.edges.find(
-      (e) => e.source === "filter-2" && e.target === "modify-3",
-    );
+    const fmEdge = obj.edges.find((e) => e.source === "filter-2" && e.target === "modify-3");
     expect(fmEdge).toEqual({
       source: "filter-2",
       target: "modify-3",
