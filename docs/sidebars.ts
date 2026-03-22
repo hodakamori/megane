@@ -20,8 +20,13 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: "category",
-      label: "Visual Pipeline",
-      items: ["guide/pipeline"],
+      label: "Visualization Pipeline",
+      items: [
+        "guide/pipeline/index",
+        "guide/pipeline/python",
+        "guide/pipeline/typescript",
+        "guide/pipeline/json",
+      ],
     },
     {
       type: "category",

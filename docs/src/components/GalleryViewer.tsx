@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
+import { Highlight, themes } from "prism-react-renderer";
+import { useColorMode } from "@docusaurus/theme-common";
 import type { GalleryExample } from "../gallery/types";
 import { Timeline } from "../../../src/components/Timeline";
 import styles from "./GalleryViewer.module.css";
@@ -19,6 +21,28 @@ interface FrameData {
   positions: Float32Array;
   nAtoms: number;
   frameId: number;
+}
+
+function HighlightedCode({ code, language }: { code: string; language: string }) {
+  const { colorMode } = useColorMode();
+  const theme = colorMode === "dark" ? themes.dracula : themes.github;
+  return (
+    <Highlight theme={theme} code={code} language={language}>
+      {({ tokens, getLineProps, getTokenProps }) => (
+        <pre style={{ margin: 0, padding: 0, background: "transparent", fontFamily: "inherit", fontSize: "inherit" }}>
+          <code style={{ fontFamily: "inherit", fontSize: "inherit" }}>
+            {tokens.map((line, i) => (
+              <div key={i} {...getLineProps({ line })}>
+                {line.map((token, key) => (
+                  <span key={key} {...getTokenProps({ token })} />
+                ))}
+              </div>
+            ))}
+          </code>
+        </pre>
+      )}
+    </Highlight>
+  );
 }
 
 export default function GalleryViewer({ example }: Props) {
@@ -279,15 +303,18 @@ export default function GalleryViewer({ example }: Props) {
               {copied ? "Copied!" : "Copy"}
             </button>
           </div>
-          {tabs.map((tab) => (
-            <pre
-              key={tab.id}
-              className={styles.codeBlock}
-              style={{ display: activeTab === tab.id ? "block" : "none" }}
-            >
-              <code>{example.code[tab.id]}</code>
-            </pre>
-          ))}
+          {tabs.map((tab) => {
+            const lang = tab.id === "jupyter" ? "python" : tab.id === "react" ? "tsx" : "json";
+            return (
+              <div
+                key={tab.id}
+                className={styles.codeBlock}
+                style={{ display: activeTab === tab.id ? "block" : "none" }}
+              >
+                <HighlightedCode code={example.code[tab.id]} language={lang} />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

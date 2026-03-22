@@ -43,7 +43,7 @@ viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
 viewer.frame_index = 50  # jump to frame 50
 ```
 
-For advanced usage (filtering, multi-layer rendering, custom pipelines), see [Visual Pipeline — Python API](/guide/pipeline#python-pipeline-api).
+For advanced usage (filtering, multi-layer rendering, custom pipelines), see [Python Pipeline API](/guide/pipeline/python).
 
 ### CLI Server (Docker)
 
