@@ -10,6 +10,7 @@ export default function FullViewerDemo({ height = "600px" }: Props) {
     <div className={styles.fullViewerDemo}>
       <iframe
         src="/megane/app/"
+        title="megane molecular viewer"
         style={{ height }}
         frameBorder={0}
         allow="fullscreen"
