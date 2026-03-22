@@ -15,18 +15,13 @@ The Python API is used for:
 - **Data loading** — Parse PDB files and read XTC trajectories
 
 ```python
-from megane import Pipeline, LoadStructure, LoadTrajectory, Viewport, MolecularViewer
+import megane
 
-pipe = Pipeline()
-s = pipe.add_node(LoadStructure("protein.pdb"))
-t = pipe.add_node(LoadTrajectory(xtc="trajectory.xtc"))
-v = pipe.add_node(Viewport())
-pipe.add_edge(s.out.particle, t.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(t.out.traj, v.inp.traj)
+# Quick start
+viewer = megane.view("protein.pdb")
 
-viewer = MolecularViewer()
-viewer.set_pipeline(pipe)
+# With trajectory
+viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
 ```
 
 [Python API Reference →](/api/python/)

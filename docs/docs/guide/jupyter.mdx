@@ -25,19 +25,9 @@ jupyter lab
 ### Display a structure
 
 ```python
-from megane import Pipeline, LoadStructure, AddBonds, Viewport, MolecularViewer
+import megane
 
-pipe = Pipeline()
-s     = pipe.add_node(LoadStructure("caffeine.pdb"))
-bonds = pipe.add_node(AddBonds(source="distance"))
-v     = pipe.add_node(Viewport())
-
-pipe.add_edge(s.out.particle, bonds.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(bonds.out.bond, v.inp.bond)
-
-viewer = MolecularViewer()
-viewer.set_pipeline(pipe)
+viewer = megane.view("caffeine.pdb")
 viewer  # display inline
 ```
 
@@ -46,26 +36,25 @@ The last expression in a cell renders the widget. Use `display(viewer)` to rende
 ### Play a trajectory
 
 ```python
-from megane import Pipeline, LoadStructure, LoadTrajectory, AddBonds, Viewport, MolecularViewer
+import megane
 
-pipe = Pipeline()
-s     = pipe.add_node(LoadStructure("protein.pdb"))
-traj  = pipe.add_node(LoadTrajectory(xtc="trajectory.xtc"))
-bonds = pipe.add_node(AddBonds(source="structure"))
-v     = pipe.add_node(Viewport())
-
-pipe.add_edge(s.out.particle, traj.inp.particle)
-pipe.add_edge(s.out.particle, bonds.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(traj.out.traj,  v.inp.traj)
-pipe.add_edge(bonds.out.bond, v.inp.bond)
-
-viewer = MolecularViewer()
-viewer.set_pipeline(pipe)
+viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc", bonds="structure")
 viewer
 ```
 
-The timeline scrubber appears automatically when a trajectory is connected to the viewport.
+The timeline scrubber appears automatically when a trajectory is loaded.
+
+### Options
+
+Both `view()` and `view_traj()` accept these keyword arguments:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `bonds` | `"distance"` \| `"structure"` \| `None` | `"distance"` | Bond detection method. `None` to hide bonds |
+| `perspective` | `bool` | `False` | Perspective projection instead of orthographic |
+| `cell_axes_visible` | `bool` | `True` | Show unit cell axes |
+
+For full control over the visualization (filtering, multi-layer rendering, custom nodes), see [Visual Pipeline — Python API](./pipeline#python-pipeline-api).
 
 ## Widget API
 
@@ -142,8 +131,7 @@ import plotly.graph_objects as go
 import ipywidgets as widgets
 import megane
 
-viewer = megane.MolecularViewer()
-# ... set up pipeline with trajectory ...
+viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
 
 fig = go.FigureWidget(
     data=[go.Scatter(x=list(range(n_frames)), y=energy, mode="lines+markers")],
@@ -215,18 +203,18 @@ Event handling, Plotly integration, bidirectional sync, dihedral analysis, and c
 
 ## Pipeline API Reference
 
-See [Visual Pipeline — Python API](./pipeline#python-pipeline-api) for the complete list of node classes, port names, and parameters.
+For simple visualization, use `megane.view()` and `megane.view_traj()`. For advanced customization (filtering, multi-layer rendering, custom nodes), build a pipeline manually with the `Pipeline` class. See [Visual Pipeline — Python API](./pipeline#python-pipeline-api) for the complete list of node classes, port names, and parameters.
 
-All node classes are importable from `megane`:
+All classes and convenience functions are importable from `megane`:
 
 ```python
 from megane import (
-    Pipeline,
-    LoadStructure, LoadTrajectory, LoadVector, Streaming,
-    Filter, Modify,
-    AddBonds, AddLabels, AddPolyhedra,
-    VectorOverlay,
-    Viewport,
+    view, view_traj,                                    # convenience wrappers
+    Pipeline,                                            # pipeline builder
+    LoadStructure, LoadTrajectory, LoadVector, Streaming, # source nodes
+    Filter, Modify,                                      # processing nodes
+    AddBonds, AddLabels, AddPolyhedra,                   # overlay nodes
+    VectorOverlay, Viewport,                             # display nodes
 )
 ```
 

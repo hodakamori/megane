@@ -504,7 +504,16 @@ pipe.addEdge(bonds.out.bond,        v.inp.bond)
 
 ## Python Pipeline API
 
-Pipelines can be built programmatically in Python using the `Pipeline` class. This is the recommended way to use megane in Jupyter notebooks and scripts.
+For simple visualization, use the convenience wrappers `megane.view()` and `megane.view_traj()`:
+
+```python
+import megane
+
+viewer = megane.view("protein.pdb")                                     # structure
+viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")         # with trajectory
+```
+
+When you need more control — filtering atoms, multi-layer rendering, labels, polyhedra, or custom styling — build a pipeline manually with the `Pipeline` class.
 
 ### Overview
 

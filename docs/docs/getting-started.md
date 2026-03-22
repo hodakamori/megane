@@ -28,40 +28,22 @@ npm install megane-viewer
 ### Jupyter Notebook
 
 ```python
-from megane import Pipeline, LoadStructure, AddBonds, Viewport, MolecularViewer
+import megane
 
-# Build a pipeline
-pipe = Pipeline()
-s = pipe.add_node(LoadStructure("protein.pdb"))
-bonds = pipe.add_node(AddBonds(source="distance"))
-v = pipe.add_node(Viewport())
-pipe.add_edge(s.out.particle, bonds.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(bonds.out.bond, v.inp.bond)
-
-# Display in notebook
-viewer = MolecularViewer()
-viewer.set_pipeline(pipe)
-viewer
+viewer = megane.view("protein.pdb")
+viewer  # displays in notebook
 ```
 
 With a trajectory:
 
 ```python
-from megane import Pipeline, LoadStructure, LoadTrajectory, Viewport, MolecularViewer
+import megane
 
-pipe = Pipeline()
-s = pipe.add_node(LoadStructure("protein.pdb"))
-t = pipe.add_node(LoadTrajectory(xtc="trajectory.xtc"))
-v = pipe.add_node(Viewport())
-pipe.add_edge(s.out.particle, t.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(t.out.traj, v.inp.traj)
-
-viewer = MolecularViewer()
-viewer.set_pipeline(pipe)
-viewer.frame_index = 50  # Jump to frame 50
+viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
+viewer.frame_index = 50  # jump to frame 50
 ```
+
+For advanced usage (filtering, multi-layer rendering, custom pipelines), see [Visual Pipeline — Python API](/guide/pipeline#python-pipeline-api).
 
 ### CLI Server (Docker)
 
