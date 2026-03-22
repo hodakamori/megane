@@ -53,21 +53,119 @@ export default function HeroCodeTabs() {
       <div className={styles.tabContent}>
         {activeTab === 0 && (
           <pre><code>
+            <span className={styles.kn}>from</span>{" "}
+            <span className={styles.nn}>megane</span>{" "}
             <span className={styles.kn}>import</span>{" "}
-            <span className={styles.nn}>megane</span>
+            <span className={styles.p}>(</span>
+            {"\n  "}
+            <span className={styles.nc}>Pipeline</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>LoadStructure</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>AddBonds</span>
+            <span className={styles.p}>,</span>
+            {"\n  "}
+            <span className={styles.nc}>Viewport</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>MolecularViewer</span>
+            {"\n"}
+            <span className={styles.p}>)</span>
+            {"\n\n"}
+            <span className={styles.n}>pipe</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.nc}>Pipeline</span>
+            <span className={styles.p}>()</span>
+            {"\n"}
+            <span className={styles.n}>s</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>add_node</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.nc}>LoadStructure</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.s}>"protein.pdb"</span>
+            <span className={styles.p}>))</span>
+            {"\n"}
+            <span className={styles.n}>b</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>add_node</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.nc}>AddBonds</span>
+            <span className={styles.p}>())</span>
+            {"\n"}
+            <span className={styles.n}>v</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>add_node</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.nc}>Viewport</span>
+            <span className={styles.p}>())</span>
+            {"\n"}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>add_edge</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.n}>s</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>out</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.n}>b</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>inp</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>)</span>
+            {"\n"}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>add_edge</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.n}>s</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>out</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.n}>v</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>inp</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>)</span>
+            {"\n"}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>add_edge</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.n}>b</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>out</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>bond</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.n}>v</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>inp</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>bond</span>
+            <span className={styles.p}>)</span>
             {"\n\n"}
             <span className={styles.n}>viewer</span>{" "}
             <span className={styles.o}>=</span>{" "}
-            <span className={styles.n}>megane</span>
-            <span className={styles.o}>.</span>
-            <span className={styles.n}>MolecularViewer</span>
+            <span className={styles.nc}>MolecularViewer</span>
             <span className={styles.p}>()</span>
             {"\n"}
             <span className={styles.n}>viewer</span>
             <span className={styles.o}>.</span>
-            <span className={styles.n}>load</span>
+            <span className={styles.n}>set_pipeline</span>
             <span className={styles.p}>(</span>
-            <span className={styles.s}>"protein.pdb"</span>
+            <span className={styles.n}>pipe</span>
             <span className={styles.p}>)</span>
             {"\n"}
             <span className={styles.n}>viewer</span>
