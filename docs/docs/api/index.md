@@ -35,7 +35,7 @@ The TypeScript API is used for:
 - **Protocol decoding** — Parse binary WebSocket messages
 
 ```ts
-import { MeganeViewer, MoleculeRenderer } from "megane-viewer";
+import { MeganeViewer, MoleculeRenderer } from "megane-viewer/lib";
 ```
 
 [TypeScript API Reference →](/api/typescript/)

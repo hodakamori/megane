@@ -156,15 +156,15 @@ The `measurement` property returns:
 `MoleculeRenderer` is a plain Three.js class that can be mounted in any framework.
 
 ```ts
-import { MoleculeRenderer } from "megane-viewer";
+import { MoleculeRenderer } from "megane-viewer/lib";
 
-// Mount in any DOM element
-const container = document.getElementById("viewer");
-const renderer = new MoleculeRenderer(container);
+// Create and mount
+const renderer = new MoleculeRenderer();
+renderer.mount(document.getElementById("viewer")!);
 
-// Set data
-renderer.setSnapshot(snapshot);
-renderer.setFrame(frame);
+// Load data
+renderer.loadSnapshot(snapshot);
+renderer.updateFrame(frame);
 
 // Clean up
 renderer.dispose();

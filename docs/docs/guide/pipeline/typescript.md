@@ -17,7 +17,7 @@ import {
   LoadStructure,
   AddBonds,
   ViewportNode,
-} from "megane-viewer";
+} from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("protein.pdb"));
@@ -36,7 +36,7 @@ const obj = pipe.toObject();
 Render the pipeline in React with `PipelineViewer`:
 
 ```tsx
-import { PipelineViewer } from "megane-viewer";
+import { PipelineViewer } from "megane-viewer/lib";
 
 export default function App() {
   return <PipelineViewer pipeline={pipe.toObject()} width="100%" height={500} />;
@@ -56,7 +56,7 @@ After `addNode()`, each node exposes `.out` and `.inp` accessors for its ports. 
 
 ## Node classes
 
-All node classes are importable from `megane-viewer`:
+All node classes are importable from `megane-viewer/lib`:
 
 ```typescript
 import {
@@ -72,7 +72,7 @@ import {
   VectorOverlay,
   ViewportNode,
   Pipeline,
-} from "megane-viewer";
+} from "megane-viewer/lib";
 ```
 
 Constructor parameters mirror the Python API (using an options object instead of keyword args):
@@ -105,7 +105,7 @@ Port names are identical to Python. The `.traj` port maps to the `"trajectory"` 
 An embeddable viewer that renders a pipeline. Each instance is independent — no global state.
 
 ```tsx
-import { PipelineViewer } from "megane-viewer";
+import { PipelineViewer } from "megane-viewer/lib";
 
 <PipelineViewer pipeline={pipe.toObject()} width="100%" height={500} />;
 ```
@@ -121,7 +121,7 @@ import { PipelineViewer } from "megane-viewer";
 A full-featured viewer with sidebar, appearance panel, timeline, and measurement tools.
 
 ```tsx
-import { MeganeViewer } from "megane-viewer";
+import { MeganeViewer } from "megane-viewer/lib";
 
 <MeganeViewer />;
 ```
@@ -129,7 +129,7 @@ import { MeganeViewer } from "megane-viewer";
 ## Example: Basic Structure with Bonds
 
 ```typescript
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("protein.pdb"));
@@ -148,7 +148,7 @@ export default function App() {
 ## Example: Filter and Modify
 
 ```typescript
-import { PipelineViewer, Pipeline, LoadStructure, Filter, Modify, AddBonds, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, Filter, Modify, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("protein.pdb"));
@@ -171,7 +171,7 @@ export default function App() {
 ## Example: Trajectory Playback
 
 ```typescript
-import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("protein.pdb"));
@@ -193,7 +193,7 @@ export default function App() {
 ## Example: TiO₆ Coordination Polyhedra
 
 ```typescript
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("SrTiO3_supercell.pdb"));
@@ -223,7 +223,7 @@ export default function App() {
 ## Example: DAG Branching (Multiple Filters)
 
 ```typescript
-import { PipelineViewer, Pipeline, LoadStructure, Filter, AddLabels, AddBonds, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, Filter, AddLabels, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("protein.pdb"));

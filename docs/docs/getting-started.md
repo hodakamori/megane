@@ -68,7 +68,7 @@ For running from source, see the [CLI Guide](/guide/cli).
 ### React Component
 
 ```tsx
-import { MeganeViewer } from "megane-viewer";
+import { MeganeViewer } from "megane-viewer/lib";
 
 function App() {
   return (

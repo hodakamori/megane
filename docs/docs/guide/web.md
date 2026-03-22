@@ -18,8 +18,8 @@ The easiest way to get started is the `MeganeViewer` component. It includes the 
 
 ```tsx
 import { useState, useCallback, useMemo } from "react";
-import { MeganeViewer, parseStructureFile } from "megane-viewer";
-import type { Snapshot, BondSource } from "megane-viewer";
+import { MeganeViewer, parseStructureFile } from "megane-viewer/lib";
+import type { Snapshot, BondSource } from "megane-viewer/lib";
 
 function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -128,7 +128,7 @@ npm install megane-viewer
 ### Usage
 
 ```tsx
-import { PipelineViewer } from "megane-viewer";
+import { PipelineViewer } from "megane-viewer/lib";
 
 <PipelineViewer
   width="100%"
@@ -180,9 +180,9 @@ import { PipelineViewer } from "megane-viewer";
 ### `SerializedPipeline` format
 
 ```ts
-import type { PipelineNodeParams, SerializedPipeline } from "megane-viewer";
+import type { PipelineNodeParams, SerializedPipeline } from "megane-viewer/lib";
 
-// SerializedPipeline (exported from megane-viewer):
+// SerializedPipeline (exported from megane-viewer/lib):
 interface SerializedPipeline {
   version: 3;
   nodes: Array<PipelineNodeParams & {
@@ -199,7 +199,7 @@ interface SerializedPipeline {
 }
 ```
 
-`PipelineNodeParams` is a discriminated union exported by `megane-viewer`. The `type` field on each node determines which parameters are required — see [Node Reference](/guide/pipeline/#node-reference) for the full list.
+`PipelineNodeParams` is a discriminated union exported by `megane-viewer/lib`. The `type` field on each node determines which parameters are required — see [Node Reference](/guide/pipeline/#node-reference) for the full list.
 
 Each node's `type` field determines which parameters are required. See [Node Reference](/guide/pipeline/#node-reference) for the full list.
 
@@ -264,7 +264,7 @@ When the pipeline includes time-dependent data — by loading a multi-frame stru
 `PipelineViewer` works in any MDX-based framework. Import it directly in your `.mdx` file:
 
 ```mdx
-import { PipelineViewer } from "megane-viewer";
+import { PipelineViewer } from "megane-viewer/lib";
 
 # Caffeine in Water
 
@@ -307,7 +307,7 @@ You can serialize a pipeline from the megane UI (Pipeline editor → Export) and
 
 ```tsx
 import pipelineJson from "./my-pipeline.json";
-import { PipelineViewer } from "megane-viewer";
+import { PipelineViewer } from "megane-viewer/lib";
 
 // Add fileUrl to each load_structure node before rendering
 const pipeline = {
@@ -333,8 +333,8 @@ For custom layouts, megane exports each panel as a separate component. This give
 The core rendering surface without any UI panels:
 
 ```tsx
-import { Viewport } from "megane-viewer";
-import type { Snapshot, HoverInfo } from "megane-viewer";
+import { Viewport } from "megane-viewer/lib";
+import type { Snapshot, HoverInfo } from "megane-viewer/lib";
 
 function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
   return (
@@ -362,7 +362,7 @@ function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
 Combine individual panels for a custom layout:
 
 ```tsx
-import { Viewport, Sidebar, Timeline, AppearancePanel } from "megane-viewer";
+import { Viewport, Sidebar, Timeline, AppearancePanel } from "megane-viewer/lib";
 
 function CustomLayout({ snapshot, frame }) {
   const [renderer, setRenderer] = useState(null);
@@ -421,8 +421,8 @@ function CustomLayout({ snapshot, frame }) {
 For non-React applications (Vue, Svelte, vanilla JS), use `MoleculeRenderer` directly. This is the same Three.js renderer powering all megane components:
 
 ```ts
-import { MoleculeRenderer } from "megane-viewer";
-import type { Snapshot } from "megane-viewer";
+import { MoleculeRenderer } from "megane-viewer/lib";
+import type { Snapshot } from "megane-viewer/lib";
 
 // Create and mount
 const renderer = new MoleculeRenderer();
@@ -487,7 +487,7 @@ title: Protein Visualization
 ---
 
 import { useState, useEffect } from "react";
-import { MeganeViewer, parseStructureFile } from "megane-viewer";
+import { MeganeViewer, parseStructureFile } from "megane-viewer/lib";
 
 export function ProteinDemo() {
   const [snapshot, setSnapshot] = useState(null);
@@ -496,7 +496,7 @@ export function ProteinDemo() {
     fetch("/data/protein.pdb")
       .then((r) => r.text())
       .then(async (text) => {
-        const { parseStructureText } = await import("megane");
+        const { parseStructureText } = await import("megane-viewer/lib");
         const result = await parseStructureText(text);
         setSnapshot(result.snapshot);
       });
@@ -534,7 +534,7 @@ For a simpler embed without panels:
 
 ```mdx
 import { useState, useEffect } from "react";
-import { Viewport, parseStructureText } from "megane-viewer";
+import { Viewport, parseStructureText } from "megane-viewer/lib";
 
 export function SimpleViewer() {
   const [snapshot, setSnapshot] = useState(null);
@@ -589,7 +589,7 @@ import {
   MSG_SNAPSHOT,
   MSG_FRAME,
   MSG_METADATA,
-} from "megane-viewer";
+} from "megane-viewer/lib";
 
 ws.onmessage = (event) => {
   const buffer = event.data as ArrayBuffer;
@@ -630,13 +630,13 @@ import type {
   LabelConfig,         // Label panel configuration
   VectorConfig,        // Vector arrow configuration
   StructureParseResult,// Parse result from parseStructureFile/Text
-} from "megane-viewer";
+} from "megane-viewer/lib";
 ```
 
 ### Parser Functions
 
 ```ts
-import { parseStructureFile, parseStructureText } from "megane-viewer";
+import { parseStructureFile, parseStructureText } from "megane-viewer/lib";
 
 // Parse from File object (drag-and-drop, file input)
 const result = await parseStructureFile(file);
