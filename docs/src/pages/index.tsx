@@ -59,6 +59,7 @@ const paths = [
     icon: "🔬",
     title: "Python / Jupyter",
     install: "pip install megane",
+    isCommand: true,
     description: "Interactive widget inside Jupyter notebooks. Build pipelines in Python, display structures inline.",
     href: "/guide/jupyter",
     label: "Jupyter Guide",
@@ -67,6 +68,7 @@ const paths = [
     icon: "🌐",
     title: "Web / React",
     install: "npm install megane-viewer",
+    isCommand: true,
     description: "Drop <MeganeViewer /> into any React app. Build pipelines with the TypeScript builder API.",
     href: "/guide/web",
     label: "React Guide",
@@ -75,6 +77,7 @@ const paths = [
     icon: "💻",
     title: "CLI Server",
     install: "docker run hodakamori/megane",
+    isCommand: true,
     description: "Serve local structure files and view them instantly in the browser. No code needed.",
     href: "/guide/cli",
     label: "CLI Guide",
@@ -83,6 +86,7 @@ const paths = [
     icon: "🧩",
     title: "Visual Pipeline",
     install: "Drag-and-drop, no code required",
+    isCommand: false,
     description: "Wire nodes in the browser or VSCode to build visualization pipelines. Powered by AI generation.",
     href: "/guide/pipeline",
     label: "Pipeline Guide",
@@ -102,7 +106,11 @@ function QuickStartPaths() {
             <Link key={p.href} className={styles.pathCard} to={p.href}>
               <div className={styles.pathIcon}>{p.icon}</div>
               <h3 className={styles.pathTitle}>{p.title}</h3>
-              <code className={styles.pathInstall}>{p.install}</code>
+              {p.isCommand ? (
+                <code className={styles.pathInstall}>{p.install}</code>
+              ) : (
+                <span className={styles.pathInstall}>{p.install}</span>
+              )}
               <p className={styles.pathDesc}>{p.description}</p>
               <span className={styles.pathLink}>{p.label} →</span>
             </Link>

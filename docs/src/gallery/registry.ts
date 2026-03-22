@@ -56,12 +56,12 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, ViewportNode } from "megane-viewer";
 
 const pipe  = new Pipeline();
 const s     = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
 const bonds = pipe.addNode(new AddBonds({ source: "distance" }));
-const v     = pipe.addNode(new Viewport({ perspective: false }));
+const v     = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle, bonds.inp.particle);
 pipe.addEdge(s.out.particle, v.inp.particle);
@@ -150,7 +150,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer";
 
 const pipe  = new Pipeline();
 const s     = pipe.addNode(new LoadStructure("/megane/structures/perovskite_srtio3_3x3x3.xyz"));
@@ -164,7 +164,7 @@ const poly  = pipe.addNode(new AddPolyhedra({
   edgeColor: "#dddddd",
   edgeWidth: 2,
 }));
-const v = pipe.addNode(new Viewport({ perspective: false, cellAxesVisible: true, pivotMarkerVisible: true }));
+const v = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: true, pivotMarkerVisible: true }));
 
 pipe.addEdge(s.out.particle, bonds.inp.particle);
 pipe.addEdge(s.out.particle, poly.inp.particle);
@@ -270,7 +270,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, Filter, Modify, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, Filter, Modify, ViewportNode } from "megane-viewer";
 
 const pipe = new Pipeline();
 const s  = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -283,7 +283,7 @@ const mc = pipe.addNode(new Modify({ scale: 3.0, opacity: 1.0 }));
 const fw = pipe.addNode(new Filter({ query: "index >= 24" }));
 const mw = pipe.addNode(new Modify({ scale: 1.0, opacity: 0.15 }));
 
-const v = pipe.addNode(new Viewport({ perspective: false }));
+const v = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle,  fc.inp.particle);
 pipe.addEdge(fc.out.particle, mc.inp.particle);
@@ -406,7 +406,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, ViewportNode } from "megane-viewer";
 
 const pipe = new Pipeline();
 const s     = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -417,7 +417,7 @@ const mSolute  = pipe.addNode(new Modify({ scale: 1.3, opacity: 1.0 }));
 const fSolvent = pipe.addNode(new Filter({ query: "index >= 24" }));
 const mSolvent = pipe.addNode(new Modify({ scale: 0.8, opacity: 0.15 }));
 
-const v = pipe.addNode(new Viewport({ perspective: false }));
+const v = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle,        bonds.inp.particle);
 pipe.addEdge(bonds.out.bond,        v.inp.bond);
@@ -532,13 +532,13 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, Filter, AddLabels, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, Filter, AddLabels, ViewportNode } from "megane-viewer";
 
 const pipe   = new Pipeline();
 const s      = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
 const f      = pipe.addNode(new Filter({ query: "index < 24" })); // solute only
 const labels = pipe.addNode(new AddLabels({ source: "element" }));
-const v      = pipe.addNode(new Viewport({ perspective: false }));
+const v      = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle,   f.inp.particle);
 pipe.addEdge(f.out.particle,   v.inp.particle);
@@ -631,7 +631,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, ViewportNode } from "megane-viewer";
 
 const pipe  = new Pipeline();
 const s     = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -639,7 +639,7 @@ const bonds = pipe.addNode(new AddBonds({ source: "distance" }));
 // Select bonds touching water atoms (index >= 24), then hide them with opacity=0
 const fb    = pipe.addNode(new Filter({ bondQuery: "atom_index >= 24" }));
 const mb    = pipe.addNode(new Modify({ scale: 1.0, opacity: 0.0 }));
-const v     = pipe.addNode(new Viewport({ perspective: false }));
+const v     = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle,  bonds.inp.particle);
 pipe.addEdge(s.out.particle,  v.inp.particle);
@@ -738,7 +738,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, ViewportNode } from "megane-viewer";
 
 // Note: PipelineViewer auto-fetches load_structure files via fileUrl.
 // For load_trajectory, use the Jupyter / VSCode integration which handles file I/O natively.
@@ -746,7 +746,7 @@ const pipe  = new Pipeline();
 const s     = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
 const traj  = pipe.addNode(new LoadTrajectory({ xtc: "caffeine_water_vibration.xtc" }));
 const bonds = pipe.addNode(new AddBonds({ source: "structure" }));
-const v     = pipe.addNode(new Viewport({ perspective: false }));
+const v     = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle, traj.inp.particle);
 pipe.addEdge(s.out.particle, bonds.inp.particle);
@@ -839,7 +839,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, LoadVector, VectorOverlay, Viewport } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, LoadVector, VectorOverlay, ViewportNode } from "megane-viewer";
 
 // Note: load_vector reads per-atom vector data (JSON or .vec format).
 // File loading is handled natively in Jupyter and VSCode;
@@ -849,7 +849,7 @@ const s       = pipe.addNode(new LoadStructure("/megane/structures/caffeine_wate
 const bonds   = pipe.addNode(new AddBonds({ source: "distance" }));
 const vec     = pipe.addNode(new LoadVector("demo_vectors.vec"));
 const overlay = pipe.addNode(new VectorOverlay({ scale: 1.5 }));
-const v       = pipe.addNode(new Viewport({ perspective: false }));
+const v       = pipe.addNode(new ViewportNode({ perspective: false, cellAxesVisible: false, pivotMarkerVisible: false }));
 
 pipe.addEdge(s.out.particle,     bonds.inp.particle);
 pipe.addEdge(s.out.particle,     v.inp.particle);

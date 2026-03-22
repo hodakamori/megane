@@ -136,10 +136,13 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.pathCard:hover {
+.pathCard:hover,
+.pathCard:focus-visible {
   border-color: var(--ifm-color-primary);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   text-decoration: none;
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
 }
 
 .pathIcon {
