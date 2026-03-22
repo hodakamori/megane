@@ -13,7 +13,6 @@ For real-world examples, see the [Gallery](/gallery).
 
 ```typescript
 import {
-  PipelineViewer,
   Pipeline,
   LoadStructure,
   AddBonds,
@@ -29,12 +28,19 @@ pipe.addEdge(s.out.particle, b.inp.particle);
 pipe.addEdge(s.out.particle, v.inp.particle);
 pipe.addEdge(b.out.bond, v.inp.bond);
 
-// Render the pipeline in React
-<PipelineViewer pipeline={pipe.toObject()} width="100%" height={500} />;
-
-// Or serialize to JSON
+// Serialize to JSON
 const json = pipe.toJSON();
 const obj = pipe.toObject();
+```
+
+Render the pipeline in React with `PipelineViewer`:
+
+```tsx
+import { PipelineViewer } from "megane-viewer";
+
+export default function App() {
+  return <PipelineViewer pipeline={pipe.toObject()} width="100%" height={500} />;
+}
 ```
 
 After `addNode()`, each node exposes `.out` and `.inp` accessors for its ports. Pass these `NodePort` objects to `addEdge()` to wire nodes together. The pipeline serializes to the same `SerializedPipeline` v3 format used by the TypeScript engine — `toObject()` output can be passed directly to `deserializePipeline()`.

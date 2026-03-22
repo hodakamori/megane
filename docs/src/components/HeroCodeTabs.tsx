@@ -98,10 +98,28 @@ export default function HeroCodeTabs() {
           <pre><code>
             <span className={styles.kn}>import</span>{" "}
             <span className={styles.p}>{"{"}</span>{" "}
-            <span className={styles.nc}>PipelineViewer</span>{" "}
+            <span className={styles.nc}>PipelineViewer</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>Pipeline</span>
+            <span className={styles.p}>,</span>
+            {"\n  "}
+            <span className={styles.nc}>LoadStructure</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>AddBonds</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>ViewportNode</span>{" "}
             <span className={styles.p}>{"}"}</span>{" "}
             <span className={styles.kn}>from</span>{" "}
             <span className={styles.s}>"megane-viewer"</span>
+            {"\n\n"}
+            <span className={styles.kn}>const</span>{" "}
+            <span className={styles.n}>pipe</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.kn}>new</span>{" "}
+            <span className={styles.nc}>Pipeline</span>
+            <span className={styles.p}>()</span>
+            {"\n"}
+            <span className={styles.c}>{"// … addNode / addEdge …"}</span>
             {"\n\n"}
             <span className={styles.kn}>export default</span>{" "}
             <span className={styles.kn}>function</span>{" "}
@@ -110,28 +128,16 @@ export default function HeroCodeTabs() {
             <span className={styles.p}>{"{"}</span>
             {"\n  "}
             <span className={styles.kn}>return</span>{" "}
-            <span className={styles.p}>(</span>
-            {"\n    "}
             <span className={styles.o}>{"<"}</span>
-            <span className={styles.nc}>PipelineViewer</span>
-            {"\n      "}
+            <span className={styles.nc}>PipelineViewer</span>{" "}
             <span className={styles.na}>pipeline</span>
             <span className={styles.o}>{"={"}</span>
-            <span className={styles.n}>pipeline</span>
-            <span className={styles.o}>{"}"}</span>
-            {"\n      "}
-            <span className={styles.na}>width</span>
-            <span className={styles.o}>=</span>
-            <span className={styles.s}>"100%"</span>
-            {"\n      "}
-            <span className={styles.na}>height</span>
-            <span className={styles.o}>{"={"}</span>
-            <span className={styles.n}>500</span>
-            <span className={styles.o}>{"}"}</span>
-            {"\n    "}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>toObject</span>
+            <span className={styles.p}>()</span>
+            <span className={styles.o}>{"}"}</span>{" "}
             <span className={styles.o}>{"/>"}</span>
-            {"\n  "}
-            <span className={styles.p}>)</span>
             {"\n"}
             <span className={styles.p}>{"}"}</span>
           </code></pre>

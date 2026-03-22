@@ -88,8 +88,8 @@ Every node has the following common fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `xtcPath` | `string?` | Path to XTC trajectory file |
-| `trajPath` | `string?` | Path to ASE .traj trajectory file |
+| `fileName` | `string` | Display name of the trajectory file |
+| `fileUrl` | `string` | Path or URL to the trajectory file |
 
 #### `streaming`
 
@@ -99,7 +99,7 @@ No additional parameters.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `filePath` | `string` | Path to vector data file |
+| `fileName` | `string` | Path to vector data file |
 
 #### `filter`
 

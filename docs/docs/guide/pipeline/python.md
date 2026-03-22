@@ -182,7 +182,7 @@ Generate coordination polyhedra mesh.
 AddPolyhedra(
     *,
     center_elements: list[int],
-    ligand_elements: list[int] | None = None,
+    ligand_elements: list[int] | None = None,  # defaults to [8] (oxygen)
     max_distance: float = 2.5,
     opacity: float = 0.5,
     show_edges: bool = False,
