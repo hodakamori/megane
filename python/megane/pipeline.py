@@ -396,7 +396,9 @@ def _load_structure_file(path: str):
         ".gro": megane_parser.parse_gro,
         ".xyz": megane_parser.parse_xyz,
         ".mol": megane_parser.parse_mol,
+        ".sdf": megane_parser.parse_mol,
         ".data": megane_parser.parse_lammps_data,
+        ".lammps": megane_parser.parse_lammps_data,
     }
 
     parse_fn = parsers.get(ext)
