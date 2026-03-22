@@ -45,6 +45,22 @@ export type { StructureParseResult } from "./parsers/structure";
 // Core renderer (framework-agnostic)
 export { MoleculeRenderer } from "./renderer/MoleculeRenderer";
 
+// Pipeline builder API
+export {
+  Pipeline,
+  LoadStructure,
+  LoadTrajectory,
+  Streaming,
+  LoadVector,
+  Filter,
+  Modify,
+  AddBonds,
+  AddLabels,
+  AddPolyhedra,
+  VectorOverlay,
+  Viewport as ViewportNode,
+} from "./pipeline/builder";
+
 // Worker pool for off-main-thread decoding
 export { WorkerPool } from "./protocol/WorkerPool";
 

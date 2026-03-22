@@ -91,6 +91,95 @@
   font-size: 0.95rem;
 }
 
+/* Quick Start Paths */
+.quickStart {
+  padding: 3rem 2rem;
+  background: var(--ifm-background-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.quickStartInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.quickStartTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.quickStartSubtitle {
+  color: var(--ifm-color-emphasis-700);
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+.pathGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  text-align: left;
+}
+
+.pathCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  background: var(--ifm-background-color);
+  text-decoration: none !important;
+  color: inherit !important;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pathCard:hover,
+.pathCard:focus-visible {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+.pathIcon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.pathTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.pathInstall {
+  display: block;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ifm-color-emphasis-100);
+  color: var(--ifm-color-primary);
+  width: fit-content;
+}
+
+.pathDesc {
+  font-size: 0.875rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+}
+
+.pathLink {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+}
+
 /* Features grid */
 .features {
   padding: 3rem 2rem;

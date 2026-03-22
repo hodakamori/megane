@@ -24,6 +24,8 @@ python/megane/static/caffeine_water.pdb
 docs/.vitepress/dist
 docs/.vitepress/cache
 docs/node_modules
+docs/.docusaurus/
+docs/build/
 docs/api/python/
 docs/api/typescript/
 docs/notebooks/
