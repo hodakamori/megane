@@ -17,6 +17,8 @@ from megane.pipeline import (
     Streaming,
     VectorOverlay,
     Viewport,
+    view,
+    view_traj,
 )
 from megane.widget import MolecularViewer
 
@@ -38,5 +40,7 @@ __all__ = [
     "load_pdb",
     "load_traj",
     "load_trajectory",
+    "view",
+    "view_traj",
 ]
 __version__ = "0.5.0"

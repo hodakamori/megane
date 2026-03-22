@@ -1,5 +1,6 @@
 """Tests for the Python pipeline builder."""
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,8 @@ from megane.pipeline import (
     PortNamespace,
     VectorOverlay,
     Viewport,
+    view,
+    view_traj,
 )
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -708,3 +711,119 @@ class TestPipelineJsonImportErrors:
     def test_load_nonexistent_file_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             Pipeline.load(tmp_path / "does_not_exist.json")
+
+
+class TestViewWrapper:
+    """view() convenience function builds correct pipelines."""
+
+    def test_returns_molecular_viewer(self):
+        from megane.widget import MolecularViewer
+
+        viewer = view(str(FIXTURES / "1crn.pdb"))
+        assert isinstance(viewer, MolecularViewer)
+
+    def test_pipeline_has_structure_bonds_viewport(self):
+        viewer = view(str(FIXTURES / "1crn.pdb"))
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_structure" in node_types
+        assert "add_bond" in node_types
+        assert "viewport" in node_types
+
+    def test_bonds_none_omits_add_bond(self):
+        viewer = view(str(FIXTURES / "1crn.pdb"), bonds=None)
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "add_bond" not in node_types
+
+    def test_bonds_structure(self):
+        viewer = view(str(FIXTURES / "1crn.pdb"), bonds="structure")
+        pipe = viewer._pipeline_ref
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "structure"
+
+    def test_viewport_params(self):
+        viewer = view(str(FIXTURES / "1crn.pdb"), perspective=True, cell_axes_visible=False)
+        pipe = viewer._pipeline_ref
+        vp_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "viewport")
+        assert vp_cfg["perspective"] is True
+        assert vp_cfg["cellAxesVisible"] is False
+
+    def test_pipeline_enabled(self):
+        viewer = view(str(FIXTURES / "1crn.pdb"))
+        assert viewer._pipeline_enabled is True
+
+    def test_has_node_data(self):
+        viewer = view(str(FIXTURES / "1crn.pdb"))
+        pipe = viewer._pipeline_ref
+        assert len(pipe._node_data) > 0
+
+
+class TestViewTrajWrapper:
+    """view_traj() convenience function builds correct pipelines."""
+
+    def test_returns_molecular_viewer_xtc(self):
+        from megane.widget import MolecularViewer
+
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+        )
+        assert isinstance(viewer, MolecularViewer)
+
+    def test_pipeline_has_trajectory_node(self):
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+        )
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_trajectory" in node_types
+        assert "load_structure" in node_types
+        assert "viewport" in node_types
+
+    def test_total_frames_set(self):
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+        )
+        assert viewer.total_frames > 0
+
+    def test_raises_without_trajectory(self):
+        with pytest.raises(ValueError, match="Either 'xtc' or 'traj'"):
+            view_traj(str(FIXTURES / "1crn.pdb"))
+
+    @pytest.mark.skipif(
+        not importlib.util.find_spec("ase"),
+        reason="ASE not installed",
+    )
+    def test_returns_molecular_viewer_traj(self):
+        from megane.widget import MolecularViewer
+
+        viewer = view_traj(
+            str(FIXTURES / "water_100k.pdb"),
+            traj=str(FIXTURES / "water.traj"),
+        )
+        assert isinstance(viewer, MolecularViewer)
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_trajectory" in node_types
+        assert viewer.total_frames > 0
+
+    def test_raises_both_xtc_and_traj(self):
+        with pytest.raises(ValueError, match="Only one of"):
+            view_traj(
+                str(FIXTURES / "caffeine_water.pdb"),
+                xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+                traj=str(FIXTURES / "water.traj"),
+            )
+
+    def test_bonds_none(self):
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+            bonds=None,
+        )
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "add_bond" not in node_types

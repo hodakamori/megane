@@ -17,16 +17,7 @@ import plotly.graph_objects as go
 import ipywidgets as widgets
 import megane
 
-viewer = megane.MolecularViewer()
-
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
-t = pipe.add_node(megane.LoadTrajectory(xtc="trajectory.xtc"))
-v = pipe.add_node(megane.Viewport())
-pipe.add_edge(s.out.particle, t.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(t.out.traj, v.inp.traj)
-viewer.set_pipeline(pipe)
+viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
 
 # Create a Plotly time-series chart
 fig = go.FigureWidget(
@@ -118,11 +109,7 @@ Use `on_event()` as a decorator or method call:
 ```python
 import megane
 
-viewer = megane.MolecularViewer()
-
-pipe = megane.Pipeline()
-s = pipe.add_node(megane.LoadStructure("protein.pdb"))
-viewer.set_pipeline(pipe)
+viewer = megane.view("protein.pdb")
 
 # As decorator
 @viewer.on_event("measurement")

@@ -34,7 +34,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    pass
+    from megane.widget import MolecularViewer
 
 # ─── Port Objects ────────────────────────────────────────────────────
 
@@ -753,3 +753,118 @@ class Pipeline:
 
             _, trajectory = load_traj(node.traj)
             self._trajectories[node._id] = trajectory
+
+
+# ─── Convenience wrappers ────────────────────────────────────────────
+
+
+def view(
+    path: str,
+    *,
+    bonds: Literal["distance", "structure"] | None = "distance",
+    perspective: bool = False,
+    cell_axes_visible: bool = True,
+) -> "MolecularViewer":
+    """Open a molecular viewer for a structure file.
+
+    Builds a minimal pipeline with :class:`LoadStructure` and
+    :class:`Viewport` nodes and, when *bonds* is not ``None``
+    (the default), an additional :class:`AddBonds` node, then
+    returns a :class:`~megane.widget.MolecularViewer` widget.
+
+    Args:
+        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
+            ``"structure"`` reads bonds from the file, ``None`` disables bonds.
+        perspective: Use perspective projection instead of orthographic.
+        cell_axes_visible: Show unit cell axes.
+
+    Returns:
+        A :class:`~megane.widget.MolecularViewer` widget ready for display.
+
+    Example::
+
+        import megane
+        viewer = megane.view("protein.pdb")
+        viewer  # displays in notebook
+    """
+    from megane.widget import MolecularViewer
+
+    pipe = Pipeline()
+    s = pipe.add_node(LoadStructure(path))
+    v = pipe.add_node(Viewport(perspective=perspective, cell_axes_visible=cell_axes_visible))
+    pipe.add_edge(s.out.particle, v.inp.particle)
+    pipe.add_edge(s.out.cell, v.inp.cell)
+
+    if bonds is not None:
+        b = pipe.add_node(AddBonds(source=bonds))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        pipe.add_edge(b.out.bond, v.inp.bond)
+
+    viewer = MolecularViewer()
+    viewer.set_pipeline(pipe)
+    return viewer
+
+
+def view_traj(
+    path: str,
+    *,
+    xtc: str | None = None,
+    traj: str | None = None,
+    bonds: Literal["distance", "structure"] | None = "distance",
+    perspective: bool = False,
+    cell_axes_visible: bool = True,
+) -> "MolecularViewer":
+    """Open a molecular viewer with a trajectory.
+
+    Builds a pipeline (LoadStructure → LoadTrajectory → Viewport, with an
+    optional AddBonds node when *bonds* is not None) and returns a
+    :class:`~megane.widget.MolecularViewer` widget.
+
+    Args:
+        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        xtc: Path to an XTC trajectory file.
+        traj: Path to an ASE ``.traj`` file.
+        bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
+            ``"structure"`` reads bonds from the file, ``None`` disables bonds.
+        perspective: Use perspective projection instead of orthographic.
+        cell_axes_visible: Show unit cell axes.
+
+    Returns:
+        A :class:`~megane.widget.MolecularViewer` widget ready for display.
+
+    Raises:
+        ValueError: If neither *xtc* nor *traj* is provided, or if both are
+            provided.
+
+    Example::
+
+        import megane
+        viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
+        viewer.frame_index = 50
+    """
+    if xtc is None and traj is None:
+        raise ValueError("Either 'xtc' or 'traj' must be provided. Use view() for structure-only display.")
+    if xtc is not None and traj is not None:
+        raise ValueError("Only one of 'xtc' or 'traj' can be provided, not both.")
+
+    from megane.widget import MolecularViewer
+
+    pipe = Pipeline()
+    s = pipe.add_node(LoadStructure(path))
+    t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj))
+    v = pipe.add_node(Viewport(perspective=perspective, cell_axes_visible=cell_axes_visible))
+
+    pipe.add_edge(s.out.particle, t.inp.particle)
+    pipe.add_edge(s.out.particle, v.inp.particle)
+    pipe.add_edge(s.out.cell, v.inp.cell)
+    pipe.add_edge(t.out.traj, v.inp.traj)
+
+    if bonds is not None:
+        b = pipe.add_node(AddBonds(source=bonds))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        pipe.add_edge(b.out.bond, v.inp.bond)
+
+    viewer = MolecularViewer()
+    viewer.set_pipeline(pipe)
+    return viewer
