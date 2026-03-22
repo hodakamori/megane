@@ -56,7 +56,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -152,7 +152,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/perovskite_srtio3_3x3x3.xyz"));
@@ -276,7 +276,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, Filter, Modify, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, Filter, Modify, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -414,7 +414,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -544,7 +544,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, Filter, AddLabels, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, Filter, AddLabels, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -647,7 +647,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, Filter, Modify, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
@@ -756,7 +756,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 // Note: PipelineViewer auto-fetches load_structure files via fileUrl.
 // For load_trajectory, use the Jupyter / VSCode integration which handles file I/O natively.
@@ -859,7 +859,7 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, LoadVector, VectorOverlay, ViewportNode } from "megane-viewer";
+import { PipelineViewer, Pipeline, LoadStructure, AddBonds, LoadVector, VectorOverlay, ViewportNode } from "megane-viewer/lib";
 
 // Note: load_vector reads per-atom vector data (JSON or .vec format).
 // File loading is handled natively in Jupyter and VSCode;

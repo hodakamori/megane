@@ -130,7 +130,7 @@ docker run --rm -p 8080:8080 -v ./mydata:/data megane \
 ### React
 
 ```tsx
-import { MeganeViewer, parseStructureFile } from "megane-viewer";
+import { MeganeViewer, parseStructureFile } from "megane-viewer/lib";
 
 function App() {
   const [snapshot, setSnapshot] = useState(null);
@@ -146,15 +146,24 @@ function App() {
 
 ## Supported File Formats
 
+### Structure formats (`LoadStructure` node)
+
 | Format | Extension | Description |
 |--------|-----------|-------------|
 | PDB | `.pdb` | Protein Data Bank |
 | GRO | `.gro` | GROMACS structure file |
 | XYZ | `.xyz` | Cartesian coordinate format |
 | MOL/SDF | `.mol`, `.sdf` | MDL Molfile (V2000) |
-| XTC | `.xtc` | GROMACS compressed trajectory |
-| CIF | `.cif` | Crystallographic Information File |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
+| CIF† | `.cif` | Crystallographic Information File |
+
+> †CIF is supported in the browser (WASM) viewer. The Python backend does not yet support `.cif`.
+
+### Trajectory formats (`LoadTrajectory` node)
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| XTC | `.xtc` | GROMACS compressed trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj` | LAMMPS dump trajectory |
 

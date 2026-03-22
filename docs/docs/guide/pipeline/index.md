@@ -58,7 +58,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, LAMMPS data) | — | particle, trajectory, cell |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL/SDF, CIF, LAMMPS data) | — | particle, trajectory, cell |
 | **Load Trajectory** | Load an XTC or ASE .traj trajectory file | particle | trajectory |
 | **Streaming** | WebSocket-based real-time data delivery | — | particle, bond, trajectory, cell |
 | **Load Vector** | Load per-atom vector data from a file | — | vector |
@@ -91,7 +91,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.data` (LAMMPS) |
+| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`, `.data`, `.lammps` |
 
 ### Load Trajectory
 
