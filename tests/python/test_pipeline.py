@@ -1,5 +1,6 @@
 """Tests for the Python pipeline builder."""
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -791,6 +792,31 @@ class TestViewTrajWrapper:
     def test_raises_without_trajectory(self):
         with pytest.raises(ValueError, match="Either 'xtc' or 'traj'"):
             view_traj(str(FIXTURES / "1crn.pdb"))
+
+    @pytest.mark.skipif(
+        not importlib.util.find_spec("ase"),
+        reason="ASE not installed",
+    )
+    def test_returns_molecular_viewer_traj(self):
+        from megane.widget import MolecularViewer
+
+        viewer = view_traj(
+            str(FIXTURES / "water_100k.pdb"),
+            traj=str(FIXTURES / "water.traj"),
+        )
+        assert isinstance(viewer, MolecularViewer)
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_trajectory" in node_types
+        assert viewer.total_frames > 0
+
+    def test_raises_both_xtc_and_traj(self):
+        with pytest.raises(ValueError, match="Only one of"):
+            view_traj(
+                str(FIXTURES / "caffeine_water.pdb"),
+                xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+                traj=str(FIXTURES / "water.traj"),
+            )
 
     def test_bonds_none(self):
         viewer = view_traj(

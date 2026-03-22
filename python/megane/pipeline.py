@@ -767,8 +767,10 @@ def view(
 ) -> "MolecularViewer":
     """Open a molecular viewer for a structure file.
 
-    Builds a minimal pipeline (LoadStructure → AddBonds → Viewport)
-    and returns a :class:`~megane.widget.MolecularViewer` widget.
+    Builds a minimal pipeline with :class:`LoadStructure` and
+    :class:`Viewport` nodes and, when *bonds* is not ``None``
+    (the default), an additional :class:`AddBonds` node, then
+    returns a :class:`~megane.widget.MolecularViewer` widget.
 
     Args:
         path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
@@ -815,8 +817,9 @@ def view_traj(
 ) -> "MolecularViewer":
     """Open a molecular viewer with a trajectory.
 
-    Builds a pipeline (LoadStructure → LoadTrajectory → AddBonds → Viewport)
-    and returns a :class:`~megane.widget.MolecularViewer` widget.
+    Builds a pipeline (LoadStructure → LoadTrajectory → Viewport, with an
+    optional AddBonds node when *bonds* is not None) and returns a
+    :class:`~megane.widget.MolecularViewer` widget.
 
     Args:
         path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
@@ -831,7 +834,8 @@ def view_traj(
         A :class:`~megane.widget.MolecularViewer` widget ready for display.
 
     Raises:
-        ValueError: If neither *xtc* nor *traj* is provided.
+        ValueError: If neither *xtc* nor *traj* is provided, or if both are
+            provided.
 
     Example::
 
@@ -841,6 +845,8 @@ def view_traj(
     """
     if xtc is None and traj is None:
         raise ValueError("Either 'xtc' or 'traj' must be provided. Use view() for structure-only display.")
+    if xtc is not None and traj is not None:
+        raise ValueError("Only one of 'xtc' or 'traj' can be provided, not both.")
 
     from megane.widget import MolecularViewer
 
