@@ -110,7 +110,7 @@ export default function HeroCodeTabs() {
             <span className={styles.nc}>ViewportNode</span>{" "}
             <span className={styles.p}>{"}"}</span>{" "}
             <span className={styles.kn}>from</span>{" "}
-            <span className={styles.s}>"megane-viewer"</span>
+            <span className={styles.s}>"megane-viewer/lib"</span>
             {"\n\n"}
             <span className={styles.kn}>const</span>{" "}
             <span className={styles.n}>pipe</span>{" "}
