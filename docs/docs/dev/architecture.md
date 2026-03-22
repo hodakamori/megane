@@ -3,8 +3,6 @@ sidebar_position: 1
 title: Visual Pipeline Architecture
 ---
 
-# Visual Pipeline Architecture
-
 Developer guide to megane's internal architecture: how molecular data flows from file parsing to pixels on screen, and how to extend the system.
 
 ## Design Philosophy
@@ -24,7 +22,7 @@ Pipeline execution produces a pure data structure — `ViewportState` — with n
 
 ### GPU-Efficient Impostor Rendering
 
-Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **screen-aligned quads** (2 triangles) with ray-sphere intersection in the fragment shader. Each atom costs 7 floats of GPU memory (position xyz, radius, color rgb) and all atoms draw in a single instanced call. This is what allows megane to render 1M+ atoms at 60 fps on mid-range hardware.
+Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **screen-aligned quads** (2 triangles) with ray-sphere intersection in the fragment shader. The base per-atom data costs 7 floats of GPU memory (position xyz, radius, color rgb), and the current `ImpostorAtomMesh` implementation adds 2 more floats for per-atom scale and opacity overrides (9 floats/atom total). All atoms draw in a single instanced call. This is what allows megane to render 1M+ atoms at 60 fps on mid-range hardware.
 
 ## System Overview
 
