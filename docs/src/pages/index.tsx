@@ -65,17 +65,17 @@ const paths = [
     label: "Jupyter Guide",
   },
   {
-    icon: "🌐",
-    title: "Web / React",
+    icon: "⚛️",
+    title: "TypeScript / React",
     install: "npm install megane-viewer",
     isCommand: true,
-    description: "Drop <MeganeViewer /> into any React app. Build pipelines with the TypeScript builder API.",
+    description: "Drop <PipelineViewer /> into any React app. Build pipelines with the TypeScript builder API.",
     href: "/guide/web",
     label: "React Guide",
   },
   {
-    icon: "💻",
-    title: "CLI Server",
+    icon: "🐳",
+    title: "Docker",
     install: "docker run hodakamori/megane",
     isCommand: true,
     description: "Serve local structure files and view them instantly in the browser. No code needed.",
@@ -83,13 +83,13 @@ const paths = [
     label: "CLI Guide",
   },
   {
-    icon: "🧩",
-    title: "Visual Pipeline",
-    install: "Drag-and-drop, no code required",
+    icon: "🖥️",
+    title: "VSCode",
+    install: "Install from Marketplace",
     isCommand: false,
-    description: "Wire nodes in the browser or VSCode to build visualization pipelines. Powered by AI generation.",
-    href: "/guide/pipeline",
-    label: "Pipeline Guide",
+    description: "Open .pdb, .gro, .xyz, .mol, .cif files directly in VS Code with the megane extension.",
+    href: "https://marketplace.visualstudio.com/items?itemName=hodakamori.vscode-megane",
+    label: "VSCode Extension",
   },
 ];
 
@@ -284,8 +284,8 @@ export default function Home(): React.JSX.Element {
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <Hero />
       <main>
-        <QuickStartPaths />
         <Features />
+        <QuickStartPaths />
         <div className="container">
           <PillarSection />
         </div>
