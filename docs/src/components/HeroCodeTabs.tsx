@@ -3,7 +3,7 @@ import styles from "./HeroCodeTabs.module.css";
 
 const installCommands = [
   { label: "pip", command: "pip install megane" },
-  { label: "npm", command: "npm install megane" },
+  { label: "npm", command: "npm install megane-viewer" },
 ];
 
 const tabs = [
@@ -86,35 +86,122 @@ export default function HeroCodeTabs() {
           <pre><code>
             <span className={styles.kn}>import</span>{" "}
             <span className={styles.p}>{"{"}</span>{" "}
-            <span className={styles.n}>useMeganeLocal</span>
+            <span className={styles.nc}>PipelineViewer</span>
             <span className={styles.p}>,</span>{" "}
-            <span className={styles.nc}>MeganeViewer</span>{" "}
+            <span className={styles.nc}>Pipeline</span>
+            <span className={styles.p}>,</span>
+            {"\n  "}
+            <span className={styles.nc}>LoadStructure</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>AddBonds</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.nc}>ViewportNode</span>{" "}
             <span className={styles.p}>{"}"}</span>{" "}
             <span className={styles.kn}>from</span>{" "}
-            <span className={styles.s}>"megane"</span>
+            <span className={styles.s}>"megane-viewer"</span>
             {"\n\n"}
             <span className={styles.kn}>const</span>{" "}
-            <span className={styles.n}>mol</span>{" "}
+            <span className={styles.n}>pipe</span>{" "}
             <span className={styles.o}>=</span>{" "}
-            <span className={styles.n}>useMeganeLocal</span>
+            <span className={styles.kn}>new</span>{" "}
+            <span className={styles.nc}>Pipeline</span>
             <span className={styles.p}>()</span>
             {"\n"}
-            <span className={styles.n}>mol</span>
+            <span className={styles.kn}>const</span>{" "}
+            <span className={styles.n}>s</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.n}>pipe</span>
             <span className={styles.o}>.</span>
-            <span className={styles.n}>loadFile</span>
+            <span className={styles.n}>addNode</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.kn}>new</span>{" "}
+            <span className={styles.nc}>LoadStructure</span>
             <span className={styles.p}>(</span>
             <span className={styles.s}>"protein.pdb"</span>
+            <span className={styles.p}>))</span>
+            {"\n"}
+            <span className={styles.kn}>const</span>{" "}
+            <span className={styles.n}>b</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>addNode</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.kn}>new</span>{" "}
+            <span className={styles.nc}>AddBonds</span>
+            <span className={styles.p}>())</span>
+            {"\n"}
+            <span className={styles.kn}>const</span>{" "}
+            <span className={styles.n}>v</span>{" "}
+            <span className={styles.o}>=</span>{" "}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>addNode</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.kn}>new</span>{" "}
+            <span className={styles.nc}>ViewportNode</span>
+            <span className={styles.p}>())</span>
+            {"\n\n"}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>addEdge</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.n}>s</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>out</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.n}>b</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>inp</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>)</span>
+            {"\n"}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>addEdge</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.n}>s</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>out</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.n}>v</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>inp</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>particle</span>
+            <span className={styles.p}>)</span>
+            {"\n"}
+            <span className={styles.n}>pipe</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>addEdge</span>
+            <span className={styles.p}>(</span>
+            <span className={styles.n}>b</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>out</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>bond</span>
+            <span className={styles.p}>,</span>{" "}
+            <span className={styles.n}>v</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>inp</span>
+            <span className={styles.o}>.</span>
+            <span className={styles.n}>bond</span>
             <span className={styles.p}>)</span>
             {"\n\n"}
             <span className={styles.o}>{"<"}</span>
-            <span className={styles.nc}>MeganeViewer</span>{" "}
-            <span className={styles.na}>snapshot</span>
-            <span className={styles.o}>{"="}</span>
-            <span className={styles.p}>{"{"}</span>
-            <span className={styles.n}>mol</span>
+            <span className={styles.nc}>PipelineViewer</span>{" "}
+            <span className={styles.na}>pipeline</span>
+            <span className={styles.o}>{"={"}</span>
+            <span className={styles.n}>pipe</span>
             <span className={styles.o}>.</span>
-            <span className={styles.n}>snapshot</span>
-            <span className={styles.p}>{"}"}</span>{" "}
+            <span className={styles.n}>toObject</span>
+            <span className={styles.p}>()</span>
+            <span className={styles.o}>{"}"}</span>{" "}
             <span className={styles.o}>{"/>"}</span>
           </code></pre>
         )}

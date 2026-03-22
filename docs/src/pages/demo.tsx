@@ -12,6 +12,13 @@ export default function DemoPage() {
 
         <BrowserOnly>{() => <FullViewerDemo height="700px" />}</BrowserOnly>
 
+        <p>
+          No file handy? Download a sample structure:{" "}
+          <a href="/megane/structures/caffeine_water.pdb" download>caffeine_water.pdb</a>
+          {" · "}
+          <a href="/megane/structures/perovskite_srtio3_3x3x3.xyz" download>perovskite_srtio3.xyz</a>
+        </p>
+
         <h2>Controls</h2>
         <table>
           <thead>
