@@ -30,6 +30,11 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "Developer Internals",
+      items: ["dev/architecture"],
+    },
+    {
+      type: "category",
       label: "Reference",
       items: [
         {
