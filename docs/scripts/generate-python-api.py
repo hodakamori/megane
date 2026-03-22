@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 PYTHON_SRC = ROOT / "python" / "megane"
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "api" / "python"
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "docs" / "api" / "python"
 
 # Files to extract API documentation from
 SOURCES = [

@@ -1,0 +1,38 @@
+.galleryIndex {
+}
+
+.tagFilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.filterBtn {
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ifm-color-emphasis-700);
+  background: var(--ifm-color-emphasis-100);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.filterBtn:hover {
+  color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+}
+
+.filterBtn.active {
+  color: #fff;
+  background: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+}
+
+.emptyState {
+  color: var(--ifm-color-emphasis-600);
+  text-align: center;
+  padding: 40px 0;
+}

@@ -1,21 +1,31 @@
 {
   "name": "megane-docs",
   "private": true,
-  "type": "module",
   "scripts": {
     "api:ts": "typedoc",
     "api:py": "python3 scripts/generate-python-api.py",
     "api": "npm run api:ts && npm run api:py",
-    "dev": "npm run api && vitepress dev",
-    "build": "npm run api && vitepress build",
-    "preview": "vitepress preview"
+    "dev": "docusaurus start",
+    "build": "npm run api && docusaurus build",
+    "preview": "docusaurus serve",
+    "clear": "docusaurus clear"
+  },
+  "dependencies": {
+    "@docusaurus/core": "^3.7.0",
+    "@docusaurus/preset-classic": "^3.7.0",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.0.0",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "three": "^0.172.0"
   },
   "devDependencies": {
+    "@docusaurus/module-type-aliases": "^3.7.0",
+    "@docusaurus/tsconfig": "^3.7.0",
+    "@docusaurus/types": "^3.7.0",
     "typedoc": "^0.28.0",
     "typedoc-plugin-markdown": "^4.4.0",
-    "typedoc-vitepress-theme": "^1.1.0",
-    "vitepress": "^1.6.0",
-    "three": "^0.172.0",
-    "vue": "^3.5.0"
+    "typescript": "^5.0.0"
   }
 }
