@@ -836,7 +836,7 @@ export default function App() {
     description:
       "Load an XTC trajectory file alongside the structure to animate molecular vibrations frame by frame.",
     tags: ["trajectory", "animation", "small-molecule", "xtc"],
-    snapshotUrl: "/megane/data/caffeine_water.json",
+    snapshotUrl: "/megane/data/caffeine_water_vibration.json",
     code: {
       jupyter: `\
 import megane

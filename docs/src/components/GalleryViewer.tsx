@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import type { GalleryExample } from "../gallery/types";
+import { Timeline } from "../../../src/components/Timeline";
 import styles from "./GalleryViewer.module.css";
 
 type TabId = "jupyter" | "react" | "vscode";
@@ -14,10 +15,79 @@ interface Props {
   example: GalleryExample;
 }
 
+interface FrameData {
+  positions: Float32Array;
+  nAtoms: number;
+  frameId: number;
+}
+
 export default function GalleryViewer({ example }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("jupyter");
   const [copied, setCopied] = useState(false);
+
+  // Trajectory playback state
+  const [totalFrames, setTotalFrames] = useState(0);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [fps, setFps] = useState(10);
+
+  const framesRef = useRef<FrameData[]>([]);
+  const rendererRef = useRef<any>(null);
+  const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentFrameRef = useRef(0);
+  const fpsRef = useRef(10);
+
+  function stopPlayback() {
+    if (playIntervalRef.current !== null) {
+      clearInterval(playIntervalRef.current);
+      playIntervalRef.current = null;
+    }
+  }
+
+  function handleSeek(index: number) {
+    stopPlayback();
+    setPlaying(false);
+    currentFrameRef.current = index;
+    setCurrentFrame(index);
+    rendererRef.current?.updateFrame(framesRef.current[index]);
+  }
+
+  function handlePlayPause() {
+    setPlaying((prev) => {
+      const next = !prev;
+      if (next) {
+        playIntervalRef.current = setInterval(() => {
+          const frames = framesRef.current;
+          if (frames.length === 0) return;
+          const nextIdx = (currentFrameRef.current + 1) % frames.length;
+          currentFrameRef.current = nextIdx;
+          setCurrentFrame(nextIdx);
+          rendererRef.current?.updateFrame(frames[nextIdx]);
+        }, 1000 / fpsRef.current);
+      } else {
+        stopPlayback();
+      }
+      return next;
+    });
+  }
+
+  function handleFpsChange(newFps: number) {
+    fpsRef.current = newFps;
+    setFps(newFps);
+    // Restart interval at new rate if playing
+    if (playIntervalRef.current !== null) {
+      stopPlayback();
+      playIntervalRef.current = setInterval(() => {
+        const frames = framesRef.current;
+        if (frames.length === 0) return;
+        const nextIdx = (currentFrameRef.current + 1) % frames.length;
+        currentFrameRef.current = nextIdx;
+        setCurrentFrame(nextIdx);
+        rendererRef.current?.updateFrame(frames[nextIdx]);
+      }, 1000 / newFps);
+    }
+  }
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -25,6 +95,15 @@ export default function GalleryViewer({ example }: Props) {
     let renderer: any = null;
     let observer: IntersectionObserver | null = null;
     let unmounted = false;
+
+    // Reset playback state when example changes
+    stopPlayback();
+    setPlaying(false);
+    setCurrentFrame(0);
+    setTotalFrames(0);
+    currentFrameRef.current = 0;
+    framesRef.current = [];
+    rendererRef.current = null;
 
     async function initPreview() {
       if (!container) return;
@@ -59,6 +138,17 @@ export default function GalleryViewer({ example }: Props) {
         };
 
         renderer.loadSnapshot(snapshot);
+        rendererRef.current = renderer;
+
+        // Load trajectory frames if present
+        if (data.frames && data.frames.length > 1) {
+          framesRef.current = data.frames.map((f: any, i: number) => ({
+            positions: new Float32Array(f.positions),
+            nAtoms: data.nAtoms,
+            frameId: i,
+          }));
+          setTotalFrames(data.frames.length);
+        }
 
         const { deserializePipeline } = await import(
           "../../../src/pipeline/serialize"
@@ -109,6 +199,7 @@ export default function GalleryViewer({ example }: Props) {
 
     return () => {
       unmounted = true;
+      stopPlayback();
       observer?.disconnect();
       if (renderer) {
         renderer.dispose();
@@ -159,7 +250,19 @@ export default function GalleryViewer({ example }: Props) {
           className={styles.galleryPreview}
           ref={containerRef}
           style={{ height: example.height ?? "380px" }}
-        />
+        >
+          {totalFrames > 1 && (
+            <Timeline
+              currentFrame={currentFrame}
+              totalFrames={totalFrames}
+              playing={playing}
+              fps={fps}
+              onSeek={handleSeek}
+              onPlayPause={handlePlayPause}
+              onFpsChange={handleFpsChange}
+            />
+          )}
+        </div>
 
         <div className={styles.galleryCode}>
           <div className={styles.codeTabs}>
