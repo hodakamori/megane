@@ -42,6 +42,11 @@ After `add_node()`, each node exposes `.out` and `.inp` namespaces for its ports
 | `add_node(node)` | Add a node to the pipeline. Returns the node (with `.out`/`.inp` ports) for use in `add_edge()` |
 | `add_edge(source_port, target_port)` | Connect `source.out.<name>` → `target.inp.<name>` |
 | `to_dict()` | Serialize to v3 JSON dict |
+| `to_json(indent=2)` | Serialize to a JSON string |
+| `save(path)` | Save the pipeline to a JSON file |
+| `Pipeline.from_dict(d)` | Reconstruct a Pipeline from a v3 dict |
+| `Pipeline.from_json(s)` | Reconstruct a Pipeline from a JSON string |
+| `Pipeline.load(path)` | Load a Pipeline from a JSON file |
 
 ## Node classes
 
@@ -122,12 +127,13 @@ LoadVector(path: str)
 Select atoms by a query expression.
 
 ```python
-Filter(*, query: str)
+Filter(*, query: str = "all", bond_query: str = "")
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `query` | `str` | Selection expression (see [Filter DSL](./index.md#filter-dsl)) |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | `str` | `"all"` | Atom selection expression (see [Filter DSL](./index.md#filter-dsl)) |
+| `bond_query` | `str` | `""` | Bond selection expression (see [Bond Selection DSL](./index.md#bond-selection-dsl)). Empty string means no bond filtering. |
 
 **Ports:** `inp.particle`, `out.particle`
 
@@ -222,13 +228,14 @@ VectorOverlay(*, scale: float = 1.0)
 3D rendering output node. All data to be rendered must be explicitly connected to this node.
 
 ```python
-Viewport(*, perspective: bool = False, cell_axes_visible: bool = True)
+Viewport(*, perspective: bool = False, cell_axes_visible: bool = True, pivot_marker_visible: bool = True)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `perspective` | `bool` | `False` | Toggle perspective / orthographic projection |
 | `cell_axes_visible` | `bool` | `True` | Show simulation cell axes with labels |
+| `pivot_marker_visible` | `bool` | `True` | Show the rotation pivot marker at the camera target |
 
 **Ports:** `inp.particle`, `inp.bond`, `inp.cell`, `inp.traj`, `inp.label`, `inp.mesh`, `inp.vector`
 

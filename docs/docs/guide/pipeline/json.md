@@ -106,7 +106,7 @@ No additional parameters.
 | Field | Type | Description |
 |-------|------|-------------|
 | `query` | `string` | Atom selection query |
-| `bondQuery` | `string?` | Bond selection query |
+| `bond_query` | `string?` | Bond selection query |
 
 #### `modify`
 

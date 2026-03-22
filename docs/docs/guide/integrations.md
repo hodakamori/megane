@@ -158,13 +158,13 @@ The `measurement` property returns:
 ```ts
 import { MoleculeRenderer } from "megane-viewer";
 
-// Mount in any DOM element
-const container = document.getElementById("viewer");
-const renderer = new MoleculeRenderer(container);
+// Create and mount
+const renderer = new MoleculeRenderer();
+renderer.mount(document.getElementById("viewer")!);
 
-// Set data
-renderer.setSnapshot(snapshot);
-renderer.setFrame(frame);
+// Load data
+renderer.loadSnapshot(snapshot);
+renderer.updateFrame(frame);
 
 // Clean up
 renderer.dispose();

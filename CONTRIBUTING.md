@@ -4,7 +4,7 @@ Thank you for your interest in contributing to megane. This document covers the 
 
 ## Development Setup
 
-Prerequisites: Node.js 22+, Rust (stable), Python 3.11+, [uv](https://github.com/astral-sh/uv).
+Prerequisites: Node.js 22+, Rust (stable), Python 3.10+, [uv](https://github.com/astral-sh/uv).
 
 ```bash
 # Install dependencies

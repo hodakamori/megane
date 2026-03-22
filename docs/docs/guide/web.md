@@ -496,7 +496,7 @@ export function ProteinDemo() {
     fetch("/data/protein.pdb")
       .then((r) => r.text())
       .then(async (text) => {
-        const { parseStructureText } = await import("megane");
+        const { parseStructureText } = await import("megane-viewer");
         const result = await parseStructureText(text);
         setSnapshot(result.snapshot);
       });
