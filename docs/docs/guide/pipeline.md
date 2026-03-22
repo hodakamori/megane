@@ -321,6 +321,187 @@ Pipelines serialize to JSON (v3 format) and can be saved, loaded, and version-co
 
 Each node entry can include `"enabled": false` to bypass that node (equivalent to deleting it from the execution graph while keeping it in the editor). Omitting `enabled` or setting it to `true` is the default active state.
 
+## JavaScript/TypeScript Pipeline API
+
+Pipelines can be built programmatically in JavaScript/TypeScript using the `Pipeline` builder in `@/pipeline/builder`. The API mirrors the Python interface exactly, making it straightforward to port pipelines between languages.
+
+### Overview
+
+```typescript
+import { Pipeline, LoadStructure, AddBonds, Viewport } from '@/pipeline/builder'
+
+const pipe = new Pipeline()
+const s = pipe.addNode(new LoadStructure('protein.pdb'))
+const b = pipe.addNode(new AddBonds())
+const v = pipe.addNode(new Viewport())
+
+pipe.addEdge(s.out.particle, b.inp.particle)
+pipe.addEdge(s.out.particle, v.inp.particle)
+pipe.addEdge(b.out.bond,     v.inp.bond)
+
+// Serialize to SerializedPipeline v3 JSON
+const json = pipe.toJSON()
+const obj  = pipe.toObject()  // plain object version
+```
+
+After `addNode()`, each node exposes `.out` and `.inp` accessors for its ports. Pass these `NodePort` objects to `addEdge()` to wire nodes together. The pipeline serializes to the same `SerializedPipeline` v3 format used by the TypeScript engine — `toObject()` output can be passed directly to `deserializePipeline()`.
+
+### Pipeline class
+
+| Method | Description |
+|--------|-------------|
+| `addNode(node)` | Add a node to the pipeline. Returns the same node (with `.out`/`.inp` ports) for use in `addEdge()` |
+| `addEdge(sourcePort, targetPort)` | Connect `node.out.<name>` → `node.inp.<name>` |
+| `toObject()` | Serialize to v3 plain object (`SerializedPipeline`) |
+| `toJSON(indent?)` | Serialize to a JSON string (default indent = 2) |
+
+### Node classes
+
+All node classes are importable from `@/pipeline/builder`:
+
+```typescript
+import {
+  LoadStructure,
+  LoadTrajectory,
+  Streaming,
+  LoadVector,
+  Filter,
+  Modify,
+  AddBonds,
+  AddLabels,
+  AddPolyhedra,
+  VectorOverlay,
+  Viewport,
+  Pipeline,
+} from '@/pipeline/builder'
+```
+
+Constructor parameters mirror the Python API (using an options object instead of keyword args):
+
+| Python | JavaScript/TypeScript |
+|--------|----------------------|
+| `LoadStructure("path")` | `new LoadStructure('path')` |
+| `Filter(query="element == 'C'")` | `new Filter({ query: "element == 'C'" })` |
+| `Modify(scale=1.3, opacity=0.8)` | `new Modify({ scale: 1.3, opacity: 0.8 })` |
+| `AddBonds(source="distance")` | `new AddBonds({ source: 'distance' })` |
+| `AddLabels(source="element")` | `new AddLabels({ source: 'element' })` |
+| `AddPolyhedra(center_elements=[22])` | `new AddPolyhedra({ centerElements: [22] })` |
+| `VectorOverlay(scale=2.0)` | `new VectorOverlay({ scale: 2.0 })` |
+| `LoadTrajectory(xtc="traj.xtc")` | `new LoadTrajectory({ xtc: 'traj.xtc' })` |
+| `Viewport(perspective=True)` | `new Viewport({ perspective: true })` |
+
+### Ports
+
+After `addNode()`, each node exposes two port accessors:
+
+- `node.out.<name>` — output port (first arg to `addEdge`)
+- `node.inp.<name>` — input port (second arg to `addEdge`)
+
+Port names are identical to Python. The `.traj` port maps to the `"trajectory"` wire handle internally. Accessing an undefined port throws an `Error` with a message listing available ports.
+
+### Example: Basic Structure with Bonds
+
+```typescript
+import { Pipeline, LoadStructure, AddBonds, Viewport } from '@/pipeline/builder'
+
+const pipe = new Pipeline()
+const s = pipe.addNode(new LoadStructure('protein.pdb'))
+const b = pipe.addNode(new AddBonds({ source: 'distance' }))
+const v = pipe.addNode(new Viewport())
+
+pipe.addEdge(s.out.particle, b.inp.particle)
+pipe.addEdge(s.out.particle, v.inp.particle)
+pipe.addEdge(b.out.bond,     v.inp.bond)
+
+const json = pipe.toJSON()
+```
+
+### Example: Filter and Modify
+
+```typescript
+import { Pipeline, LoadStructure, Filter, Modify, AddBonds, Viewport } from '@/pipeline/builder'
+
+const pipe = new Pipeline()
+const s      = pipe.addNode(new LoadStructure('protein.pdb'))
+const carbons = pipe.addNode(new Filter({ query: "element == 'C'" }))
+const big    = pipe.addNode(new Modify({ scale: 1.5, opacity: 0.8 }))
+const bonds  = pipe.addNode(new AddBonds())
+const v      = pipe.addNode(new Viewport())
+
+pipe.addEdge(s.out.particle,       carbons.inp.particle)
+pipe.addEdge(carbons.out.particle, big.inp.particle)
+pipe.addEdge(s.out.particle,       bonds.inp.particle)
+pipe.addEdge(big.out.particle,     v.inp.particle)
+pipe.addEdge(bonds.out.bond,       v.inp.bond)
+```
+
+### Example: Trajectory Playback
+
+```typescript
+import { Pipeline, LoadStructure, LoadTrajectory, AddBonds, Viewport } from '@/pipeline/builder'
+
+const pipe = new Pipeline()
+const s     = pipe.addNode(new LoadStructure('protein.pdb'))
+const traj  = pipe.addNode(new LoadTrajectory({ xtc: 'trajectory.xtc' }))
+const bonds = pipe.addNode(new AddBonds({ source: 'structure' }))
+const v     = pipe.addNode(new Viewport())
+
+pipe.addEdge(s.out.particle, traj.inp.particle)
+pipe.addEdge(s.out.particle, bonds.inp.particle)
+pipe.addEdge(s.out.particle, v.inp.particle)
+pipe.addEdge(traj.out.traj,  v.inp.traj)
+pipe.addEdge(bonds.out.bond, v.inp.bond)
+```
+
+### Example: TiO₆ Coordination Polyhedra
+
+```typescript
+import { Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewport } from '@/pipeline/builder'
+
+const pipe      = new Pipeline()
+const s         = pipe.addNode(new LoadStructure('SrTiO3_supercell.pdb'))
+const bonds     = pipe.addNode(new AddBonds())
+const polyhedra = pipe.addNode(new AddPolyhedra({
+  centerElements: [22],  // Ti
+  ligandElements: [8],   // O
+  maxDistance: 2.5,
+  opacity: 0.5,
+  showEdges: true,
+}))
+const v = pipe.addNode(new Viewport())
+
+pipe.addEdge(s.out.particle,       bonds.inp.particle)
+pipe.addEdge(s.out.particle,       polyhedra.inp.particle)
+pipe.addEdge(s.out.particle,       v.inp.particle)
+pipe.addEdge(bonds.out.bond,       v.inp.bond)
+pipe.addEdge(polyhedra.out.mesh,   v.inp.mesh)
+```
+
+### Example: DAG Branching (Multiple Filters)
+
+```typescript
+import { Pipeline, LoadStructure, Filter, AddLabels, AddBonds, Viewport } from '@/pipeline/builder'
+
+const pipe     = new Pipeline()
+const s        = pipe.addNode(new LoadStructure('protein.pdb'))
+const carbon   = pipe.addNode(new Filter({ query: "element == 'C'" }))
+const nitrogen = pipe.addNode(new Filter({ query: "element == 'N'" }))
+const labels   = pipe.addNode(new AddLabels({ source: 'element' }))
+const bonds    = pipe.addNode(new AddBonds())
+const v        = pipe.addNode(new Viewport())
+
+pipe.addEdge(s.out.particle,        carbon.inp.particle)
+pipe.addEdge(s.out.particle,        nitrogen.inp.particle)
+pipe.addEdge(s.out.particle,        labels.inp.particle)
+pipe.addEdge(s.out.particle,        bonds.inp.particle)
+pipe.addEdge(carbon.out.particle,   v.inp.particle)
+pipe.addEdge(nitrogen.out.particle, v.inp.particle)
+pipe.addEdge(labels.out.label,      v.inp.label)
+pipe.addEdge(bonds.out.bond,        v.inp.bond)
+```
+
+---
+
 ## Python Pipeline API
 
 Pipelines can be built programmatically in Python using the `Pipeline` class. This is the recommended way to use megane in Jupyter notebooks and scripts.
