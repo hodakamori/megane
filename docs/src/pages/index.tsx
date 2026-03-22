@@ -54,6 +54,65 @@ function Hero() {
   );
 }
 
+const paths = [
+  {
+    icon: "🔬",
+    title: "Python / Jupyter",
+    install: "pip install megane",
+    description: "Interactive widget inside Jupyter notebooks. Build pipelines in Python, display structures inline.",
+    href: "/guide/jupyter",
+    label: "Jupyter Guide",
+  },
+  {
+    icon: "🌐",
+    title: "Web / React",
+    install: "npm install megane-viewer",
+    description: "Drop <MeganeViewer /> into any React app. Build pipelines with the TypeScript builder API.",
+    href: "/guide/web",
+    label: "React Guide",
+  },
+  {
+    icon: "💻",
+    title: "CLI Server",
+    install: "docker run hodakamori/megane",
+    description: "Serve local structure files and view them instantly in the browser. No code needed.",
+    href: "/guide/cli",
+    label: "CLI Guide",
+  },
+  {
+    icon: "🧩",
+    title: "Visual Pipeline",
+    install: "Drag-and-drop, no code required",
+    description: "Wire nodes in the browser or VSCode to build visualization pipelines. Powered by AI generation.",
+    href: "/guide/pipeline",
+    label: "Pipeline Guide",
+  },
+];
+
+function QuickStartPaths() {
+  return (
+    <section className={styles.quickStart}>
+      <div className={styles.quickStartInner}>
+        <h2 className={styles.quickStartTitle}>Start in your environment</h2>
+        <p className={styles.quickStartSubtitle}>
+          megane works everywhere — pick your entry point.
+        </p>
+        <div className={styles.pathGrid}>
+          {paths.map((p) => (
+            <Link key={p.href} className={styles.pathCard} to={p.href}>
+              <div className={styles.pathIcon}>{p.icon}</div>
+              <h3 className={styles.pathTitle}>{p.title}</h3>
+              <code className={styles.pathInstall}>{p.install}</code>
+              <p className={styles.pathDesc}>{p.description}</p>
+              <span className={styles.pathLink}>{p.label} →</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Features() {
   const features = [
     {
@@ -217,6 +276,7 @@ export default function Home(): React.JSX.Element {
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <Hero />
       <main>
+        <QuickStartPaths />
         <Features />
         <div className="container">
           <PillarSection />

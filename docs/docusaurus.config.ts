@@ -89,7 +89,15 @@ const config: Config = {
     },
   } satisfies Preset.ThemeConfig,
 
+  themes: [
+    [
+      require.resolve("@easyops-cn/docusaurus-search-local"),
+      { hashed: true, language: ["en"] },
+    ],
+  ],
+
   plugins: [
+    "docusaurus-plugin-image-zoom",
     function customWebpack() {
       return {
         name: "custom-webpack",

@@ -6,12 +6,7 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Getting Started",
       collapsed: false,
-      items: ["getting-started", "configuration"],
-    },
-    {
-      type: "category",
-      label: "Pipeline",
-      items: ["guide/pipeline"],
+      items: ["introduction", "getting-started"],
     },
     {
       type: "category",
@@ -21,6 +16,22 @@ const sidebars: SidebarsConfig = {
         "guide/cli",
         "guide/web",
         "guide/integrations",
+      ],
+    },
+    {
+      type: "category",
+      label: "Visual Pipeline",
+      items: ["guide/pipeline"],
+    },
+    {
+      type: "category",
+      label: "Reference",
+      items: [
+        {
+          type: "doc",
+          id: "configuration",
+          label: "Development Setup",
+        },
       ],
     },
   ],
