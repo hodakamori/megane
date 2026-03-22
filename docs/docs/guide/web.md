@@ -199,9 +199,9 @@ interface SerializedPipeline {
 }
 ```
 
-`PipelineNodeParams` is a discriminated union exported by `megane-viewer`. The `type` field on each node determines which parameters are required — see [Node Reference](/guide/pipeline#node-reference) for the full list.
+`PipelineNodeParams` is a discriminated union exported by `megane-viewer`. The `type` field on each node determines which parameters are required — see [Node Reference](/guide/pipeline/#node-reference) for the full list.
 
-Each node's `type` field determines which parameters are required. See [Node Reference](/guide/pipeline#node-reference) for the full list.
+Each node's `type` field determines which parameters are required. See [Node Reference](/guide/pipeline/#node-reference) for the full list.
 
 #### `load_structure` node — the `fileUrl` field
 

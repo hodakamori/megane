@@ -21,7 +21,7 @@ sidebar_position: 1
 | **Jupyter / Python** | `pip install megane` | [Jupyter Guide](./guide/jupyter) |
 | **Web / React** | `npm install megane-viewer` | [Web Guide](./guide/web) |
 | **CLI (Docker)** | `docker pull hodakamori/megane` | [CLI Guide](./guide/cli) |
-| **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline) |
+| **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline/index) |
 
 ## Supported file formats
 

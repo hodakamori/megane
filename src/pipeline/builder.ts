@@ -121,6 +121,7 @@ export class LoadStructure extends PipelineNode {
     return {
       type: this.nodeType,
       fileName: this.path,
+      fileUrl: this.path,
       hasTrajectory: false,
       hasCell: false,
     };
@@ -151,9 +152,11 @@ export class LoadTrajectory extends PipelineNode {
   }
 
   _toSerializedParams() {
+    const file = this.xtc ?? this.traj;
     return {
       type: this.nodeType,
-      fileName: this.xtc ?? this.traj,
+      fileName: file,
+      fileUrl: file,
     };
   }
 }
@@ -198,7 +201,7 @@ export class LoadVector extends PipelineNode {
   }
 
   _toSerializedParams() {
-    return { type: this.nodeType, fileName: this.path };
+    return { type: this.nodeType, fileName: this.path, fileUrl: this.path };
   }
 }
 
