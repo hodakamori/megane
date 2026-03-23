@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "megane"
-version = "0.5.0"
+version = "0.6.0"
 description = "A fast, beautiful molecular viewer"
 requires-python = ">=3.10"
 license = "MIT"
@@ -85,7 +85,7 @@ show_missing = true
 skip_empty = true
 
 [tool.bumpversion]
-current_version = "0.5.0"
+current_version = "0.6.0"
 commit = false
 tag = false
 allow_dirty = true
@@ -121,12 +121,17 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 
 [[tool.bumpversion.files]]
-filename = "docs/scripts/prepare-notebooks.py"
-search = 'megane v{current_version}'
-replace = 'megane v{new_version}'
+filename = "vscode-megane/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
 
 [[tool.bumpversion.files]]
-filename = "vscode-megane/package.json"
+filename = "package-lock.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "vscode-megane/package-lock.json"
 search = '"version": "{current_version}"'
 replace = '"version": "{new_version}"'
 
