@@ -43,7 +43,7 @@ def inject_demo_outputs(nb: nbformat.NotebookNode) -> None:
         cell_id = cell.get("id", "")
 
         if cell_id == "cell-1" or 'print(f"megane v' in source:
-            cell.outputs = [make_stream("megane v0.5.0\n")]
+            cell.outputs = [make_stream("megane v0.6.0\n")]
 
         elif cell_id == "cell-3" or (
             source.strip().endswith("viewer")
@@ -89,7 +89,7 @@ def inject_external_events_outputs(nb: nbformat.NotebookNode) -> None:
         cell.outputs = []
 
         if 'print(f"megane v' in source:
-            cell.outputs = [make_stream("megane v0.5.0\n")]
+            cell.outputs = [make_stream("megane v0.6.0\n")]
 
         elif "viewer.load" in source and "xtc=" in source and "print" in source:
             cell.outputs = [make_stream("Loaded trajectory: 100 frames\n")]
