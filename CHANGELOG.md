@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- `view()` and `view_traj()` convenience wrappers for quick visualization
+- `megane-viewer/lib` export for React component library usage
+- Visual pipeline architecture guide in documentation
+
+### Fixed
+
+- README import paths updated to `megane-viewer/lib`
+- Documentation inconsistencies between docs and implementation
+- `.sdf` and `.lammps` extensions added to Python parser dispatch
+
 ## [0.5.0] - 2026-03-17
 
 ### Added
