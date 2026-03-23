@@ -33,7 +33,6 @@ import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import {
-  computeViewBounds,
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,

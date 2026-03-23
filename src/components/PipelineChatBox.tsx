@@ -221,7 +221,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     setIsStreaming(true);
 
     // Add a placeholder assistant message for streaming
-    const assistantIdx = messages.length + 1; // index of the new assistant message
+    const _assistantIdx = messages.length + 1; // index of the new assistant message
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     const abort = new AbortController();

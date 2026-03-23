@@ -10,7 +10,6 @@ import {
   fileNameStyle,
   statsStyle,
   placeholderStyle,
-  matchesAccept,
   DropZone,
   TabSelector,
 } from "./ui";

@@ -14,8 +14,6 @@ import {
   defaultParams,
   DEFAULT_VIEWPORT_STATE,
   canConnect,
-  NODE_PORTS,
-  GENERIC_NODE_ACCEPTS,
 } from "./types";
 import { executePipeline } from "./execute";
 import { validatePipeline } from "./validate";

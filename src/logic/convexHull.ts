@@ -40,10 +40,6 @@ function cross(
   return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
 }
 
-function dot3(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
-  return ax * bx + ay * by + az * bz;
-}
-
 function makeFace(
   a: number,
   b: number,

@@ -75,7 +75,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
 
   // Pipeline execution results
   const [nodes, setNodes] = useState<Node<PipelineNodeData>[]>([]);
-  const [edges, setEdges] = useState<Edge[]>([]);
+  const [_edges, setEdges] = useState<Edge[]>([]);
   const [viewportState, setViewportState] = useState<ViewportState>(DEFAULT_VIEWPORT_STATE);
   const [primarySnapshot, setPrimarySnapshot] = useState<Snapshot | null>(null);
 

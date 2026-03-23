@@ -20,7 +20,6 @@ import { usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
-import type { NodeSnapshotData } from "../pipeline/execute";
 import type { Snapshot, Frame, Measurement, HoverInfo } from "../types";
 
 interface WidgetViewerProps {

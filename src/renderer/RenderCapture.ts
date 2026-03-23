@@ -214,7 +214,7 @@ export async function captureGif(
   renderer.renderSingleFrame();
 
   // Render GIF
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     gif.on("finished", (blob: Blob) => {
       onProgress?.(1);
       resolve(blob);

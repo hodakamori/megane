@@ -13,7 +13,6 @@ import type {
   ViewportState,
   ParticleData,
   BondData,
-  CellData,
   LabelData,
   MeshData,
   VectorData,

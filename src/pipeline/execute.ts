@@ -25,7 +25,6 @@ import type {
   ParticleData,
 } from "./types";
 import type { Frame, TrajectoryMeta, VectorFrame } from "../types";
-import type { FrameProvider } from "./types";
 import { executeStreaming, type NodeStreamingData } from "./executors/streaming";
 import { DEFAULT_VIEWPORT_STATE, NODE_PORTS } from "./types";
 import { topologicalSort, collectInputs, type EdgeOutputs } from "./graph";

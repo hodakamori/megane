@@ -36,7 +36,7 @@ export function validatePipeline(
   };
 
   // Build lookup structures
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const _nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const incomingEdges = new Map<string, Edge[]>();
   for (const node of nodes) {
     incomingEdges.set(node.id, []);
@@ -74,7 +74,7 @@ export function validatePipeline(
     }
 
     // BFS forward from each node to see if it can reach a viewport
-    const reachesViewport = new Set<string>(viewportIds);
+    const _reachesViewport = new Set<string>(viewportIds);
     // Work backwards from viewport
     const forwardAdj = new Map<string, Set<string>>();
     for (const node of nodes) {

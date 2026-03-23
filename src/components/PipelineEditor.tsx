@@ -3,7 +3,7 @@
  * Typed data-flow pipeline with color-coded handles per data type.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -24,7 +24,6 @@ import {
   DATA_TYPE_COLORS,
   NODE_PORTS,
   NODE_CATEGORY_COLORS,
-  NODE_CATEGORY,
 } from "../pipeline/types";
 import type { NodeCategory } from "../pipeline/types";
 import { PIPELINE_TEMPLATES } from "../pipeline/templates";
