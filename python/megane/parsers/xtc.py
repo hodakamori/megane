@@ -40,10 +40,7 @@ def load_trajectory(pdb_path: str, xtc_path: str) -> InMemoryTrajectory:
     n_frames = result.n_frames
 
     if n_atoms != pdb_result.n_atoms:
-        raise ValueError(
-            f"Atom count mismatch: PDB has {pdb_result.n_atoms} atoms, "
-            f"XTC has {n_atoms} atoms."
-        )
+        raise ValueError(f"Atom count mismatch: PDB has {pdb_result.n_atoms} atoms, XTC has {n_atoms} atoms.")
 
     # Convert flat frame_positions (n_frames, n_atoms*3) to list of (n_atoms, 3)
     frame_data = np.asarray(result.frame_positions, dtype=np.float32)
