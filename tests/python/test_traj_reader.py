@@ -20,8 +20,11 @@ def test_load_traj():
     assert set(structure.elements.tolist()) == {1, 8}  # H=1, O=8
 
     assert isinstance(trajectory, InMemoryTrajectory)
-    assert trajectory.n_frames >= 1
+    assert trajectory.n_frames == 5
     assert trajectory.n_atoms == 3
+
+    # First frame defines topology: positions should match frame 0
+    np.testing.assert_allclose(structure.positions, trajectory.get_frame(0), atol=1e-6)
 
 
 def test_get_frame():
@@ -32,8 +35,7 @@ def test_get_frame():
     assert frame0.shape == (3, 3)
     assert frame0.dtype == np.float32
 
-    if trajectory.n_frames > 1:
-        frame1 = trajectory.get_frame(1)
-        assert frame1.shape == (3, 3)
-        # Frames should differ
-        assert not np.allclose(frame0, frame1, atol=1e-6)
+    frame1 = trajectory.get_frame(1)
+    assert frame1.shape == (3, 3)
+    # Frames should differ
+    assert not np.allclose(frame0, frame1, atol=1e-6)

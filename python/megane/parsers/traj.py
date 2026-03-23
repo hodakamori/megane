@@ -54,11 +54,11 @@ def load_traj(path: str) -> tuple[Structure, InMemoryTrajectory]:
     # Extract frame positions
     n_frames = result.n_frames
     if n_frames > 0:
-        frame_data = np.asarray(result.frame_positions, dtype=np.float32)
-        frames = [frame_data[i].reshape(n_atoms, 3) for i in range(n_frames)]
+        frame_data = np.asarray(result.frame_positions, dtype=np.float32).reshape(n_frames, n_atoms, 3)
+        frames = frame_data
     else:
         # Single-frame: use the main positions as the only frame
-        frames = [positions.copy()]
+        frames = positions.copy().reshape(1, n_atoms, 3)
         n_frames = 1
 
     trajectory = InMemoryTrajectory(

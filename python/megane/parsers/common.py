@@ -11,7 +11,7 @@ import numpy as np
 class InMemoryTrajectory:
     """In-memory trajectory with frame-by-frame access."""
 
-    _frames: list[np.ndarray]  # list of (N, 3) float32 arrays
+    _frames: np.ndarray  # (n_frames, n_atoms, 3) float32 array
     n_frames: int
     n_atoms: int
     timestep_ps: float

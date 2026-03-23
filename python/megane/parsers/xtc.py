@@ -42,9 +42,9 @@ def load_trajectory(pdb_path: str, xtc_path: str) -> InMemoryTrajectory:
     if n_atoms != pdb_result.n_atoms:
         raise ValueError(f"Atom count mismatch: PDB has {pdb_result.n_atoms} atoms, XTC has {n_atoms} atoms.")
 
-    # Convert flat frame_positions (n_frames, n_atoms*3) to list of (n_atoms, 3)
-    frame_data = np.asarray(result.frame_positions, dtype=np.float32)
-    frames = [frame_data[i].reshape(n_atoms, 3) for i in range(n_frames)]
+    # Convert flat frame_positions (n_frames, n_atoms*3) to array of shape (n_frames, n_atoms, 3)
+    frame_data = np.asarray(result.frame_positions, dtype=np.float32).reshape(n_frames, n_atoms, 3)
+    frames = frame_data
 
     box_matrix = np.asarray(result.box_matrix, dtype=np.float32)
 
