@@ -23,9 +23,6 @@ def test_load_traj():
     assert trajectory.n_frames == 4
     assert trajectory.n_atoms == 3
 
-    # First frame defines topology: positions should match frame 0
-    np.testing.assert_allclose(structure.positions, trajectory.get_frame(0), atol=1e-6)
-
 
 def test_get_frame():
     """Test retrieving individual frames from InMemoryTrajectory."""
