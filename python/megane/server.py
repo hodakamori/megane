@@ -19,7 +19,6 @@ from megane.protocol import encode_frame, encode_metadata, encode_snapshot
 
 if TYPE_CHECKING:
     from megane.parsers.common import InMemoryTrajectory
-    from megane.parsers.xtc import Trajectory
 
 __all__ = ["app", "configure"]
 
@@ -40,7 +39,7 @@ class ServerState:
     snapshot_bytes: bytes = b""
     pdb_path: str = ""
     xtc_path: Optional[str] = None
-    trajectory: Optional[Trajectory | InMemoryTrajectory] = None
+    trajectory: Optional[InMemoryTrajectory] = None
 
 
 _state = ServerState()

@@ -9,10 +9,7 @@ import numpy as np
 
 @dataclass
 class InMemoryTrajectory:
-    """In-memory trajectory with frame-by-frame access.
-
-    Compatible interface with :class:`megane.parsers.xtc.Trajectory`.
-    """
+    """In-memory trajectory with frame-by-frame access."""
 
     _frames: list[np.ndarray]  # list of (N, 3) float32 arrays
     n_frames: int

@@ -9,6 +9,8 @@ struct PyStructure {
     #[pyo3(get)]
     n_atoms: usize,
     #[pyo3(get)]
+    n_frames: usize,
+    #[pyo3(get)]
     positions: Py<PyArray2<f32>>,
     #[pyo3(get)]
     elements: Py<PyArray1<u8>>,
@@ -18,6 +20,8 @@ struct PyStructure {
     bond_orders: Py<PyArray1<u8>>,
     #[pyo3(get)]
     box_matrix: Py<PyArray2<f32>>,
+    #[pyo3(get)]
+    frame_positions: Py<PyArray2<f32>>,
 }
 
 impl PyStructure {
@@ -45,13 +49,28 @@ impl PyStructure {
         };
         let box_array = Array2::from_shape_vec((3, 3), box_vec).expect("box reshape");
 
+        // Frame positions for multi-frame formats (e.g. .traj)
+        let n_frames = data.frame_positions.len();
+        let stride = n * 3;
+        let frame_array = if n_frames > 0 {
+            let mut flat: Vec<f32> = Vec::with_capacity(n_frames * stride);
+            for frame in &data.frame_positions {
+                flat.extend_from_slice(frame);
+            }
+            Array2::from_shape_vec((n_frames, stride), flat).expect("frame_positions reshape")
+        } else {
+            Array2::from_shape_vec((0, stride.max(1)), vec![]).expect("empty frames")
+        };
+
         Self {
             n_atoms: n,
+            n_frames,
             positions: pos_array.into_pyarray(py).into(),
             elements: elem_array.into_pyarray(py).into(),
             bonds: bond_array.into_pyarray(py).into(),
             bond_orders: bo_array.into_pyarray(py).into(),
             box_matrix: box_array.into_pyarray(py).into(),
+            frame_positions: frame_array.into_pyarray(py).into(),
         }
     }
 }
@@ -91,9 +110,51 @@ fn parse_lammps_data(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     Ok(PyStructure::from_parsed(py, data))
 }
 
-/// Parsed LAMMPS dump trajectory data exposed to Python.
+/// Parse a CIF file text and return structured data.
+#[pyfunction]
+fn parse_cif(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::cif::parse(text).map_err(PyValueError::new_err)?;
+    Ok(PyStructure::from_parsed(py, data))
+}
+
+/// Parse an XTC trajectory binary and return frame data.
+#[pyfunction]
+fn parse_xtc(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
+    let traj = megane_core::xtc::parse_xtc(data).map_err(PyValueError::new_err)?;
+
+    let box_vec = match traj.box_matrix {
+        Some(m) => m.to_vec(),
+        None => vec![0.0f32; 9],
+    };
+    let box_array = Array2::from_shape_vec((3, 3), box_vec).expect("box reshape");
+
+    let stride = traj.n_atoms * 3;
+    let mut flat: Vec<f32> = Vec::with_capacity(traj.n_frames * stride);
+    for frame in &traj.frame_positions {
+        flat.extend_from_slice(frame);
+    }
+    let frame_array =
+        Array2::from_shape_vec((traj.n_frames, stride), flat).expect("frame_positions reshape");
+
+    Ok(PyTrajectoryData {
+        n_atoms: traj.n_atoms,
+        n_frames: traj.n_frames,
+        timestep_ps: traj.timestep_ps,
+        box_matrix: box_array.into_pyarray(py).into(),
+        frame_positions: frame_array.into_pyarray(py).into(),
+    })
+}
+
+/// Parse an ASE .traj file (binary) and return structured data.
+#[pyfunction]
+fn parse_traj(py: Python<'_>, data: &[u8]) -> PyResult<PyStructure> {
+    let parsed = megane_core::traj::parse_traj(data).map_err(PyValueError::new_err)?;
+    Ok(PyStructure::from_parsed(py, parsed))
+}
+
+/// Parsed trajectory data exposed to Python (shared by XTC and LAMMPS dump).
 #[pyclass]
-struct PyLammpstrjData {
+struct PyTrajectoryData {
     #[pyo3(get)]
     n_atoms: usize,
     #[pyo3(get)]
@@ -108,7 +169,7 @@ struct PyLammpstrjData {
 
 /// Parse a LAMMPS dump trajectory text and return frame data.
 #[pyfunction]
-fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyLammpstrjData> {
+fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
     let data = megane_core::lammpstrj::parse_lammpstrj(text).map_err(PyValueError::new_err)?;
 
     let box_vec = match data.box_matrix {
@@ -126,7 +187,7 @@ fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyLammpstrjData> {
     let frame_array =
         Array2::from_shape_vec((data.n_frames, stride), flat).expect("frame_positions reshape");
 
-    Ok(PyLammpstrjData {
+    Ok(PyTrajectoryData {
         n_atoms: data.n_atoms,
         n_frames: data.n_frames,
         timestep_ps: data.timestep_ps,
@@ -142,6 +203,9 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_cif, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_xtc, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_traj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammpstrj, m)?)?;
     Ok(())
 }
