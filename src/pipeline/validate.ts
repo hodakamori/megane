@@ -36,7 +36,6 @@ export function validatePipeline(
   };
 
   // Build lookup structures
-  const _nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const incomingEdges = new Map<string, Edge[]>();
   for (const node of nodes) {
     incomingEdges.set(node.id, []);
@@ -64,26 +63,6 @@ export function validatePipeline(
   const viewportIds = nodes.filter((n) => n.type === "viewport").map((n) => n.id);
 
   if (viewportIds.length > 0) {
-    // Build reverse adjacency (target → sources) to find what reaches viewport
-    const reverseAdj = new Map<string, Set<string>>();
-    for (const node of nodes) {
-      reverseAdj.set(node.id, new Set());
-    }
-    for (const edge of edges) {
-      reverseAdj.get(edge.source)?.add(edge.target);
-    }
-
-    // BFS forward from each node to see if it can reach a viewport
-    const _reachesViewport = new Set<string>(viewportIds);
-    // Work backwards from viewport
-    const forwardAdj = new Map<string, Set<string>>();
-    for (const node of nodes) {
-      forwardAdj.set(node.id, new Set());
-    }
-    for (const edge of edges) {
-      forwardAdj.get(edge.source)?.add(edge.target);
-    }
-
     // BFS backwards from viewport nodes
     const queue = [...viewportIds];
     const visited = new Set<string>(viewportIds);

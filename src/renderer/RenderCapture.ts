@@ -214,10 +214,13 @@ export async function captureGif(
   renderer.renderSingleFrame();
 
   // Render GIF
-  return new Promise((resolve, _reject) => {
+  return new Promise((resolve, reject) => {
     gif.on("finished", (blob: Blob) => {
       onProgress?.(1);
       resolve(blob);
+    });
+    gif.on("abort", () => {
+      reject(new Error("GIF encoding was aborted"));
     });
     gif.on("progress", (p: number) => {
       onProgress?.(0.8 + p * 0.2);
