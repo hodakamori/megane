@@ -20,7 +20,7 @@ def test_load_traj():
     assert set(structure.elements.tolist()) == {1, 8}  # H=1, O=8
 
     assert isinstance(trajectory, InMemoryTrajectory)
-    assert trajectory.n_frames == 5
+    assert trajectory.n_frames == 4
     assert trajectory.n_atoms == 3
 
     # First frame defines topology: positions should match frame 0

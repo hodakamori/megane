@@ -38,9 +38,7 @@ impl PyStructure {
         let bonds_flat: Vec<u32> = data.bonds.iter().flat_map(|(a, b)| [*a, *b]).collect();
         let bond_array = if n_bonds > 0 {
             Array2::from_shape_vec((n_bonds, 2), bonds_flat).map_err(|e| {
-                PyValueError::new_err(format!(
-                    "failed to reshape bonds into ({n_bonds}, 2): {e}"
-                ))
+                PyValueError::new_err(format!("failed to reshape bonds into ({n_bonds}, 2): {e}"))
             })?
         } else {
             Array2::from_shape_vec((0, 2), vec![]).map_err(|e| {
@@ -172,13 +170,12 @@ fn parse_xtc(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
             expected_len
         )));
     }
-    let frame_array =
-        Array2::from_shape_vec((traj.n_frames, stride), flat).map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({}, {}): {e}",
-                traj.n_frames, stride
-            ))
-        })?;
+    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), flat).map_err(|e| {
+        PyValueError::new_err(format!(
+            "failed to reshape frame_positions into ({}, {}): {e}",
+            traj.n_frames, stride
+        ))
+    })?;
 
     Ok(PyTrajectoryData {
         n_atoms: traj.n_atoms,
@@ -230,13 +227,12 @@ fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
     for frame in &data.frame_positions {
         flat.extend_from_slice(frame);
     }
-    let frame_array =
-        Array2::from_shape_vec((data.n_frames, stride), flat).map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({}, {}): {e}",
-                data.n_frames, stride
-            ))
-        })?;
+    let frame_array = Array2::from_shape_vec((data.n_frames, stride), flat).map_err(|e| {
+        PyValueError::new_err(format!(
+            "failed to reshape frame_positions into ({}, {}): {e}",
+            data.n_frames, stride
+        ))
+    })?;
 
     Ok(PyTrajectoryData {
         n_atoms: data.n_atoms,
