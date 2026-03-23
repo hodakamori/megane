@@ -225,21 +225,32 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 atom_labels.push(label);
 
                 // Extract coordinates
-                if use_fractional {
-                    let fx = parse_cif_float(fields[cols.fract_x.unwrap()]).unwrap_or(0.0);
-                    let fy = parse_cif_float(fields[cols.fract_y.unwrap()]).unwrap_or(0.0);
-                    let fz = parse_cif_float(fields[cols.fract_z.unwrap()]).unwrap_or(0.0);
-                    let (x, y, z) = fract_to_cart(fx, fy, fz, box_matrix.as_ref().unwrap());
+                if let (true, Some(fx_col), Some(fy_col), Some(fz_col), Some(bm)) = (
+                    use_fractional,
+                    cols.fract_x,
+                    cols.fract_y,
+                    cols.fract_z,
+                    box_matrix.as_ref(),
+                ) {
+                    let fx = parse_cif_float(fields[fx_col]).unwrap_or(0.0);
+                    let fy = parse_cif_float(fields[fy_col]).unwrap_or(0.0);
+                    let fz = parse_cif_float(fields[fz_col]).unwrap_or(0.0);
+                    let (x, y, z) = fract_to_cart(fx, fy, fz, bm);
+                    positions.push(x);
+                    positions.push(y);
+                    positions.push(z);
+                } else if let (Some(cx), Some(cy), Some(cz)) =
+                    (cols.cartn_x, cols.cartn_y, cols.cartn_z)
+                {
+                    let x = parse_cif_float(fields[cx]).unwrap_or(0.0);
+                    let y = parse_cif_float(fields[cy]).unwrap_or(0.0);
+                    let z = parse_cif_float(fields[cz]).unwrap_or(0.0);
                     positions.push(x);
                     positions.push(y);
                     positions.push(z);
                 } else {
-                    let x = parse_cif_float(fields[cols.cartn_x.unwrap()]).unwrap_or(0.0);
-                    let y = parse_cif_float(fields[cols.cartn_y.unwrap()]).unwrap_or(0.0);
-                    let z = parse_cif_float(fields[cols.cartn_z.unwrap()]).unwrap_or(0.0);
-                    positions.push(x);
-                    positions.push(y);
-                    positions.push(z);
+                    i += 1;
+                    continue;
                 }
 
                 i += 1;
