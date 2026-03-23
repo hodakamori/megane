@@ -1,5 +1,6 @@
 """megane - A fast, beautiful molecular viewer."""
 
+from megane.parsers.cif import load_cif
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.pdb import load_pdb
 from megane.parsers.traj import load_traj
@@ -36,6 +37,7 @@ __all__ = [
     "Streaming",
     "VectorOverlay",
     "Viewport",
+    "load_cif",
     "load_lammps_data",
     "load_pdb",
     "load_traj",

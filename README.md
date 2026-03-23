@@ -155,9 +155,7 @@ function App() {
 | XYZ | `.xyz` | Cartesian coordinate format |
 | MOL/SDF | `.mol`, `.sdf` | MDL Molfile (V2000) |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
-| CIF† | `.cif` | Crystallographic Information File |
-
-> †CIF is supported in the browser (WASM) viewer. The Python backend does not yet support `.cif`.
+| CIF | `.cif` | Crystallographic Information File |
 
 ### Trajectory formats (`LoadTrajectory` node)
 

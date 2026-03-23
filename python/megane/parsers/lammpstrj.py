@@ -171,7 +171,7 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
 
     logger.info("Loaded LAMMPS dump: %d frames, %d atoms", len(frames), n_atoms)
     return InMemoryTrajectory(
-        _frames=frames,
+        _frames=np.stack(frames) if frames else np.empty((0, n_atoms, 3), dtype=np.float32),
         n_frames=len(frames),
         n_atoms=n_atoms,
         timestep_ps=timestep_ps,
