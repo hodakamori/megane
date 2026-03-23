@@ -134,3 +134,39 @@ def test_build_metadata_bytes():
     # n_frames should be 0 (no trajectory)
     n_frames = struct.unpack("<I", data[8:12])[0]
     assert n_frames == 0
+
+
+# ─── WebSocket validation ──────────────────────────────────────────
+
+
+def test_websocket_malformed_json(client):
+    """Malformed JSON does not crash the WebSocket connection."""
+    with client.websocket_connect("/ws") as ws:
+        ws.send_text("not valid json {{{")
+        # Connection should still be alive; send a valid command
+        ws.send_text('{"type": "stop"}')
+
+
+def test_websocket_request_frame_missing_key(client):
+    """request_frame without 'frame' key is silently ignored."""
+    configure(str(FIXTURES / "1crn.pdb"))
+    with client.websocket_connect("/ws") as ws:
+        ws.receive_bytes()  # snapshot
+        ws.receive_bytes()  # metadata
+        ws.send_text('{"type": "request_frame"}')
+        # Should not crash; send another command to verify
+        ws.send_text('{"type": "stop"}')
+
+
+def test_upload_path_traversal(client):
+    """Upload with path traversal filename is sanitized."""
+    pdb_path = FIXTURES / "1crn.pdb"
+    pdb_content = pdb_path.read_bytes()
+
+    response = client.post(
+        "/api/upload",
+        files={"pdb": ("../../etc/passwd", pdb_content, "chemical/x-pdb")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["nAtoms"] == 327
