@@ -137,13 +137,13 @@ async def upload_file(
     """Upload a PDB file (and optional XTC) to load in the viewer."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Save PDB
-        pdb_path = Path(tmpdir) / (pdb.filename or "upload.pdb")
+        pdb_path = Path(tmpdir) / Path(pdb.filename or "upload.pdb").name
         pdb_path.write_bytes(await pdb.read())
 
         # Save XTC if provided
         xtc_path = None
         if xtc is not None:
-            xtc_path_obj = Path(tmpdir) / (xtc.filename or "upload.xtc")
+            xtc_path_obj = Path(tmpdir) / Path(xtc.filename or "upload.xtc").name
             xtc_path_obj.write_bytes(await xtc.read())
             xtc_path = str(xtc_path_obj)
 
@@ -175,21 +175,25 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
         async def _run_stream(traj, start: int, end: int, stride: int, fps: int) -> None:
             """Stream frames at the given FPS. Runs as a cancellable task."""
-            delay = 1.0 / fps
-            for i in range(start, end, stride):
+            delay = 1.0 / max(fps, 1)
+            for i in range(start, end, max(stride, 1)):
                 positions = traj.get_frame(i)
                 await websocket.send_bytes(encode_frame(i, positions))
                 await asyncio.sleep(delay)
 
         while True:
             data = await websocket.receive_text()
-            msg = json.loads(data)
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                logger.warning("Ignoring malformed JSON from client")
+                continue
             cmd = msg.get("type")
             traj = _state.trajectory
 
             if cmd == "request_frame" and traj is not None:
-                frame_idx = msg["frame"]
-                if 0 <= frame_idx < traj.n_frames:
+                frame_idx = msg.get("frame")
+                if isinstance(frame_idx, int) and 0 <= frame_idx < traj.n_frames:
                     positions = traj.get_frame(frame_idx)
                     await websocket.send_bytes(encode_frame(frame_idx, positions))
 
@@ -197,10 +201,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 # Cancel any existing stream
                 if stream_task and not stream_task.done():
                     stream_task.cancel()
-                start = msg.get("start", 0)
-                end = msg.get("end", traj.n_frames)
-                stride = msg.get("stride", 1)
-                fps = msg.get("fps", 30)
+                try:
+                    start = max(int(msg.get("start", 0)), 0)
+                    end = min(int(msg.get("end", traj.n_frames)), traj.n_frames)
+                    stride = max(int(msg.get("stride", 1)), 1)
+                    fps = max(int(msg.get("fps", 30)), 1)
+                except (TypeError, ValueError):
+                    logger.warning("Ignoring stream command with invalid parameters")
+                    continue
                 stream_task = asyncio.create_task(_run_stream(traj, start, end, stride, fps))
 
             elif cmd == "stop":

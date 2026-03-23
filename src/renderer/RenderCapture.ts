@@ -219,6 +219,9 @@ export async function captureGif(
       onProgress?.(1);
       resolve(blob);
     });
+    gif.on("abort", () => {
+      reject(new Error("GIF encoding was aborted"));
+    });
     gif.on("progress", (p: number) => {
       onProgress?.(0.8 + p * 0.2);
     });

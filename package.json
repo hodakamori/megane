@@ -37,7 +37,7 @@
   "scripts": {
     "dev": "vite",
     "build:wasm": "cd crates/megane-wasm && wasm-pack build --target web --release",
-    "build": "npm run build:wasm && tsc && vite build && vite build --config vite.widget.config.ts",
+    "build": "npm run build:wasm && tsc && vite build && vite build --config vite.widget.config.ts && rm -rf dist && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts",
     "build:app": "npm run build:wasm && tsc && vite build",
     "build:widget": "vite build --config vite.widget.config.ts",
     "build:lib": "npm run build:wasm && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts",

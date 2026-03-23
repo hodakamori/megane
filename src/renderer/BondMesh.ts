@@ -209,7 +209,7 @@ export class BondMesh {
   }
 
   /** Update bond positions for a new frame. */
-  updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void {
+  updatePositions(positions: Float32Array, _bonds: Uint32Array, _nBonds: number): void {
     for (let i = 0; i < this.visualBonds.length; i++) {
       const vb = this.visualBonds[i];
       this.setCylinderAt(i, positions, vb.ai, vb.bi, vb.radius, vb.offsetDir, vb.offsetMag);

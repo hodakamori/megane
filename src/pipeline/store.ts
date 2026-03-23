@@ -10,13 +10,7 @@ import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } fro
 import type { NodeStreamingData } from "./executors/streaming";
 import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
 import type { PipelineNodeType, ViewportState, SerializedPipeline, NodeError } from "./types";
-import {
-  defaultParams,
-  DEFAULT_VIEWPORT_STATE,
-  canConnect,
-  NODE_PORTS,
-  GENERIC_NODE_ACCEPTS,
-} from "./types";
+import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect } from "./types";
 import { executePipeline } from "./execute";
 import { validatePipeline } from "./validate";
 import { serializePipeline, deserializePipeline } from "./serialize";
