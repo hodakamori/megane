@@ -121,12 +121,17 @@ search = '__version__ = "{current_version}"'
 replace = '__version__ = "{new_version}"'
 
 [[tool.bumpversion.files]]
-filename = "docs/scripts/prepare-notebooks.py"
-search = 'megane v{current_version}'
-replace = 'megane v{new_version}'
+filename = "vscode-megane/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
 
 [[tool.bumpversion.files]]
-filename = "vscode-megane/package.json"
+filename = "package-lock.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "vscode-megane/package-lock.json"
 search = '"version": "{current_version}"'
 replace = '"version": "{new_version}"'
 

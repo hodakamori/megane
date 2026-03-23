@@ -11,6 +11,7 @@ Usage:
 """
 
 import os
+import tomllib
 
 import nbformat
 from nbconvert import HTMLExporter
@@ -19,6 +20,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(SCRIPT_DIR, "..", "..")
 EXAMPLES_DIR = os.path.join(ROOT, "examples")
 OUTPUT_DIR = os.path.join(ROOT, "docs", "public", "notebooks")
+
+with open(os.path.join(ROOT, "pyproject.toml"), "rb") as _f:
+    _VERSION = tomllib.load(_f)["project"]["version"]
 
 
 def make_stream(text: str) -> nbformat.NotebookNode:
@@ -43,7 +47,7 @@ def inject_demo_outputs(nb: nbformat.NotebookNode) -> None:
         cell_id = cell.get("id", "")
 
         if cell_id == "cell-1" or 'print(f"megane v' in source:
-            cell.outputs = [make_stream("megane v0.6.0\n")]
+            cell.outputs = [make_stream(f"megane v{_VERSION}\n")]
 
         elif cell_id == "cell-3" or (
             source.strip().endswith("viewer")
@@ -89,7 +93,7 @@ def inject_external_events_outputs(nb: nbformat.NotebookNode) -> None:
         cell.outputs = []
 
         if 'print(f"megane v' in source:
-            cell.outputs = [make_stream("megane v0.6.0\n")]
+            cell.outputs = [make_stream(f"megane v{_VERSION}\n")]
 
         elif "viewer.load" in source and "xtc=" in source and "print" in source:
             cell.outputs = [make_stream("Loaded trajectory: 100 frames\n")]
