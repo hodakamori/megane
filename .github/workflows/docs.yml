@@ -84,7 +84,7 @@ jobs:
 
       - name: Build docs
         working-directory: docs
-        run: npm run build
+        run: npx docusaurus build
 
       - if: ${{ !inputs.dry_run }}
         uses: actions/configure-pages@v5
