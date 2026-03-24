@@ -7,6 +7,7 @@ avoiding the need to build the Rust extension (megane_parser) in CI.
 from __future__ import annotations
 
 import ast
+import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -164,8 +165,6 @@ def _escape_mdx_braces(text: str) -> str:
 
     Preserves braces inside backtick-delimited inline code spans.
     """
-    import re
-
     parts = re.split(r"(`[^`]*`)", text)
     for i, part in enumerate(parts):
         if not part.startswith("`"):
@@ -244,7 +243,7 @@ def generate_python_api() -> str:
                     all_functions.append(_parse_function(node))
 
     if module_docstring:
-        lines.append(module_docstring)
+        lines.append(_escape_mdx_braces(module_docstring))
         lines.append("")
 
     lines.append("## Installation")
