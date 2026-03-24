@@ -159,11 +159,26 @@ def _parse_class(
     )
 
 
+def _escape_mdx_braces(text: str) -> str:
+    """Escape { and } in text so MDX does not treat them as JSX expressions.
+
+    Preserves braces inside backtick-delimited inline code spans.
+    """
+    import re
+
+    parts = re.split(r"(`[^`]*`)", text)
+    for i, part in enumerate(parts):
+        if not part.startswith("`"):
+            parts[i] = part.replace("{", "\\{").replace("}", "\\}")
+    return "".join(parts)
+
+
 def _format_docstring(docstring: str) -> str:
     """Format a docstring for markdown output."""
     if not docstring:
         return ""
-    return textwrap.dedent(docstring).strip()
+    text = textwrap.dedent(docstring).strip()
+    return _escape_mdx_braces(text)
 
 
 def _func_to_markdown(func: FuncInfo, heading_level: int = 3) -> str:
