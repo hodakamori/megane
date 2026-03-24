@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-24
+
 ### Added
 
 - `view()` and `view_traj()` convenience wrappers for quick visualization
