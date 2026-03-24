@@ -259,7 +259,7 @@ When the pipeline includes time-dependent data — by loading a multi-frame stru
 
 > **Note:** `PipelineViewer` does not currently support `load_trajectory` nodes. Trajectories must be embedded in the structure file (e.g. ASE `.traj`, multi-frame XYZ). External XTC trajectories require a `MeganeViewer` with a server-side pipeline.
 
-### Usage in MDX (Next.js / VitePress)
+### Usage in MDX (Next.js / Docusaurus)
 
 `PipelineViewer` works in any MDX-based framework. Import it directly in your `.mdx` file:
 

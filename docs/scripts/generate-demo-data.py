@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate pre-parsed demo data (JSON snapshot) from PDB files.
 
-Outputs Snapshot-compatible JSON for the VitePress live demos.
+Outputs Snapshot-compatible JSON for the Docusaurus live demos.
 Uses a minimal pure-Python PDB parser with covalent bond inference.
 No Rust/WASM dependency required.
 """

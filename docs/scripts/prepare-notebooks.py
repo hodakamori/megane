@@ -3,7 +3,7 @@ Prepare example notebooks for docs by converting to HTML with nbconvert.
 
 Reads notebooks from examples/, injects simulated outputs for cells that
 would produce text or widget output, then converts to HTML using nbconvert's
-basic template for embedding in VitePress.
+basic template for embedding in Docusaurus.
 
 Usage:
     pip install nbconvert nbformat

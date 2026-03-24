@@ -84,7 +84,7 @@ jobs:
 
       - name: Build docs
         working-directory: docs
-        run: npx vitepress build
+        run: npm run build
 
       - if: ${{ !inputs.dry_run }}
         uses: actions/configure-pages@v5
@@ -92,7 +92,7 @@ jobs:
       - if: ${{ !inputs.dry_run }}
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/.vitepress/dist
+          path: docs/build
 
   deploy:
     if: ${{ !inputs.dry_run }}
