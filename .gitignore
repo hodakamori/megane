@@ -21,8 +21,6 @@ crates/megane-wasm/pkg/
 python/megane/static/app/
 python/megane/static/caffeine_water.pdb
 .ipynb_checkpoints/
-docs/.vitepress/dist
-docs/.vitepress/cache
 docs/node_modules
 docs/.docusaurus/
 docs/build/
