@@ -7,6 +7,7 @@ avoiding the need to build the Rust extension (megane_parser) in CI.
 from __future__ import annotations
 
 import ast
+import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -159,11 +160,24 @@ def _parse_class(
     )
 
 
+def _escape_mdx_braces(text: str) -> str:
+    """Escape { and } in text so MDX does not treat them as JSX expressions.
+
+    Preserves braces inside backtick-delimited inline code spans.
+    """
+    parts = re.split(r"(`[^`]*`)", text)
+    for i, part in enumerate(parts):
+        if not part.startswith("`"):
+            parts[i] = part.replace("{", "\\{").replace("}", "\\}")
+    return "".join(parts)
+
+
 def _format_docstring(docstring: str) -> str:
     """Format a docstring for markdown output."""
     if not docstring:
         return ""
-    return textwrap.dedent(docstring).strip()
+    text = textwrap.dedent(docstring).strip()
+    return _escape_mdx_braces(text)
 
 
 def _func_to_markdown(func: FuncInfo, heading_level: int = 3) -> str:
@@ -229,7 +243,7 @@ def generate_python_api() -> str:
                     all_functions.append(_parse_function(node))
 
     if module_docstring:
-        lines.append(module_docstring)
+        lines.append(_escape_mdx_braces(module_docstring))
         lines.append("")
 
     lines.append("## Installation")

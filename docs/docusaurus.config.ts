@@ -15,12 +15,17 @@ const config: Config = {
   organizationName: "hodakamori",
   projectName: "megane",
   onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
   staticDirectories: ["public"],
 
   i18n: {
     defaultLocale: "en",
     locales: ["en"],
+  },
+
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
   },
 
   presets: [
