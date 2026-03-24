@@ -24,8 +24,8 @@ python/megane/static/caffeine_water.pdb
 docs/node_modules
 docs/.docusaurus/
 docs/build/
-docs/api/python/
-docs/api/typescript/
+docs/docs/api/python/
+docs/docs/api/typescript/
 docs/notebooks/
 docs/public/notebooks/
 dev-preview/
