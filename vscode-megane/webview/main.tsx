@@ -27,11 +27,12 @@ function App() {
       const message = event.data;
       if (message.type === "loadFile") {
         const { content, filename, wasmBytes } = message;
-        // If WASM bytes were sent from the extension host, use them directly
-        // to avoid fetch() issues in some webview environments
+        // If WASM bytes were sent from the extension host, create a blob URL
+        // so the shared WASM init path can keep treating this as a URL string.
         if (wasmBytes) {
+          const wasmBlob = new Blob([wasmBytes], { type: "application/wasm" });
           (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
-            new Uint8Array(wasmBytes).buffer;
+            URL.createObjectURL(wasmBlob);
         }
         // Create a File object so parseStructureFile can detect format from extension
         const file = new File([content], filename, { type: "text/plain" });
