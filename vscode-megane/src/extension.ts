@@ -54,7 +54,10 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
 
     // Read and prepare all data BEFORE setting html to avoid a race where the
     // webview sends "ready" before the message handler is registered.
-    const pipelineData = await vscode.workspace.fs.readFile(document.uri);
+    const [pipelineData, wasmData] = await Promise.all([
+      vscode.workspace.fs.readFile(document.uri),
+      vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
+    ]);
     const pipeline = JSON.parse(
       new TextDecoder("utf-8").decode(pipelineData),
     ) as SerializedPipeline;
@@ -111,6 +114,7 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
           pipeline,
           structureFiles,
           trajectoryFiles,
+          wasmBytes: Array.from(wasmData),
         });
       }
     });
@@ -154,15 +158,23 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
       localResourceRoots: [mediaDir],
     };
 
-    // Read the file and prepare the message BEFORE setting html to avoid
-    // a race where the webview sends "ready" before the handler is registered.
-    const fileData = await vscode.workspace.fs.readFile(document.uri);
+    // Read the file and WASM binary BEFORE setting html to avoid a race where
+    // the webview sends "ready" before the handler is registered.
+    const [fileData, wasmData] = await Promise.all([
+      vscode.workspace.fs.readFile(document.uri),
+      vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
+    ]);
     const text = new TextDecoder("utf-8").decode(fileData);
     const filename = path.basename(document.uri.fsPath);
 
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
-        webview.postMessage({ type: "loadFile", content: text, filename });
+        webview.postMessage({
+          type: "loadFile",
+          content: text,
+          filename,
+          wasmBytes: Array.from(wasmData),
+        });
       }
     });
 

@@ -11,6 +11,8 @@ export default defineConfig({
       // Resolve deps from vscode-megane/node_modules for src/ files that don't have access to it
       "zustand": path.resolve(__dirname, "node_modules/zustand"),
       "@xyflow/react": path.resolve(__dirname, "node_modules/@xyflow/react"),
+      "@dagrejs/dagre": path.resolve(__dirname, "node_modules/@dagrejs/dagre"),
+      "gif.js": path.resolve(__dirname, "node_modules/gif.js"),
       "three": path.resolve(__dirname, "node_modules/three"),
     },
   },
