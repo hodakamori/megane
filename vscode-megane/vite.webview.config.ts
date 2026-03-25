@@ -8,13 +8,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "../src"),
-      // Resolve deps from vscode-megane/node_modules for src/ files that don't have access to it
-      "zustand": path.resolve(__dirname, "node_modules/zustand"),
-      "@xyflow/react": path.resolve(__dirname, "node_modules/@xyflow/react"),
-      "@dagrejs/dagre": path.resolve(__dirname, "node_modules/@dagrejs/dagre"),
-      "gif.js": path.resolve(__dirname, "node_modules/gif.js"),
-      "three": path.resolve(__dirname, "node_modules/three"),
     },
+    // Resolve dependencies from both vscode-megane/node_modules and parent node_modules
+    modules: [
+      path.resolve(__dirname, "node_modules"),
+      path.resolve(__dirname, "../node_modules"),
+    ],
   },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),

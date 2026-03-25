@@ -60,65 +60,69 @@ class MeganePipelineEditorProvider {
             enableScripts: true,
             localResourceRoots: [mediaDir],
         };
-        // Read and prepare all data BEFORE setting html to avoid a race where the
-        // webview sends "ready" before the message handler is registered.
-        const [pipelineData, wasmData] = await Promise.all([
-            vscode.workspace.fs.readFile(document.uri),
-            vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
-        ]);
-        const pipeline = JSON.parse(new TextDecoder("utf-8").decode(pipelineData));
-        if (pipeline.version !== 3) {
-            throw new Error(`Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`);
+        let payload;
+        try {
+            const [pipelineData, wasmData] = await Promise.all([
+                vscode.workspace.fs.readFile(document.uri),
+                vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
+            ]);
+            const pipeline = JSON.parse(new TextDecoder("utf-8").decode(pipelineData));
+            if (pipeline.version !== 3) {
+                throw new Error(`Not a valid megane pipeline file (version 3 required, got ${pipeline.version})`);
+            }
+            const dir = path.dirname(document.uri.fsPath);
+            // Read structure files referenced by load_structure nodes
+            const structureFiles = [];
+            // Read trajectory files referenced by load_trajectory nodes (binary as ArrayBuffer)
+            const trajectoryFiles = [];
+            for (const node of pipeline.nodes) {
+                if (!node.fileName)
+                    continue;
+                const filePath = String(node.fileName);
+                // Reject absolute paths and paths that escape the pipeline file's directory
+                if (path.isAbsolute(filePath)) {
+                    continue;
+                }
+                const resolvedPath = path.resolve(dir, filePath);
+                if (!(resolvedPath === dir || resolvedPath.startsWith(dir + path.sep))) {
+                    continue;
+                }
+                const fileUri = vscode.Uri.file(resolvedPath);
+                const filename = path.basename(filePath);
+                try {
+                    if (node.type === "load_structure") {
+                        const raw = await vscode.workspace.fs.readFile(fileUri);
+                        structureFiles.push({
+                            nodeId: node.id,
+                            content: new TextDecoder("utf-8").decode(raw),
+                            filename,
+                        });
+                    }
+                    else if (node.type === "load_trajectory") {
+                        const raw = await vscode.workspace.fs.readFile(fileUri);
+                        trajectoryFiles.push({ nodeId: node.id, content: raw.buffer, filename });
+                    }
+                }
+                catch {
+                    // File not found — skip silently; webview will show a warning on the node
+                }
+            }
+            payload = {
+                type: "loadPipeline",
+                pipeline,
+                structureFiles,
+                trajectoryFiles,
+                wasmBytes: Array.from(wasmData),
+            };
         }
-        const dir = path.dirname(document.uri.fsPath);
-        // Read structure files referenced by load_structure nodes
-        const structureFiles = [];
-        // Read trajectory files referenced by load_trajectory nodes (binary as ArrayBuffer)
-        const trajectoryFiles = [];
-        for (const node of pipeline.nodes) {
-            if (!node.fileName)
-                continue;
-            const filePath = String(node.fileName);
-            // Reject absolute paths and paths that escape the pipeline file's directory
-            if (path.isAbsolute(filePath)) {
-                continue;
-            }
-            const resolvedPath = path.resolve(dir, filePath);
-            if (!(resolvedPath === dir || resolvedPath.startsWith(dir + path.sep))) {
-                continue;
-            }
-            const fileUri = vscode.Uri.file(resolvedPath);
-            const filename = path.basename(filePath);
-            try {
-                if (node.type === "load_structure") {
-                    const raw = await vscode.workspace.fs.readFile(fileUri);
-                    structureFiles.push({
-                        nodeId: node.id,
-                        content: new TextDecoder("utf-8").decode(raw),
-                        filename,
-                    });
-                }
-                else if (node.type === "load_trajectory") {
-                    const raw = await vscode.workspace.fs.readFile(fileUri);
-                    trajectoryFiles.push({ nodeId: node.id, content: raw.buffer, filename });
-                }
-            }
-            catch {
-                // File not found — skip silently; webview will show a warning on the node
-            }
+        catch (err) {
+            payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
         }
         webview.onDidReceiveMessage((message) => {
             if (message.type === "ready") {
-                webview.postMessage({
-                    type: "loadPipeline",
-                    pipeline,
-                    structureFiles,
-                    trajectoryFiles,
-                    wasmBytes: Array.from(wasmData),
-                });
+                webview.postMessage(payload);
             }
         });
-        // Set html last so the webview starts loading after the handler is ready
         webview.html = getHtmlForWebview(webview, mediaDir);
     }
 }
@@ -145,25 +149,30 @@ class MeganeEditorProvider {
             enableScripts: true,
             localResourceRoots: [mediaDir],
         };
-        // Read the file and WASM binary BEFORE setting html to avoid a race where
-        // the webview sends "ready" before the handler is registered.
-        const [fileData, wasmData] = await Promise.all([
-            vscode.workspace.fs.readFile(document.uri),
-            vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
-        ]);
-        const text = new TextDecoder("utf-8").decode(fileData);
-        const filename = path.basename(document.uri.fsPath);
+        // Prepare the message to send, then register handler, then set HTML.
+        // This avoids both: (a) race where "ready" fires before handler, and
+        // (b) blank screen if file reading fails before HTML is set.
+        let payload;
+        try {
+            const [fileData, wasmData] = await Promise.all([
+                vscode.workspace.fs.readFile(document.uri),
+                vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
+            ]);
+            payload = {
+                type: "loadFile",
+                content: new TextDecoder("utf-8").decode(fileData),
+                filename: path.basename(document.uri.fsPath),
+                wasmBytes: Array.from(wasmData),
+            };
+        }
+        catch (err) {
+            payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
+        }
         webview.onDidReceiveMessage((message) => {
             if (message.type === "ready") {
-                webview.postMessage({
-                    type: "loadFile",
-                    content: text,
-                    filename,
-                    wasmBytes: Array.from(wasmData),
-                });
+                webview.postMessage(payload);
             }
         });
-        // Set html last so the webview starts loading after the handler is ready
         webview.html = getHtmlForWebview(webview, mediaDir);
     }
 }

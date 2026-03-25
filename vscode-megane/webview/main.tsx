@@ -47,6 +47,8 @@ function App() {
           console.error("Failed to load file:", err);
           setError(`Failed to load file: ${err instanceof Error ? err.message : String(err)}`);
         });
+      } else if (message.type === "error") {
+        setError(message.message || "Unknown error from extension host");
       } else if (message.type === "loadPipeline") {
         const { pipeline, structureFiles, trajectoryFiles, wasmBytes } = message as {
           pipeline: SerializedPipeline;
