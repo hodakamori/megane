@@ -20,12 +20,20 @@ const vscode = acquireVsCodeApi();
 function App() {
   const local = useMeganeLocal();
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const message = event.data;
       if (message.type === "loadFile") {
-        const { content, filename } = message;
+        const { content, filename, wasmBytes } = message;
+        // If WASM bytes were sent from the extension host, create a blob URL
+        // so the shared WASM init path can keep treating this as a URL string.
+        if (wasmBytes) {
+          const wasmBlob = new Blob([wasmBytes], { type: "application/wasm" });
+          (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
+            URL.createObjectURL(wasmBlob);
+        }
         // Create a File object so parseStructureFile can detect format from extension
         const file = new File([content], filename, { type: "text/plain" });
         local.loadFile(file).then(() => {
@@ -36,13 +44,25 @@ function App() {
           if (loaderNode) {
             updateNodeParams(loaderNode.id, { fileName: filename });
           }
+        }).catch((err) => {
+          console.error("Failed to load file:", err);
+          setError(`Failed to load file: ${err instanceof Error ? err.message : String(err)}`);
         });
+      } else if (message.type === "error") {
+        setError(message.message || "Unknown error from extension host");
       } else if (message.type === "loadPipeline") {
-        const { pipeline, structureFiles, trajectoryFiles } = message as {
+        const { pipeline, structureFiles, trajectoryFiles, wasmBytes } = message as {
           pipeline: SerializedPipeline;
           structureFiles: Array<{ nodeId: string; content: string; filename: string }>;
           trajectoryFiles: Array<{ nodeId: string; content: ArrayBuffer; filename: string }>;
+          wasmBytes?: number[];
         };
+        // If WASM bytes were sent from the extension host, create a blob URL for them
+        if (wasmBytes) {
+          const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
+          (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
+            URL.createObjectURL(wasmBlob);
+        }
 
         (async () => {
           const store = usePipelineStore.getState();
@@ -123,6 +143,29 @@ function App() {
     },
     [local.loadFile],
   );
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          height: "100%",
+          color: "#ef4444",
+          fontSize: "14px",
+          padding: "20px",
+          textAlign: "center",
+          gap: "8px",
+        }}
+      >
+        <div style={{ fontWeight: "bold" }}>Error</div>
+        <div style={{ color: "#64748b", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
+      </div>
+    );
+  }
 
   if (!loaded) {
     return (

@@ -61,21 +61,21 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@dagrejs/dagre": "^3.0.0",
     "@types/node": "^25.3.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/vscode": "^1.80.0",
     "@vitejs/plugin-react": "^4.3.0",
     "@vscode/vsce": "^3.0.0",
-    "typescript": "^5.7.0",
-    "vite": "^6.0.0",
-    "vite-plugin-wasm": "^3.5.0"
-  },
-  "dependencies": {
     "@xyflow/react": "^12.0.0",
+    "gif.js": "^0.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.172.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-plugin-wasm": "^3.5.0",
     "zustand": "^5.0.0"
   }
 }
