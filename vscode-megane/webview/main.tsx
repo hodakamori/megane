@@ -168,8 +168,17 @@ declare function acquireVsCodeApi(): {
   setState(state: unknown): void;
 };
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+try {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+} catch (err) {
+  const root = document.getElementById("root");
+  if (root) {
+    root.style.cssText = "padding:24px;color:#ef4444;font-size:14px;white-space:pre-wrap;";
+    root.textContent = `megane failed to initialize:\n${err}`;
+  }
+  console.error("megane: mount error", err);
+}
