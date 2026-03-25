@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-25
+
+### Fixed
+
+- VSCode extension blank screen when opening .gro files
+- MDX brace escaping in generated API documentation
+- Migrate `onBrokenMarkdownLinks` config from VitePress to Docusaurus
+- Remove old VitePress documentation remnants
+
 ## [0.6.0] - 2026-03-24
 
 ### Added
