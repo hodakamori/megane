@@ -112,7 +112,7 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
         pipeline,
         structureFiles,
         trajectoryFiles,
-        wasmBytes: Array.from(wasmData),
+        wasmBytes: wasmData.buffer,
       };
     } catch (err) {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
