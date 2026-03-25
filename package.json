@@ -1,6 +1,6 @@
 {
   "name": "megane-viewer",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "type": "module",
   "description": "A fast, beautiful molecular viewer – anywidget-compatible",
   "license": "MIT",
