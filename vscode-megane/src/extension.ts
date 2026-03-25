@@ -112,7 +112,7 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
         pipeline,
         structureFiles,
         trajectoryFiles,
-        wasmBytes: wasmData.buffer,
+        wasmBytes: Array.from(wasmData),
       };
     } catch (err) {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
@@ -175,7 +175,7 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
         type: "loadFile",
         content: new TextDecoder("utf-8").decode(fileData),
         filename: path.basename(document.uri.fsPath),
-        wasmBytes: wasmData,
+        wasmBytes: Array.from(wasmData),
       };
     } catch (err) {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };

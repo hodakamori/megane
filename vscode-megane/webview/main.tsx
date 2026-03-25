@@ -30,7 +30,7 @@ function App() {
         // If WASM bytes were sent from the extension host, create a blob URL
         // so the shared WASM init path can keep treating this as a URL string.
         if (wasmBytes) {
-          const wasmBlob = new Blob([wasmBytes], { type: "application/wasm" });
+          const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
           (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
             URL.createObjectURL(wasmBlob);
         }
