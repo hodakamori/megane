@@ -175,7 +175,7 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
         type: "loadFile",
         content: new TextDecoder("utf-8").decode(fileData),
         filename: path.basename(document.uri.fsPath),
-        wasmBytes: Array.from(wasmData),
+        wasmBytes: wasmData,
       };
     } catch (err) {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
