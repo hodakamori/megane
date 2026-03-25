@@ -60,7 +60,8 @@ class MeganePipelineEditorProvider {
             enableScripts: true,
             localResourceRoots: [mediaDir],
         };
-        webview.html = getHtmlForWebview(webview, mediaDir);
+        // Read and prepare all data BEFORE setting html to avoid a race where the
+        // webview sends "ready" before the message handler is registered.
         const pipelineData = await vscode.workspace.fs.readFile(document.uri);
         const pipeline = JSON.parse(new TextDecoder("utf-8").decode(pipelineData));
         if (pipeline.version !== 3) {
@@ -113,6 +114,8 @@ class MeganePipelineEditorProvider {
                 });
             }
         });
+        // Set html last so the webview starts loading after the handler is ready
+        webview.html = getHtmlForWebview(webview, mediaDir);
     }
 }
 class MeganeEditorProvider {
@@ -138,17 +141,18 @@ class MeganeEditorProvider {
             enableScripts: true,
             localResourceRoots: [mediaDir],
         };
-        webview.html = getHtmlForWebview(webview, mediaDir);
-        // Read the file and send its content to the webview
+        // Read the file and prepare the message BEFORE setting html to avoid
+        // a race where the webview sends "ready" before the handler is registered.
         const fileData = await vscode.workspace.fs.readFile(document.uri);
         const text = new TextDecoder("utf-8").decode(fileData);
         const filename = path.basename(document.uri.fsPath);
-        // Wait for webview to signal it's ready, then send the file
         webview.onDidReceiveMessage((message) => {
             if (message.type === "ready") {
                 webview.postMessage({ type: "loadFile", content: text, filename });
             }
         });
+        // Set html last so the webview starts loading after the handler is ready
+        webview.html = getHtmlForWebview(webview, mediaDir);
     }
 }
 function getHtmlForWebview(webview, mediaDir) {
