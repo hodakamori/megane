@@ -57,10 +57,11 @@ function App() {
           trajectoryFiles: Array<{ nodeId: string; content: ArrayBuffer; filename: string }>;
           wasmBytes?: number[];
         };
-        // If WASM bytes were sent from the extension host, use them directly
+        // If WASM bytes were sent from the extension host, create a blob URL for them
         if (wasmBytes) {
+          const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
           (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
-            new Uint8Array(wasmBytes).buffer;
+            URL.createObjectURL(wasmBlob);
         }
 
         (async () => {
