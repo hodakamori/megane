@@ -317,14 +317,6 @@ const importBtnStyle: React.CSSProperties = {
   color: "#6366f1",
 };
 
-const toolbarSepStyle: React.CSSProperties = {
-  width: 1,
-  alignSelf: "stretch",
-  margin: "2px 0",
-  background: "rgba(148, 163, 184, 0.3)",
-  flexShrink: 0,
-};
-
 const dropdownStyle: React.CSSProperties = {
   position: "absolute",
   top: "100%",
