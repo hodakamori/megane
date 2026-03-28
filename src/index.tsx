@@ -123,7 +123,6 @@ function App() {
   useEffect(() => {
     (async () => {
       await ds.local.loadText(defaultPDB);
-      ds.local.loadDemoVectors();
       // Load demo trajectory
       const resp = await fetch(defaultXtcUrl);
       const blob = await resp.blob();
