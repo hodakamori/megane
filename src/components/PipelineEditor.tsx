@@ -331,18 +331,7 @@ const textBtnBase: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 4,
-};
-
-/** Shared base for icon-only buttons */
-const iconOnlyBtnBase: React.CSSProperties = {
-  borderRadius: 6,
-  padding: "5px 8px",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 1,
-  border: "none",
+  whiteSpace: "nowrap",
 };
 
 const addBtnStyle: React.CSSProperties = {
@@ -366,22 +355,22 @@ const templateBtnStyle: React.CSSProperties = {
   color: "#8b5cf6",
 };
 
-const layoutIconBtnStyle: React.CSSProperties = {
-  ...iconOnlyBtnBase,
+const layoutBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
   background: "rgba(16, 185, 129, 0.08)",
   border: "1px solid rgba(16, 185, 129, 0.25)",
   color: "#10b981",
 };
 
-const exportIconBtnStyle: React.CSSProperties = {
-  ...iconOnlyBtnBase,
+const exportBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
   background: "rgba(6, 182, 212, 0.08)",
   border: "1px solid rgba(6, 182, 212, 0.25)",
   color: "#06b6d4",
 };
 
-const importIconBtnStyle: React.CSSProperties = {
-  ...iconOnlyBtnBase,
+const importBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
   background: "rgba(99, 102, 241, 0.08)",
   border: "1px solid rgba(99, 102, 241, 0.25)",
   color: "#6366f1",
@@ -652,102 +641,106 @@ function PipelineEditorInner({
 
       <div style={toolbarSepStyle} />
 
-      {/* Group 2: Layout & IO (icon-only) */}
+      {/* Group 2: Layout & IO */}
       <button
         onClick={handleAutoLayout}
-        style={layoutIconBtnStyle}
+        style={layoutBtnStyle}
         title="Auto Layout"
         aria-label="Auto Layout"
       >
-        {IconLayout}
+        {IconLayout} Layout
       </button>
       <button
         onClick={handleExport}
-        style={exportIconBtnStyle}
+        style={exportBtnStyle}
         title="Export Pipeline"
         aria-label="Export Pipeline"
       >
-        {IconExport}
+        {IconExport} Export
       </button>
       <button
         onClick={handleImportClick}
-        style={importIconBtnStyle}
+        style={importBtnStyle}
         title="Import Pipeline"
         aria-label="Import Pipeline"
       >
-        {IconImport}
+        {IconImport} Import
       </button>
 
       <div style={toolbarSepStyle} />
 
       {/* Group 3: Templates & Add Node */}
-      <button
-        onClick={() => {
-          setShowTemplateMenu(!showTemplateMenu);
-          setShowAddMenu(false);
-        }}
-        style={templateBtnStyle}
-        title="Templates"
-      >
-        {IconTemplates} Templates
-      </button>
-      {showTemplateMenu && (
-        <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
-          {PIPELINE_TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              onClick={() => handleApplyTemplate(template.id)}
-              style={{ ...dropdownItemStyle, padding: "8px 14px" }}
-              onMouseEnter={(e) => {
-                (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                (e.target as HTMLElement).style.background = "none";
-              }}
-            >
-              <div style={{ fontWeight: 500 }}>{template.label}</div>
-              <div style={templateItemDescStyle}>{template.description}</div>
-            </button>
-          ))}
-        </div>
-      )}
-      <button
-        onClick={() => {
-          setShowAddMenu(!showAddMenu);
-          setShowTemplateMenu(false);
-        }}
-        style={addBtnStyle}
-        title="Add Node"
-      >
-        {IconPlus} Add Node
-      </button>
-      {showAddMenu && (
-        <div style={dropdownStyle}>
-          {ADD_NODE_GROUPS.map((group) => (
-            <div key={group.category}>
-              <div style={{ ...groupHeaderStyle, color: NODE_CATEGORY_COLORS[group.category] }}>
-                {CATEGORY_ICONS[group.category]}
-                <span style={{ color: "#94a3b8" }}>{group.label}</span>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => {
+            setShowTemplateMenu(!showTemplateMenu);
+            setShowAddMenu(false);
+          }}
+          style={templateBtnStyle}
+          title="Templates"
+        >
+          {IconTemplates} Templates
+        </button>
+        {showTemplateMenu && (
+          <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
+            {PIPELINE_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => handleApplyTemplate(template.id)}
+                style={{ ...dropdownItemStyle, padding: "8px 14px" }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLElement).style.background = "none";
+                }}
+              >
+                <div style={{ fontWeight: 500 }}>{template.label}</div>
+                <div style={templateItemDescStyle}>{template.description}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => {
+            setShowAddMenu(!showAddMenu);
+            setShowTemplateMenu(false);
+          }}
+          style={addBtnStyle}
+          title="Add Node"
+        >
+          {IconPlus} Add Node
+        </button>
+        {showAddMenu && (
+          <div style={dropdownStyle}>
+            {ADD_NODE_GROUPS.map((group) => (
+              <div key={group.category}>
+                <div style={{ ...groupHeaderStyle, color: NODE_CATEGORY_COLORS[group.category] }}>
+                  {CATEGORY_ICONS[group.category]}
+                  <span style={{ color: "#94a3b8" }}>{group.label}</span>
+                </div>
+                {group.types.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => handleAddNode(type)}
+                    style={dropdownItemStyle}
+                    onMouseEnter={(e) => {
+                      (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLElement).style.background = "none";
+                    }}
+                  >
+                    {NODE_TYPE_LABELS[type]}
+                  </button>
+                ))}
               </div>
-              {group.types.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => handleAddNode(type)}
-                  style={dropdownItemStyle}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.background = "none";
-                  }}
-                >
-                  {NODE_TYPE_LABELS[type]}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </>
   );
 
