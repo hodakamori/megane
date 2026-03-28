@@ -73,19 +73,179 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   },
 ];
 
+/* ── Inline SVG Icons (14×14, currentColor) ────────────────────────── */
+
+const IconRender = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const IconLayout = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+
+const IconExport = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+const IconImport = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
+
+const IconTemplates = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+
+const IconPlus = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+/* Category icons for Add Node dropdown */
+const CATEGORY_ICONS: Record<NodeCategory, JSX.Element> = {
+  data_load: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </svg>
+  ),
+  bond: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  ),
+  filter: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+  ),
+  modify: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  ),
+  overlay: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  ),
+  viewport: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
+};
+
+/* ── Toolbar styles ────────────────────────────────────────────────── */
+
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 600;
 const DEFAULT_WIDTH = 480;
 
-const addBtnStyle: React.CSSProperties = {
-  background: "rgba(59, 130, 246, 0.08)",
-  border: "1px solid rgba(59, 130, 246, 0.25)",
+/** Shared base for icon+text buttons */
+const textBtnBase: React.CSSProperties = {
   borderRadius: 6,
-  padding: "4px 12px",
+  padding: "4px 10px",
   cursor: "pointer",
   fontSize: 11,
   fontWeight: 600,
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+};
+
+/** Shared base for icon-only buttons */
+const iconOnlyBtnBase: React.CSSProperties = {
+  borderRadius: 6,
+  padding: "5px 8px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1,
+  border: "none",
+};
+
+const addBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(59, 130, 246, 0.08)",
+  border: "1px solid rgba(59, 130, 246, 0.25)",
   color: "#3b82f6",
+};
+
+const renderBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(245, 158, 11, 0.08)",
+  border: "1px solid rgba(245, 158, 11, 0.25)",
+  color: "#f59e0b",
+};
+
+const templateBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(139, 92, 246, 0.08)",
+  border: "1px solid rgba(139, 92, 246, 0.25)",
+  color: "#8b5cf6",
+};
+
+const layoutIconBtnStyle: React.CSSProperties = {
+  ...iconOnlyBtnBase,
+  background: "rgba(16, 185, 129, 0.08)",
+  border: "1px solid rgba(16, 185, 129, 0.25)",
+  color: "#10b981",
+};
+
+const exportIconBtnStyle: React.CSSProperties = {
+  ...iconOnlyBtnBase,
+  background: "rgba(6, 182, 212, 0.08)",
+  border: "1px solid rgba(6, 182, 212, 0.25)",
+  color: "#06b6d4",
+};
+
+const importIconBtnStyle: React.CSSProperties = {
+  ...iconOnlyBtnBase,
+  background: "rgba(99, 102, 241, 0.08)",
+  border: "1px solid rgba(99, 102, 241, 0.25)",
+  color: "#6366f1",
+};
+
+const toolbarSepStyle: React.CSSProperties = {
+  width: 1,
+  height: 16,
+  background: "rgba(148, 163, 184, 0.3)",
+  flexShrink: 0,
+  margin: "0 2px",
 };
 
 const dropdownStyle: React.CSSProperties = {
@@ -124,61 +284,6 @@ const groupHeaderStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
-};
-
-const layoutBtnStyle: React.CSSProperties = {
-  background: "rgba(16, 185, 129, 0.08)",
-  border: "1px solid rgba(16, 185, 129, 0.25)",
-  borderRadius: 6,
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 11,
-  fontWeight: 600,
-  color: "#10b981",
-};
-
-const exportBtnStyle: React.CSSProperties = {
-  background: "rgba(6, 182, 212, 0.08)",
-  border: "1px solid rgba(6, 182, 212, 0.25)",
-  borderRadius: 6,
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 11,
-  fontWeight: 600,
-  color: "#06b6d4",
-};
-
-const importBtnStyle: React.CSSProperties = {
-  background: "rgba(99, 102, 241, 0.08)",
-  border: "1px solid rgba(99, 102, 241, 0.25)",
-  borderRadius: 6,
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 11,
-  fontWeight: 600,
-  color: "#6366f1",
-};
-
-const renderBtnStyle: React.CSSProperties = {
-  background: "rgba(245, 158, 11, 0.08)",
-  border: "1px solid rgba(245, 158, 11, 0.25)",
-  borderRadius: 6,
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 11,
-  fontWeight: 600,
-  color: "#f59e0b",
-};
-
-const templateBtnStyle: React.CSSProperties = {
-  background: "rgba(139, 92, 246, 0.08)",
-  border: "1px solid rgba(139, 92, 246, 0.25)",
-  borderRadius: 6,
-  padding: "4px 12px",
-  cursor: "pointer",
-  fontSize: 11,
-  fontWeight: 600,
-  color: "#8b5cf6",
 };
 
 const templateItemDescStyle: React.CSSProperties = {
@@ -393,26 +498,36 @@ function PipelineEditorInner({
 
   const headerExtra = (
     <>
-      <button onClick={() => setShowRenderModal(true)} style={renderBtnStyle}>
-        Render
+      {/* Group 1: Render */}
+      <button onClick={() => setShowRenderModal(true)} style={renderBtnStyle} title="Render">
+        {IconRender} Render
       </button>
-      <button onClick={handleAutoLayout} style={layoutBtnStyle}>
-        Auto Layout
+
+      <div style={toolbarSepStyle} />
+
+      {/* Group 2: Layout & IO (icon-only) */}
+      <button onClick={handleAutoLayout} style={layoutIconBtnStyle} title="Auto Layout">
+        {IconLayout}
       </button>
-      <button onClick={handleExport} style={exportBtnStyle}>
-        Export
+      <button onClick={handleExport} style={exportIconBtnStyle} title="Export Pipeline">
+        {IconExport}
       </button>
-      <button onClick={handleImportClick} style={importBtnStyle}>
-        Import
+      <button onClick={handleImportClick} style={importIconBtnStyle} title="Import Pipeline">
+        {IconImport}
       </button>
+
+      <div style={toolbarSepStyle} />
+
+      {/* Group 3: Templates & Add Node */}
       <button
         onClick={() => {
           setShowTemplateMenu(!showTemplateMenu);
           setShowAddMenu(false);
         }}
         style={templateBtnStyle}
+        title="Templates"
       >
-        Templates
+        {IconTemplates} Templates
       </button>
       {showTemplateMenu && (
         <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
@@ -440,25 +555,17 @@ function PipelineEditorInner({
           setShowTemplateMenu(false);
         }}
         style={addBtnStyle}
+        title="Add Node"
       >
-        + Add Node
+        {IconPlus} Add Node
       </button>
       {showAddMenu && (
         <div style={dropdownStyle}>
           {ADD_NODE_GROUPS.map((group) => (
             <div key={group.category}>
-              <div style={groupHeaderStyle}>
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: NODE_CATEGORY_COLORS[group.category],
-                    display: "inline-block",
-                    flexShrink: 0,
-                  }}
-                />
-                {group.label}
+              <div style={{ ...groupHeaderStyle, color: NODE_CATEGORY_COLORS[group.category] }}>
+                {CATEGORY_ICONS[group.category]}
+                <span style={{ color: "#94a3b8" }}>{group.label}</span>
               </div>
               {group.types.map((type) => (
                 <button
