@@ -103,6 +103,8 @@ export function CollapsiblePanel({
           onClick={onToggleCollapse}
           style={collapsedButtonStyle}
           title={`Open ${title.toLowerCase()}`}
+          aria-label={`Open ${title.toLowerCase()}`}
+          aria-expanded="false"
         >
           <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>&#9664;</span>
           {title}
@@ -116,21 +118,32 @@ export function CollapsiblePanel({
       {containerExtra}
       <div style={panelHeaderStyle}>
         <span style={panelTitleStyle}>{title}</span>
+        <button
+          onClick={onToggleCollapse}
+          style={collapseButtonStyle}
+          title="Collapse panel"
+          aria-label="Collapse panel"
+          aria-expanded="true"
+        >
+          &#9654;
+        </button>
+      </div>
+      {headerExtra && (
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            position: "relative",
+            gap: 4,
+            padding: "5px 8px",
+            borderBottom: "1px solid rgba(226,232,240,0.6)",
+            flexShrink: 0,
             flexWrap: "wrap",
+            rowGap: 4,
           }}
         >
           {headerExtra}
-          <button onClick={onToggleCollapse} style={collapseButtonStyle} title="Collapse panel">
-            &#9654;
-          </button>
         </div>
-      </div>
+      )}
       {children}
     </div>
   );
