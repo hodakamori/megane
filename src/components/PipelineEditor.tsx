@@ -331,19 +331,9 @@ const textBtnBase: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 4,
+  whiteSpace: "nowrap",
 };
 
-/** Shared base for icon-only buttons */
-const iconOnlyBtnBase: React.CSSProperties = {
-  borderRadius: 6,
-  padding: "5px 8px",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 1,
-  border: "none",
-};
 
 const addBtnStyle: React.CSSProperties = {
   ...textBtnBase,
@@ -367,21 +357,21 @@ const templateBtnStyle: React.CSSProperties = {
 };
 
 const layoutIconBtnStyle: React.CSSProperties = {
-  ...iconOnlyBtnBase,
+  ...textBtnBase,
   background: "rgba(16, 185, 129, 0.08)",
   border: "1px solid rgba(16, 185, 129, 0.25)",
   color: "#10b981",
 };
 
 const exportIconBtnStyle: React.CSSProperties = {
-  ...iconOnlyBtnBase,
+  ...textBtnBase,
   background: "rgba(6, 182, 212, 0.08)",
   border: "1px solid rgba(6, 182, 212, 0.25)",
   color: "#06b6d4",
 };
 
 const importIconBtnStyle: React.CSSProperties = {
-  ...iconOnlyBtnBase,
+  ...textBtnBase,
   background: "rgba(99, 102, 241, 0.08)",
   border: "1px solid rgba(99, 102, 241, 0.25)",
   color: "#6366f1",
@@ -659,7 +649,7 @@ function PipelineEditorInner({
         title="Auto Layout"
         aria-label="Auto Layout"
       >
-        {IconLayout}
+        {IconLayout} Layout
       </button>
       <button
         onClick={handleExport}
@@ -667,7 +657,7 @@ function PipelineEditorInner({
         title="Export Pipeline"
         aria-label="Export Pipeline"
       >
-        {IconExport}
+        {IconExport} Export
       </button>
       <button
         onClick={handleImportClick}
@@ -675,7 +665,7 @@ function PipelineEditorInner({
         title="Import Pipeline"
         aria-label="Import Pipeline"
       >
-        {IconImport}
+        {IconImport} Import
       </button>
 
       <div style={toolbarSepStyle} />
