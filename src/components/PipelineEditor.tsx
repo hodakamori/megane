@@ -334,7 +334,6 @@ const textBtnBase: React.CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-
 const addBtnStyle: React.CSSProperties = {
   ...textBtnBase,
   background: "rgba(59, 130, 246, 0.08)",

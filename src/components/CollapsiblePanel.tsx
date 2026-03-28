@@ -116,7 +116,15 @@ export function CollapsiblePanel({
       {containerExtra}
       <div style={panelHeaderStyle}>
         <span style={panelTitleStyle}>{title}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            position: "relative",
+            flexWrap: "wrap",
+          }}
+        >
           {headerExtra}
           <button onClick={onToggleCollapse} style={collapseButtonStyle} title="Collapse panel">
             &#9654;
