@@ -73,41 +73,29 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   },
 ];
 
-/* ── Inline SVG Icons (14×14, currentColor) ────────────────────────── */
+/* ── Inline SVG Icons (12×12, currentColor) ────────────────────────── */
+
+const iconProps = {
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: "2",
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true as const,
+  focusable: "false" as const,
+  style: { flexShrink: 0, width: 12, height: 12 } as React.CSSProperties,
+};
 
 const IconRender = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    style={{ flexShrink: 0 }}
-  >
+  <svg {...iconProps}>
     <circle cx="12" cy="12" r="10" />
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
 const IconLayout = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    style={{ flexShrink: 0 }}
-  >
+  <svg {...iconProps}>
     <rect x="3" y="3" width="7" height="7" rx="1" />
     <rect x="14" y="3" width="7" height="7" rx="1" />
     <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -116,19 +104,7 @@ const IconLayout = (
 );
 
 const IconExport = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    style={{ flexShrink: 0 }}
-  >
+  <svg {...iconProps}>
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="7 10 12 15 17 10" />
     <line x1="12" y1="15" x2="12" y2="3" />
@@ -136,19 +112,7 @@ const IconExport = (
 );
 
 const IconImport = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    style={{ flexShrink: 0 }}
-  >
+  <svg {...iconProps}>
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
@@ -156,19 +120,7 @@ const IconImport = (
 );
 
 const IconTemplates = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    style={{ flexShrink: 0 }}
-  >
+  <svg {...iconProps}>
     <polygon points="12 2 2 7 12 12 22 7 12 2" />
     <polyline points="2 17 12 22 22 17" />
     <polyline points="2 12 12 17 22 12" />
@@ -176,19 +128,7 @@ const IconTemplates = (
 );
 
 const IconPlus = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-    style={{ flexShrink: 0 }}
-  >
+  <svg {...iconProps} strokeWidth="2.5">
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
@@ -323,15 +263,16 @@ const DEFAULT_WIDTH = 480;
 
 /** Shared base for icon+text buttons */
 const textBtnBase: React.CSSProperties = {
-  borderRadius: 6,
-  padding: "4px 10px",
+  borderRadius: 5,
+  padding: "3px 6px",
   cursor: "pointer",
-  fontSize: 11,
+  fontSize: 10.5,
   fontWeight: 600,
-  display: "flex",
+  display: "inline-flex",
   alignItems: "center",
-  gap: 4,
+  gap: 3,
   whiteSpace: "nowrap",
+  lineHeight: 1,
 };
 
 const addBtnStyle: React.CSSProperties = {
@@ -378,10 +319,10 @@ const importBtnStyle: React.CSSProperties = {
 
 const toolbarSepStyle: React.CSSProperties = {
   width: 1,
-  height: 16,
+  alignSelf: "stretch",
+  margin: "2px 0",
   background: "rgba(148, 163, 184, 0.3)",
   flexShrink: 0,
-  margin: "0 2px",
 };
 
 const dropdownStyle: React.CSSProperties = {
@@ -639,8 +580,6 @@ function PipelineEditorInner({
         {IconRender} Render
       </button>
 
-      <div style={toolbarSepStyle} />
-
       {/* Group 2: Layout & IO */}
       <button
         onClick={handleAutoLayout}
@@ -666,8 +605,6 @@ function PipelineEditorInner({
       >
         {IconImport} Import
       </button>
-
-      <div style={toolbarSepStyle} />
 
       {/* Group 3: Templates & Add Node */}
       <div style={{ position: "relative" }}>
