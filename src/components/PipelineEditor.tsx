@@ -85,6 +85,8 @@ const IconRender = (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
     style={{ flexShrink: 0 }}
   >
     <circle cx="12" cy="12" r="10" />
@@ -102,6 +104,8 @@ const IconLayout = (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
     style={{ flexShrink: 0 }}
   >
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -121,6 +125,8 @@ const IconExport = (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
     style={{ flexShrink: 0 }}
   >
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -139,6 +145,8 @@ const IconImport = (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
     style={{ flexShrink: 0 }}
   >
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -157,6 +165,8 @@ const IconTemplates = (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
     style={{ flexShrink: 0 }}
   >
     <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -175,6 +185,8 @@ const IconPlus = (
     strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
+    aria-hidden="true"
+    focusable="false"
     style={{ flexShrink: 0 }}
   >
     <line x1="12" y1="5" x2="12" y2="19" />
@@ -194,6 +206,8 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       style={{ flexShrink: 0 }}
     >
       <ellipse cx="12" cy="5" rx="9" ry="3" />
@@ -211,6 +225,8 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       style={{ flexShrink: 0 }}
     >
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -227,6 +243,8 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       style={{ flexShrink: 0 }}
     >
       <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -242,6 +260,8 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       style={{ flexShrink: 0 }}
     >
       <line x1="4" y1="21" x2="4" y2="14" />
@@ -265,6 +285,8 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       style={{ flexShrink: 0 }}
     >
       <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -282,6 +304,8 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
       style={{ flexShrink: 0 }}
     >
       <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
@@ -629,13 +653,28 @@ function PipelineEditorInner({
       <div style={toolbarSepStyle} />
 
       {/* Group 2: Layout & IO (icon-only) */}
-      <button onClick={handleAutoLayout} style={layoutIconBtnStyle} title="Auto Layout">
+      <button
+        onClick={handleAutoLayout}
+        style={layoutIconBtnStyle}
+        title="Auto Layout"
+        aria-label="Auto Layout"
+      >
         {IconLayout}
       </button>
-      <button onClick={handleExport} style={exportIconBtnStyle} title="Export Pipeline">
+      <button
+        onClick={handleExport}
+        style={exportIconBtnStyle}
+        title="Export Pipeline"
+        aria-label="Export Pipeline"
+      >
         {IconExport}
       </button>
-      <button onClick={handleImportClick} style={importIconBtnStyle} title="Import Pipeline">
+      <button
+        onClick={handleImportClick}
+        style={importIconBtnStyle}
+        title="Import Pipeline"
+        aria-label="Import Pipeline"
+      >
         {IconImport}
       </button>
 
