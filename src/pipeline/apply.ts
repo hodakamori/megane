@@ -349,13 +349,69 @@ function applyLabels(
   }
 }
 
+/** Merge multiple MeshData into a single combined MeshData. */
+function mergeMeshData(meshes: MeshData[]): MeshData {
+  if (meshes.length === 1) return meshes[0];
+
+  let totalVerts = 0;
+  let totalIdx = 0;
+  let totalEdgeFloats = 0;
+  let hasEdges = false;
+  for (const m of meshes) {
+    totalVerts += m.positions.length / 3;
+    totalIdx += m.indices.length;
+    if (m.showEdges && m.edgePositions) {
+      totalEdgeFloats += m.edgePositions.length;
+      hasEdges = true;
+    }
+  }
+
+  const positions = new Float32Array(totalVerts * 3);
+  const normals = new Float32Array(totalVerts * 3);
+  const colors = new Float32Array(totalVerts * 4);
+  const indices = new Uint32Array(totalIdx);
+  const edgePositions = hasEdges ? new Float32Array(totalEdgeFloats) : null;
+
+  let vertOff = 0;
+  let idxOff = 0;
+  let edgeOff = 0;
+  for (const m of meshes) {
+    const nv = m.positions.length / 3;
+    positions.set(m.positions, vertOff * 3);
+    normals.set(m.normals, vertOff * 3);
+    colors.set(m.colors, vertOff * 4);
+    for (let i = 0; i < m.indices.length; i++) {
+      indices[idxOff + i] = m.indices[i] + vertOff;
+    }
+    if (edgePositions && m.showEdges && m.edgePositions) {
+      edgePositions.set(m.edgePositions, edgeOff);
+      edgeOff += m.edgePositions.length;
+    }
+    vertOff += nv;
+    idxOff += m.indices.length;
+  }
+
+  return {
+    type: "mesh",
+    positions,
+    indices,
+    normals,
+    colors,
+    opacity: meshes[0].opacity,
+    showEdges: hasEdges,
+    edgePositions,
+    edgeColor: meshes[0].edgeColor,
+    edgeWidth: meshes[0].edgeWidth,
+  };
+}
+
 function applyMeshes(
   renderer: MoleculeRenderer,
   meshes: MeshData[],
   prevMeshes: MeshData[] | null,
 ): void {
   if (meshes.length > 0) {
-    renderer.loadPolyhedra(meshes[0]);
+    renderer.loadPolyhedra(mergeMeshData(meshes));
   } else if (prevMeshes && prevMeshes.length > 0) {
     renderer.clearPolyhedra();
   }
