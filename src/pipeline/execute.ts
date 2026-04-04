@@ -20,6 +20,7 @@ import type {
   LabelGeneratorParams,
   PolyhedronGeneratorParams,
   VectorOverlayParams,
+  SurfaceMeshParams,
   PipelineNodeType,
   NodeError,
   ParticleData,
@@ -37,6 +38,7 @@ import { executeLabelGenerator } from "./executors/labelGenerator";
 import { executePolyhedronGenerator } from "./executors/polyhedronGenerator";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
+import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeViewport } from "./executors/viewport";
 
 export interface PipelineNodeData {
@@ -229,6 +231,16 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "surface_mesh": {
+        const outputs = executeSurfaceMesh(data.params as SurfaceMeshParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (!outputs.has("mesh")) {
+          addError(id, { message: "No surface mesh generated", severity: "warning" });
         }
         break;
       }

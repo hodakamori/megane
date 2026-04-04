@@ -38,6 +38,7 @@ import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
+import { SurfaceMeshNode } from "./nodes/SurfaceMeshNode";
 import { StreamingNode } from "./nodes/StreamingNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
@@ -55,6 +56,7 @@ const nodeTypes = {
   label_generator: LabelGeneratorNode,
   polyhedron_generator: PolyhedronGeneratorNode,
   vector_overlay: VectorOverlayNode,
+  surface_mesh: SurfaceMeshNode,
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
@@ -69,7 +71,7 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   {
     category: "overlay",
     label: "Overlay",
-    types: ["label_generator", "polyhedron_generator", "vector_overlay"],
+    types: ["label_generator", "polyhedron_generator", "vector_overlay", "surface_mesh"],
   },
 ];
 

@@ -182,6 +182,22 @@ export function validatePipeline(
         }
         break;
       }
+      case "surface_mesh": {
+        const sm = params as import("./types").SurfaceMeshParams;
+        if (sm.probeRadius <= 0) {
+          addError(node.id, {
+            message: "Probe radius must be positive",
+            severity: "error",
+          });
+        }
+        if (sm.gridResolution <= 0) {
+          addError(node.id, {
+            message: "Grid resolution must be positive",
+            severity: "error",
+          });
+        }
+        break;
+      }
     }
   }
 

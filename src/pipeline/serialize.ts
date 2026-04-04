@@ -20,6 +20,7 @@ const VALID_NODE_TYPES: Set<string> = new Set([
   "label_generator",
   "polyhedron_generator",
   "vector_overlay",
+  "surface_mesh",
 ]);
 
 /**
