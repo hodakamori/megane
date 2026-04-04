@@ -397,6 +397,73 @@ export class VectorOverlay extends PipelineNode {
 }
 
 /**
+ * Generate surface mesh (isosurface) around atom positions.
+ *
+ * Ports:
+ *   inp.particle — atom data
+ *   inp.cell     — simulation cell (optional, for PBC-aware bounds)
+ *   out.mesh     — surface mesh
+ */
+export class SurfaceMesh extends PipelineNode {
+  readonly nodeType = "surface_mesh";
+  protected readonly _outPorts = { mesh: "mesh" };
+  protected readonly _inpPorts = { particle: "particle", cell: "cell" };
+
+  public probeRadius: number;
+  public smoothingLevel: number;
+  public gridResolution: number;
+  public opacity: number;
+  public color: string;
+  public showEdges: boolean;
+  public edgeColor: string;
+  public edgeWidth: number;
+
+  constructor({
+    probeRadius = 3.0,
+    smoothingLevel = 2,
+    gridResolution = 2.0,
+    opacity = 0.4,
+    color = "#4fc3f7",
+    showEdges = false,
+    edgeColor = "#dddddd",
+    edgeWidth = 2,
+  }: {
+    probeRadius?: number;
+    smoothingLevel?: number;
+    gridResolution?: number;
+    opacity?: number;
+    color?: string;
+    showEdges?: boolean;
+    edgeColor?: string;
+    edgeWidth?: number;
+  } = {}) {
+    super();
+    this.probeRadius = probeRadius;
+    this.smoothingLevel = smoothingLevel;
+    this.gridResolution = gridResolution;
+    this.opacity = opacity;
+    this.color = color;
+    this.showEdges = showEdges;
+    this.edgeColor = edgeColor;
+    this.edgeWidth = edgeWidth;
+  }
+
+  _toSerializedParams() {
+    return {
+      type: this.nodeType,
+      probeRadius: this.probeRadius,
+      smoothingLevel: this.smoothingLevel,
+      gridResolution: this.gridResolution,
+      opacity: this.opacity,
+      color: this.color,
+      showEdges: this.showEdges,
+      edgeColor: this.edgeColor,
+      edgeWidth: this.edgeWidth,
+    };
+  }
+}
+
+/**
  * 3D rendering output node. All data to be rendered must be connected here.
  *
  * Ports:

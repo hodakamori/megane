@@ -34,6 +34,7 @@ export type {
   LabelData,
   MeshData,
   PolyhedronGeneratorParams,
+  SurfaceMeshParams,
   ViewportState,
   SerializedPipeline,
 } from "./pipeline/types";
@@ -58,6 +59,7 @@ export {
   AddLabels,
   AddPolyhedra,
   VectorOverlay,
+  SurfaceMesh,
   Viewport as ViewportNode,
 } from "./pipeline/builder";
 
