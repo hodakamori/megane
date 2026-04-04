@@ -178,7 +178,8 @@ export type PipelineNodeType =
   | "modify"
   | "label_generator"
   | "polyhedron_generator"
-  | "vector_overlay";
+  | "vector_overlay"
+  | "surface_mesh";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -193,6 +194,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   label_generator: "Labels",
   polyhedron_generator: "Polyhedra",
   vector_overlay: "Vectors",
+  surface_mesh: "Surface Mesh",
 };
 
 // ─── Node Categories ──────────────────────────────────────────────────
@@ -211,6 +213,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   label_generator: "overlay",
   polyhedron_generator: "overlay",
   vector_overlay: "overlay",
+  surface_mesh: "overlay",
   viewport: "viewport",
 };
 
@@ -293,6 +296,13 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     inputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
     outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
   },
+  surface_mesh: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "cell", dataType: "cell", label: "Cell" },
+    ],
+    outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
+  },
 };
 
 /**
@@ -365,6 +375,18 @@ export interface VectorOverlayParams {
   scale: number;
 }
 
+export interface SurfaceMeshParams {
+  type: "surface_mesh";
+  probeRadius: number; // probe sphere radius in Angstroms (controls surface resolution)
+  smoothingLevel: number; // iterations of Laplacian smoothing (0 = none)
+  gridResolution: number; // grid cells per Angstrom (controls mesh density)
+  opacity: number; // face opacity 0-1
+  color: string; // surface color as hex string
+  showEdges: boolean; // wireframe edges
+  edgeColor: string; // edge color as hex string
+  edgeWidth: number; // edge line width in pixels
+}
+
 export interface PolyhedronGeneratorParams {
   type: "polyhedron_generator";
   centerElements: number[]; // atomic numbers of center atoms
@@ -388,7 +410,8 @@ export type PipelineNodeParams =
   | ModifyParams
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
-  | VectorOverlayParams;
+  | VectorOverlayParams
+  | SurfaceMeshParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -424,6 +447,18 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
+    case "surface_mesh":
+      return {
+        type,
+        probeRadius: 3.0,
+        smoothingLevel: 2,
+        gridResolution: 2.0,
+        opacity: 0.4,
+        color: "#4fc3f7",
+        showEdges: false,
+        edgeColor: "#dddddd",
+        edgeWidth: 2,
+      };
   }
 }
 
