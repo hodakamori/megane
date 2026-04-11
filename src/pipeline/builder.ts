@@ -275,9 +275,9 @@ export class AddBonds extends PipelineNode {
   protected readonly _outPorts = { bond: "bond" };
   protected readonly _inpPorts = { particle: "particle" };
 
-  public source: "distance" | "structure";
+  public source: "distance" | "structure" | "file";
 
-  constructor({ source = "distance" }: { source?: "distance" | "structure" } = {}) {
+  constructor({ source = "distance" }: { source?: "distance" | "structure" | "file" } = {}) {
     super();
     this.source = source;
   }
