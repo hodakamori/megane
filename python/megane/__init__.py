@@ -18,6 +18,7 @@ from megane.pipeline import (
     Streaming,
     VectorOverlay,
     Viewport,
+    build_pipeline,
     view,
     view_traj,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "AddLabels",
     "AddPolyhedra",
     "Filter",
+    "build_pipeline",
     "LoadStructure",
     "LoadTrajectory",
     "LoadVector",

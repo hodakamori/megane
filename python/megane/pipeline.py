@@ -870,3 +870,83 @@ def view_traj(
     viewer = MolecularViewer()
     viewer.set_pipeline(pipe)
     return viewer
+
+
+def build_pipeline(
+    path: str,
+    *,
+    xtc: str | None = None,
+    traj: str | None = None,
+    bonds: Literal["distance", "structure"] | None = "distance",
+    perspective: bool = False,
+    cell_axes_visible: bool = True,
+    pivot_marker_visible: bool = True,
+) -> Pipeline:
+    """Build a pipeline for a molecular structure, optionally with a trajectory.
+
+    Constructs a :class:`Pipeline` with :class:`LoadStructure` and
+    :class:`Viewport` nodes.  When *xtc* or *traj* is provided, a
+    :class:`LoadTrajectory` node is added.  When *bonds* is not ``None``
+    (the default), an :class:`AddBonds` node is included.
+
+    Unlike :func:`view` and :func:`view_traj`, this function returns the
+    :class:`Pipeline` directly without creating a widget, making it
+    suitable for serialization (via :meth:`Pipeline.to_json`) or further
+    programmatic modification.
+
+    Args:
+        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        xtc: Path to an XTC trajectory file.
+        traj: Path to an ASE ``.traj`` file.
+        bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
+            ``"structure"`` reads bonds from the file, ``None`` disables bonds.
+        perspective: Use perspective projection instead of orthographic.
+        cell_axes_visible: Show unit cell axes.
+        pivot_marker_visible: Show pivot marker in viewport.
+
+    Returns:
+        A :class:`Pipeline` instance ready for serialization or
+        passing to :meth:`~megane.widget.MolecularViewer.set_pipeline`.
+
+    Raises:
+        ValueError: If both *xtc* and *traj* are provided.
+
+    Example::
+
+        import megane
+
+        # Structure only -> JSON
+        pipe = megane.build_pipeline("protein.pdb")
+        print(pipe.to_json())
+
+        # With trajectory -> save to file
+        pipe = megane.build_pipeline("protein.pdb", xtc="trajectory.xtc")
+        pipe.save("pipeline.json")
+    """
+    if xtc is not None and traj is not None:
+        raise ValueError("Only one of 'xtc' or 'traj' can be provided, not both.")
+
+    pipe = Pipeline()
+    s = pipe.add_node(LoadStructure(path))
+    v = pipe.add_node(
+        Viewport(
+            perspective=perspective,
+            cell_axes_visible=cell_axes_visible,
+            pivot_marker_visible=pivot_marker_visible,
+        )
+    )
+
+    pipe.add_edge(s.out.particle, v.inp.particle)
+    pipe.add_edge(s.out.cell, v.inp.cell)
+
+    if xtc is not None or traj is not None:
+        t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj))
+        pipe.add_edge(s.out.particle, t.inp.particle)
+        pipe.add_edge(t.out.traj, v.inp.traj)
+
+    if bonds is not None:
+        b = pipe.add_node(AddBonds(source=bonds))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        pipe.add_edge(b.out.bond, v.inp.bond)
+
+    return pipe

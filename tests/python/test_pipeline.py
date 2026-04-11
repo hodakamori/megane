@@ -19,6 +19,7 @@ from megane.pipeline import (
     PortNamespace,
     VectorOverlay,
     Viewport,
+    build_pipeline,
     view,
     view_traj,
 )
@@ -827,3 +828,79 @@ class TestViewTrajWrapper:
         pipe = viewer._pipeline_ref
         node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
         assert "add_bond" not in node_types
+
+
+class TestBuildPipeline:
+    """build_pipeline() convenience function builds correct pipelines."""
+
+    def test_returns_pipeline(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        assert isinstance(pipe, Pipeline)
+
+    def test_structure_only_has_correct_nodes(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_structure" in node_types
+        assert "add_bond" in node_types
+        assert "viewport" in node_types
+        assert "load_trajectory" not in node_types
+
+    def test_bonds_none_omits_add_bond(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"), bonds=None)
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "add_bond" not in node_types
+
+    def test_bonds_structure(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"), bonds="structure")
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "structure"
+
+    def test_viewport_params(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            perspective=True,
+            cell_axes_visible=False,
+            pivot_marker_visible=False,
+        )
+        vp_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "viewport")
+        assert vp_cfg["perspective"] is True
+        assert vp_cfg["cellAxesVisible"] is False
+        assert vp_cfg["pivotMarkerVisible"] is False
+
+    def test_has_node_data(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        assert len(pipe._node_data) > 0
+
+    def test_to_json_produces_valid_json(self):
+        import json
+
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        d = json.loads(pipe.to_json())
+        assert d["version"] == 3
+
+    def test_with_xtc_trajectory(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+        )
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_trajectory" in node_types
+        assert "load_structure" in node_types
+        assert "viewport" in node_types
+        assert len(pipe._trajectories) > 0
+
+    def test_raises_both_xtc_and_traj(self):
+        with pytest.raises(ValueError, match="Only one of"):
+            build_pipeline(
+                str(FIXTURES / "caffeine_water.pdb"),
+                xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+                traj=str(FIXTURES / "water.traj"),
+            )
+
+    def test_compatible_with_set_pipeline(self):
+        from megane.widget import MolecularViewer
+
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        viewer = MolecularViewer()
+        viewer.set_pipeline(pipe)
+        assert viewer._pipeline_enabled is True
