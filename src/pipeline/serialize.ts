@@ -25,24 +25,24 @@ const VALID_NODE_TYPES: Set<string> = new Set([
 /**
  * Serialize xyflow nodes and edges into the portable JSON format.
  */
-/** Strip ephemeral (non-serializable) fields from node params. */
-function cleanParams(params: Record<string, unknown>): Record<string, unknown> {
-  const { bondFileData, ...rest } = params;
-  return rest;
-}
-
 export function serializePipeline(
   nodes: Node<PipelineNodeData>[],
   edges: Edge[],
 ): SerializedPipeline {
   return {
     version: 3,
-    nodes: nodes.map((n) => ({
-      ...cleanParams(n.data.params as unknown as Record<string, unknown>),
-      id: n.id,
-      position: n.position,
-      enabled: n.data.enabled,
-    })),
+    nodes: nodes.map((n) => {
+      // Strip ephemeral (non-serializable) fields from params
+      const { bondFileData, ...params } = n.data.params as typeof n.data.params & {
+        bondFileData?: unknown;
+      };
+      return {
+        ...params,
+        id: n.id,
+        position: n.position,
+        enabled: n.data.enabled,
+      };
+    }),
     edges: edges.map((e) => ({
       source: e.source,
       target: e.target,

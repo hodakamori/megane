@@ -249,7 +249,7 @@ export function executeAddBond(
           validPairs.push(a, b);
         }
       }
-      let bondIndices = new Uint32Array(validPairs);
+      let bondIndices: Uint32Array = new Uint32Array(validPairs);
       let nBonds = bondIndices.length / 2;
 
       if (nBonds > 0) {
