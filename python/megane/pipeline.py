@@ -738,7 +738,8 @@ class Pipeline:
         """Read a .top file and return flat bond pairs [a0, b0, a1, b1, ...]."""
         from megane.parsers.top import parse_top_bonds
 
-        bonds = parse_top_bonds(node.top)  # type: ignore[arg-type]
+        assert node.top is not None
+        bonds = parse_top_bonds(node.top)
         return bonds.flatten().tolist()
 
     def _load_structure_data(self, node: LoadStructure) -> None:
