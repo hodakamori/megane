@@ -238,6 +238,8 @@ class AddBonds(PipelineNode):
     Args:
         source: ``"distance"`` for VDW-based inference,
                 ``"structure"`` to use bonds from the file.
+        top: Path to a GROMACS ``.top`` topology file.  When provided,
+             *source* is ignored and bonds are read from the topology.
 
     Ports:
         inp.particle — atom data
@@ -252,9 +254,11 @@ class AddBonds(PipelineNode):
         self,
         *,
         source: Literal["distance", "structure"] = "distance",
+        top: str | None = None,
     ) -> None:
         super().__init__()
         self.source = source
+        self.top = top
 
 
 class AddLabels(PipelineNode):
@@ -549,7 +553,10 @@ class Pipeline:
         elif ntype == "modify":
             return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0))
         elif ntype == "add_bond":
-            return AddBonds(source=nd.get("bondSource", "distance"))
+            bond_source = nd.get("bondSource", "distance")
+            if bond_source == "file":
+                return AddBonds(top=nd.get("bondFileName", ""))
+            return AddBonds(source=bond_source)
         elif ntype == "label_generator":
             return AddLabels(source=nd.get("source", "element"))
         elif ntype == "polyhedron_generator":
@@ -699,7 +706,12 @@ class Pipeline:
             base["scale"] = node.scale
             base["opacity"] = node.opacity
         elif isinstance(node, AddBonds):
-            base["bondSource"] = node.source
+            if node.top is not None:
+                base["bondSource"] = "file"
+                base["bondFileName"] = node.top
+                base["bondFileData"] = self._parse_top_bonds(node)
+            else:
+                base["bondSource"] = node.source
         elif isinstance(node, AddLabels):
             base["source"] = node.source
         elif isinstance(node, AddPolyhedra):
@@ -720,6 +732,14 @@ class Pipeline:
             base["pivotMarkerVisible"] = node.pivot_marker_visible
 
         return base
+
+    @staticmethod
+    def _parse_top_bonds(node: AddBonds) -> list[int]:
+        """Read a .top file and return flat bond pairs [a0, b0, a1, b1, ...]."""
+        from megane.parsers.top import parse_top_bonds
+
+        bonds = parse_top_bonds(node.top)  # type: ignore[arg-type]
+        return bonds.flatten().tolist()
 
     def _load_structure_data(self, node: LoadStructure) -> None:
         """Load structure file and store binary snapshot data."""
@@ -878,6 +898,7 @@ def build_pipeline(
     xtc: str | None = None,
     traj: str | None = None,
     bonds: Literal["distance", "structure"] | None = "distance",
+    top: str | None = None,
     perspective: bool = False,
     cell_axes_visible: bool = True,
     pivot_marker_visible: bool = True,
@@ -900,6 +921,9 @@ def build_pipeline(
         traj: Path to an ASE ``.traj`` file.
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
             ``"structure"`` reads bonds from the file, ``None`` disables bonds.
+            Ignored when *top* is provided.
+        top: Path to a GROMACS ``.top`` topology file for bond definitions.
+            When provided, overrides *bonds*.
         perspective: Use perspective projection instead of orthographic.
         cell_axes_visible: Show unit cell axes.
         pivot_marker_visible: Show pivot marker in viewport.
@@ -922,6 +946,10 @@ def build_pipeline(
         # With trajectory -> save to file
         pipe = megane.build_pipeline("protein.pdb", xtc="trajectory.xtc")
         pipe.save("pipeline.json")
+
+        # With GROMACS topology
+        pipe = megane.build_pipeline("protein.pdb", top="topology.top")
+        print(pipe.to_json())
     """
     if xtc is not None and traj is not None:
         raise ValueError("Only one of 'xtc' or 'traj' can be provided, not both.")
@@ -944,7 +972,11 @@ def build_pipeline(
         pipe.add_edge(s.out.particle, t.inp.particle)
         pipe.add_edge(t.out.traj, v.inp.traj)
 
-    if bonds is not None:
+    if top is not None:
+        b = pipe.add_node(AddBonds(top=top))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        pipe.add_edge(b.out.bond, v.inp.bond)
+    elif bonds is not None:
         b = pipe.add_node(AddBonds(source=bonds))
         pipe.add_edge(s.out.particle, b.inp.particle)
         pipe.add_edge(b.out.bond, v.inp.bond)

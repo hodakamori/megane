@@ -60,6 +60,10 @@ class TestNodeClasses:
         n = AddBonds(source="structure")
         assert n.source == "structure"
 
+    def test_add_bonds_top(self):
+        n = AddBonds(top="topology.top")
+        assert n.top == "topology.top"
+
     def test_add_labels(self):
         n = AddLabels(source="resname")
         assert n.source == "resname"
@@ -390,6 +394,19 @@ class TestPipelineSerialization:
 
         bond_node = next(n for n in result["nodes"] if n["type"] == "add_bond")
         assert bond_node["bondSource"] == "structure"
+
+    def test_add_bonds_top_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        b = pipe.add_node(AddBonds(top=str(FIXTURES / "test_topology.top")))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        result = pipe.to_dict()
+
+        bond_node = next(n for n in result["nodes"] if n["type"] == "add_bond")
+        assert bond_node["bondSource"] == "file"
+        assert bond_node["bondFileName"] == str(FIXTURES / "test_topology.top")
+        assert isinstance(bond_node["bondFileData"], list)
+        assert len(bond_node["bondFileData"]) > 0
 
     def test_polyhedra_serialization(self):
         pipe = Pipeline()
@@ -904,3 +921,37 @@ class TestBuildPipeline:
         viewer = MolecularViewer()
         viewer.set_pipeline(pipe)
         assert viewer._pipeline_enabled is True
+
+    def test_with_top_topology(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            top=str(FIXTURES / "test_topology.top"),
+        )
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "add_bond" in node_types
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "file"
+        assert "bondFileData" in bond_cfg
+        assert isinstance(bond_cfg["bondFileData"], list)
+        assert len(bond_cfg["bondFileData"]) == 8  # 4 bonds * 2
+
+    def test_top_overrides_bonds(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            bonds="distance",
+            top=str(FIXTURES / "test_topology.top"),
+        )
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "file"
+
+    def test_top_json_includes_bond_data(self):
+        import json
+
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            top=str(FIXTURES / "test_topology.top"),
+        )
+        d = json.loads(pipe.to_json())
+        bond_node = next(n for n in d["nodes"] if n["type"] == "add_bond")
+        assert bond_node["bondSource"] == "file"
+        assert bond_node["bondFileData"] == [0, 1, 1, 2, 2, 3, 1, 4]
