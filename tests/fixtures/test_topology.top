@@ -1,0 +1,19 @@
+; Test GROMACS topology file
+[ moleculetype ]
+protein  3
+
+[ atoms ]
+     1  N    1  ALA  N    1  -0.3   14.01
+     2  CA   1  ALA  CA   2   0.0   12.01
+     3  C    1  ALA  C    3   0.6   12.01
+     4  O    1  ALA  O    4  -0.5   16.00
+     5  CB   1  ALA  CB   5  -0.1   12.01
+
+[ bonds ]
+     1     2     1  ; N-CA
+     2     3     1  ; CA-C
+     3     4     1  ; C-O
+     2     5     1  ; CA-CB
+
+[ angles ]
+     1     2     3     1

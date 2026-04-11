@@ -19,6 +19,7 @@ from megane.pipeline import (
     PortNamespace,
     VectorOverlay,
     Viewport,
+    build_pipeline,
     view,
     view_traj,
 )
@@ -58,6 +59,10 @@ class TestNodeClasses:
     def test_add_bonds_structure(self):
         n = AddBonds(source="structure")
         assert n.source == "structure"
+
+    def test_add_bonds_top(self):
+        n = AddBonds(top="topology.top")
+        assert n.top == "topology.top"
 
     def test_add_labels(self):
         n = AddLabels(source="resname")
@@ -389,6 +394,19 @@ class TestPipelineSerialization:
 
         bond_node = next(n for n in result["nodes"] if n["type"] == "add_bond")
         assert bond_node["bondSource"] == "structure"
+
+    def test_add_bonds_top_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        b = pipe.add_node(AddBonds(top=str(FIXTURES / "test_topology.top")))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        result = pipe.to_dict()
+
+        bond_node = next(n for n in result["nodes"] if n["type"] == "add_bond")
+        assert bond_node["bondSource"] == "file"
+        assert bond_node["bondFileName"] == str(FIXTURES / "test_topology.top")
+        assert isinstance(bond_node["bondFileData"], list)
+        assert len(bond_node["bondFileData"]) > 0
 
     def test_polyhedra_serialization(self):
         pipe = Pipeline()
@@ -827,3 +845,113 @@ class TestViewTrajWrapper:
         pipe = viewer._pipeline_ref
         node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
         assert "add_bond" not in node_types
+
+
+class TestBuildPipeline:
+    """build_pipeline() convenience function builds correct pipelines."""
+
+    def test_returns_pipeline(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        assert isinstance(pipe, Pipeline)
+
+    def test_structure_only_has_correct_nodes(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_structure" in node_types
+        assert "add_bond" in node_types
+        assert "viewport" in node_types
+        assert "load_trajectory" not in node_types
+
+    def test_bonds_none_omits_add_bond(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"), bonds=None)
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "add_bond" not in node_types
+
+    def test_bonds_structure(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"), bonds="structure")
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "structure"
+
+    def test_viewport_params(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            perspective=True,
+            cell_axes_visible=False,
+            pivot_marker_visible=False,
+        )
+        vp_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "viewport")
+        assert vp_cfg["perspective"] is True
+        assert vp_cfg["cellAxesVisible"] is False
+        assert vp_cfg["pivotMarkerVisible"] is False
+
+    def test_has_node_data(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        assert len(pipe._node_data) > 0
+
+    def test_to_json_produces_valid_json(self):
+        import json
+
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        d = json.loads(pipe.to_json())
+        assert d["version"] == 3
+
+    def test_with_xtc_trajectory(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+        )
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_trajectory" in node_types
+        assert "load_structure" in node_types
+        assert "viewport" in node_types
+        assert len(pipe._trajectories) > 0
+
+    def test_raises_both_xtc_and_traj(self):
+        with pytest.raises(ValueError, match="Only one of"):
+            build_pipeline(
+                str(FIXTURES / "caffeine_water.pdb"),
+                xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+                traj=str(FIXTURES / "water.traj"),
+            )
+
+    def test_compatible_with_set_pipeline(self):
+        from megane.widget import MolecularViewer
+
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
+        viewer = MolecularViewer()
+        viewer.set_pipeline(pipe)
+        assert viewer._pipeline_enabled is True
+
+    def test_with_top_topology(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            top=str(FIXTURES / "test_topology.top"),
+        )
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "add_bond" in node_types
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "file"
+        assert "bondFileData" in bond_cfg
+        assert isinstance(bond_cfg["bondFileData"], list)
+        assert len(bond_cfg["bondFileData"]) == 8  # 4 bonds * 2
+
+    def test_top_overrides_bonds(self):
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            bonds="distance",
+            top=str(FIXTURES / "test_topology.top"),
+        )
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "file"
+
+    def test_top_json_includes_bond_data(self):
+        import json
+
+        pipe = build_pipeline(
+            str(FIXTURES / "1crn.pdb"),
+            top=str(FIXTURES / "test_topology.top"),
+        )
+        d = json.loads(pipe.to_json())
+        bond_node = next(n for n in d["nodes"] if n["type"] == "add_bond")
+        assert bond_node["bondSource"] == "file"
+        assert bond_node["bondFileData"] == [0, 1, 1, 2, 2, 3, 1, 4]
