@@ -220,10 +220,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 all_models.push(std::mem::take(&mut current_model));
                 model_count += 1;
             }
-            "CRYST1" => {
-                if box_matrix.is_none() {
-                    box_matrix = parse_cryst1(line);
-                }
+            "CRYST1" if box_matrix.is_none() => {
+                box_matrix = parse_cryst1(line);
             }
             "ATOM" | "HETATM" => {
                 if let Some((serial, atom)) = parse_atom_line(line) {
