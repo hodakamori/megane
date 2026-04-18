@@ -31,12 +31,18 @@ export function serializePipeline(
 ): SerializedPipeline {
   return {
     version: 3,
-    nodes: nodes.map((n) => ({
-      ...n.data.params,
-      id: n.id,
-      position: n.position,
-      enabled: n.data.enabled,
-    })),
+    nodes: nodes.map((n) => {
+      // Strip ephemeral (non-serializable) fields from params
+      const { bondFileData, ...params } = n.data.params as typeof n.data.params & {
+        bondFileData?: unknown;
+      };
+      return {
+        ...params,
+        id: n.id,
+        position: n.position,
+        enabled: n.data.enabled,
+      };
+    }),
     edges: edges.map((e) => ({
       source: e.source,
       target: e.target,

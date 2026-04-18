@@ -236,6 +236,59 @@ export function executeAddBond(
         outputs.set("bond", bond);
       }
     }
+  } else if (params.bondSource === "file") {
+    const raw = params.bondFileData;
+    if (raw && raw.length >= 2) {
+      // Filter bond indices to valid atom range
+      const nAtoms = snapshot.nAtoms;
+      const validPairs: number[] = [];
+      for (let i = 0; i < raw.length; i += 2) {
+        const a = raw[i];
+        const b = raw[i + 1];
+        if (a < nAtoms && b < nAtoms) {
+          validPairs.push(a, b);
+        }
+      }
+      let bondIndices: Uint32Array = new Uint32Array(validPairs);
+      let nBonds = bondIndices.length / 2;
+
+      if (nBonds > 0) {
+        let extPositions: Float32Array | null = null;
+        let extElements: Uint8Array | null = null;
+        let extNAtoms = 0;
+
+        const result = processPbcBonds(
+          bondIndices,
+          null,
+          snapshot.positions,
+          snapshot.elements,
+          snapshot.nAtoms,
+          snapshot.box,
+        );
+        bondIndices = result.bondIndices;
+        nBonds = result.nBonds;
+        extPositions = result.positions;
+        extElements = result.elements;
+        extNAtoms = result.nAtoms;
+
+        const bond: BondData = {
+          type: "bond",
+          sourceNodeId: particleData.sourceNodeId,
+          bondIndices,
+          bondOrders: null,
+          nBonds,
+          scale: 1.0,
+          opacity: 1.0,
+          positions: extPositions,
+          elements: extElements,
+          nAtoms: extNAtoms,
+          atomElements: snapshot.elements,
+          selectedBondIndices: null,
+          bondOpacityOverrides: null,
+        };
+        outputs.set("bond", bond);
+      }
+    }
   } else if (params.bondSource === "distance") {
     let bondIndices = inferBondsVdwJS(
       snapshot.positions,

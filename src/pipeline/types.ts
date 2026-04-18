@@ -329,6 +329,9 @@ export interface StreamingParams {
 export interface AddBondParams {
   type: "add_bond";
   bondSource: BondSource;
+  bondFileName?: string | null;
+  /** Ephemeral: parsed bond indices from topology file. Not serialized. */
+  bondFileData?: Uint32Array | null;
 }
 
 export interface ViewportParams {
