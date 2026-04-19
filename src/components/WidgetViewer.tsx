@@ -145,25 +145,29 @@ function WidgetViewerPipeline({
     if (!bondNode) return;
     const params = bondNode.data.params;
     if (params.type !== "add_bond" || (params as AddBondParams).bondSource !== "distance") return;
-    if (!snapshot || !frame) return;
+    // In pipeline mode the `snapshot` prop is null (set_pipeline only populates
+    // `_node_snapshots_data`), so fall back to the store snapshot — same
+    // pattern as Viewport and MeasurementPanel below.
+    const effectiveSnapshot = storeSnapshot ?? snapshot;
+    if (!effectiveSnapshot || !frame) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
 
     const newBonds = inferBondsVdwJS(
       frame.positions,
-      snapshot.elements,
-      snapshot.nAtoms,
+      effectiveSnapshot.elements,
+      effectiveSnapshot.nAtoms,
       0.6,
-      snapshot.box,
+      effectiveSnapshot.box,
     );
 
     const result = processPbcBonds(
       newBonds,
       null,
       frame.positions,
-      snapshot.elements,
-      snapshot.nAtoms,
-      snapshot.box,
+      effectiveSnapshot.elements,
+      effectiveSnapshot.nAtoms,
+      effectiveSnapshot.box,
     );
     renderer.updateBondsExt(
       result.bondIndices,
@@ -172,7 +176,7 @@ function WidgetViewerPipeline({
       result.elements,
       result.nAtoms,
     );
-  }, [frame, snapshot]);
+  }, [frame, storeSnapshot, snapshot]);
 
   // Apply pipeline JSON from Python
   const prevPipelineJsonRef = useRef<string>("");
