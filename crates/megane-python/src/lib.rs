@@ -1,6 +1,6 @@
 use megane_core::parser::ParsedStructure;
 use numpy::ndarray::{Array1, Array2};
-use numpy::{IntoPyArray, PyArray1, PyArray2};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -243,6 +243,45 @@ fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
     })
 }
 
+/// Infer bonds from interatomic distances using VDW radii.
+///
+/// Returns an (n_bonds, 2) uint32 array of atom index pairs.  Mirrors the
+/// per-frame inference the frontend performs when `bondSource == "distance"`.
+#[pyfunction]
+fn infer_bonds_vdw(
+    py: Python<'_>,
+    elements: PyReadonlyArray1<u8>,
+    positions: PyReadonlyArray2<f32>,
+) -> PyResult<Py<PyArray2<u32>>> {
+    let elements_view = elements.as_array();
+    let positions_view = positions.as_array();
+
+    let n_atoms = elements_view.len();
+    let shape = positions_view.shape();
+    if shape.len() != 2 || shape[0] != n_atoms || shape[1] != 3 {
+        return Err(PyValueError::new_err(format!(
+            "positions shape {:?} does not match (n_atoms={}, 3)",
+            shape, n_atoms
+        )));
+    }
+
+    let elements_vec: Vec<u8> = elements_view.iter().copied().collect();
+    let positions_vec: Vec<f32> = positions_view.iter().copied().collect();
+
+    let bonds = megane_core::bonds::infer_bonds_vdw(&positions_vec, &elements_vec, n_atoms);
+
+    let n_bonds = bonds.len();
+    let mut flat: Vec<u32> = Vec::with_capacity(n_bonds * 2);
+    for (a, b) in &bonds {
+        flat.push(*a);
+        flat.push(*b);
+    }
+    let arr = Array2::from_shape_vec((n_bonds, 2), flat).map_err(|e| {
+        PyValueError::new_err(format!("failed to reshape bonds into (n_bonds, 2): {e}"))
+    })?;
+    Ok(arr.into_pyarray(py).into())
+}
+
 #[pymodule]
 fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
@@ -254,5 +293,6 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_xtc, m)?)?;
     m.add_function(wrap_pyfunction!(parse_traj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammpstrj, m)?)?;
+    m.add_function(wrap_pyfunction!(infer_bonds_vdw, m)?)?;
     Ok(())
 }

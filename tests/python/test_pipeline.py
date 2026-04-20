@@ -841,6 +841,35 @@ class TestViewTrajWrapper:
         node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
         assert "add_bond" not in node_types
 
+    def test_bonds_distance_default(self):
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+        )
+        pipe = viewer._pipeline_ref
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "distance"
+
+    def test_bonds_structure(self):
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+            bonds="structure",
+        )
+        pipe = viewer._pipeline_ref
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "structure"
+
+    def test_bonds_file_alias(self):
+        viewer = view_traj(
+            str(FIXTURES / "caffeine_water.pdb"),
+            xtc=str(FIXTURES / "caffeine_water_vibration.xtc"),
+            bonds="file",
+        )
+        pipe = viewer._pipeline_ref
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "structure"
+
 
 class TestBuildPipeline:
     """build_pipeline() convenience function builds correct pipelines."""
@@ -864,6 +893,11 @@ class TestBuildPipeline:
 
     def test_bonds_structure(self):
         pipe = build_pipeline(str(FIXTURES / "1crn.pdb"), bonds="structure")
+        bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
+        assert bond_cfg["bondSource"] == "structure"
+
+    def test_bonds_file_alias(self):
+        pipe = build_pipeline(str(FIXTURES / "1crn.pdb"), bonds="file")
         bond_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "add_bond")
         assert bond_cfg["bondSource"] == "structure"
 
