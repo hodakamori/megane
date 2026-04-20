@@ -112,7 +112,7 @@ class LoadStructure(PipelineNode):
 
 
 class LoadTrajectory(PipelineNode):
-    """Load an external trajectory file (XTC or ASE .traj).
+    """Load an external trajectory file (XTC, ASE .traj, or multi-frame XYZ).
 
     Requires connection from a ``LoadStructure`` node via
     ``pipe.add_edge(s.out.particle, t.inp.particle)``.
@@ -121,6 +121,7 @@ class LoadTrajectory(PipelineNode):
     Args:
         xtc: Path to XTC trajectory file.
         traj: Path to ASE .traj file.
+        xyz: Path to multi-frame XYZ file.
 
     Ports:
         inp.particle — atom topology source
@@ -136,10 +137,12 @@ class LoadTrajectory(PipelineNode):
         *,
         xtc: str | None = None,
         traj: str | None = None,
+        xyz: str | None = None,
     ) -> None:
         super().__init__()
         self.xtc = xtc
         self.traj = traj
+        self.xyz = xyz
 
 
 class Streaming(PipelineNode):
@@ -392,10 +395,7 @@ def _load_structure_file(path: str):
 
     ext = pathlib.Path(path).suffix.lower()
 
-    with open(path) as f:
-        text = f.read()
-
-    parsers = {
+    text_parsers = {
         ".pdb": megane_parser.parse_pdb,
         ".gro": megane_parser.parse_gro,
         ".xyz": megane_parser.parse_xyz,
@@ -404,12 +404,22 @@ def _load_structure_file(path: str):
         ".data": megane_parser.parse_lammps_data,
         ".lammps": megane_parser.parse_lammps_data,
     }
+    binary_parsers = {
+        ".traj": megane_parser.parse_traj,
+    }
 
-    parse_fn = parsers.get(ext)
-    if parse_fn is None:
-        raise ValueError(f"Unsupported structure format: {ext!r}.  Supported: {', '.join(sorted(parsers))}")
+    if ext in text_parsers:
+        with open(path) as f:
+            text = f.read()
+        result = text_parsers[ext](text)
+    elif ext in binary_parsers:
+        with open(path, "rb") as f:
+            data = f.read()
+        result = binary_parsers[ext](data)
+    else:
+        supported = sorted({*text_parsers, *binary_parsers})
+        raise ValueError(f"Unsupported structure format: {ext!r}.  Supported: {', '.join(supported)}")
 
-    result = parse_fn(text)
     return Structure(
         n_atoms=result.n_atoms,
         positions=np.asarray(result.positions, dtype=np.float32),
@@ -546,7 +556,8 @@ class Pipeline:
             ext = pathlib.Path(fname).suffix.lower()
             return LoadTrajectory(
                 xtc=fname if ext == ".xtc" else None,
-                traj=fname if ext != ".xtc" and fname else None,
+                traj=fname if ext == ".traj" else None,
+                xyz=fname if ext == ".xyz" else None,
             )
         elif ntype == "filter":
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
@@ -696,7 +707,7 @@ class Pipeline:
             base["hasTrajectory"] = False
             base["hasCell"] = has_cell
         elif isinstance(node, LoadTrajectory):
-            base["fileName"] = node.xtc or node.traj
+            base["fileName"] = node.xtc or node.traj or node.xyz
         elif isinstance(node, Streaming):
             base["connected"] = False
         elif isinstance(node, Filter):
@@ -766,16 +777,26 @@ class Pipeline:
         if node.xtc is not None:
             from megane.parsers.xtc import load_trajectory
 
-            self._trajectories[node._id] = load_trajectory(source.path, node.xtc)
-
-            # Update parent LoadStructure's hasTrajectory flag
-            if source._id in self._nodes:
-                self._nodes[source._id][1]["hasTrajectory"] = True
+            trajectory = load_trajectory(source.path, node.xtc)
+            self._trajectories[node._id] = trajectory
         elif node.traj is not None:
             from megane.parsers.traj import load_traj
 
             _, trajectory = load_traj(node.traj)
             self._trajectories[node._id] = trajectory
+        elif node.xyz is not None:
+            from megane.parsers.xyz import load_xyz_trajectory
+
+            _, trajectory = load_xyz_trajectory(node.xyz)
+            self._trajectories[node._id] = trajectory
+        else:
+            return
+
+        # Update parent LoadStructure's hasTrajectory flag. Only mark true
+        # when there is more than one frame — single-frame sources
+        # shouldn't advertise a playable trajectory to the frontend.
+        if trajectory.n_frames > 1 and source._id in self._nodes:
+            self._nodes[source._id][1]["hasTrajectory"] = True
 
 
 # ─── Convenience wrappers ────────────────────────────────────────────
@@ -834,6 +855,7 @@ def view_traj(
     *,
     xtc: str | None = None,
     traj: str | None = None,
+    xyz: str | None = None,
     bonds: Literal["distance", "structure"] | None = "distance",
     perspective: bool = False,
     cell_axes_visible: bool = True,
@@ -844,10 +866,16 @@ def view_traj(
     optional AddBonds node when *bonds* is not None) and returns a
     :class:`~megane.widget.MolecularViewer` widget.
 
+    When *path* points to a self-contained trajectory file (``.traj`` or
+    multi-frame ``.xyz``) and no explicit trajectory kwarg is provided,
+    the trajectory is auto-loaded from that same file.
+
     Args:
-        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        path: Path to a structure or self-contained trajectory file (PDB,
+            GRO, XYZ, MOL, LAMMPS data, ASE .traj).
         xtc: Path to an XTC trajectory file.
         traj: Path to an ASE ``.traj`` file.
+        xyz: Path to a multi-frame XYZ trajectory file.
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
             ``"structure"`` reads bonds from the file, ``None`` disables bonds.
         perspective: Use perspective projection instead of orthographic.
@@ -857,25 +885,41 @@ def view_traj(
         A :class:`~megane.widget.MolecularViewer` widget ready for display.
 
     Raises:
-        ValueError: If neither *xtc* nor *traj* is provided, or if both are
-            provided.
+        ValueError: If more than one of *xtc*, *traj*, *xyz* is provided,
+            or if none is provided and *path* isn't a self-contained
+            trajectory file.
 
     Example::
 
         import megane
         viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
+        viewer = megane.view_traj("trajectory.traj")   # auto-detects .traj
+        viewer = megane.view_traj("multiframe.xyz")    # auto-detects .xyz
         viewer.frame_index = 50
     """
-    if xtc is None and traj is None:
-        raise ValueError("Either 'xtc' or 'traj' must be provided. Use view() for structure-only display.")
-    if xtc is not None and traj is not None:
-        raise ValueError("Only one of 'xtc' or 'traj' can be provided, not both.")
+    import pathlib
+
+    if sum(x is not None for x in (xtc, traj, xyz)) > 1:
+        raise ValueError("Only one of 'xtc', 'traj', or 'xyz' can be provided, not multiple.")
+
+    if xtc is None and traj is None and xyz is None:
+        ext = pathlib.Path(path).suffix.lower()
+        if ext == ".traj":
+            traj = path
+        elif ext == ".xyz":
+            xyz = path
+        else:
+            raise ValueError(
+                "Either 'xtc', 'traj', or 'xyz' must be provided, "
+                "or 'path' must point to a .traj or .xyz file. "
+                "Use view() for structure-only display."
+            )
 
     from megane.widget import MolecularViewer
 
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure(path))
-    t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj))
+    t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj, xyz=xyz))
     v = pipe.add_node(Viewport(perspective=perspective, cell_axes_visible=cell_axes_visible))
 
     pipe.add_edge(s.out.particle, t.inp.particle)
@@ -898,6 +942,7 @@ def build_pipeline(
     *,
     xtc: str | None = None,
     traj: str | None = None,
+    xyz: str | None = None,
     bonds: Literal["distance", "structure"] | None = "distance",
     top: str | None = None,
     perspective: bool = False,
@@ -907,7 +952,7 @@ def build_pipeline(
     """Build a pipeline for a molecular structure, optionally with a trajectory.
 
     Constructs a :class:`Pipeline` with :class:`LoadStructure` and
-    :class:`Viewport` nodes.  When *xtc* or *traj* is provided, a
+    :class:`Viewport` nodes.  When *xtc*, *traj*, or *xyz* is provided, a
     :class:`LoadTrajectory` node is added.  When *bonds* is not ``None``
     (the default), an :class:`AddBonds` node is included.
 
@@ -917,9 +962,11 @@ def build_pipeline(
     programmatic modification.
 
     Args:
-        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data,
+            ASE .traj).
         xtc: Path to an XTC trajectory file.
         traj: Path to an ASE ``.traj`` file.
+        xyz: Path to a multi-frame XYZ trajectory file.
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
             ``"structure"`` reads bonds from the file, ``None`` disables bonds.
             Ignored when *top* is provided.
@@ -934,7 +981,7 @@ def build_pipeline(
         passing to :meth:`~megane.widget.MolecularViewer.set_pipeline`.
 
     Raises:
-        ValueError: If both *xtc* and *traj* are provided.
+        ValueError: If more than one of *xtc*, *traj*, *xyz* is provided.
 
     Example::
 
@@ -952,8 +999,8 @@ def build_pipeline(
         pipe = megane.build_pipeline("protein.pdb", top="topology.top")
         print(pipe.to_json())
     """
-    if xtc is not None and traj is not None:
-        raise ValueError("Only one of 'xtc' or 'traj' can be provided, not both.")
+    if sum(x is not None for x in (xtc, traj, xyz)) > 1:
+        raise ValueError("Only one of 'xtc', 'traj', or 'xyz' can be provided, not multiple.")
 
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure(path))
@@ -968,8 +1015,8 @@ def build_pipeline(
     pipe.add_edge(s.out.particle, v.inp.particle)
     pipe.add_edge(s.out.cell, v.inp.cell)
 
-    if xtc is not None or traj is not None:
-        t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj))
+    if xtc is not None or traj is not None or xyz is not None:
+        t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj, xyz=xyz))
         pipe.add_edge(s.out.particle, t.inp.particle)
         pipe.add_edge(t.out.traj, v.inp.traj)
 
