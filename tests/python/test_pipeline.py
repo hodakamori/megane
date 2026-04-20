@@ -1,6 +1,5 @@
 """Tests for the Python pipeline builder."""
 
-import importlib.util
 from pathlib import Path
 
 import pytest
@@ -811,10 +810,6 @@ class TestViewTrajWrapper:
         with pytest.raises(ValueError, match=r"Either 'xtc', 'traj', or 'xyz'"):
             view_traj(str(FIXTURES / "1crn.pdb"))
 
-    @pytest.mark.skipif(
-        not importlib.util.find_spec("ase"),
-        reason="ASE not installed",
-    )
     def test_returns_molecular_viewer_traj(self):
         from megane.widget import MolecularViewer
 
