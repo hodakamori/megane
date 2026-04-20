@@ -240,7 +240,8 @@ class AddBonds(PipelineNode):
 
     Args:
         source: ``"distance"`` for VDW-based inference,
-                ``"structure"`` to use bonds from the file.
+                ``"structure"`` (alias ``"file"``) to use bonds from the
+                loaded structure file.
         top: Path to a GROMACS ``.top`` topology file.  When provided,
              *source* is ignored and bonds are read from the topology.
 
@@ -256,11 +257,11 @@ class AddBonds(PipelineNode):
     def __init__(
         self,
         *,
-        source: Literal["distance", "structure"] = "distance",
+        source: Literal["distance", "structure", "file"] = "distance",
         top: str | None = None,
     ) -> None:
         super().__init__()
-        self.source = source
+        self.source = "structure" if source == "file" else source
         self.top = top
 
 
@@ -805,7 +806,7 @@ class Pipeline:
 def view(
     path: str,
     *,
-    bonds: Literal["distance", "structure"] | None = "distance",
+    bonds: Literal["distance", "structure", "file"] | None = "distance",
     perspective: bool = False,
     cell_axes_visible: bool = True,
 ) -> "MolecularViewer":
@@ -819,7 +820,8 @@ def view(
     Args:
         path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
-            ``"structure"`` reads bonds from the file, ``None`` disables bonds.
+            ``"structure"`` (alias ``"file"``) reads bonds from the loaded
+            structure file, ``None`` disables bonds.
         perspective: Use perspective projection instead of orthographic.
         cell_axes_visible: Show unit cell axes.
 
@@ -856,7 +858,7 @@ def view_traj(
     xtc: str | None = None,
     traj: str | None = None,
     xyz: str | None = None,
-    bonds: Literal["distance", "structure"] | None = "distance",
+    bonds: Literal["distance", "structure", "file"] | None = "distance",
     perspective: bool = False,
     cell_axes_visible: bool = True,
 ) -> "MolecularViewer":
@@ -876,8 +878,10 @@ def view_traj(
         xtc: Path to an XTC trajectory file.
         traj: Path to an ASE ``.traj`` file.
         xyz: Path to a multi-frame XYZ trajectory file.
-        bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
-            ``"structure"`` reads bonds from the file, ``None`` disables bonds.
+        bonds: Bond detection method. ``"distance"`` (default) uses VDW radii
+            and is recomputed per frame during trajectory playback,
+            ``"structure"`` (alias ``"file"``) reads bonds once from the
+            loaded structure file, ``None`` disables bonds.
         perspective: Use perspective projection instead of orthographic.
         cell_axes_visible: Show unit cell axes.
 
@@ -943,7 +947,7 @@ def build_pipeline(
     xtc: str | None = None,
     traj: str | None = None,
     xyz: str | None = None,
-    bonds: Literal["distance", "structure"] | None = "distance",
+    bonds: Literal["distance", "structure", "file"] | None = "distance",
     top: str | None = None,
     perspective: bool = False,
     cell_axes_visible: bool = True,
@@ -968,8 +972,9 @@ def build_pipeline(
         traj: Path to an ASE ``.traj`` file.
         xyz: Path to a multi-frame XYZ trajectory file.
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
-            ``"structure"`` reads bonds from the file, ``None`` disables bonds.
-            Ignored when *top* is provided.
+            ``"structure"`` (alias ``"file"``) reads bonds from the loaded
+            structure file, ``None`` disables bonds. Ignored when *top* is
+            provided.
         top: Path to a GROMACS ``.top`` topology file for bond definitions.
             When provided, overrides *bonds*.
         perspective: Use perspective projection instead of orthographic.
