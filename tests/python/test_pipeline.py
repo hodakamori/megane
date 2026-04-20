@@ -808,7 +808,7 @@ class TestViewTrajWrapper:
         assert viewer.total_frames > 0
 
     def test_raises_without_trajectory(self):
-        with pytest.raises(ValueError, match="Either 'xtc' or 'traj'"):
+        with pytest.raises(ValueError, match=r"Either 'xtc', 'traj', or 'xyz'"):
             view_traj(str(FIXTURES / "1crn.pdb"))
 
     @pytest.mark.skipif(

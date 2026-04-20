@@ -1,4 +1,4 @@
-"""ASE .traj file reader backed by shared Rust megane-core via PyO3."""
+"""Multi-frame XYZ trajectory reader backed by shared Rust megane-core via PyO3."""
 
 from __future__ import annotations
 
@@ -10,30 +10,30 @@ from megane import megane_parser
 from megane.parsers.common import InMemoryTrajectory
 from megane.parsers.pdb import Structure
 
-__all__ = ["load_traj", "InMemoryTrajectory"]
+__all__ = ["load_xyz_trajectory", "InMemoryTrajectory"]
 
 logger = logging.getLogger(__name__)
 
 
-def load_traj(path: str) -> tuple[Structure, InMemoryTrajectory]:
-    """Load an ASE .traj file as structure + trajectory.
+def load_xyz_trajectory(path: str) -> tuple[Structure, InMemoryTrajectory]:
+    """Load a multi-frame XYZ file as structure + trajectory.
 
-    Uses the Rust .traj parser (megane-core) instead of ASE.
-    The first frame defines the topology (elements, bonds). All frames
-    are read into memory.
+    Uses the Rust XYZ parser (megane-core). The first frame defines the
+    topology (elements). All frames are read into memory. Single-frame
+    XYZ files are returned as a 1-frame trajectory.
 
     Args:
-        path: Path to .traj file.
+        path: Path to XYZ file.
 
     Returns:
         Tuple of (Structure, InMemoryTrajectory).
     """
-    logger.debug("Loading ASE .traj file: %s", path)
+    logger.debug("Loading XYZ trajectory: %s", path)
 
-    with open(path, "rb") as f:
-        data = f.read()
+    with open(path) as f:
+        text = f.read()
 
-    result = megane_parser.parse_traj(data)
+    result = megane_parser.parse_xyz(text)
 
     n_atoms = result.n_atoms
     positions = np.asarray(result.positions, dtype=np.float32)
@@ -69,5 +69,5 @@ def load_traj(path: str) -> tuple[Structure, InMemoryTrajectory]:
         box=box_matrix,
     )
 
-    logger.info("Loaded .traj: %d frames, %d atoms, %d bonds", n_frames, n_atoms, len(bonds))
+    logger.info("Loaded XYZ: %d frames, %d atoms", n_frames, n_atoms)
     return structure, trajectory

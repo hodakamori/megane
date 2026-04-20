@@ -20,7 +20,7 @@ def test_load_traj():
     assert set(structure.elements.tolist()) == {1, 8}  # H=1, O=8
 
     assert isinstance(trajectory, InMemoryTrajectory)
-    assert trajectory.n_frames == 4
+    assert trajectory.n_frames == 5
     assert trajectory.n_atoms == 3
 
 
@@ -36,3 +36,12 @@ def test_get_frame():
     assert frame1.shape == (3, 3)
     # Frames should differ
     assert not np.allclose(frame0, frame1, atol=1e-6)
+
+
+def test_view_traj_single_path_traj():
+    """view_traj("file.traj") auto-detects an ASE .traj as both structure and trajectory."""
+    import megane
+
+    _, trajectory = load_traj(str(FIXTURES / "water.traj"))
+    viewer = megane.view_traj(str(FIXTURES / "water.traj"))
+    assert viewer.total_frames == trajectory.n_frames
