@@ -262,9 +262,9 @@ export function inferBondsVdwJS(
             const dxo = OFFSETS[o * 3];
             const dyo = OFFSETS[o * 3 + 1];
             const dzo = OFFSETS[o * 3 + 2];
-            const jx = ((ix + dxo) % nx + nx) % nx;
-            const jy = ((iy + dyo) % ny + ny) % ny;
-            const jz = ((iz + dzo) % nz + nz) % nz;
+            const jx = (((ix + dxo) % nx) + nx) % nx;
+            const jy = (((iy + dyo) % ny) + ny) % ny;
+            const jz = (((iz + dzo) % nz) + nz) % nz;
             const nbrIdx = jx * nyz + jy * nz + jz;
             // In very small boxes, wrapped neighbor can map back to self — skip to avoid dup.
             if (nbrIdx === cellIdx) continue;
