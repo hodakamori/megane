@@ -5,6 +5,12 @@
  *
  * Uses a cell-list spatial data structure for O(N) performance.
  * Supports periodic boundary conditions (PBC) via minimum-image convention.
+ *
+ * Hot-path notes:
+ * - CSR cell list (two Uint32Arrays) instead of `number[][]` — no per-cell heap allocation.
+ * - Per-atom VDW radius precomputed into a Float32Array — no Record lookups in the inner loop.
+ * - Pair-check body inlined; PBC / non-PBC paths specialized into separate loops.
+ * - Bond pairs written to a growable Uint32Array — no intermediate `number[]` + `push`.
  */
 
 import { VDW_RADII, DEFAULT_RADIUS } from "../constants";
@@ -13,6 +19,25 @@ import { invert3x3 } from "../pipeline/executors/mathUtils";
 const DEFAULT_VDW_BOND_FACTOR = 0.6;
 const MIN_BOND_DIST = 0.4;
 const CELL_SIZE = 2.0;
+
+// 13 half-shell neighbor offsets (flattened to avoid per-iteration array destructure).
+// prettier-ignore
+const OFFSETS = new Int8Array([
+  0, 0, 1,
+  0, 1, -1,
+  0, 1, 0,
+  0, 1, 1,
+  1, -1, -1,
+  1, -1, 0,
+  1, -1, 1,
+  1, 0, -1,
+  1, 0, 0,
+  1, 0, 1,
+  1, 1, -1,
+  1, 1, 0,
+  1, 1, 1,
+]);
+const N_OFFSETS = 13;
 
 /**
  * Infer bonds based on van der Waals radii.
@@ -35,18 +60,28 @@ export function inferBondsVdwJS(
   const boxInv = hasBox ? invert3x3(box!) : null;
   const usePbc = hasBox && boxInv !== null;
 
+  // Precompute per-atom VDW radius — replaces the per-pair Record lookup.
+  const radii = new Float32Array(nAtoms);
+  for (let i = 0; i < nAtoms; i++) {
+    const r = VDW_RADII[elements[i]];
+    radii[i] = r !== undefined ? r : DEFAULT_RADIUS;
+  }
+
   let nx: number, ny: number, nz: number;
+  // originX/Y/Z are subtracted from positions before grid assignment (0 in PBC mode).
+  let originX = 0,
+    originY = 0,
+    originZ = 0;
 
   if (usePbc) {
-    // Use box vector lengths for grid dimensions
-    const lx = Math.sqrt(box![0] * box![0] + box![1] * box![1] + box![2] * box![2]);
-    const ly = Math.sqrt(box![3] * box![3] + box![4] * box![4] + box![5] * box![5]);
-    const lz = Math.sqrt(box![6] * box![6] + box![7] * box![7] + box![8] * box![8]);
+    const b = box!;
+    const lx = Math.sqrt(b[0] * b[0] + b[1] * b[1] + b[2] * b[2]);
+    const ly = Math.sqrt(b[3] * b[3] + b[4] * b[4] + b[5] * b[5]);
+    const lz = Math.sqrt(b[6] * b[6] + b[7] * b[7] + b[8] * b[8]);
     nx = Math.max(1, Math.floor(lx / CELL_SIZE));
     ny = Math.max(1, Math.floor(ly / CELL_SIZE));
     nz = Math.max(1, Math.floor(lz / CELL_SIZE));
   } else {
-    // Compute bounding box
     let minX = Infinity,
       minY = Infinity,
       minZ = Infinity;
@@ -64,146 +99,269 @@ export function inferBondsVdwJS(
       if (y > maxY) maxY = y;
       if (z > maxZ) maxZ = z;
     }
+    originX = minX;
+    originY = minY;
+    originZ = minZ;
     nx = Math.max(1, Math.floor((maxX - minX) / CELL_SIZE) + 1);
     ny = Math.max(1, Math.floor((maxY - minY) / CELL_SIZE) + 1);
     nz = Math.max(1, Math.floor((maxZ - minZ) / CELL_SIZE) + 1);
   }
 
-  // Build cell list: for each cell, store array of atom indices
+  const nyz = ny * nz;
   const nCells = nx * ny * nz;
-  const cells: number[][] = new Array(nCells);
-  for (let c = 0; c < nCells; c++) cells[c] = [];
+
+  // CSR cell list: assign every atom a cell index, then counting-sort into a flat array.
+  const atomCell = new Uint32Array(nAtoms);
+  const cellStart = new Uint32Array(nCells + 1);
 
   if (usePbc) {
-    // Assign atoms using fractional coordinates wrapped to [0, 1)
+    const bi0 = boxInv![0],
+      bi1 = boxInv![1],
+      bi2 = boxInv![2];
+    const bi3 = boxInv![3],
+      bi4 = boxInv![4],
+      bi5 = boxInv![5];
+    const bi6 = boxInv![6],
+      bi7 = boxInv![7],
+      bi8 = boxInv![8];
+    const nxF = nx,
+      nyF = ny,
+      nzF = nz;
     for (let i = 0; i < nAtoms; i++) {
       const px = positions[i * 3];
       const py = positions[i * 3 + 1];
       const pz = positions[i * 3 + 2];
-      // Convert to fractional
-      let fx = boxInv![0] * px + boxInv![3] * py + boxInv![6] * pz;
-      let fy = boxInv![1] * px + boxInv![4] * py + boxInv![7] * pz;
-      let fz = boxInv![2] * px + boxInv![5] * py + boxInv![8] * pz;
-      // Wrap to [0, 1)
+      let fx = bi0 * px + bi3 * py + bi6 * pz;
+      let fy = bi1 * px + bi4 * py + bi7 * pz;
+      let fz = bi2 * px + bi5 * py + bi8 * pz;
       fx = fx - Math.floor(fx);
       fy = fy - Math.floor(fy);
       fz = fz - Math.floor(fz);
-      const cx = Math.min(Math.floor(fx * nx), nx - 1);
-      const cy = Math.min(Math.floor(fy * ny), ny - 1);
-      const cz = Math.min(Math.floor(fz * nz), nz - 1);
-      cells[cx * ny * nz + cy * nz + cz].push(i);
+      let cx = (fx * nxF) | 0;
+      let cy = (fy * nyF) | 0;
+      let cz = (fz * nzF) | 0;
+      if (cx >= nxF) cx = nxF - 1;
+      if (cy >= nyF) cy = nyF - 1;
+      if (cz >= nzF) cz = nzF - 1;
+      const idx = cx * nyz + cy * nz + cz;
+      atomCell[i] = idx;
+      cellStart[idx + 1]++;
     }
   } else {
-    // Original bounding-box assignment
-    let minX = Infinity,
-      minY = Infinity,
-      minZ = Infinity;
     for (let i = 0; i < nAtoms; i++) {
-      if (positions[i * 3] < minX) minX = positions[i * 3];
-      if (positions[i * 3 + 1] < minY) minY = positions[i * 3 + 1];
-      if (positions[i * 3 + 2] < minZ) minZ = positions[i * 3 + 2];
-    }
-    for (let i = 0; i < nAtoms; i++) {
-      const cx = Math.min(Math.floor((positions[i * 3] - minX) / CELL_SIZE), nx - 1);
-      const cy = Math.min(Math.floor((positions[i * 3 + 1] - minY) / CELL_SIZE), ny - 1);
-      const cz = Math.min(Math.floor((positions[i * 3 + 2] - minZ) / CELL_SIZE), nz - 1);
-      cells[cx * ny * nz + cy * nz + cz].push(i);
+      const px = positions[i * 3] - originX;
+      const py = positions[i * 3 + 1] - originY;
+      const pz = positions[i * 3 + 2] - originZ;
+      let cx = (px / CELL_SIZE) | 0;
+      let cy = (py / CELL_SIZE) | 0;
+      let cz = (pz / CELL_SIZE) | 0;
+      if (cx >= nx) cx = nx - 1;
+      if (cy >= ny) cy = ny - 1;
+      if (cz >= nz) cz = nz - 1;
+      const idx = cx * nyz + cy * nz + cz;
+      atomCell[i] = idx;
+      cellStart[idx + 1]++;
     }
   }
 
-  // Half-shell neighbor offsets (13 neighbors + self)
-  const offsets: [number, number, number][] = [
-    [0, 0, 1],
-    [0, 1, -1],
-    [0, 1, 0],
-    [0, 1, 1],
-    [1, -1, -1],
-    [1, -1, 0],
-    [1, -1, 1],
-    [1, 0, -1],
-    [1, 0, 0],
-    [1, 0, 1],
-    [1, 1, -1],
-    [1, 1, 0],
-    [1, 1, 1],
-  ];
+  // Prefix-sum the per-cell counts, then scatter atoms into cellAtoms.
+  for (let c = 0; c < nCells; c++) {
+    cellStart[c + 1] += cellStart[c];
+  }
+  const cellAtoms = new Uint32Array(nAtoms);
+  // Use cellStart as a moving cursor; restore afterward by shifting.
+  for (let i = 0; i < nAtoms; i++) {
+    const c = atomCell[i];
+    const pos = cellStart[c]++;
+    cellAtoms[pos] = i;
+  }
+  // Shift cellStart back so cellStart[c] points to the start of cell c again.
+  for (let c = nCells; c > 0; c--) {
+    cellStart[c] = cellStart[c - 1];
+  }
+  cellStart[0] = 0;
+
+  // Output buffer — grows by doubling.
+  let outBuf = new Uint32Array(Math.min(nAtoms * 8, 1024));
+  let outLen = 0;
+
+  const pushBond = (a: number, b: number): void => {
+    if (outLen + 2 > outBuf.length) {
+      const grown = new Uint32Array(outBuf.length * 2);
+      grown.set(outBuf);
+      outBuf = grown;
+    }
+    outBuf[outLen++] = a;
+    outBuf[outLen++] = b;
+  };
 
   const minDistSq = MIN_BOND_DIST * MIN_BOND_DIST;
-  const bondPairs: number[] = [];
 
-  function checkPair(i: number, j: number): void {
-    const ri = VDW_RADII[elements[i]] ?? DEFAULT_RADIUS;
-    const rj = VDW_RADII[elements[j]] ?? DEFAULT_RADIUS;
-    const threshold = (ri + rj) * vdwScale;
-    const thresholdSq = threshold * threshold;
+  if (usePbc) {
+    const b = box!;
+    const b0 = b[0],
+      b1 = b[1],
+      b2 = b[2];
+    const b3 = b[3],
+      b4 = b[4],
+      b5 = b[5];
+    const b6 = b[6],
+      b7 = b[7],
+      b8 = b[8];
+    const bi0 = boxInv![0],
+      bi1 = boxInv![1],
+      bi2 = boxInv![2];
+    const bi3 = boxInv![3],
+      bi4 = boxInv![4],
+      bi5 = boxInv![5];
+    const bi6 = boxInv![6],
+      bi7 = boxInv![7],
+      bi8 = boxInv![8];
 
-    let dx = positions[j * 3] - positions[i * 3];
-    let dy = positions[j * 3 + 1] - positions[i * 3 + 1];
-    let dz = positions[j * 3 + 2] - positions[i * 3 + 2];
+    for (let ix = 0; ix < nx; ix++) {
+      for (let iy = 0; iy < ny; iy++) {
+        for (let iz = 0; iz < nz; iz++) {
+          const cellIdx = ix * nyz + iy * nz + iz;
+          const aStart = cellStart[cellIdx];
+          const aEnd = cellStart[cellIdx + 1];
 
-    if (usePbc) {
-      // Minimum-image convention
-      let sx = boxInv![0] * dx + boxInv![3] * dy + boxInv![6] * dz;
-      let sy = boxInv![1] * dx + boxInv![4] * dy + boxInv![7] * dz;
-      let sz = boxInv![2] * dx + boxInv![5] * dy + boxInv![8] * dz;
-      sx -= Math.round(sx);
-      sy -= Math.round(sy);
-      sz -= Math.round(sz);
-      dx = box![0] * sx + box![3] * sy + box![6] * sz;
-      dy = box![1] * sx + box![4] * sy + box![7] * sz;
-      dz = box![2] * sx + box![5] * sy + box![8] * sz;
-    }
-
-    const distSq = dx * dx + dy * dy + dz * dz;
-
-    if (distSq > minDistSq && distSq <= thresholdSq) {
-      const a = i < j ? i : j;
-      const b = i < j ? j : i;
-      bondPairs.push(a, b);
-    }
-  }
-
-  // Self-cell pairs + neighbor-cell pairs
-  for (let ix = 0; ix < nx; ix++) {
-    for (let iy = 0; iy < ny; iy++) {
-      for (let iz = 0; iz < nz; iz++) {
-        const cellIdx = ix * ny * nz + iy * nz + iz;
-        const cell = cells[cellIdx];
-
-        // Pairs within the same cell
-        for (let a = 0; a < cell.length; a++) {
-          for (let b = a + 1; b < cell.length; b++) {
-            checkPair(cell[a], cell[b]);
-          }
-        }
-
-        // Pairs with neighbor cells (half-shell)
-        for (const [dx, dy, dz] of offsets) {
-          const jx = ix + dx;
-          const jy = iy + dy;
-          const jz = iz + dz;
-
-          if (usePbc) {
-            // Wrap neighbor cell indices with modular arithmetic
-            const jxW = ((jx % nx) + nx) % nx;
-            const jyW = ((jy % ny) + ny) % ny;
-            const jzW = ((jz % nz) + nz) % nz;
-            const neighborIdx = jxW * ny * nz + jyW * nz + jzW;
-            // Skip if wrapped cell is the same as current cell (small boxes)
-            if (neighborIdx === cellIdx) continue;
-            const neighbor = cells[neighborIdx];
-            for (const ai of cell) {
-              for (const bi of neighbor) {
-                checkPair(ai, bi);
+          // Self-cell pairs.
+          for (let a = aStart; a < aEnd; a++) {
+            const i = cellAtoms[a];
+            const ix3 = i * 3;
+            const pix = positions[ix3];
+            const piy = positions[ix3 + 1];
+            const piz = positions[ix3 + 2];
+            const ri = radii[i];
+            for (let b2i = a + 1; b2i < aEnd; b2i++) {
+              const j = cellAtoms[b2i];
+              const jx3 = j * 3;
+              let dx = positions[jx3] - pix;
+              let dy = positions[jx3 + 1] - piy;
+              let dz = positions[jx3 + 2] - piz;
+              let sx = bi0 * dx + bi3 * dy + bi6 * dz;
+              let sy = bi1 * dx + bi4 * dy + bi7 * dz;
+              let sz = bi2 * dx + bi5 * dy + bi8 * dz;
+              sx -= Math.round(sx);
+              sy -= Math.round(sy);
+              sz -= Math.round(sz);
+              dx = b0 * sx + b3 * sy + b6 * sz;
+              dy = b1 * sx + b4 * sy + b7 * sz;
+              dz = b2 * sx + b5 * sy + b8 * sz;
+              const distSq = dx * dx + dy * dy + dz * dz;
+              const th = (ri + radii[j]) * vdwScale;
+              if (distSq > minDistSq && distSq <= th * th) {
+                if (i < j) pushBond(i, j);
+                else pushBond(j, i);
               }
             }
-          } else {
+          }
+
+          // Neighbor-cell pairs (half-shell).
+          for (let o = 0; o < N_OFFSETS; o++) {
+            const dxo = OFFSETS[o * 3];
+            const dyo = OFFSETS[o * 3 + 1];
+            const dzo = OFFSETS[o * 3 + 2];
+            const jx = ((ix + dxo) % nx + nx) % nx;
+            const jy = ((iy + dyo) % ny + ny) % ny;
+            const jz = ((iz + dzo) % nz + nz) % nz;
+            const nbrIdx = jx * nyz + jy * nz + jz;
+            // In very small boxes, wrapped neighbor can map back to self — skip to avoid dup.
+            if (nbrIdx === cellIdx) continue;
+            const bStart = cellStart[nbrIdx];
+            const bEnd = cellStart[nbrIdx + 1];
+            for (let a = aStart; a < aEnd; a++) {
+              const i = cellAtoms[a];
+              const ix3 = i * 3;
+              const pix = positions[ix3];
+              const piy = positions[ix3 + 1];
+              const piz = positions[ix3 + 2];
+              const ri = radii[i];
+              for (let bb = bStart; bb < bEnd; bb++) {
+                const j = cellAtoms[bb];
+                const jx3 = j * 3;
+                let dx = positions[jx3] - pix;
+                let dy = positions[jx3 + 1] - piy;
+                let dz = positions[jx3 + 2] - piz;
+                let sx = bi0 * dx + bi3 * dy + bi6 * dz;
+                let sy = bi1 * dx + bi4 * dy + bi7 * dz;
+                let sz = bi2 * dx + bi5 * dy + bi8 * dz;
+                sx -= Math.round(sx);
+                sy -= Math.round(sy);
+                sz -= Math.round(sz);
+                dx = b0 * sx + b3 * sy + b6 * sz;
+                dy = b1 * sx + b4 * sy + b7 * sz;
+                dz = b2 * sx + b5 * sy + b8 * sz;
+                const distSq = dx * dx + dy * dy + dz * dz;
+                const th = (ri + radii[j]) * vdwScale;
+                if (distSq > minDistSq && distSq <= th * th) {
+                  if (i < j) pushBond(i, j);
+                  else pushBond(j, i);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } else {
+    // Non-PBC: plain Cartesian distance, no minimum-image math.
+    for (let ix = 0; ix < nx; ix++) {
+      for (let iy = 0; iy < ny; iy++) {
+        for (let iz = 0; iz < nz; iz++) {
+          const cellIdx = ix * nyz + iy * nz + iz;
+          const aStart = cellStart[cellIdx];
+          const aEnd = cellStart[cellIdx + 1];
+
+          for (let a = aStart; a < aEnd; a++) {
+            const i = cellAtoms[a];
+            const ix3 = i * 3;
+            const pix = positions[ix3];
+            const piy = positions[ix3 + 1];
+            const piz = positions[ix3 + 2];
+            const ri = radii[i];
+            for (let b2i = a + 1; b2i < aEnd; b2i++) {
+              const j = cellAtoms[b2i];
+              const jx3 = j * 3;
+              const dx = positions[jx3] - pix;
+              const dy = positions[jx3 + 1] - piy;
+              const dz = positions[jx3 + 2] - piz;
+              const distSq = dx * dx + dy * dy + dz * dz;
+              const th = (ri + radii[j]) * vdwScale;
+              if (distSq > minDistSq && distSq <= th * th) {
+                if (i < j) pushBond(i, j);
+                else pushBond(j, i);
+              }
+            }
+          }
+
+          for (let o = 0; o < N_OFFSETS; o++) {
+            const jx = ix + OFFSETS[o * 3];
+            const jy = iy + OFFSETS[o * 3 + 1];
+            const jz = iz + OFFSETS[o * 3 + 2];
             if (jx < 0 || jx >= nx || jy < 0 || jy >= ny || jz < 0 || jz >= nz) continue;
-            const neighborIdx = jx * ny * nz + jy * nz + jz;
-            const neighbor = cells[neighborIdx];
-            for (const ai of cell) {
-              for (const bi of neighbor) {
-                checkPair(ai, bi);
+            const nbrIdx = jx * nyz + jy * nz + jz;
+            const bStart = cellStart[nbrIdx];
+            const bEnd = cellStart[nbrIdx + 1];
+            for (let a = aStart; a < aEnd; a++) {
+              const i = cellAtoms[a];
+              const ix3 = i * 3;
+              const pix = positions[ix3];
+              const piy = positions[ix3 + 1];
+              const piz = positions[ix3 + 2];
+              const ri = radii[i];
+              for (let bb = bStart; bb < bEnd; bb++) {
+                const j = cellAtoms[bb];
+                const jx3 = j * 3;
+                const dx = positions[jx3] - pix;
+                const dy = positions[jx3 + 1] - piy;
+                const dz = positions[jx3 + 2] - piz;
+                const distSq = dx * dx + dy * dy + dz * dz;
+                const th = (ri + radii[j]) * vdwScale;
+                if (distSq > minDistSq && distSq <= th * th) {
+                  if (i < j) pushBond(i, j);
+                  else pushBond(j, i);
+                }
               }
             }
           }
@@ -212,5 +370,5 @@ export function inferBondsVdwJS(
     }
   }
 
-  return new Uint32Array(bondPairs);
+  return outBuf.slice(0, outLen);
 }

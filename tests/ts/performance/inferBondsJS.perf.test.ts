@@ -37,6 +37,16 @@ describe("performance: inferBondsVdwJS", () => {
     expect(time).toBeLessThan(200);
   });
 
+  it("3,000 atoms with 44x44x44 PBC box stays within a 30fps frame budget", () => {
+    // Matches the caffeine_water.pdb template (3024 atoms, 44A PBC box) that
+    // the per-frame bond recalc runs for during trajectory playback.
+    const { positions, elements } = generateAtoms(3_000, 44);
+    const box = new Float32Array([44, 0, 0, 0, 44, 0, 0, 0, 44]);
+    const time = benchmark(() => inferBondsVdwJS(positions, elements, 3_000, 0.6, box));
+    console.log(`  inferBondsVdwJS 3k atoms (PBC 44A): ${time.toFixed(1)}ms`);
+    expect(time).toBeLessThan(33);
+  });
+
   it("10,000 atoms completes under 2000ms", () => {
     const { positions, elements } = generateAtoms(10_000, 40);
     const time = benchmark(() => inferBondsVdwJS(positions, elements, 10_000));

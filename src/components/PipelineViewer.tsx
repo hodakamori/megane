@@ -27,7 +27,7 @@
  *   />
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { Viewport } from "./Viewport";
 import { Timeline } from "./Timeline";
@@ -228,14 +228,21 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
 
   // ─── Per-frame bond recalculation (distance mode) ────────────────
 
+  // Memoized so effect below does not refire on unrelated node edits
+  // (position, colour, other params) — only when distance-bond mode toggles.
+  const hasDistanceBond = useMemo(
+    () =>
+      nodes.some(
+        (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
+      ),
+    [nodes],
+  );
+
   useEffect(() => {
+    if (!hasDistanceBond) return;
     if (!currentFrameData || !primarySnapshot) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
-    const hasDistanceBond = nodes.some(
-      (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
-    );
-    if (!hasDistanceBond) return;
 
     const newBonds = inferBondsVdwJS(
       currentFrameData.positions,
@@ -259,7 +266,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
       result.elements,
       result.nAtoms,
     );
-  }, [currentFrameData, primarySnapshot, nodes]);
+  }, [currentFrameData, primarySnapshot, hasDistanceBond]);
 
   // ─── Playback ────────────────────────────────────────────────────
 
