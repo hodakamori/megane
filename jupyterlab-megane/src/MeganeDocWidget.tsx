@@ -47,7 +47,11 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
 
   if (typeof state === "object") {
     return (
-      <div className="megane-jupyter-status error">
+      <div
+        className="megane-jupyter-status error"
+        data-testid="megane-doc-root"
+        data-state="error"
+      >
         <div className="label">Error</div>
         <div>{state.error}</div>
       </div>
@@ -55,10 +59,19 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
   }
 
   if (state === "loading") {
-    return <div className="megane-jupyter-status">Loading structure...</div>;
+    return (
+      <div
+        className="megane-jupyter-status"
+        data-testid="megane-doc-root"
+        data-state="loading"
+      >
+        Loading structure...
+      </div>
+    );
   }
 
   return (
+    <div data-testid="megane-doc-root" data-state="ready" style={{ width: "100%", height: "100%" }}>
     <MeganeViewer
       snapshot={local.snapshot}
       frame={local.frame}
@@ -76,6 +89,7 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
       onLoadVectorFile={(f: File) => local.loadVectorFile(f)}
       onLoadDemoVectors={() => local.loadDemoVectors()}
     />
+    </div>
   );
 }
 

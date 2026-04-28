@@ -28,6 +28,8 @@ export function MeasurementPanel({
 
   return (
     <div
+      data-testid="measurement-panel"
+      data-selection-count={selection.atoms.length}
       style={{
         position: "absolute",
         bottom: 60,
@@ -56,6 +58,7 @@ export function MeasurementPanel({
         <strong style={{ letterSpacing: "-0.01em" }}>Selection</strong>
         <button
           onClick={onClear}
+          data-testid="measurement-clear"
           style={{
             background: "none",
             border: "none",
