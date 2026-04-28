@@ -1,0 +1,19 @@
+/**
+ * Ambient declarations for the `@megane/*` aliases. The actual modules live
+ * under `../src/*` (the shared megane frontend) and are resolved by webpack
+ * at bundle time via the alias in webpack.config.js. We declare them here so
+ * tsc does not try to follow the alias into the parent source tree (which
+ * would force tsc to emit those files outside our rootDir).
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+declare module "@megane/components/MeganeViewer" {
+  import type { ComponentType } from "react";
+  export const MeganeViewer: ComponentType<any>;
+}
+
+declare module "@megane/hooks/useMeganeLocal" {
+  export function useMeganeLocal(): any;
+}
+
+declare module "@megane/styles/megane.css";

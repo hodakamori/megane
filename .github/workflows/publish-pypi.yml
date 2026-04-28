@@ -40,6 +40,11 @@ jobs:
           node-version: "22"
           cache: "npm"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install jupyterlab
+
       - run: npm ci
       - run: npm run build
 
@@ -47,6 +52,11 @@ jobs:
         with:
           name: frontend-assets
           path: python/megane/static/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: labextension-assets
+          path: wheel-share/
 
   build-wheels:
     name: Build wheels (${{ matrix.os }}-${{ matrix.target }})
@@ -66,6 +76,11 @@ jobs:
         with:
           name: frontend-assets
           path: python/megane/static/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: labextension-assets
+          path: wheel-share/
 
       - uses: PyO3/maturin-action@v1
         with:
@@ -89,6 +104,11 @@ jobs:
         with:
           name: frontend-assets
           path: python/megane/static/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: labextension-assets
+          path: wheel-share/
 
       - uses: PyO3/maturin-action@v1
         with:

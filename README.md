@@ -49,6 +49,7 @@ One codebase, every environment.
 | Environment | How | Install |
 |---|---|---|
 | **Jupyter** | anywidget inline viewer | `pip install megane` |
+| **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .cif from the file browser | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
 | **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .cif | Extension |

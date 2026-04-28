@@ -20,6 +20,10 @@ crates/megane-wasm/pkg/
 *.so
 python/megane/static/app/
 python/megane/static/caffeine_water.pdb
+wheel-share/data/share/jupyter/labextensions/megane-jupyterlab/
+jupyterlab-megane/lib/
+jupyterlab-megane/node_modules/
+jupyterlab-megane/tsconfig.tsbuildinfo
 .ipynb_checkpoints/
 docs/node_modules
 docs/.docusaurus/

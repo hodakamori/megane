@@ -1,0 +1,5 @@
+{
+  "packageManager": "python",
+  "packageName": "megane",
+  "uninstallInstructions": "Use your Python package manager (pip/uv/conda) to uninstall the megane package."
+}

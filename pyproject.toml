@@ -51,7 +51,11 @@ manifest-path = "crates/megane-python/Cargo.toml"
 python-source = "python"
 module-name = "megane.megane_parser"
 features = ["pyo3/extension-module"]
-include = ["python/megane/static/**", "LICENSE"]
+data = "wheel-share"
+include = [
+    { path = "python/megane/static/**/*", format = ["sdist", "wheel"] },
+    "LICENSE",
+]
 
 [tool.ruff]
 target-version = "py310"
