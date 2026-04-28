@@ -46,6 +46,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node tests/e2e/snapshot.test.mjs",
+    "test:e2e:vscode": "node tests/e2e/vscode_full_screen.test.mjs",
+    "test:e2e:vscode:update": "node tests/e2e/vscode_full_screen.test.mjs --update",
     "test:all": "vitest run && node tests/e2e/snapshot.test.mjs",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
