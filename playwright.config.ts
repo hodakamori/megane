@@ -36,10 +36,17 @@ export default defineConfig({
     video: "retain-on-failure",
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
-    // Note: explicit --use-gl=swiftshader was removed. Headless Chromium
-    // already uses SwANGLE under the hood, and forcing swiftshader can
-    // break WebGL2 context creation on minimal CI images that lack the
-    // required system GL libs. The fonts flags caused similar issues.
+    launchOptions: {
+      args: [
+        // GitHub Actions ubuntu-latest runners only allocate 64MB to
+        // /dev/shm, which headless Chromium can exhaust when loading
+        // our ~300KB WASM bundle alongside Three.js textures. The
+        // resulting silent renderer crash leaves __megane_test_ready
+        // never set, which is what was causing the webapp / contract
+        // specs to time out on waitForReady in CI.
+        "--disable-dev-shm-usage",
+      ],
+    },
   },
 
   projects: [

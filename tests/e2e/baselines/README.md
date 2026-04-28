@@ -1,44 +1,44 @@
 # Baseline images for cross-platform E2E
 
 Each subdirectory holds the reference PNGs for one Playwright project.
-Baselines are **environment-specific** (Chromium swiftshader output is
-GPU/driver-independent but font metrics differ between hosts), so they
-must be generated on the same OS image used by CI (`ubuntu-latest`).
+Baselines are committed to the repository so CI can compare against
+them on every run.
 
 ## First-run behaviour
 
 If a baseline file does not exist when a spec runs, `compareToBaseline()`
 in `tests/e2e/lib/setup.ts` writes the captured PNG to disk and returns
 `isNew: true`. The test passes — but the artifact is not yet under
-version control, so subsequent runs in the same environment compare
-against it.
-
-This means the **first CI run after these baselines are deleted will
-auto-generate fresh, environment-correct baselines**. They are uploaded
-as part of the per-project `playwright-report-<project>` artifact.
+version control. Use this to seed new baselines locally, then commit
+the resulting PNGs.
 
 ## Updating baselines
 
-After the first run on a new CI image, download the generated PNGs from
-the artifact, copy them into `tests/e2e/baselines/<project>/`, and
-commit. From then on, comparisons run against committed baselines.
-
-Locally, run with `--update-snapshots` (or just delete the file you want
-to refresh):
+Run the spec(s), then commit the regenerated PNG. Locally, deleting the
+baseline file (or running with `--update-snapshots`) is the simplest
+path:
 
 ```sh
-npx playwright test --project=webapp --update-snapshots
+rm tests/e2e/baselines/webapp/default-view.png
+npx playwright test --project=webapp
+git add tests/e2e/baselines/webapp/default-view.png
 ```
 
 If a comparison fails it writes `.diff.png` and `.new.png` next to the
 baseline; both are gitignored so you can inspect them without polluting
 the working tree.
 
-## Why baselines aren't generated locally and committed
+## Environment determinism
 
-Local dev images differ from `ubuntu-latest` (different font cache,
-different fontconfig version, sometimes different libfreetype). Those
-small differences produce 2–4% pixel diffs which would fail in CI even
-when no real regression has occurred. The plan in
-`/root/.claude/plans/jupyter-extension-jupyter-widget-merry-gizmo.md`
-explicitly calls this out: "CI is ubuntu-latest fixed for baseline".
+CI runs on `ubuntu-latest`. Locally the dev container is also Ubuntu +
+Chromium installed via `npx playwright install chromium`, so the
+rendered pixels match within the diff tolerance configured in
+`tests/e2e/lib/setup.ts` (DEFAULT_MAX_DIFF_PERCENT = 2.0% within a
+project, 4.0% for cross-platform parity). The launchOption
+`--disable-dev-shm-usage` is set in `playwright.config.ts` because GH
+Actions runners ship a 64MB `/dev/shm` that the WASM bundle + Three.js
+can exhaust, silently aborting WebGL.
+
+If a future hardware/font upgrade pushes baselines past tolerance,
+either tighten the test (mask the noisy region) or regenerate the
+baselines on the same `ubuntu-latest` image and commit the new PNGs.

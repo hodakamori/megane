@@ -147,14 +147,12 @@ jobs:
         run: docker build -t megane:ci .
 
   e2e:
-    # Cross-platform 3-layer E2E. Currently soft-failing while the
-    # initial baselines and CI-specific environment quirks are sorted
-    # out (the artifact upload below provides traces and PNGs for
-    # debugging). Once the suite is stable on `ubuntu-latest`, remove
-    # `continue-on-error` and require this job in branch protection.
+    # Cross-platform 3-layer E2E. The `--disable-dev-shm-usage`
+    # launchOption in playwright.config.ts is what unblocked
+    # webapp / contract on ubuntu-latest (the 64MB /dev/shm was
+    # too small for our WASM + Three.js renderer). Required check.
     name: E2E (${{ matrix.project }})
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
