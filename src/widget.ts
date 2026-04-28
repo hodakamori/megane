@@ -10,6 +10,7 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { WidgetViewer } from "./components/WidgetViewer";
+import { perfMark, perfMeasure } from "./perf";
 import {
   decodeSnapshot,
   decodeFrame,
@@ -27,6 +28,7 @@ interface AnyWidgetModel {
 }
 
 function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
+  perfMark("megane:widget:start");
   // Container setup
   const container = document.createElement("div");
   container.style.width = "100%";
@@ -124,6 +126,8 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     currentSnapshot = parseSnapshot();
     currentFrame = parseFrame();
     renderApp();
+    perfMark("megane:widget:end");
+    perfMeasure("megane:widget-mount", "megane:widget:start", "megane:widget:end");
     return true;
   }
 

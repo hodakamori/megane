@@ -62,12 +62,14 @@ export function DropZone({
   onFile,
   label,
   children,
+  testId,
 }: {
   accept: string;
   exts: string[];
   onFile: (file: File) => void;
   label: string;
   children: React.ReactNode;
+  testId?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,9 +101,18 @@ export function DropZone({
   );
 
   return (
-    <div onDrop={handleDrop} onDragOver={handleDragOver} style={{ minHeight: 0 }}>
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      style={{ minHeight: 0 }}
+      data-testid={testId ? `${testId}-dropzone` : undefined}
+    >
       {children}
-      <button onClick={() => inputRef.current?.click()} style={{ ...smallBtnStyle, marginTop: 10 }}>
+      <button
+        onClick={() => inputRef.current?.click()}
+        style={{ ...smallBtnStyle, marginTop: 10 }}
+        data-testid={testId ? `${testId}-button` : undefined}
+      >
         {label}
       </button>
       <input
@@ -110,6 +121,7 @@ export function DropZone({
         accept={accept}
         onChange={handleFileChange}
         style={{ display: "none" }}
+        data-testid={testId ? `${testId}-input` : undefined}
       />
     </div>
   );
