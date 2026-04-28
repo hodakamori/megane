@@ -41,7 +41,7 @@ const CASES = [
 
 async function loadOne(page, baseUrl, { key, file, expectedAtoms }) {
   console.log(`\n=== Format: ${key} ===`);
-  await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 30000 });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForSelector("canvas", { timeout: 15000 });
   // Wait until renderer signals readiness (set by MoleculeRenderer perf hook)
   await page.waitForFunction(() => window.__meganeRendererReady === true, null, { timeout: 15000 })

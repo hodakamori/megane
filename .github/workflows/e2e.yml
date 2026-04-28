@@ -13,7 +13,7 @@ jobs:
   e2e-app:
     name: Browser app E2E (snapshots + interaction + perf)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -28,26 +28,30 @@ jobs:
       - run: PUPPETEER_SKIP_DOWNLOAD=1 npm ci
       - run: npm run build:wasm
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright (project-local) and Chromium
         run: |
-          # Reuse the project's playwright dependency to install matching browsers.
-          npx --yes playwright install chromium --with-deps
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium --with-deps
 
       - name: snapshot.test.mjs
+        timeout-minutes: 6
         run: node tests/e2e/snapshot.test.mjs
         env:
           CI: "true"
 
       - name: format_load_app.test.mjs
         if: always()
+        timeout-minutes: 6
         run: node tests/e2e/format_load_app.test.mjs
 
       - name: interaction_app.test.mjs
         if: always()
+        timeout-minutes: 5
         run: node tests/e2e/interaction_app.test.mjs
 
       - name: perf_app.test.mjs
         if: always()
+        timeout-minutes: 8
         run: node tests/e2e/perf_app.test.mjs
 
       - name: Upload screenshots and perf artifacts
@@ -65,7 +69,7 @@ jobs:
   e2e-jupyter:
     name: ipywidget + JupyterLab extension E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -78,37 +82,48 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: PUPPETEER_SKIP_DOWNLOAD=1 npm ci
+
+      # Python + JupyterLab MUST be installed before `npm run build:lab`,
+      # since that step invokes `jupyter labextension build` to populate
+      # wheel-share/data/share/jupyter/labextensions/megane-jupyterlab/.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install JupyterLab + maturin
+        run: pip install jupyterlab maturin
+
       - run: npm run build:wasm
       - run: npm run build:widget
       - run: npm run build:lab
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - uses: astral-sh/setup-uv@v5
-      - name: Install python package + jupyterlab
+      - name: Install megane Python package (editable + dev extras)
         run: |
           pip install -e ".[dev]"
-          pip install jupyterlab maturin
           maturin develop --release
 
-      - name: Install Playwright Chromium
-        run: npx --yes playwright install chromium --with-deps
+      - name: Install Playwright (project-local) and Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium --with-deps
 
       - name: test_widget_render.mjs (existing baseline)
         if: always()
+        timeout-minutes: 8
         run: node tests/e2e/test_widget_render.mjs
 
       - name: widget_interaction.test.mjs
         if: always()
+        timeout-minutes: 6
         run: node tests/e2e/widget_interaction.test.mjs
 
       - name: jupyterlab_open_file.test.mjs
         if: always()
+        timeout-minutes: 8
         run: node tests/e2e/jupyterlab_open_file.test.mjs
 
       - name: perf_widget.test.mjs
         if: always()
+        timeout-minutes: 8
         run: node tests/e2e/perf_widget.test.mjs
 
       - name: Upload screenshots and perf artifacts

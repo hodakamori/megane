@@ -16,15 +16,13 @@ import { spawn } from "child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { createRequire } from "module";
+import { getChromium } from "./utils/playwright.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOTS_DIR = join(__dirname, "snapshots");
 const CWD = join(__dirname, "..", "..");
 
-// Resolve Playwright from global installation
-const _require = createRequire("/opt/node22/lib/node_modules/");
-const { chromium } = _require("playwright");
+const chromium = getChromium();
 
 // Resolve pixelmatch and pngjs from project node_modules
 const { default: pixelmatch } = await import(join(CWD, "node_modules", "pixelmatch", "index.js"));

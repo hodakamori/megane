@@ -56,7 +56,7 @@ async function runScenarioOnce({ context, server, fixture, fixtureKey }) {
   const page = await context.newPage();
   page.on("pageerror", (err) => console.log(`  [pageerror] ${err.message}`));
   try {
-    await page.goto(server.url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(server.url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForSelector("canvas", { timeout: 15000 });
     await page
       .waitForFunction(() => window.__meganeRendererReady === true, null, { timeout: 30000 })

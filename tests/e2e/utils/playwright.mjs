@@ -35,20 +35,62 @@ mkdirSync(SNAPSHOTS_DIR, { recursive: true });
 
 // ---- Playwright resolution ----
 
-const _require = createRequire("/opt/node22/lib/node_modules/");
+/**
+ * Resolve Playwright from multiple possible install locations.
+ * Local dev installs Playwright at /opt/node22/lib/node_modules/ per CLAUDE.md;
+ * GitHub-hosted runners typically use ~/.npm-global or /usr/local/lib/node_modules/.
+ * The project's own node_modules is preferred when present so a single
+ * `npm i --no-save playwright` in CI is enough.
+ */
+const RESOLVE_BASES = [
+  join(REPO_ROOT, "node_modules", "_"),
+  "/opt/node22/lib/node_modules/_",
+  "/usr/local/lib/node_modules/_",
+  "/usr/lib/node_modules/_",
+];
+
+function tryRequirePlaywright() {
+  let lastErr = null;
+  for (const base of RESOLVE_BASES) {
+    try {
+      const req = createRequire(base);
+      const pw = req("playwright");
+      if (pw && pw.chromium) return pw;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(
+    `Could not locate the 'playwright' package. Tried: ${RESOLVE_BASES.join(", ")}\n` +
+      `Last error: ${lastErr ? lastErr.message : "unknown"}`,
+  );
+}
+
+let _cachedPw = null;
+function loadPw() {
+  if (!_cachedPw) _cachedPw = tryRequirePlaywright();
+  return _cachedPw;
+}
 
 export function getChromium() {
-  const { chromium } = _require("playwright");
-  return chromium;
+  return loadPw().chromium;
 }
 
 export function getPlaywrightVersion() {
   try {
-    const pkg = _require("playwright/package.json");
-    return pkg.version;
+    for (const base of RESOLVE_BASES) {
+      try {
+        const req = createRequire(base);
+        const pkg = req("playwright/package.json");
+        return pkg.version;
+      } catch {
+        /* try next */
+      }
+    }
   } catch {
-    return "unknown";
+    /* fallthrough */
   }
+  return "unknown";
 }
 
 // ---- Generic helpers ----

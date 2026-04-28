@@ -25,7 +25,7 @@ import {
 const FIXTURES = join(REPO_ROOT, "tests", "fixtures");
 
 async function gotoFresh(page, baseUrl) {
-  await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 30000 });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForSelector("canvas", { timeout: 15000 });
   await page.waitForFunction(() => window.__meganeRendererReady === true, null, { timeout: 15000 })
     .catch(() => {});
