@@ -50,9 +50,12 @@ async function openOne(browser, baseUrl, token, { key, path }) {
   page.on("pageerror", (err) => console.log("  [pageerror]", err.message));
 
   try {
-    // JupyterLab supports opening a path with a specific factory via the /lab/tree URL:
-    //   /lab/tree/<path>?factory=<factoryName>&token=<token>
-    const url = `${baseUrl}/lab/tree/${path}?factory=${encodeURIComponent(FACTORY)}&token=${token}`;
+    // JupyterLab persists workspace state (open tabs, layout) per workspace.
+    // Using a unique workspace name per case avoids the previous file's
+    // open-tab state interfering with this case's docmanager:open call.
+    //   /lab/workspaces/<workspace>/tree/<path>?factory=<factoryName>&token=<token>
+    const ws = `e2e-${key}-${Date.now()}`;
+    const url = `${baseUrl}/lab/workspaces/${ws}/tree/${path}?factory=${encodeURIComponent(FACTORY)}&token=${token}&reset=1`;
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForSelector(".jp-LabShell", { timeout: 30000 });
     await page.waitForTimeout(2500);

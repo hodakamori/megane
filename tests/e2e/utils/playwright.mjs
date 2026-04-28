@@ -113,10 +113,15 @@ export function startViteServer({ cwd = REPO_ROOT, port = randomPort(15000, 1000
       env: { ...process.env, NODE_ENV: "development" },
     });
 
-    const timer = setTimeout(() => reject(new Error("Vite dev server did not start in time")), 30000);
+    let buf = "";
+    const timer = setTimeout(
+      () => reject(new Error(`Vite dev server did not start in time (last buf: ${buf.slice(-400)})`)),
+      90000,
+    );
     const handler = (data) => {
-      const line = data.toString();
-      if (line.includes("Local:") && line.includes(String(port))) {
+      buf += data.toString();
+      // ANSI-color and ASCII variants of the "Local:" announcement.
+      if (buf.includes(String(port)) && (buf.includes("Local") || buf.includes("ready in"))) {
         clearTimeout(timer);
         resolve({
           proc,
@@ -156,10 +161,14 @@ export function startJupyterLab({
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, HOME: process.env.HOME || "/root" },
     });
-    const timer = setTimeout(() => reject(new Error("JupyterLab did not start in time")), 60000);
+    let buf = "";
+    const timer = setTimeout(
+      () => reject(new Error(`JupyterLab did not start in time (last buf: ${buf.slice(-400)})`)),
+      120000,
+    );
     const handler = (data) => {
-      const line = data.toString();
-      if (line.includes(String(port)) && (line.includes("http://") || line.includes("is running at"))) {
+      buf += data.toString();
+      if (buf.includes(String(port)) && (buf.includes("http://") || buf.includes("is running at"))) {
         clearTimeout(timer);
         resolve({
           proc,

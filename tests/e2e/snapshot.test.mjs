@@ -55,13 +55,14 @@ function startViteServer() {
       env: { ...process.env, NODE_ENV: "development" },
     });
 
+    let buf = "";
     const timeout = setTimeout(() => {
-      reject(new Error("Vite dev server did not start in time"));
-    }, 30000);
+      reject(new Error(`Vite dev server did not start in time (last buf: ${buf.slice(-400)})`));
+    }, 90000);
 
     const handler = (data) => {
-      const line = data.toString();
-      if (line.includes("Local:") && line.includes(String(PORT))) {
+      buf += data.toString();
+      if (buf.includes(String(PORT)) && (buf.includes("Local") || buf.includes("ready in"))) {
         clearTimeout(timeout);
         resolve(proc);
       }

@@ -68,16 +68,21 @@ function createTestNotebook(path, pdbPath) {
   writeFileSync(path, JSON.stringify(nb, null, 2));
 }
 
-async function waitForServer(proc, timeout = 60000) {
+async function waitForServer(proc, timeout = 120000) {
+  // Accumulate stderr/stdout into a single buffer rather than checking each
+  // chunk independently. JupyterLab's startup output is sometimes split
+  // across chunks so the URL line and the port number can appear in
+  // different `data` callbacks; the accumulation approach is robust to
+  // that split.
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error("JupyterLab server did not start in time")),
+      () => reject(new Error(`JupyterLab server did not start in time (last buf: ${buf.slice(-400)})`)),
       timeout
     );
+    let buf = "";
     const handler = (data) => {
-      const line = data.toString();
-      // JupyterLab prints the URL on stderr; match any localhost variant
-      if (line.includes(`${PORT}`) && (line.includes("http://") || line.includes("is running at"))) {
+      buf += data.toString();
+      if (buf.includes(`${PORT}`) && (buf.includes("http://") || buf.includes("is running at"))) {
         clearTimeout(timer);
         resolve();
       }
