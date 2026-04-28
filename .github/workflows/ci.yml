@@ -171,9 +171,6 @@ jobs:
       - run: npm ci
       - run: npm run build:wasm
       - run: npm run build:widget
-      - name: Build labextension (jupyterlab projects)
-        if: matrix.project == 'jupyterlab-doc' || matrix.project == 'widget-jupyterlab'
-        run: npm run build:lab
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -181,6 +178,9 @@ jobs:
         if: matrix.project == 'jupyterlab-doc' || matrix.project == 'widget-jupyterlab'
         run: |
           pip install -e ".[dev]" jupyterlab
+      - name: Build labextension (jupyterlab-doc only)
+        if: matrix.project == 'jupyterlab-doc'
+        run: npm run build:lab
       - name: Install megane labextension into JupyterLab
         if: matrix.project == 'jupyterlab-doc'
         run: |
