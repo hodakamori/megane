@@ -36,7 +36,12 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [context, local]);
+    // `local` is intentionally omitted: useMeganeLocal returns a fresh
+    // object on every render, so including it would re-fire this effect
+    // on every state update and re-parse the file in a loop. We only
+    // want to load when the document context is first ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context]);
 
   const handleUploadStructure = useCallback(
     (file: File) => {

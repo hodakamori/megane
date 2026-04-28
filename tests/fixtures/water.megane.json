@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "nodes": [
+    {
+      "id": "load-1",
+      "type": "load_structure",
+      "fileName": "water_wrapped.pdb",
+      "hasTrajectory": false,
+      "hasCell": false,
+      "position": { "x": 0, "y": 0 },
+      "enabled": true
+    },
+    {
+      "id": "viewport-1",
+      "type": "viewport",
+      "perspective": true,
+      "cellAxesVisible": false,
+      "pivotMarkerVisible": false,
+      "position": { "x": 400, "y": 0 },
+      "enabled": true
+    }
+  ],
+  "edges": [
+    {
+      "source": "load-1",
+      "sourceHandle": "particles",
+      "target": "viewport-1",
+      "targetHandle": "particles"
+    }
+  ]
+}
