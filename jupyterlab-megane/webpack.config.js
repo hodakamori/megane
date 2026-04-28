@@ -1,5 +1,6 @@
 /* eslint-disable */
 const path = require("path");
+const webpack = require("webpack");
 
 module.exports = {
   experiments: {
@@ -15,6 +16,15 @@ module.exports = {
       path.resolve(__dirname, "../node_modules")
     ]
   },
+  plugins: [
+    // src/ai/skillLoader.ts uses Vite's import.meta.glob which webpack
+    // can't handle. Swap it for a stub that returns an empty skill set;
+    // the DocWidget doesn't surface the AI chat box.
+    new webpack.NormalModuleReplacementPlugin(
+      /[\\/]src[\\/]ai[\\/]skillLoader\.ts$/,
+      path.resolve(__dirname, "src/skillLoaderStub.ts")
+    )
+  ],
   module: {
     rules: [
       {
