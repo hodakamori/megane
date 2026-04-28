@@ -25,6 +25,7 @@ export function Timeline({
 
   return (
     <div
+      data-testid="timeline"
       style={{
         position: "absolute",
         bottom: 0,
@@ -46,6 +47,7 @@ export function Timeline({
     >
       {/* Play/Pause button */}
       <button
+        data-testid="play-button"
         onClick={onPlayPause}
         style={{
           background: "none",
@@ -70,6 +72,7 @@ export function Timeline({
 
       {/* Frame counter */}
       <span
+        data-testid="frame-counter"
         style={{
           minWidth: 80,
           textAlign: "center",
@@ -84,6 +87,7 @@ export function Timeline({
 
       {/* Seek slider */}
       <input
+        data-testid="frame-slider"
         type="range"
         min={0}
         max={totalFrames - 1}
@@ -99,6 +103,7 @@ export function Timeline({
 
       {/* FPS selector */}
       <select
+        data-testid="fps-select"
         value={fps}
         onChange={(e) => onFpsChange(parseInt(e.target.value, 10))}
         style={{

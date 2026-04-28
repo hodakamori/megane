@@ -15,6 +15,12 @@ tests/fixtures/.*.npz
 tests/e2e/screenshot_*.png
 tests/e2e/snapshots/*.diff.png
 tests/e2e/snapshots/*.new.png
+tests/e2e/baselines/**/*.diff.png
+tests/e2e/baselines/**/*.new.png
+tests/e2e/baselines/**/*.current.png
+tests/e2e/notebooks/
+playwright-report/
+test-results/
 target/
 crates/megane-wasm/pkg/
 *.so

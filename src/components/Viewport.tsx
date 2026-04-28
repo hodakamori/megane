@@ -172,6 +172,7 @@ export function Viewport({
   return (
     <div
       ref={containerRef}
+      data-testid="viewer-root"
       style={{
         width: "100%",
         height: "100%",

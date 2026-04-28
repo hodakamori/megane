@@ -65,6 +65,7 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
 
   return (
     <MeganeViewer
+      testContext="jupyterlab-doc"
       snapshot={local.snapshot}
       frame={local.frame}
       currentFrame={local.currentFrame}

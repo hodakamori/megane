@@ -145,3 +145,63 @@ jobs:
 
       - name: Build image
         run: docker build -t megane:ci .
+
+  e2e:
+    name: E2E (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - webapp
+          - contract
+          - widget-jupyterlab
+          - jupyterlab-doc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build:wasm
+      - run: npm run build:widget
+      - name: Build labextension (jupyterlab projects)
+        if: matrix.project == 'jupyterlab-doc' || matrix.project == 'widget-jupyterlab'
+        run: npm run build:lab
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python package + JupyterLab
+        if: matrix.project == 'jupyterlab-doc' || matrix.project == 'widget-jupyterlab'
+        run: |
+          pip install -e ".[dev]" jupyterlab
+      - name: Install megane labextension into JupyterLab
+        if: matrix.project == 'jupyterlab-doc'
+        run: |
+          mkdir -p $(jupyter --data-dir)/labextensions
+          cp -r wheel-share/data/share/jupyter/labextensions/megane-jupyterlab \
+                $(jupyter --data-dir)/labextensions/
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E (${{ matrix.project }})
+        env:
+          MEGANE_E2E_NO_WEBSERVER: ${{ (matrix.project == 'webapp' || matrix.project == 'contract') && '' || '1' }}
+        run: npx playwright test --project=${{ matrix.project }} --reporter=list,html
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+            tests/e2e/baselines/${{ matrix.project }}/*.diff.png
+            tests/e2e/baselines/${{ matrix.project }}/*.new.png
+          if-no-files-found: ignore
+          retention-days: 14

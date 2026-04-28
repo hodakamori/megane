@@ -39,6 +39,37 @@ import {
   type ViewExtent,
 } from "./CameraManager";
 
+const _testMode = (() => {
+  try {
+    const g: any = globalThis as any;
+    if (g.__MEGANE_TEST__) return true;
+    if (typeof window !== "undefined" && window.location?.search) {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("test") === "1") return true;
+    }
+  } catch {}
+  return false;
+})();
+
+function _signalRender(hasSnapshot: boolean): void {
+  if (!_testMode) return;
+  if (typeof window === "undefined") return;
+  const w = window as any;
+  if (!w.__megane_test_ready) {
+    w.__megane_test_ready = {
+      firstFrame: false,
+      dataLoaded: false,
+      frame: 0,
+      renderEpoch: 0,
+    };
+  }
+  if (hasSnapshot) {
+    w.__megane_test_ready.firstFrame = true;
+    w.__megane_test_ready.renderEpoch =
+      (w.__megane_test_ready.renderEpoch ?? 0) + 1;
+  }
+}
+
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
   private renderer!: THREE.WebGLRenderer;
@@ -220,6 +251,20 @@ export class MoleculeRenderer {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
+    if (_testMode && typeof window !== "undefined") {
+      const w = window as any;
+      if (!w.__megane_test_ready) {
+        w.__megane_test_ready = {
+          firstFrame: false,
+          dataLoaded: false,
+          frame: 0,
+          renderEpoch: 0,
+        };
+      }
+      w.__megane_test_ready.dataLoaded = true;
+      w.__megane_test_ready.atomCount = snapshot.nAtoms;
+    }
+
     // Always use impostor rendering for consistent behavior at any atom count
     if (this.atomRenderer === null || !this.useImpostor) {
       this.swapRenderers(true);
@@ -287,6 +332,13 @@ export class MoleculeRenderer {
     this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
+    }
+
+    if (_testMode && typeof window !== "undefined") {
+      const w = window as any;
+      if (w.__megane_test_ready) {
+        w.__megane_test_ready.frame = (frame as any).index ?? w.__megane_test_ready.frame ?? 0;
+      }
     }
   }
 
@@ -949,6 +1001,8 @@ export class MoleculeRenderer {
     if (this.labelOverlay) {
       this.labelOverlay.render(this.camera, _size.x, _size.y, _dpr);
     }
+
+    _signalRender(this.snapshot != null);
   }
 
   /**
@@ -1228,6 +1282,8 @@ export class MoleculeRenderer {
     if (this.labelOverlay) {
       this.labelOverlay.render(this.camera, _size.x, _size.y, _dpr);
     }
+
+    _signalRender(this.snapshot != null);
   };
 
   /** Clean up all resources. */
