@@ -32,6 +32,7 @@ COPY Cargo.toml ./
 COPY crates/ crates/
 COPY pyproject.toml README.md LICENSE ./
 COPY python/ python/
+COPY wheel-share/ wheel-share/
 COPY --from=frontend /app/python/megane/static/ python/megane/static/
 
 # Verify frontend assets
