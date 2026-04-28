@@ -97,11 +97,15 @@ jobs:
       - run: npm run build:lab
 
       - name: Install megane Python package (editable + dev extras)
-        run: |
-          pip install -e ".[dev]"
-          maturin develop --release
+        # `pip install -e .` already invokes maturin via the PEP 517
+        # build backend (see [tool.maturin] in pyproject.toml), which
+        # also processes the `data = "wheel-share"` directory. We skip
+        # `maturin develop --release` because it requires an active
+        # virtualenv that GitHub-hosted runners do not provide.
+        run: pip install -e ".[dev]"
 
       - name: Install Playwright (project-local) and Chromium
+        if: always()
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install chromium --with-deps
