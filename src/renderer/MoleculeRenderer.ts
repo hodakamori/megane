@@ -41,20 +41,30 @@ import {
 
 const _testMode = (() => {
   try {
-    const g: any = globalThis as any;
+    const g = globalThis as { __MEGANE_TEST__?: boolean };
     if (g.__MEGANE_TEST__) return true;
     if (typeof window !== "undefined" && window.location?.search) {
       const p = new URLSearchParams(window.location.search);
       if (p.get("test") === "1") return true;
     }
-  } catch {}
+  } catch {
+    /* noop */
+  }
   return false;
 })();
 
-function _signalRender(hasSnapshot: boolean): void {
-  if (!_testMode) return;
-  if (typeof window === "undefined") return;
-  const w = window as any;
+interface MeganeTestReady {
+  firstFrame: boolean;
+  dataLoaded: boolean;
+  frame: number;
+  renderEpoch: number;
+  atomCount?: number;
+}
+
+function _getTestReady(): MeganeTestReady | null {
+  if (!_testMode) return null;
+  if (typeof window === "undefined") return null;
+  const w = window as Window & { __megane_test_ready?: MeganeTestReady };
   if (!w.__megane_test_ready) {
     w.__megane_test_ready = {
       firstFrame: false,
@@ -63,11 +73,14 @@ function _signalRender(hasSnapshot: boolean): void {
       renderEpoch: 0,
     };
   }
-  if (hasSnapshot) {
-    w.__megane_test_ready.firstFrame = true;
-    w.__megane_test_ready.renderEpoch =
-      (w.__megane_test_ready.renderEpoch ?? 0) + 1;
-  }
+  return w.__megane_test_ready;
+}
+
+function _signalRender(hasSnapshot: boolean): void {
+  const r = _getTestReady();
+  if (!r || !hasSnapshot) return;
+  r.firstFrame = true;
+  r.renderEpoch = (r.renderEpoch ?? 0) + 1;
 }
 
 export class MoleculeRenderer {
@@ -251,18 +264,10 @@ export class MoleculeRenderer {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
-    if (_testMode && typeof window !== "undefined") {
-      const w = window as any;
-      if (!w.__megane_test_ready) {
-        w.__megane_test_ready = {
-          firstFrame: false,
-          dataLoaded: false,
-          frame: 0,
-          renderEpoch: 0,
-        };
-      }
-      w.__megane_test_ready.dataLoaded = true;
-      w.__megane_test_ready.atomCount = snapshot.nAtoms;
+    const _ready = _getTestReady();
+    if (_ready) {
+      _ready.dataLoaded = true;
+      _ready.atomCount = snapshot.nAtoms;
     }
 
     // Always use impostor rendering for consistent behavior at any atom count
@@ -334,11 +339,10 @@ export class MoleculeRenderer {
       this.updateSelectionVisuals();
     }
 
-    if (_testMode && typeof window !== "undefined") {
-      const w = window as any;
-      if (w.__megane_test_ready) {
-        w.__megane_test_ready.frame = (frame as any).index ?? w.__megane_test_ready.frame ?? 0;
-      }
+    const _ready = _getTestReady();
+    if (_ready) {
+      const idx = (frame as Frame & { index?: number }).index;
+      _ready.frame = typeof idx === "number" ? idx : (_ready.frame ?? 0);
     }
   }
 
