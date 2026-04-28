@@ -1,0 +1,61 @@
+{
+  "name": "megane-jupyterlab",
+  "version": "0.6.2",
+  "description": "JupyterLab 4 extension for the megane molecular viewer",
+  "license": "MIT",
+  "author": "hodakamori",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hodakamori/megane.git"
+  },
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "style": "style/index.css",
+  "files": [
+    "lib/**/*.{js,d.ts,js.map}",
+    "style/**/*.css",
+    "schema/*.json",
+    "install.json"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc && jupyter labextension build .",
+    "build:prod": "npm run clean && tsc && jupyter labextension build .",
+    "clean": "rimraf lib tsconfig.tsbuildinfo ../wheel-share/data/share/jupyter/labextensions/megane-jupyterlab"
+  },
+  "dependencies": {
+    "@jupyterlab/application": "^4.0.0",
+    "@jupyterlab/apputils": "^4.0.0",
+    "@jupyterlab/coreutils": "^6.0.0",
+    "@jupyterlab/docregistry": "^4.0.0",
+    "@jupyterlab/services": "^7.0.0",
+    "@jupyterlab/ui-components": "^4.0.0",
+    "@lumino/widgets": "^2.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "three": "^0.183.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@jupyterlab/builder": "^4.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "rimraf": "^5.0.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "~5.7.0"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "outputDir": "../wheel-share/data/share/jupyter/labextensions/megane-jupyterlab",
+    "webpackConfig": "./webpack.config.js",
+    "sharedPackages": {
+      "react": {
+        "bundled": false,
+        "singleton": true
+      },
+      "react-dom": {
+        "bundled": false,
+        "singleton": true
+      }
+    }
+  }
+}

@@ -36,7 +36,8 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 | Command | What it does |
 |---|---|
 | `npm run build:wasm` | Compile Rust to WASM (MUST run first) |
-| `npm run build` | Full build: WASM + tsc + Vite app + Vite widget |
+| `npm run build` | Full build: WASM + tsc + Vite app + Vite widget + JupyterLab labextension |
+| `npm run build:lab` | Build only the JupyterLab labextension (`jupyterlab-megane/`) |
 | `npm run dev` | Vite dev server (requires WASM already built) |
 | `maturin develop --release` | Build+install Python extension (editable) |
 | `npm test` | TypeScript unit tests (vitest) |
@@ -62,7 +63,9 @@ Project-specific skills are defined in `.claude/skills/`. Each skill provides in
 - Python source: `python/megane/`
 - Rust crates: `crates/{megane-core,megane-python,megane-wasm}/`
 - Vite configs: `vite.config.ts` (app), `vite.widget.config.ts` (widget), `vite.webview.config.ts` (VSCode)
+- JupyterLab labextension source: `jupyterlab-megane/` (built with `@jupyterlab/builder` / webpack, imports the shared `src/` viewer via webpack alias `@megane/*`)
 - App builds to: `python/megane/static/app/`
 - Widget builds to: `dist/`
+- JupyterLab labextension builds to: `wheel-share/data/share/jupyter/labextensions/megane-jupyterlab/` and is shipped in the wheel via `[tool.maturin] data = "wheel-share"`
 - Test fixtures: `tests/fixtures/` (PDB, XYZ, XTC files)
 - E2E snapshots: `tests/e2e/snapshots/`

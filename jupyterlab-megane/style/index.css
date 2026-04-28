@@ -1,0 +1,37 @@
+/* Container styles for the megane document widget. The viewer's own CSS
+   (imported from src/styles/megane.css) handles the rest. */
+.megane-jupyter-doc {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.megane-jupyter-doc > div {
+  width: 100%;
+  height: 100%;
+}
+
+.megane-jupyter-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 14px;
+  color: #64748b;
+  padding: 20px;
+  text-align: center;
+}
+
+.megane-jupyter-status.error {
+  color: #ef4444;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.megane-jupyter-status.error .label {
+  font-weight: bold;
+}
