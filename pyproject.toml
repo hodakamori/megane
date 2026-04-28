@@ -54,7 +54,6 @@ features = ["pyo3/extension-module"]
 data = "wheel-share"
 include = [
     { path = "python/megane/static/**/*", format = ["sdist", "wheel"] },
-    { path = "wheel-share/**/*", format = ["sdist", "wheel"] },
     "LICENSE",
 ]
 
