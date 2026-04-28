@@ -67,25 +67,48 @@ export async function waitForReady(
   } = {},
 ): Promise<void> {
   const { needsData = true, untilEpoch, timeout = 30_000 } = opts;
-  await scope.waitForFunction(
-    ([needsData, minEpoch]: [boolean, number | undefined]) => {
-      const w = window as unknown as {
-        __megane_test_ready?: {
-          firstFrame: boolean;
-          dataLoaded: boolean;
-          renderEpoch: number;
+  try {
+    await scope.waitForFunction(
+      ([needsData, minEpoch]: [boolean, number | undefined]) => {
+        const w = window as unknown as {
+          __megane_test_ready?: {
+            firstFrame: boolean;
+            dataLoaded: boolean;
+            renderEpoch: number;
+          };
         };
-      };
-      const r = w.__megane_test_ready;
-      if (!r) return false;
-      if (!r.firstFrame) return false;
-      if (needsData && !r.dataLoaded) return false;
-      if (typeof minEpoch === "number" && r.renderEpoch < minEpoch) return false;
-      return true;
-    },
-    [needsData, untilEpoch],
-    { timeout },
-  );
+        const r = w.__megane_test_ready;
+        if (!r) return false;
+        if (!r.firstFrame) return false;
+        if (needsData && !r.dataLoaded) return false;
+        if (typeof minEpoch === "number" && r.renderEpoch < minEpoch) return false;
+        return true;
+      },
+      [needsData, untilEpoch],
+      { timeout },
+    );
+  } catch (e) {
+    // Best-effort diagnostic: dump what the page sees so the test
+    // log shows whether testMode never engaged vs data never loaded.
+    const state = await scope
+      .evaluate(() => {
+        const w = window as unknown as {
+          __megane_test_ready?: unknown;
+          __MEGANE_TEST__?: unknown;
+          location?: { search?: string; href?: string };
+        };
+        return {
+          ready: w.__megane_test_ready ?? null,
+          testFlag: w.__MEGANE_TEST__ ?? null,
+          search: w.location?.search ?? null,
+          href: w.location?.href ?? null,
+        };
+      })
+      .catch(() => null);
+    // eslint-disable-next-line no-console
+    console.error("waitForReady timeout. State:", JSON.stringify(state));
+    throw e;
+  }
 }
 
 /** Read the current ready state — used to snapshot epoch before an interaction. */

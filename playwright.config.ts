@@ -36,13 +36,10 @@ export default defineConfig({
     video: "retain-on-failure",
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,
-    launchOptions: {
-      args: [
-        "--use-gl=swiftshader",
-        "--font-render-hinting=none",
-        "--disable-font-subpixel-positioning",
-      ],
-    },
+    // Note: explicit --use-gl=swiftshader was removed. Headless Chromium
+    // already uses SwANGLE under the hood, and forcing swiftshader can
+    // break WebGL2 context creation on minimal CI images that lack the
+    // required system GL libs. The fonts flags caused similar issues.
   },
 
   projects: [
@@ -89,8 +86,10 @@ export default defineConfig({
         command: `npx vite --port ${PORT_WEBAPP} --host 127.0.0.1`,
         port: PORT_WEBAPP,
         reuseExistingServer: !process.env.CI,
-        timeout: 60_000,
-        stdout: "ignore",
+        timeout: 120_000,
+        // stdout/stderr piped so server failures end up in the test
+        // output. Hiding stdout previously made CI failures opaque.
+        stdout: "pipe",
         stderr: "pipe",
         env: {
           NODE_ENV: "development",
