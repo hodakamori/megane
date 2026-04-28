@@ -68,7 +68,7 @@ function createTestNotebook(path, pdbPath) {
   writeFileSync(path, JSON.stringify(nb, null, 2));
 }
 
-async function waitForServer(proc, timeout = 30000) {
+async function waitForServer(proc, timeout = 60000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error("JupyterLab server did not start in time")),

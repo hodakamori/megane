@@ -40,39 +40,47 @@ const CASES = [
   { key: "caffeine_water", path: "tests/fixtures/caffeine_water.pdb" },
 ];
 
-async function openOne(page, baseUrl, token, { key, path }) {
+async function openOne(browser, baseUrl, token, { key, path }) {
   console.log(`\n=== Lab open: ${key} (${path}) ===`);
-  // JupyterLab supports opening a path with a specific factory via the /lab/tree URL:
-  //   /lab/tree/<path>?factory=<factoryName>&token=<token>
-  const url = `${baseUrl}/lab/tree/${path}?factory=${encodeURIComponent(FACTORY)}&token=${token}`;
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.waitForSelector(".jp-LabShell", { timeout: 30000 });
-  await page.waitForTimeout(2500);
+  // Use a fresh browser context per case so JupyterLab tab state from a
+  // previous file does not interfere with the megane-doc-root selector
+  // (Lab keeps inactive document widgets in the DOM).
+  const context = await browser.newContext({ viewport: { width: 1280, height: 960 } });
+  const page = await context.newPage();
+  page.on("pageerror", (err) => console.log("  [pageerror]", err.message));
 
-  // Wait for the megane doc widget to mark itself ready
-  const readyOk = await page
-    .waitForSelector('[data-testid="megane-doc-root"][data-state="ready"]', { timeout: 60000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!readyOk) {
-    await saveScreenshot(page, `lab-${key}-failure.png`).catch(() => {});
+  try {
+    // JupyterLab supports opening a path with a specific factory via the /lab/tree URL:
+    //   /lab/tree/<path>?factory=<factoryName>&token=<token>
+    const url = `${baseUrl}/lab/tree/${path}?factory=${encodeURIComponent(FACTORY)}&token=${token}`;
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForSelector(".jp-LabShell", { timeout: 30000 });
+    await page.waitForTimeout(2500);
+
+    // Wait for the megane doc widget to mark itself ready
+    const readyOk = await page
+      .waitForSelector('[data-testid="megane-doc-root"][data-state="ready"]', { timeout: 60000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!readyOk) {
+      await saveScreenshot(page, `lab-${key}-failure.png`).catch(() => {});
+    }
+    assert(readyOk, `[${key}] megane-doc-root reached state=ready`);
+
+    // Confirm a canvas drew something
+    await sleep(1500);
+    const pixels = await waitForCanvasNonEmpty(
+      page,
+      '[data-testid="megane-doc-root"] canvas',
+      { timeout: 20000 },
+    );
+    assert(pixels.hasContent, `[${key}] canvas drew non-white pixels (${pixels.nonWhitePixels}/${pixels.totalPixels})`);
+
+    await saveScreenshot(page, `lab-${key}.png`);
+    console.log(`  screenshot saved: lab-${key}.png`);
+  } finally {
+    await context.close().catch(() => {});
   }
-  assert(readyOk, `[${key}] megane-doc-root reached state=ready`);
-
-  // Confirm a canvas drew something
-  await sleep(1500);
-  const pixels = await waitForCanvasNonEmpty(
-    page,
-    '[data-testid="megane-doc-root"] canvas',
-    { timeout: 20000 },
-  );
-  assert(pixels.hasContent, `[${key}] canvas drew non-white pixels (${pixels.nonWhitePixels}/${pixels.totalPixels})`);
-
-  await saveScreenshot(page, `lab-${key}.png`);
-  console.log(`  screenshot saved: lab-${key}.png`);
-
-  // Each case re-navigates to a fresh /lab/tree URL, so explicit close is unnecessary.
-  await sleep(300);
 }
 
 let server = null;
@@ -86,16 +94,12 @@ try {
 
   const chromium = getChromium();
   browser = await chromium.launch({ headless: true, args: ["--use-gl=swiftshader"] });
-  const context = await browser.newContext({ viewport: { width: 1280, height: 960 } });
-  const page = await context.newPage();
-  page.on("pageerror", (err) => console.log("  [pageerror]", err.message));
 
   for (const c of CASES) {
     try {
-      await openOne(page, server.url, token, c);
+      await openOne(browser, server.url, token, c);
     } catch (err) {
       console.error(`  FAIL [${c.key}]: ${err.message}`);
-      await saveScreenshot(page, `lab-${c.key}-failure.png`).catch(() => {});
     }
   }
 
