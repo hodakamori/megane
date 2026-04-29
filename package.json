@@ -71,6 +71,7 @@
     "test:e2e:camera:webapp": "playwright test --project=camera__webapp",
     "test:e2e:measurement:webapp": "playwright test --project=measurement__webapp",
     "test:e2e:subsystems:webapp": "playwright test --project=subsystem-rendering__webapp",
+    "test:e2e:phase2": "playwright test --grep-invert='@phase0' --project=appearance__webapp --project=modify-node__webapp --project=camera__webapp --project=measurement__webapp --project=subsystem-rendering__webapp",
     "test:all": "vitest run && playwright test",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
