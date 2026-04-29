@@ -8,7 +8,7 @@ The megane viewer ships through 5 distribution targets. Each one renders the sam
 
 ## CRITICAL: Playwright, NOT Puppeteer
 
-All E2E uses `@playwright/test`. `puppeteer` is in `package.json` but unused. Never invoke Puppeteer.
+All E2E uses `@playwright/test`. `puppeteer` is **not** in `package.json`; only `playwright` 1.56 is installed. Never add or invoke Puppeteer.
 
 E2E is **local-only by policy** — see `.claude/skills/testing/SKILL.md`. CI does not run any E2E project (port-bind races + font-fontconfig pixel drift on hosted runners). Run locally before merging UI-touching PRs.
 
@@ -101,11 +101,13 @@ follow-up.
 Specs that iterate hosts read `MEGANE_HOST=webapp|widget-jupyterlab|widget-vscode|jupyterlab-doc|vscode`. Default = webapp.
 
 ```sh
-# Run measurement on every host:
+# Sweep an existing cross-host-capable spec across every host:
 for host in webapp widget-jupyterlab widget-vscode jupyterlab-doc vscode; do
-  MEGANE_HOST=$host npm run test:e2e:measurement
+  MEGANE_HOST=$host npm run test:e2e:format-loading
 done
 ```
+
+(There is no `test:e2e:measurement` script — measurement coverage was deferred, see the note above.)
 
 ## Run Everything
 

@@ -8,11 +8,16 @@ description: Run tests for megane. Covers TypeScript, Rust, Python, and E2E test
 
 All E2E tests and browser scripts use Playwright. The cross-platform
 3-layer suite (`tests/e2e/*.spec.ts`) uses `@playwright/test` via the
-local `playwright` devDependency installed by `npm ci`.
+local `playwright` 1.56 devDependency installed by `npm ci`.
 
-The legacy `*.mjs` scripts (`tests/e2e/snapshot.test.mjs` etc.) still
-resolve Playwright through `createRequire("/opt/node22/lib/node_modules/")`.
-NEVER try to use Puppeteer, even though it appears in package.json.
+The surviving legacy `*.mjs` scripts (`tests/e2e/perf_app.test.mjs`,
+`perf_widget.test.mjs`, `widget_interaction.test.mjs`,
+`test_notebook_screenshots.mjs`, `test_vscode_render.mjs`,
+`vscode_full_screen.test.mjs`) resolve Playwright through
+`createRequire("/opt/node22/lib/node_modules/")`. The shared helper is
+`tests/e2e/utils/playwright.mjs` — reuse it instead of duplicating the
+`createRequire` block. `puppeteer` is **not** in `package.json`; never
+add it.
 
 ## Unit Tests
 
@@ -121,7 +126,7 @@ is supported by the host fixture but most current specs only have a
 webapp implementation:
 
 ```sh
-MEGANE_HOST=widget-jupyterlab npm run test:e2e:measurement
+MEGANE_HOST=widget-jupyterlab npm run test:e2e:format-loading
 ```
 
 `MEGANE_HOST` accepts `webapp | widget-jupyterlab | widget-vscode |
@@ -188,14 +193,18 @@ fix the regression or replace the baseline.
 ## Legacy E2E (kept for one release)
 
 ```
-node tests/e2e/snapshot.test.mjs            # legacy webapp pixel-diff
-node tests/e2e/test_widget_render.mjs       # legacy widget render
-node tests/e2e/test_notebook_screenshots.mjs
-node tests/e2e/test_vscode_render.mjs       # post-release VSCode
+node tests/e2e/test_notebook_screenshots.mjs   # notebook screenshot capture
+node tests/e2e/test_vscode_render.mjs          # post-release VSCode rendering check
+node tests/e2e/vscode_full_screen.test.mjs     # also wired as `npm run test:e2e:vscode:legacy`
+node tests/e2e/perf_app.test.mjs               # webapp performance probe
+node tests/e2e/perf_widget.test.mjs            # widget performance probe
+node tests/e2e/widget_interaction.test.mjs     # legacy widget interaction screenshots
 ```
 
 These are scheduled to be removed once their coverage is fully
-replicated by the spec.ts suite.
+replicated by the spec.ts suite. The deleted `snapshot.test.mjs` and
+`test_widget_render.mjs` runners have already been retired in favour of
+the Playwright projects.
 
 ## Run All Tests
 
