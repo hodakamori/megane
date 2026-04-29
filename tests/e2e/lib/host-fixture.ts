@@ -16,7 +16,7 @@
 import { existsSync, mkdirSync, copyFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
-import type { Page, Frame } from "playwright/test";
+import { test, type Page, type Frame } from "playwright/test";
 
 import { waitForReady } from "./setup";
 import {
@@ -85,11 +85,25 @@ const DEFAULT_FIXTURE = "caffeine_water.pdb";
 
 function resolveHost(opt?: HostName): HostName {
   if (opt) return opt;
+  // Prefer per-project metadata (set by playwright.config.ts's phase2Matrix)
+  // so a single `playwright test --project=appearance__vscode` run picks up
+  // the right host without callers having to set MEGANE_HOST manually.
+  try {
+    const md = test.info().project.metadata as { meganeHost?: HostName } | undefined;
+    if (md?.meganeHost && ALL_HOSTS.includes(md.meganeHost)) return md.meganeHost;
+  } catch {
+    /* outside a Playwright test context — fall back to env */
+  }
   const env = (process.env.MEGANE_HOST ?? "webapp") as HostName;
   if (!ALL_HOSTS.includes(env)) {
     throw new Error(`MEGANE_HOST=${env!} is not one of ${ALL_HOSTS.join(", ")}`);
   }
   return env;
+}
+
+/** Read the resolved host without booting anything (useful for test.skip gates). */
+export function getHost(opt?: HostName): HostName {
+  return resolveHost(opt);
 }
 
 function repoRoot(): string {

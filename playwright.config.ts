@@ -20,6 +20,36 @@ import { defineConfig } from "playwright/test";
 
 const PORT_WEBAPP = Number(process.env.MEGANE_E2E_PORT_WEBAPP ?? 15173);
 
+/** Hosts the Phase 2 cross-host matrix targets. */
+const PHASE2_HOSTS = [
+  "webapp",
+  "jupyterlab-doc",
+  "vscode",
+  "widget-jupyterlab",
+  "widget-vscode",
+] as const;
+type Phase2Host = (typeof PHASE2_HOSTS)[number];
+
+/** Per-host Playwright timeout (ms). VSCode is slowest; webapp is fastest. */
+const HOST_TIMEOUT_MS: Record<Phase2Host, number> = {
+  webapp: 60_000,
+  "jupyterlab-doc": 180_000,
+  vscode: 240_000,
+  "widget-jupyterlab": 180_000,
+  "widget-vscode": 240_000,
+};
+
+/** Build matrix entries `<feature>__<host>` for a given feature spec. */
+function phase2Matrix(feature: string, testMatch: RegExp) {
+  return PHASE2_HOSTS.map((host) => ({
+    name: `${feature}__${host}`,
+    testMatch,
+    timeout: HOST_TIMEOUT_MS[host],
+    metadata: { meganeHost: host },
+    use: host === "webapp" ? { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` } : {},
+  }));
+}
+
 export default defineConfig({
   testDir: "tests/e2e",
   testMatch: /.*\.spec\.ts$/,
@@ -123,6 +153,15 @@ export default defineConfig({
       testMatch: /render-modal\.spec\.ts$/,
       use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
     },
+
+    // ── Phase 2 cross-host matrix ────────────────────────────────────
+    // Each Phase 2 spec runs against all 5 hosts via metadata.meganeHost.
+    // Specs read the host from test.info().project.metadata.meganeHost
+    // (or fall back to MEGANE_HOST env var for single-project filtered runs).
+    ...phase2Matrix("appearance", /appearance\.spec\.ts$/),
+    ...phase2Matrix("camera", /camera\.spec\.ts$/),
+    ...phase2Matrix("measurement", /measurement\.spec\.ts$/),
+    ...phase2Matrix("subsystem-rendering", /subsystem-rendering\.spec\.ts$/),
   ],
 
   webServer: process.env.MEGANE_E2E_NO_WEBSERVER
