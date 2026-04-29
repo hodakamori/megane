@@ -408,10 +408,16 @@ function repoRoot(): string {
 /**
  * Reduce sources of pixel jitter before screenshotting. Per the plan, we do
  * NOT loosen pixel diff tolerance to hide flakiness — we mask it.
+ *
+ * Accepts a Page or Frame — for Frame inputs we resolve the parent Page
+ * to drive the mouse, then run the evaluate within the Frame so the
+ * stabilising stylesheet lands in the right document.
  */
-export async function stabilizeUi(page: Page): Promise<void> {
-  await page.mouse.move(0, 0).catch(() => {});
-  await page
+export async function stabilizeUi(scope: Page | Frame): Promise<void> {
+  const ownerPage =
+    "mouse" in scope ? (scope as Page) : (scope as Frame).page?.() ?? null;
+  await ownerPage?.mouse.move(0, 0).catch(() => {});
+  await scope
     .evaluate(() => {
       try {
         window.scrollTo(0, 0);
