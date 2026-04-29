@@ -62,6 +62,8 @@
     "test:e2e:pipeline-file": "playwright test --project=pipeline-file",
     "test:e2e:render-modal": "playwright test --project=render-modal",
     "test:e2e:appearance": "playwright test --project=appearance__webapp --project=appearance__jupyterlab-doc --project=appearance__vscode --project=appearance__widget-jupyterlab --project=appearance__widget-vscode",
+    "test:e2e:modify-node": "playwright test --project=modify-node__webapp --project=modify-node__jupyterlab-doc --project=modify-node__vscode --project=modify-node__widget-jupyterlab --project=modify-node__widget-vscode",
+    "test:e2e:modify-node:webapp": "playwright test --project=modify-node__webapp",
     "test:e2e:camera": "playwright test --project=camera__webapp --project=camera__jupyterlab-doc --project=camera__vscode --project=camera__widget-jupyterlab --project=camera__widget-vscode",
     "test:e2e:measurement": "playwright test --project=measurement__webapp --project=measurement__jupyterlab-doc --project=measurement__vscode --project=measurement__widget-jupyterlab --project=measurement__widget-vscode",
     "test:e2e:subsystems": "playwright test --project=subsystem-rendering__webapp --project=subsystem-rendering__jupyterlab-doc --project=subsystem-rendering__vscode --project=subsystem-rendering__widget-jupyterlab --project=subsystem-rendering__widget-vscode",
