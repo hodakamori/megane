@@ -97,6 +97,7 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
         </button>
         <input
           ref={inputRef}
+          data-testid="load-structure-input"
           type="file"
           accept={STRUCTURE_ACCEPT}
           onChange={(e) => {

@@ -568,7 +568,12 @@ function PipelineEditorInner({
   const headerExtra = (
     <>
       {/* Group 1: Render */}
-      <button onClick={() => setShowRenderModal(true)} style={renderBtnStyle} title="Render">
+      <button
+        data-testid="pipeline-editor-render"
+        onClick={() => setShowRenderModal(true)}
+        style={renderBtnStyle}
+        title="Render"
+      >
         {IconRender} Render
       </button>
 

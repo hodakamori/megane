@@ -1,4 +1,4 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-e2e-snapshot test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean lint lint-python lint-rust lint-fix lint-rust-fix
+.PHONY: build build-frontend install dev test test-widget test-e2e test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean lint lint-python lint-rust lint-fix lint-rust-fix
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
@@ -37,10 +37,6 @@ test-ts:
 test-rust:
 	cargo test -p megane-core
 
-# Legacy snapshot tests (kept for one release; superseded by webapp.spec.ts).
-test-e2e-snapshot:
-	node tests/e2e/snapshot.test.mjs
-
 # Run notebook tests (headless, no browser needed)
 test-notebooks:
 	python -m pytest tests/python/test_notebooks.py -v
@@ -54,7 +50,7 @@ test-integration:
 	python -m pytest tests/python/test_serve_integration.py tests/python/test_demo_code.py -v
 
 # Run all tests (Python + TypeScript + Rust + E2E + Notebooks + Integration)
-test-all: test test-ts test-rust test-e2e test-e2e-snapshot test-notebooks test-integration
+test-all: test test-ts test-rust test-e2e test-notebooks test-integration
 
 # Run TypeScript tests with coverage
 coverage-ts:

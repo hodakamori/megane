@@ -249,8 +249,17 @@ export function RenderModal({
   const hasAnimation = totalFrames > 1;
 
   return createPortal(
-    <div style={backdropStyle} onClick={exporting ? undefined : onClose}>
-      <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+    <div
+      style={backdropStyle}
+      onClick={exporting ? undefined : onClose}
+      data-testid="render-modal-backdrop"
+    >
+      <div
+        style={panelStyle}
+        onClick={(e) => e.stopPropagation()}
+        data-testid="render-modal"
+        data-mode={hasAnimation ? "with-animation" : "snapshot-only"}
+      >
         {/* Header */}
         <div
           style={{

@@ -196,6 +196,11 @@ function getHtmlForWebview(webview: vscode.Webview, mediaDir: vscode.Uri): strin
   const wasmUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm"));
   const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "main.css"));
   const nonce = getNonce();
+  // E2E test-mode flag — gated on MEGANE_E2E_MODE in the extension host's
+  // environment so production builds don't expose it. Setting
+  // window.__MEGANE_TEST__ before the bundle loads switches the megane
+  // renderer into deterministic mode (see src/renderer/MoleculeRenderer.ts).
+  const e2eMode = process.env.MEGANE_E2E_MODE === "1";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -225,6 +230,7 @@ function getHtmlForWebview(webview: vscode.Webview, mediaDir: vscode.Uri): strin
   <script nonce="${nonce}">
     window.__MEGANE_WASM_URL__ = "${wasmUri}";
     window.__MEGANE_CONTEXT__ = "vscode";
+    ${e2eMode ? "window.__MEGANE_TEST__ = true;" : ""}
   </script>
   <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
 </body>
