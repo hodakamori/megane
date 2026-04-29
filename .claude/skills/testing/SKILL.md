@@ -114,9 +114,11 @@ in `waitForReady`.
 
 ### Cross-host feature specs
 
-Feature-oriented specs (`format-loading`, `playback`, `measurement`,
-`appearance`, `sidebar`, `widget-api`, `pipeline-editor`, `pipeline-file`,
-`render-modal`) are parametrized via `MEGANE_HOST`:
+Feature-oriented specs (`format-loading`, `playback`, `sidebar`,
+`widget-api`, `pipeline-editor`, `pipeline-file`, `render-modal`)
+target webapp by default. Cross-host parametrization via `MEGANE_HOST`
+is supported by the host fixture but most current specs only have a
+webapp implementation:
 
 ```sh
 MEGANE_HOST=widget-jupyterlab npm run test:e2e:measurement

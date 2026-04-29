@@ -83,16 +83,20 @@ MEGANE_E2E_MODE=1 npm run test:e2e:vscode
 Feature specs live alongside the platform specs and each defines its own Playwright project:
 
 ```sh
-npm run test:e2e:format-loading      # PDB/GRO/XYZ/MOL/SDF/CIF/LAMMPS/XTC/TRAJ load
-npm run test:e2e:playback            # play/pause/scrub/fps
-npm run test:e2e:measurement         # right-click 2-4 atoms, distance/angle/dihedral
-npm run test:e2e:appearance          # AppearancePanel sliders
-npm run test:e2e:sidebar             # collapse toggle
-npm run test:e2e:widget-api          # programmatic frame_index, selected_atoms, on_event
-npm run test:e2e:pipeline-editor     # 11 node types, add/connect/execute
-npm run test:e2e:pipeline-file       # open .megane.json on each platform
-npm run test:e2e:render-modal        # PNG snapshot (GIF/MP4 gated by MEGANE_E2E_FFMPEG=1)
+npm run test:e2e:format-loading      # PDB/GRO/XYZ/MOL/SDF/CIF/LAMMPS load on webapp
+npm run test:e2e:playback            # play/pause/scrub/fps on webapp
+npm run test:e2e:sidebar             # CollapsiblePanel (Pipeline panel) toggle on webapp
+npm run test:e2e:widget-api          # programmatic frame_index / selected_atoms in JupyterLab
+npm run test:e2e:pipeline-editor     # seeded node kinds + Render button mounts modal
+npm run test:e2e:pipeline-file       # drag-drop .megane.json on webapp
+npm run test:e2e:render-modal        # snapshot mode (GIF/MP4 gated by MEGANE_E2E_FFMPEG=1)
 ```
+
+Measurement (right-click selection) and the AppearancePanel slider tests
+were planned but pulled from this PR: the webapp doesn't mount
+AppearancePanel, and reliable measurement coverage needs a renderer-side
+hook to expose projected atom positions. The test IDs are in place for a
+follow-up.
 
 Specs that iterate hosts read `MEGANE_HOST=webapp|widget-jupyterlab|widget-vscode|jupyterlab-doc|vscode`. Default = webapp.
 
