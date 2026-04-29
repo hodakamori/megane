@@ -121,11 +121,7 @@ export function CollapsiblePanel({
   }
 
   return (
-    <div
-      style={{ ...panelContainerStyle, width }}
-      data-testid={panelTestId}
-      data-collapsed="false"
-    >
+    <div style={{ ...panelContainerStyle, width }} data-testid={panelTestId} data-collapsed="false">
       {containerExtra}
       <div style={panelHeaderStyle}>
         <span style={panelTitleStyle}>{title}</span>
