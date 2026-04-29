@@ -48,6 +48,16 @@ const _testMode = (() => {
       const p = new URLSearchParams(window.location.search);
       if (p.get("test") === "1") return true;
     }
+    // E2E hosts (notably ms-toolsai.jupyter widget output and the
+    // VSCode webview) render the megane bundle inside a nested iframe
+    // that the test runner can only reach via Page.addInitScript on the
+    // outer page. Inherit the flag from the parent window when the same
+    // origin allows it. Cross-origin access throws; we silently fall
+    // back to false.
+    if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+      const pg = (window.parent as Window & { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__;
+      if (pg) return true;
+    }
   } catch {
     /* noop */
   }

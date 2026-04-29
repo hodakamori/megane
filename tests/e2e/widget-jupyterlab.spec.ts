@@ -32,31 +32,48 @@ import {
 } from "./lib/hosts/jupyterlab";
 
 const PLATFORM = "widget-jupyterlab";
-const FIXTURE_PDB = "1crn.pdb";
-const FIXTURE_PDB_ATOMS = 327;
 
 const REPO = join(fileURLToPath(import.meta.url), "..", "..", "..");
 const NOTEBOOK_DIR = join(REPO, "tests", "e2e", "notebooks");
 const PORT = Number(process.env.MEGANE_LAB_PORT ?? 18888);
 const TOKEN = "megane-e2e-token";
 
+interface WidgetFormatFixture {
+  id: string;
+  file: string;
+  expectedAtoms?: number;
+}
+
+// `MolecularViewer.load()` is the legacy entry point and is hard-wired
+// to the PDB parser. Multi-format coverage on this host therefore uses
+// multiple PDB fixtures rather than mixing in .gro / .xyz, which would
+// fail with `PDB file contains no ATOM or HETATM records` regardless of
+// renderer behaviour. Pipeline-based loads (which DO support every
+// format) are exercised on jupyterlab-doc.
+const FORMATS: WidgetFormatFixture[] = [
+  { id: "pdb-1crn", file: "1crn.pdb", expectedAtoms: 327 },
+  { id: "pdb-water-wrapped", file: "water_wrapped.pdb" },
+  { id: "pdb-caffeine-water", file: "caffeine_water.pdb" },
+];
+
 let lab: JupyterLabHandle | null = null;
 
-const NOTEBOOK_LEGACY: NotebookSpec = {
-  cells: [
-    {
-      cell_type: "code",
-      source: ["import megane\n", "viewer = megane.MolecularViewer()\n"],
-    },
-    {
-      cell_type: "code",
-      source: [`viewer.load("${REPO}/tests/fixtures/${FIXTURE_PDB}")\n`, "viewer\n"],
-    },
-  ],
-};
+function legacyNotebook(file: string): NotebookSpec {
+  return {
+    cells: [
+      {
+        cell_type: "code",
+        source: ["import megane\n", "viewer = megane.MolecularViewer()\n"],
+      },
+      {
+        cell_type: "code",
+        source: [`viewer.load("${REPO}/tests/fixtures/${file}")\n`, "viewer\n"],
+      },
+    ],
+  };
+}
 
-test.describe.configure({ mode: "serial" });
-test.describe.configure({ timeout: 180_000 });
+test.describe.configure({ timeout: 240_000 });
 
 test.beforeAll(async () => {
   test.setTimeout(120_000);
@@ -79,26 +96,30 @@ test.afterAll(() => {
   lab = null;
 });
 
-test("widget legacy load() satisfies 3-layer contract", async ({ page }) => {
-  const nb = writeNotebook(NOTEBOOK_DIR, "widget_legacy_1crn", NOTEBOOK_LEGACY);
-  await openLabNotebook(page, {
-    port: PORT,
-    token: TOKEN,
-    notebook: "widget_legacy_1crn.ipynb",
+for (const f of FORMATS) {
+  test(`widget legacy load() ${f.id} satisfies 3-layer contract`, async ({ page }) => {
+    const nb = writeNotebook(NOTEBOOK_DIR, `widget_legacy_${f.id}`, legacyNotebook(f.file));
+    await openLabNotebook(page, {
+      port: PORT,
+      token: TOKEN,
+      notebook: `widget_legacy_${f.id}.ipynb`,
+    });
+
+    await assertDomContract(page, [
+      ...defaultViewerContract({
+        expectedAtoms: f.expectedAtoms,
+        context: "widget-simple",
+      }),
+    ]);
+
+    await expectFullPageMatch(page, PLATFORM, `legacy-${f.id}`);
+    await expectViewerRegionMatch(page, PLATFORM, `legacy-${f.id}-viewer`);
+
+    if (f.expectedAtoms !== undefined) {
+      const ready = await getReadyState(page);
+      expect(ready.atomCount).toBe(f.expectedAtoms);
+    }
+
+    void nb;
   });
-
-  await assertDomContract(page, [
-    ...defaultViewerContract({
-      expectedAtoms: FIXTURE_PDB_ATOMS,
-      context: "widget-simple",
-    }),
-  ]);
-
-  await expectFullPageMatch(page, PLATFORM, "legacy-1crn");
-  await expectViewerRegionMatch(page, PLATFORM, "legacy-1crn-viewer");
-
-  const ready = await getReadyState(page);
-  expect(ready.atomCount).toBe(FIXTURE_PDB_ATOMS);
-
-  void nb;
-});
+}

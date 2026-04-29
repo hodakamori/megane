@@ -26,13 +26,25 @@ import {
 } from "./lib/hosts/jupyterlab";
 
 const PLATFORM = "jupyterlab-doc";
-const FIXTURE_PDB = "1crn.pdb";
-const FIXTURE_PDB_ATOMS = 327;
 
 const REPO = join(fileURLToPath(import.meta.url), "..", "..", "..");
 const NOTEBOOK_DIR = join(REPO, "tests", "e2e", "notebooks");
 const PORT = Number(process.env.MEGANE_LAB_DOC_PORT ?? 18889);
 const TOKEN = "megane-e2e-doc";
+
+interface DocFormatFixture {
+  id: string;
+  file: string;
+  expectedAtoms?: number;
+}
+
+const FORMATS: DocFormatFixture[] = [
+  { id: "pdb-1crn", file: "1crn.pdb", expectedAtoms: 327 },
+  { id: "gro-water", file: "water.gro" },
+  { id: "xyz-perovskite", file: "perovskite_srtio3.xyz" },
+  { id: "mol-methane", file: "methane.mol" },
+  { id: "sdf-ethanol", file: "ethanol.sdf" },
+];
 
 let lab: JupyterLabHandle | null = null;
 
@@ -43,10 +55,9 @@ test.beforeAll(async () => {
     throw new Error("megane labextension not built. Run `npm run build:lab`.");
   }
   mkdirSync(NOTEBOOK_DIR, { recursive: true });
-  copyFileSync(
-    join(REPO, "tests", "fixtures", FIXTURE_PDB),
-    join(NOTEBOOK_DIR, FIXTURE_PDB),
-  );
+  for (const f of FORMATS) {
+    copyFileSync(join(REPO, "tests", "fixtures", f.file), join(NOTEBOOK_DIR, f.file));
+  }
   lab = await startJupyterLab({
     port: PORT,
     token: TOKEN,
@@ -61,21 +72,23 @@ test.afterAll(() => {
   lab = null;
 });
 
-test("DocWidget renders 1crn.pdb with jupyterlab-doc context", async ({ page }) => {
-  await openLabFile(page, { port: PORT, token: TOKEN, file: FIXTURE_PDB });
+for (const f of FORMATS) {
+  test(`DocWidget renders ${f.id} with jupyterlab-doc context`, async ({ page }) => {
+    await openLabFile(page, { port: PORT, token: TOKEN, file: f.file });
 
-  await assertDomContract(page, [
-    ...defaultViewerContract({
-      expectedAtoms: FIXTURE_PDB_ATOMS,
-      context: "jupyterlab-doc",
-    }),
-  ]);
+    await assertDomContract(page, [
+      ...defaultViewerContract({
+        expectedAtoms: f.expectedAtoms,
+        context: "jupyterlab-doc",
+      }),
+    ]);
 
-  await expectFullPageMatch(page, PLATFORM, "1crn-doc");
-  await expectViewerRegionMatch(page, PLATFORM, "1crn-doc-viewer");
+    await expectFullPageMatch(page, PLATFORM, `${f.id}-doc`);
+    await expectViewerRegionMatch(page, PLATFORM, `${f.id}-doc-viewer`);
 
-  const ctx = await page
-    .locator('[data-testid="megane-viewer"]')
-    .getAttribute("data-megane-context");
-  expect(ctx).toBe("jupyterlab-doc");
-});
+    const ctx = await page
+      .locator('[data-testid="megane-viewer"]')
+      .getAttribute("data-megane-context");
+    expect(ctx).toBe("jupyterlab-doc");
+  });
+}
