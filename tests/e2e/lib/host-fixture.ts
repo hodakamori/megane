@@ -215,13 +215,24 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
         // subsystem-rendering specs can attach overlays. Bonds via
         // distance metric so the rendered output stays comparable to
         // the legacy load() default.
+        // For multi-frame XYZ fixtures we additionally inject a
+        // LoadTrajectory(xyz=...) node — Python's LoadStructure path
+        // only retains frame 0, so without the companion node the
+        // seekbar would be stuck at one frame.
+        const trajCells = fixture.endsWith(".xyz")
+          ? [
+              `_t = _pipe.add_node(LoadTrajectory(xyz=\"${repo}/tests/fixtures/${fixture}\"))\n`,
+              "_pipe.add_edge(_s.out.particle, _t.inp.particle)\n",
+              "_pipe.add_edge(_t.out.traj, _v.inp.traj)\n",
+            ]
+          : [];
         const nb: NotebookSpec = {
           cells: [
             {
               cell_type: "code",
               source: [
                 "import megane\n",
-                "from megane import Pipeline, LoadStructure, AddBonds, Viewport\n",
+                "from megane import Pipeline, LoadStructure, LoadTrajectory, AddBonds, Viewport\n",
                 "viewer = megane.MolecularViewer()\n",
                 "_pipe = Pipeline()\n",
                 `_s = _pipe.add_node(LoadStructure(\"${repo}/tests/fixtures/${fixture}\"))\n`,
@@ -231,6 +242,7 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
                 "_pipe.add_edge(_s.out.particle, _v.inp.particle)\n",
                 "_pipe.add_edge(_s.out.cell, _v.inp.cell)\n",
                 "_pipe.add_edge(_b.out.bond, _v.inp.bond)\n",
+                ...trajCells,
                 "viewer.set_pipeline(_pipe)\n",
                 "viewer\n",
               ],
@@ -271,7 +283,7 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
             cell_type: "code",
             source: [
               "import megane\n",
-              "from megane import Pipeline, LoadStructure, AddBonds, Viewport\n",
+              "from megane import Pipeline, LoadStructure, LoadTrajectory, AddBonds, Viewport\n",
               "from IPython.display import display, HTML\n",
               "display(HTML('<script>window.parent.postMessage({type: \"megane-test-mode\"}, \"*\")</script>'))\n",
               "viewer = megane.MolecularViewer()\n",
@@ -283,6 +295,13 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
               "_pipe.add_edge(_s.out.particle, _v.inp.particle)\n",
               "_pipe.add_edge(_s.out.cell, _v.inp.cell)\n",
               "_pipe.add_edge(_b.out.bond, _v.inp.bond)\n",
+              ...(fixture.endsWith(".xyz")
+                ? [
+                    `_t = _pipe.add_node(LoadTrajectory(xyz=\"${workspace}/${fixture}\"))\n`,
+                    "_pipe.add_edge(_s.out.particle, _t.inp.particle)\n",
+                    "_pipe.add_edge(_t.out.traj, _v.inp.traj)\n",
+                  ]
+                : []),
               "viewer.set_pipeline(_pipe)\n",
               "viewer\n",
             ],

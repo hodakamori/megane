@@ -163,6 +163,7 @@ export default defineConfig({
     ...phase2Matrix("camera", /camera\.spec\.ts$/),
     ...phase2Matrix("measurement", /measurement\.spec\.ts$/),
     ...phase2Matrix("subsystem-rendering", /subsystem-rendering\.spec\.ts$/),
+    ...phase2Matrix("trajectory-bonds", /trajectory-bonds\.spec\.ts$/),
   ],
 
   webServer: process.env.MEGANE_E2E_NO_WEBSERVER
