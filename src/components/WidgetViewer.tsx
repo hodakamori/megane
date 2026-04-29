@@ -75,6 +75,7 @@ function WidgetViewerPipeline({
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const [bondCount, setBondCount] = useState<number>(0);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
   const appearance = useAppearancePanelState(rendererRef, true);
 
@@ -179,7 +180,18 @@ function WidgetViewerPipeline({
       result.elements,
       result.nAtoms,
     );
+    setBondCount(result.bondIndices.length / 2);
   }, [frame, storeSnapshot, snapshot]);
+
+  // Track pipeline-driven bond updates (initial load, bondSource flips,
+  // file-mode bonds). Mirrors MeganeViewer's pattern.
+  useEffect(() => {
+    const total = viewportState.bonds.reduce(
+      (sum, b) => sum + b.bondIndices.length / 2,
+      0,
+    );
+    setBondCount(total);
+  }, [viewportState.bonds]);
 
   // Apply pipeline JSON from Python
   const prevPipelineJsonRef = useRef<string>("");
@@ -256,6 +268,7 @@ function WidgetViewerPipeline({
       data-testid="megane-viewer"
       data-megane-context="widget-pipeline"
       data-atom-count={effectiveSnapshot?.nAtoms ?? 0}
+      data-bond-count={bondCount}
       data-total-frames={totalFrames}
       data-current-frame={currentFrame}
       style={{
@@ -400,6 +413,7 @@ function WidgetViewerSimple({
       data-testid="megane-viewer"
       data-megane-context="widget-simple"
       data-atom-count={snapshot?.nAtoms ?? 0}
+      data-bond-count={snapshot?.nBonds ?? 0}
       data-total-frames={totalFrames}
       data-current-frame={currentFrame}
       style={{
