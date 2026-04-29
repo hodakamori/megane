@@ -44,16 +44,16 @@ interface WidgetFormatFixture {
   expectedAtoms?: number;
 }
 
-// `MolecularViewer.load()` is the legacy entry point and is hard-wired
-// to the PDB parser. Multi-format coverage on this host therefore uses
-// multiple PDB fixtures rather than mixing in .gro / .xyz, which would
-// fail with `PDB file contains no ATOM or HETATM records` regardless of
-// renderer behaviour. Pipeline-based loads (which DO support every
-// format) are exercised on jupyterlab-doc.
+// `MolecularViewer.load()` now dispatches by file extension to the
+// shared Rust-backed parsers (Phase 1.4 of the E2E COVERAGE_PLAN).
+// Multi-format coverage on this host therefore mixes PDB and non-PDB
+// fixtures so the dispatch path stays exercised. Pipeline-based loads
+// (which exposed every format earlier) remain the recommended API.
 const FORMATS: WidgetFormatFixture[] = [
   { id: "pdb-1crn", file: "1crn.pdb", expectedAtoms: 327 },
   { id: "pdb-water-wrapped", file: "water_wrapped.pdb" },
   { id: "pdb-caffeine-water", file: "caffeine_water.pdb" },
+  { id: "xyz-si-diamond", file: "si_diamond.xyz" },
 ];
 
 let lab: JupyterLabHandle | null = null;

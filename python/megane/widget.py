@@ -91,17 +91,27 @@ class MolecularViewer(anywidget.AnyWidget):
     ) -> None:
         """Load a molecular structure, optionally with a trajectory.
 
+        The structure path is dispatched by extension to the appropriate
+        Rust-backed parser (PDB, GRO, XYZ, MOL, SDF, CIF, LAMMPS data, .traj).
+        For multi-frame XYZ files the trajectory is inferred automatically.
+
         .. deprecated::
             Use :meth:`set_pipeline` with a :class:`~megane.pipeline.Pipeline`
-            instead.
+            instead. The legacy single-snapshot path remains for backward
+            compatibility but does not expose the full pipeline graph API.
 
         Args:
-            pdb_path: Path to PDB file.
-            xtc: Optional path to XTC trajectory file.
-            traj: Optional path to ASE .traj file.  When provided,
+            pdb_path: Path to a structure file. The argument retains its
+                historic name but accepts any format supported by
+                :func:`megane.pipeline._load_structure_file`.
+            xtc: Optional path to an XTC trajectory file. Only valid when
+                ``pdb_path`` is a PDB file (XTC requires PDB topology).
+            traj: Optional path to an ASE .traj file. When provided,
                 *pdb_path* is ignored and both structure and trajectory
                 are read from the .traj file.
         """
+        import pathlib
+
         warnings.warn(
             "MolecularViewer.load() is deprecated and will be removed in a future major release. "
             "Use set_pipeline() with a Pipeline instead. "
@@ -119,11 +129,45 @@ class MolecularViewer(anywidget.AnyWidget):
             self.total_frames = trajectory.n_frames
             return
 
-        structure = load_pdb(pdb_path)
+        ext = pathlib.Path(pdb_path).suffix.lower()
+
+        # Multi-frame XYZ: structure + trajectory come from the same file.
+        if ext == ".xyz":
+            from megane.parsers.xyz import load_xyz_trajectory
+
+            structure, trajectory = load_xyz_trajectory(pdb_path)
+            self._structure = structure
+            self._snapshot_data = encode_snapshot(structure)
+            if trajectory.n_frames > 1:
+                self._trajectory = trajectory
+                self.total_frames = trajectory.n_frames
+            if xtc is not None:
+                raise ValueError(
+                    "xtc= cannot be combined with an .xyz structure path; "
+                    "use set_pipeline() with LoadTrajectory(xyz=...) instead."
+                )
+            return
+
+        # Generic structure dispatch — covers PDB, GRO, MOL, SDF, CIF,
+        # LAMMPS .data / .lammps. Falls back to the historic load_pdb
+        # path so any caller that supplies extension-less PDB text still
+        # works.
+        if ext == ".pdb" or ext == "":
+            structure = load_pdb(pdb_path)
+        else:
+            from megane.pipeline import _load_structure_file
+
+            structure = _load_structure_file(pdb_path)
+
         self._structure = structure
         self._snapshot_data = encode_snapshot(structure)
 
         if xtc is not None:
+            if ext not in (".pdb", ""):
+                raise ValueError(
+                    f"xtc= requires a PDB topology file; got {ext!r}. "
+                    "Use set_pipeline() with LoadTrajectory(xtc=...) for non-PDB topologies."
+                )
             from megane.parsers.xtc import load_trajectory
 
             self._trajectory = load_trajectory(pdb_path, xtc)
