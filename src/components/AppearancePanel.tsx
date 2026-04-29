@@ -122,6 +122,7 @@ export function AppearancePanel({
             }}
           >
             <input
+              data-testid="appearance-atom-scale"
               type="range"
               min="0.1"
               max="2.0"
@@ -145,6 +146,7 @@ export function AppearancePanel({
             }}
           >
             <input
+              data-testid="appearance-atom-opacity"
               type="range"
               min="0"
               max="1"
@@ -168,6 +170,7 @@ export function AppearancePanel({
             }}
           >
             <input
+              data-testid="appearance-bond-scale"
               type="range"
               min="0.1"
               max="3.0"
@@ -191,6 +194,7 @@ export function AppearancePanel({
             }}
           >
             <input
+              data-testid="appearance-bond-opacity"
               type="range"
               min="0"
               max="1"
@@ -215,6 +219,7 @@ export function AppearancePanel({
               }}
             >
               <input
+                data-testid="appearance-vdw-scale"
                 type="range"
                 min="0.1"
                 max="1.5"
@@ -291,6 +296,7 @@ export function AppearancePanel({
                   }}
                 >
                   <input
+                    data-testid="appearance-vector-scale"
                     type="range"
                     min="0.1"
                     max="10.0"
