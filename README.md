@@ -54,6 +54,8 @@ One codebase, every environment.
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
 | **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .cif | Extension |
 
+For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
+
 The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
