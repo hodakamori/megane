@@ -10,6 +10,7 @@ import { PipelineEditor } from "./PipelineEditor";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
+import { AppearancePanel } from "./AppearancePanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -18,6 +19,7 @@ import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
+import { useAppearancePanelState } from "../hooks/useAppearancePanelState";
 import type { Snapshot, Frame, HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
@@ -74,6 +76,8 @@ export function MeganeViewer({
   const pipelineCollapsedRef = useRef(isNarrow);
   const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+
+  const appearance = useAppearancePanelState(rendererRef, isNarrow);
 
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
@@ -257,6 +261,17 @@ export function MeganeViewer({
         measurement={measurement}
         elements={snapshot?.elements ?? null}
         onClear={handleClearSelection}
+      />
+      <AppearancePanel
+        {...appearance}
+        labels={{
+          source: "none",
+          onSourceChange: () => {},
+          onUploadFile: () => {},
+          fileName: null,
+          hasStructureLabels: false,
+        }}
+        top={60}
       />
     </div>
   );

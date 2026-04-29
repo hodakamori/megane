@@ -44,12 +44,14 @@ interface WidgetVscodeFixture {
   expectedAtoms?: number;
 }
 
-// `MolecularViewer.load()` is PDB-only — see widget-jupyterlab.spec.ts
-// for the same constraint. Cross-format coverage is exercised on the
-// `vscode` custom editor instead.
+// `MolecularViewer.load()` now dispatches by extension (Phase 1.4 of
+// the E2E COVERAGE_PLAN), so we exercise at least one non-PDB format
+// on the widget-vscode host as well. Cross-format coverage on the
+// custom editor remains in `vscode.spec.ts`.
 const FORMATS: WidgetVscodeFixture[] = [
   { id: "pdb-1crn", file: "1crn.pdb", expectedAtoms: 327 },
   { id: "pdb-water-wrapped", file: "water_wrapped.pdb" },
+  { id: "xyz-si-diamond", file: "si_diamond.xyz" },
 ];
 
 let cs: CodeServerHandle | null = null;
