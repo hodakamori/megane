@@ -89,14 +89,23 @@ or in the spec call — never widen the tolerance.
 
 ## Project status
 
-| Project           | State    | Notes                                                  |
-|-------------------|----------|--------------------------------------------------------|
-| webapp            | active   | Vite dev server, M2 done                               |
-| contract          | active   | WebApp viewer-region baseline used by all platforms    |
-| widget-jupyterlab | active   | anywidget + JupyterLab, M3 minimal scenario done       |
-| jupyterlab-doc    | active   | DocWidget direct-open, M4 minimal scenario done        |
-| widget-vscode     | scaffold | needs code-server + ms-toolsai.jupyter; .skip()ed      |
-| vscode            | scaffold | needs local VSIX + code-server; .skip()ed              |
+| Project           | State        | Where it runs    | Notes                                                  |
+|-------------------|--------------|------------------|--------------------------------------------------------|
+| webapp            | active       | **local-only**   | Vite preview / Node static server. CI port-bind race.  |
+| contract          | active       | **local-only**   | WebApp viewer-region baseline used by all platforms    |
+| widget-jupyterlab | active       | local + CI       | anywidget + JupyterLab                                 |
+| jupyterlab-doc    | active       | local + CI       | DocWidget direct-open path                             |
+| widget-vscode     | scaffold     | n/a (skipped)    | needs code-server + ms-toolsai.jupyter                 |
+| vscode            | scaffold     | n/a (skipped)    | needs local VSIX + code-server                         |
+
+**WebApp and Contract are local-only:** Playwright's `webServer`
+manager hits a non-deterministic port-bind race against our Node
+static server on GitHub Actions `ubuntu-latest` runners (failure within
+~5 seconds, before any spec runs). After several stabilisation
+attempts we moved them out of CI. Run them locally before pushing any
+change that touches `MeganeViewer`, `Viewport`, `MoleculeRenderer`, or
+the widget bundle. See `.claude/skills/testing/SKILL.md` for the local
+commands.
 
 Follow-up milestones (more interaction matrices, more dynamic-update
 matrices, more host options) are tracked in the planning doc.
