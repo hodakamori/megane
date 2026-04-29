@@ -26,13 +26,13 @@ import { test, expect } from "playwright/test";
 import {
   assertDomContract,
   defaultViewerContract,
-  expectViewerRegionMatch,
+  expectFullPageMatch,
   stabilizeUi,
   waitForReady,
   getReadyState,
 } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
-import { connectEdge, insertNode } from "./lib/pipeline";
+import { connectEdge, findNodeIdByType, insertNode } from "./lib/pipeline";
 import { getVisibleSubsystems } from "./lib/render-utils";
 
 const PLATFORM = "subsystem-rendering";
@@ -44,14 +44,6 @@ test.describe.configure({ mode: "serial" });
 let boot: HostBoot | null = null;
 
 test.beforeAll(async ({ browser }, info) => {
-  const host = getHost();
-  if (host === "widget-jupyterlab" || host === "widget-vscode") {
-    test.skip(
-      true,
-      `Subsystem-rendering spec needs the React Flow store path; widget hosts use set_pipeline().`,
-    );
-    return;
-  }
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   boot = await bootHost(page, { fixture: FIXTURE, portSeed: info.workerIndex + 41 });
@@ -78,17 +70,19 @@ test("subsystems: default visibility — atoms + bonds + cell are on", async () 
   // No overlays in the default pipeline.
   expect(v.polyhedra).toBe(false);
   expect(v.vectors).toBe(false);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-default`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-default`);
 });
 
 test("subsystems: inserting label_generator turns on labels", async () => {
   if (!boot) test.skip(true, "boot not initialised");
   const before = await getReadyState(boot!.scope);
+  const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
+  const viewportId = await findNodeIdByType(boot!.scope, "viewport");
   const id = await insertNode(boot!.scope, "label_generator");
-  await connectEdge(boot!.scope, "loader-1", id, "particle", "particle");
+  await connectEdge(boot!.scope, loaderId, id, "particle", "particle");
   // Label generator outputs to viewport.label port. The default Viewport
   // node's label input picks it up automatically once executed.
-  await connectEdge(boot!.scope, id, "viewport-1", "label", "label");
+  await connectEdge(boot!.scope, id, viewportId, "label", "label");
   // Wait for re-execution + a render frame.
   await waitForReady(boot!.scope, { untilEpoch: before.renderEpoch + 1, timeout: 10_000 }).catch(
     () => {
@@ -100,15 +94,17 @@ test("subsystems: inserting label_generator turns on labels", async () => {
   // attached and a snapshot is loaded — the test API uses that proxy.
   expect(v.labels).toBe(true);
   await stabilizeUi(boot!.scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-labels`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-labels`);
 });
 
 test("subsystems: inserting polyhedron_generator wires the polyhedra subsystem", async () => {
   if (!boot) test.skip(true, "boot not initialised");
   const before = await getReadyState(boot!.scope);
+  const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
+  const viewportId = await findNodeIdByType(boot!.scope, "viewport");
   const id = await insertNode(boot!.scope, "polyhedron_generator");
-  await connectEdge(boot!.scope, "loader-1", id, "particle", "particle");
-  await connectEdge(boot!.scope, id, "viewport-1", "mesh", "mesh");
+  await connectEdge(boot!.scope, loaderId, id, "particle", "particle");
+  await connectEdge(boot!.scope, id, viewportId, "mesh", "mesh");
   // Polyhedron generation runs analyses (coordination geometry); it
   // may not produce any meshes for caffeine_water without bespoke
   // params. The visibility flag still reports whether the renderer's
@@ -124,5 +120,5 @@ test("subsystems: inserting polyhedron_generator wires the polyhedra subsystem",
   // Sanity assertion: getVisibleSubsystems still returns the full shape.
   expect(typeof v.polyhedra).toBe("boolean");
   await stabilizeUi(boot!.scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-polyhedra`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-polyhedra`);
 });

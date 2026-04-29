@@ -56,8 +56,11 @@ export const HOST_CONTEXT: Record<HostName, string> = {
   webapp: "webapp",
   "jupyterlab-doc": "jupyterlab-doc",
   vscode: "vscode",
-  "widget-jupyterlab": "widget-simple",
-  "widget-vscode": "widget-simple",
+  // Widget hosts boot in set_pipeline mode so the React Flow store is
+  // populated (modify-node + subsystem-rendering specs need it). That
+  // path renders WidgetViewerPipeline which emits "widget-pipeline".
+  "widget-jupyterlab": "widget-pipeline",
+  "widget-vscode": "widget-pipeline",
 };
 
 export interface HostBoot {
@@ -207,14 +210,28 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
         runtimeDir: `/tmp/megane-jupyter-widget-runtime-${seed}`,
       });
       try {
+        // set_pipeline boot: ensures the React Flow store is populated
+        // with LoadStructure + AddBond + Viewport so modify-node /
+        // subsystem-rendering specs can attach overlays. Bonds via
+        // distance metric so the rendered output stays comparable to
+        // the legacy load() default.
         const nb: NotebookSpec = {
           cells: [
             {
               cell_type: "code",
               source: [
                 "import megane\n",
+                "from megane import Pipeline, LoadStructure, AddBonds, Viewport\n",
                 "viewer = megane.MolecularViewer()\n",
-                `viewer.load(\"${repo}/tests/fixtures/${fixture}\")\n`,
+                "_pipe = Pipeline()\n",
+                `_s = _pipe.add_node(LoadStructure(\"${repo}/tests/fixtures/${fixture}\"))\n`,
+                "_b = _pipe.add_node(AddBonds(source=\"distance\"))\n",
+                "_v = _pipe.add_node(Viewport())\n",
+                "_pipe.add_edge(_s.out.particle, _b.inp.particle)\n",
+                "_pipe.add_edge(_s.out.particle, _v.inp.particle)\n",
+                "_pipe.add_edge(_s.out.cell, _v.inp.cell)\n",
+                "_pipe.add_edge(_b.out.bond, _v.inp.bond)\n",
+                "viewer.set_pipeline(_pipe)\n",
                 "viewer\n",
               ],
             },
@@ -254,10 +271,19 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
             cell_type: "code",
             source: [
               "import megane\n",
+              "from megane import Pipeline, LoadStructure, AddBonds, Viewport\n",
               "from IPython.display import display, HTML\n",
               "display(HTML('<script>window.parent.postMessage({type: \"megane-test-mode\"}, \"*\")</script>'))\n",
               "viewer = megane.MolecularViewer()\n",
-              `viewer.load(\"${workspace}/${fixture}\")\n`,
+              "_pipe = Pipeline()\n",
+              `_s = _pipe.add_node(LoadStructure(\"${workspace}/${fixture}\"))\n`,
+              "_b = _pipe.add_node(AddBonds(source=\"distance\"))\n",
+              "_v = _pipe.add_node(Viewport())\n",
+              "_pipe.add_edge(_s.out.particle, _b.inp.particle)\n",
+              "_pipe.add_edge(_s.out.particle, _v.inp.particle)\n",
+              "_pipe.add_edge(_s.out.cell, _v.inp.cell)\n",
+              "_pipe.add_edge(_b.out.bond, _v.inp.bond)\n",
+              "viewer.set_pipeline(_pipe)\n",
               "viewer\n",
             ],
             metadata: {},

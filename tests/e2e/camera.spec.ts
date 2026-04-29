@@ -22,7 +22,7 @@ import { test, expect } from "playwright/test";
 import {
   assertDomContract,
   defaultViewerContract,
-  expectViewerRegionMatch,
+  expectFullPageMatch,
   stabilizeUi,
   waitForReady,
   getReadyState,
@@ -68,7 +68,7 @@ test("camera: default state is orthographic and viewer-region baseline matches",
   expect(Number.isFinite(state!.target[0])).toBe(true);
   expect(Number.isFinite(state!.position[0])).toBe(true);
   await stabilizeUi(boot!.scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-orthographic`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-orthographic`);
 });
 
 test("camera: setCameraMode('perspective') flips mode and re-fits", async () => {
@@ -79,7 +79,7 @@ test("camera: setCameraMode('perspective') flips mode and re-fits", async () => 
   const state = await getCameraState(boot!.scope);
   expect(state!.mode).toBe("perspective");
   await stabilizeUi(boot!.scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-perspective`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-perspective`);
 });
 
 test("camera: resetCamera() restores fitted view", async () => {
@@ -101,5 +101,5 @@ test("camera: resetCamera() restores fitted view", async () => {
     expect(Math.abs(stateA!.target[i] - stateB!.target[i])).toBeLessThan(1e-3);
   }
   await stabilizeUi(boot!.scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-reset`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-reset`);
 });

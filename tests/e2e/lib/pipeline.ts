@@ -135,3 +135,31 @@ export async function listNodes(scope: Scope): Promise<InsertedNode[]> {
     return store.getState().nodes.map((n) => ({ id: n.id, type: n.type ?? "" }));
   });
 }
+
+/**
+ * Find the first node matching `type` and return its id. Throws if none.
+ * Lets specs work against pipelines whose ids vary by host (the React
+ * Flow default uses "loader-1" / "viewport-1"; pipelines deserialised
+ * from Python's `Pipeline.set_pipeline()` use "load_structure-1" /
+ * "viewport-3" etc).
+ */
+export async function findNodeIdByType(scope: Scope, type: string): Promise<string> {
+  return await scope.evaluate((t) => {
+    const w = window as Window & {
+      __megane_test_pipeline_store?: {
+        getState: () => { nodes: Array<{ id: string; type?: string }> };
+      };
+    };
+    const store = w.__megane_test_pipeline_store;
+    if (!store) throw new Error("__megane_test_pipeline_store not exposed; testMode off?");
+    const node = store.getState().nodes.find((n) => n.type === t);
+    if (!node) {
+      const seen = store
+        .getState()
+        .nodes.map((n) => `${n.type ?? "?"}:${n.id}`)
+        .join(", ");
+      throw new Error(`findNodeIdByType: no node of type ${t} found. Saw: ${seen}`);
+    }
+    return node.id;
+  }, type);
+}

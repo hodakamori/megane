@@ -12,8 +12,10 @@ import { Viewport } from "./Viewport";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
+import { AppearancePanel } from "./AppearancePanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
+import { useAppearancePanelState } from "../hooks/useAppearancePanelState";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
@@ -74,6 +76,7 @@ function WidgetViewerPipeline({
   const [fps, setFps] = useState(30);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+  const appearance = useAppearancePanelState(rendererRef, true);
 
   const {
     selection,
@@ -289,6 +292,17 @@ function WidgetViewerPipeline({
         elements={effectiveSnapshot?.elements ?? null}
         onClear={handleClearSelection}
       />
+      <AppearancePanel
+        {...appearance}
+        labels={{
+          source: "none",
+          onSourceChange: () => {},
+          onUploadFile: () => {},
+          fileName: null,
+          hasStructureLabels: false,
+        }}
+        top={12}
+      />
     </div>
   );
 }
@@ -309,6 +323,7 @@ function WidgetViewerSimple({
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+  const appearance = useAppearancePanelState(rendererRef, true);
 
   const {
     selection,
@@ -420,6 +435,17 @@ function WidgetViewerSimple({
         measurement={measurement}
         elements={snapshot?.elements ?? null}
         onClear={handleClearSelection}
+      />
+      <AppearancePanel
+        {...appearance}
+        labels={{
+          source: "none",
+          onSourceChange: () => {},
+          onUploadFile: () => {},
+          fileName: null,
+          hasStructureLabels: false,
+        }}
+        top={12}
       />
     </div>
   );

@@ -19,6 +19,7 @@ import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
+import { useAppearancePanelState } from "../hooks/useAppearancePanelState";
 import type { Snapshot, Frame, HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
@@ -76,16 +77,7 @@ export function MeganeViewer({
   const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
 
-  // Appearance panel local state. Sliders push values directly into the
-  // renderer; pipeline-driven Modify nodes can still override per-particle
-  // scale/opacity via the override APIs.
-  const [appearanceCollapsed, setAppearanceCollapsed] = useState(isNarrow);
-  const [atomScale, setAtomScaleState] = useState(1.0);
-  const [atomOpacity, setAtomOpacityState] = useState(1.0);
-  const [bondScale, setBondScaleState] = useState(1.0);
-  const [bondOpacity, setBondOpacityState] = useState(1.0);
-  const [vdwScale, setVdwScaleState] = useState(1.0);
-  const [vectorScale, setVectorScaleState] = useState(1.0);
+  const appearance = useAppearancePanelState(rendererRef, isNarrow);
 
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
@@ -224,34 +216,6 @@ export function MeganeViewer({
     rendererRef.current?.setViewInsets(0, pipelineCollapsed ? 0 : pipelineWidthRef.current + 12);
   }, [pipelineCollapsed]);
 
-  const handleAtomScaleChange = useCallback((v: number) => {
-    setAtomScaleState(v);
-    rendererRef.current?.setAtomScale(v);
-  }, []);
-  const handleAtomOpacityChange = useCallback((v: number) => {
-    setAtomOpacityState(v);
-    rendererRef.current?.setAtomOpacity(v);
-  }, []);
-  const handleBondScaleChange = useCallback((v: number) => {
-    setBondScaleState(v);
-    rendererRef.current?.setBondScale(v);
-  }, []);
-  const handleBondOpacityChange = useCallback((v: number) => {
-    setBondOpacityState(v);
-    rendererRef.current?.setBondOpacity(v);
-  }, []);
-  const handleVdwScaleChange = useCallback((v: number) => {
-    setVdwScaleState(v);
-    rendererRef.current?.setAtomScale(v);
-  }, []);
-  const handleVectorScaleChange = useCallback((v: number) => {
-    setVectorScaleState(v);
-    rendererRef.current?.setVectorScale(v);
-  }, []);
-  const handleToggleAppearance = useCallback(() => {
-    setAppearanceCollapsed((prev) => !prev);
-  }, []);
-
   return (
     <div
       data-testid="megane-viewer"
@@ -299,18 +263,7 @@ export function MeganeViewer({
         onClear={handleClearSelection}
       />
       <AppearancePanel
-        atomScale={atomScale}
-        onAtomScaleChange={handleAtomScaleChange}
-        atomOpacity={atomOpacity}
-        onAtomOpacityChange={handleAtomOpacityChange}
-        bondScale={bondScale}
-        onBondScaleChange={handleBondScaleChange}
-        bondOpacity={bondOpacity}
-        onBondOpacityChange={handleBondOpacityChange}
-        vdwScale={vdwScale}
-        onVdwScaleChange={handleVdwScaleChange}
-        vectorScale={vectorScale}
-        onVectorScaleChange={handleVectorScaleChange}
+        {...appearance}
         labels={{
           source: "none",
           onSourceChange: () => {},
@@ -319,8 +272,6 @@ export function MeganeViewer({
           hasStructureLabels: false,
         }}
         top={60}
-        collapsed={appearanceCollapsed}
-        onToggleCollapse={handleToggleAppearance}
       />
     </div>
   );

@@ -146,7 +146,15 @@ test("measurement: second atom raises count=2 and renders a measurement label", 
 
 test("measurement-clear empties the selection", async () => {
   if (!boot) test.skip(true, "boot not initialised");
-  await boot!.scope.locator('[data-testid="measurement-clear"]').first().click();
+  // dispatchEvent the click directly instead of synthesising a mouse-down +
+  // mouse-up via Playwright. On widget hosts the JupyterLab/VSCode notebook
+  // toolbar can hover over the bottom-right area (measurement panel zone)
+  // while the user-data-dir loads, eating click-through; using
+  // HTMLElement.click() bypasses pointer hit-testing entirely.
+  await boot!.scope.evaluate(() => {
+    const btn = document.querySelector<HTMLElement>('[data-testid="measurement-clear"]');
+    btn?.click();
+  });
   // Panel unmounts when selection is empty.
   await expect(boot!.scope.locator('[data-testid="measurement-panel"]')).toHaveCount(0, {
     timeout: 5_000,

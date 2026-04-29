@@ -22,7 +22,7 @@ import { test, expect } from "playwright/test";
 import {
   assertDomContract,
   defaultViewerContract,
-  expectViewerRegionMatch,
+  expectFullPageMatch,
   getReadyState,
   stabilizeUi,
   waitForReady,
@@ -38,14 +38,6 @@ test.describe.configure({ mode: "serial" });
 let boot: HostBoot | null = null;
 
 test.beforeAll(async ({ browser }, info) => {
-  const host = getHost();
-  if (host === "widget-jupyterlab" || host === "widget-vscode") {
-    test.skip(
-      true,
-      `AppearancePanel not yet mounted in WidgetViewer (host=${host}); spec gated until follow-up to Stage 4 wires it up.`,
-    );
-    return;
-  }
   const seed = info.workerIndex + 1;
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
@@ -88,7 +80,7 @@ async function setSlider(testId: string, value: number): Promise<void> {
 
 async function captureBaseline(name: string): Promise<void> {
   if (!boot) throw new Error("boot not initialised");
-  await expectViewerRegionMatch(boot.scope, PLATFORM, `${getHost()}-${name}`);
+  await expectFullPageMatch(boot.scope, PLATFORM, `${getHost()}-${name}`);
 }
 
 test("appearance: viewer mounts before any slider input", async () => {

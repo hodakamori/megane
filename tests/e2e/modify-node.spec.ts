@@ -23,13 +23,13 @@ import { test } from "playwright/test";
 import {
   assertDomContract,
   defaultViewerContract,
-  expectViewerRegionMatch,
+  expectFullPageMatch,
   getReadyState,
   stabilizeUi,
   waitForReady,
 } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
-import { connectEdge, insertNode, setNodeParam } from "./lib/pipeline";
+import { connectEdge, findNodeIdByType, insertNode, setNodeParam } from "./lib/pipeline";
 
 const PLATFORM = "modify-node";
 const FIXTURE = "caffeine_water.pdb";
@@ -41,14 +41,6 @@ let boot: HostBoot | null = null;
 let modifyId: string | null = null;
 
 test.beforeAll(async ({ browser }, info) => {
-  const host = getHost();
-  if (host === "widget-jupyterlab" || host === "widget-vscode") {
-    test.skip(
-      true,
-      `Modify-node spec needs the React Flow store path; widget hosts use set_pipeline() instead. Coverage lives in widget-api.spec.ts.`,
-    );
-    return;
-  }
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   boot = await bootHost(page, { fixture: FIXTURE, portSeed: info.workerIndex + 11 });
@@ -68,15 +60,17 @@ test("modify-node: insert + route + default scale=1 baseline", async () => {
   if (!boot) test.skip(true, "boot not initialised");
   const scope = boot!.scope;
 
+  // Resolve loader/viewport ids by type so this works against either
+  // the React Flow default (loader-1 / viewport-1) or pipelines that
+  // come from Python's set_pipeline (load_structure-1 / viewport-3).
+  const loaderId = await findNodeIdByType(scope, "load_structure");
+  const viewportId = await findNodeIdByType(scope, "viewport");
   modifyId = await insertNode(scope, "modify");
-  // Route loader-1 → modify → viewport-1 (the existing direct edge
-  // stays in the store; the executor merges, so the modify effects
-  // still apply on top of the unmodified path).
-  await connectEdge(scope, "loader-1", modifyId, "particle", "in");
-  await connectEdge(scope, modifyId, "viewport-1", "out", "particle");
+  await connectEdge(scope, loaderId, modifyId, "particle", "in");
+  await connectEdge(scope, modifyId, viewportId, "out", "particle");
 
   await stabilizeUi(scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-default`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-default`);
 });
 
 test("modify-node: scale=0.5 shrinks atoms", async () => {
@@ -86,7 +80,7 @@ test("modify-node: scale=0.5 shrinks atoms", async () => {
   await setNodeParam(scope, modifyId!, { scale: 0.5 });
   await waitForReady(scope, { untilEpoch: before.renderEpoch + 1, timeout: 10_000 });
   await stabilizeUi(scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-scale-0_5`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-scale-0_5`);
 });
 
 test("modify-node: opacity=0.4 fades atoms", async () => {
@@ -98,5 +92,5 @@ test("modify-node: opacity=0.4 fades atoms", async () => {
   await setNodeParam(scope, modifyId!, { opacity: 0.4 });
   await waitForReady(scope, { untilEpoch: before.renderEpoch + 1, timeout: 10_000 });
   await stabilizeUi(scope);
-  await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-opacity-0_4`);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-opacity-0_4`);
 });
