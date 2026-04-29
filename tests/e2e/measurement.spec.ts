@@ -35,14 +35,6 @@ test.describe.configure({ mode: "serial" });
 let boot: HostBoot | null = null;
 
 test.beforeAll(async ({ browser }, info) => {
-  const host = getHost();
-  if (host === "widget-jupyterlab" || host === "widget-vscode") {
-    test.skip(
-      true,
-      `Measurement spec skipped on widget host=${host}; widget-api.spec.ts already covers viewer.selected_atoms via the Python traitlet path.`,
-    );
-    return;
-  }
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   boot = await bootHost(page, { fixture: FIXTURE, portSeed: info.workerIndex + 31 });

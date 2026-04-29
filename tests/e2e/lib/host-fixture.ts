@@ -171,7 +171,10 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
 
     case "vscode": {
       const port = 18991 + seed;
-      const workspace = `/tmp/megane-e2e-workspace-vscode-${seed}`;
+      // openVscodeFile() in lib/hosts/code-server.ts hard-codes
+      // /workspace as the folder URL — keep parity so the explorer
+      // tree finds the fixture.
+      const workspace = "/workspace";
       mkdirSync(workspace, { recursive: true });
       copyFileSync(join(repo, "tests", "fixtures", fixture), join(workspace, fixture));
       const cs = await startCodeServer({ port, workspace, e2eMode: true });
@@ -234,7 +237,9 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
 
     case "widget-vscode": {
       const port = 18992 + seed;
-      const workspace = `/tmp/megane-e2e-workspace-widget-vscode-${seed}`;
+      // Same /workspace pin as the "vscode" case — openVscodeNotebook
+      // navigates through code-server's explorer, which is rooted there.
+      const workspace = "/workspace";
       mkdirSync(workspace, { recursive: true });
       const slug = `phase2_widget_${fixture.replace(/[^a-z0-9]/gi, "_")}`;
       const notebookPath = join(workspace, `${slug}.ipynb`);
@@ -266,6 +271,13 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
       copyFileSync(join(repo, "tests", "fixtures", fixture), join(workspace, fixture));
       const cs = await startCodeServer({ port, workspace, e2eMode: true });
       try {
+        // ms-toolsai.jupyter renders the cell output in a srcdoc iframe
+        // that does NOT inherit MEGANE_E2E_MODE from the extension host.
+        // The renderer falls back to reading __MEGANE_TEST__ from the
+        // parent window, so seed it via addInitScript on every frame.
+        await page.addInitScript(() => {
+          (globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__ = true;
+        });
         const wv = await openVscodeNotebook(page, { port, notebook: `${slug}.ipynb` });
         return {
           host,

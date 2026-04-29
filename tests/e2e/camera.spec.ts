@@ -43,14 +43,6 @@ test.describe.configure({ mode: "serial" });
 let boot: HostBoot | null = null;
 
 test.beforeAll(async ({ browser }, info) => {
-  const host = getHost();
-  if (host === "widget-jupyterlab" || host === "widget-vscode") {
-    test.skip(
-      true,
-      `Camera spec skipped on widget host=${host}; renderer state is host-agnostic and webapp/jupyterlab-doc/vscode coverage is sufficient.`,
-    );
-    return;
-  }
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   boot = await bootHost(page, { fixture: FIXTURE, portSeed: info.workerIndex + 21 });
