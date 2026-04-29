@@ -45,6 +45,7 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
           <div style={labelStyle}>Scale</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
+              data-testid="modify-node-scale"
               className="nodrag"
               type="range"
               min={0.1}
@@ -61,6 +62,7 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
           <div style={labelStyle}>Opacity</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
+              data-testid="modify-node-opacity"
               className="nodrag"
               type="range"
               min={0}

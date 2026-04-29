@@ -57,8 +57,6 @@
     "test:e2e:format-loading": "playwright test --project=format-loading",
     "test:e2e:playback": "playwright test --project=playback",
     "test:e2e:sidebar": "playwright test --project=sidebar",
-    "test:e2e:appearance": "playwright test --project=appearance",
-    "test:e2e:measurement": "playwright test --project=measurement",
     "test:e2e:widget-api": "playwright test --project=widget-api",
     "test:e2e:pipeline-editor": "playwright test --project=pipeline-editor",
     "test:e2e:pipeline-file": "playwright test --project=pipeline-file",

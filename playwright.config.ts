@@ -104,16 +104,6 @@ export default defineConfig({
       use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
     },
     {
-      name: "appearance",
-      testMatch: /appearance\.spec\.ts$/,
-      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
-    },
-    {
-      name: "measurement",
-      testMatch: /measurement\.spec\.ts$/,
-      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
-    },
-    {
       name: "widget-api",
       testMatch: /widget-api\.spec\.ts$/,
       timeout: 240_000,

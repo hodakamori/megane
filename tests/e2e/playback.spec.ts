@@ -28,8 +28,12 @@ test.describe("playback: webapp default trajectory", () => {
 
   test("seekbar advances frame counter and renderer state", async ({ page }) => {
     const before = await getReadyState(page);
+    // Set the value via React's native setter so the synthetic onChange
+    // fires (vanilla `el.value = ...` is shadowed by React's prop tracking).
     await page.locator('[data-testid="playback-seekbar"]').evaluate((el: HTMLInputElement) => {
-      el.value = "2";
+      const proto = Object.getPrototypeOf(el);
+      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      setter?.call(el, "2");
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
     });
@@ -40,10 +44,17 @@ test.describe("playback: webapp default trajectory", () => {
       { testid: "playback-seekbar", visible: true },
     ]);
 
-    const frame = await page
-      .locator('[data-testid="megane-viewer"]')
-      .getAttribute("data-current-frame");
-    expect(Number(frame)).toBe(2);
+    // The data-current-frame attribute on megane-viewer reflects the
+    // frame the renderer last drew. Allow a brief settle for the prop
+    // propagation through usePlaybackStore.
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid="megane-viewer"]');
+        return el?.getAttribute("data-current-frame") === "2";
+      },
+      null,
+      { timeout: 5_000 },
+    );
 
     await expectViewerRegionMatch(page, PLATFORM, "frame-2-viewer");
   });

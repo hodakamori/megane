@@ -54,8 +54,9 @@ async function dropStructure(
   fixture: StructureCase,
 ): Promise<void> {
   const bytes = readFileSync(join(FIXTURES, fixture.file));
-  // Hidden file input wired to the dropzone (see ui.tsx FileDropZone).
-  const input = page.locator('[data-testid="structure-upload-input"]').first();
+  // Hidden file input on the LoadStructure node (the seeded graph mounts
+  // this node by default).
+  const input = page.locator('[data-testid="load-structure-input"]').first();
   await input.setInputFiles({
     name: fixture.file,
     mimeType: fixture.mime,
