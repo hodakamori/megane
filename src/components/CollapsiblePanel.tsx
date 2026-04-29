@@ -96,11 +96,18 @@ export function CollapsiblePanel({
   containerExtra,
   children,
 }: CollapsiblePanelProps) {
+  const panelTestId = `panel-${title.replace(/\s+/g, "-").toLowerCase()}`;
+
   if (collapsed) {
     return (
-      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}>
+      <div
+        style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}
+        data-testid={panelTestId}
+        data-collapsed="true"
+      >
         <button
           onClick={onToggleCollapse}
+          data-testid={`${panelTestId}-toggle`}
           style={collapsedButtonStyle}
           title={`Open ${title.toLowerCase()}`}
           aria-label={`Open ${title.toLowerCase()}`}
@@ -114,12 +121,13 @@ export function CollapsiblePanel({
   }
 
   return (
-    <div style={{ ...panelContainerStyle, width }}>
+    <div style={{ ...panelContainerStyle, width }} data-testid={panelTestId} data-collapsed="false">
       {containerExtra}
       <div style={panelHeaderStyle}>
         <span style={panelTitleStyle}>{title}</span>
         <button
           onClick={onToggleCollapse}
+          data-testid={`${panelTestId}-toggle`}
           style={collapseButtonStyle}
           title="Collapse panel"
           aria-label="Collapse panel"

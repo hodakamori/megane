@@ -200,7 +200,12 @@ export function NodeShell({ id, nodeType, enabled, children, disabledPorts }: No
   };
 
   return (
-    <div style={containerStyle}>
+    <div
+      style={containerStyle}
+      data-testid={`pipeline-node-${nodeType}`}
+      data-node-id={id}
+      data-enabled={enabled ? "true" : "false"}
+    >
       {/* Input handles */}
       {ports.inputs.map((port, i) => {
         const isDisabled = disabledPorts?.has(port.name) ?? false;

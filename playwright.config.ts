@@ -81,8 +81,47 @@ export default defineConfig({
     },
     {
       name: "vscode",
-      testMatch: /vscode\.spec\.ts$/,
+      testMatch: /(^|\/)vscode\.spec\.ts$/,
       timeout: 240_000,
+    },
+
+    // ── Feature specs ─────────────────────────────────────────────────
+    // These run against the same prebuilt webapp as `webapp` / `contract`,
+    // unless they boot their own JupyterLab/code-server host.
+    {
+      name: "format-loading",
+      testMatch: /format-loading\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
+    },
+    {
+      name: "playback",
+      testMatch: /playback\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
+    },
+    {
+      name: "sidebar",
+      testMatch: /sidebar\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
+    },
+    {
+      name: "widget-api",
+      testMatch: /widget-api\.spec\.ts$/,
+      timeout: 240_000,
+    },
+    {
+      name: "pipeline-editor",
+      testMatch: /pipeline-editor\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
+    },
+    {
+      name: "pipeline-file",
+      testMatch: /pipeline-file\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
+    },
+    {
+      name: "render-modal",
+      testMatch: /render-modal\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
     },
   ],
 

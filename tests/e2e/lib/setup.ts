@@ -347,7 +347,8 @@ export async function expectFullPageMatch(
   opts: { maxDiffPercent?: number; mask?: Locator[]; updateBaselines?: boolean } = {},
 ): Promise<void> {
   const baseline = baselinePath(platform, name);
-  if (opts.updateBaselines && existsSync(baseline)) {
+  const shouldUpdate = opts.updateBaselines || process.env.MEGANE_E2E_UPDATE === "1";
+  if (shouldUpdate && existsSync(baseline)) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { unlinkSync } = await import("fs");
@@ -370,9 +371,17 @@ export async function expectViewerRegionMatch(
   scope: Page | Frame,
   platform: string,
   name: string,
-  opts: { maxDiffPercent?: number } = {},
+  opts: { maxDiffPercent?: number; updateBaselines?: boolean } = {},
 ): Promise<void> {
   const baseline = baselinePath(platform, name);
+  const shouldUpdate = opts.updateBaselines || process.env.MEGANE_E2E_UPDATE === "1";
+  if (shouldUpdate && existsSync(baseline)) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { unlinkSync } = await import("fs");
+      unlinkSync(baseline);
+    } catch {}
+  }
   const tmp = baseline.replace(/\.png$/, ".current.png");
   const buf = await captureViewerRegion(scope, tmp);
   const r = await compareToBaseline(baseline, buf, { maxDiffPercent: opts.maxDiffPercent });

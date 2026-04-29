@@ -37,6 +37,7 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Reference",
       items: [
+        "platform-support",
         {
           type: "doc",
           id: "configuration",
