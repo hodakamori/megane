@@ -164,6 +164,18 @@ export class StructureLayer {
     }
   }
 
+  isAtomsVisible(): boolean {
+    return this.atomRenderer?.mesh.visible ?? false;
+  }
+
+  isBondsVisible(): boolean {
+    return this.bondRenderer?.mesh.visible ?? false;
+  }
+
+  isCellVisible(): boolean {
+    return this.cellRenderer?.mesh.visible ?? false;
+  }
+
   getPositions(): Float32Array | null {
     return this.currentPositions ?? this.snapshot?.positions ?? null;
   }
