@@ -48,7 +48,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -68,7 +74,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -96,7 +108,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -121,7 +139,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -145,3 +169,18 @@ jobs:
 
       - name: Build image
         run: docker build -t megane:ci .
+
+  # Cross-platform 3-layer E2E (`tests/e2e/*.spec.ts`) is **local-only**.
+  #
+  # We attempted to run the suite on GH-hosted ubuntu-latest runners but
+  # the `webapp` / `contract` projects hit a non-deterministic port-bind
+  # race against Playwright's webServer manager (5-second fast-fails),
+  # and the JupyterLab-hosted projects suffered baseline drift between
+  # the dev container Chromium and the CI Chromium fonts/fontconfig.
+  # Stabilising both required CI-environment-specific patches that we
+  # don't want to maintain.
+  #
+  # The expectation is that contributors run the E2E suite locally before
+  # pushing changes that touch the WebApp / Viewport / MoleculeRenderer
+  # / Widget / DocWidget paths. See `.claude/skills/testing/SKILL.md`
+  # for the commands.

@@ -25,9 +25,9 @@ test:
 test-widget:
 	python -m pytest tests/python/test_widget.py -v
 
-# Run E2E browser test (requires playwright + chromium)
+# Run E2E browser test (3-layer Playwright suite, all active projects)
 test-e2e:
-	node tests/e2e/test_widget_render.mjs
+	npx playwright test --project=webapp --project=contract --project=widget-jupyterlab --project=jupyterlab-doc
 
 # Run TypeScript unit + component tests
 test-ts:
@@ -37,7 +37,7 @@ test-ts:
 test-rust:
 	cargo test -p megane-core
 
-# Run E2E snapshot tests (Playwright + Vite dev server)
+# Legacy snapshot tests (kept for one release; superseded by webapp.spec.ts).
 test-e2e-snapshot:
 	node tests/e2e/snapshot.test.mjs
 

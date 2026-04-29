@@ -246,8 +246,15 @@ function WidgetViewerPipeline({
     [onSeek, playing],
   );
 
+  const effectiveSnapshot = storeSnapshot ?? snapshot;
+
   return (
     <div
+      data-testid="megane-viewer"
+      data-megane-context="widget-pipeline"
+      data-atom-count={effectiveSnapshot?.nAtoms ?? 0}
+      data-total-frames={totalFrames}
+      data-current-frame={currentFrame}
       style={{
         width: "100%",
         height: "100%",
@@ -256,7 +263,7 @@ function WidgetViewerPipeline({
       }}
     >
       <Viewport
-        snapshot={storeSnapshot ?? snapshot}
+        snapshot={effectiveSnapshot}
         frame={frame}
         onRendererReady={handleRendererReady}
         onHover={setHoverInfo}
@@ -279,7 +286,7 @@ function WidgetViewerPipeline({
       <MeasurementPanel
         selection={selection}
         measurement={measurement}
-        elements={storeSnapshot?.elements ?? snapshot?.elements ?? null}
+        elements={effectiveSnapshot?.elements ?? null}
         onClear={handleClearSelection}
       />
     </div>
@@ -375,6 +382,11 @@ function WidgetViewerSimple({
 
   return (
     <div
+      data-testid="megane-viewer"
+      data-megane-context="widget-simple"
+      data-atom-count={snapshot?.nAtoms ?? 0}
+      data-total-frames={totalFrames}
+      data-current-frame={currentFrame}
       style={{
         width: "100%",
         height: "100%",

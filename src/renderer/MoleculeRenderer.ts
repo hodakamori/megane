@@ -40,6 +40,50 @@ import {
   type ViewExtent,
 } from "./CameraManager";
 
+const _testMode = (() => {
+  try {
+    const g = globalThis as { __MEGANE_TEST__?: boolean };
+    if (g.__MEGANE_TEST__) return true;
+    if (typeof window !== "undefined" && window.location?.search) {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("test") === "1") return true;
+    }
+  } catch {
+    /* noop */
+  }
+  return false;
+})();
+
+interface MeganeTestReady {
+  firstFrame: boolean;
+  dataLoaded: boolean;
+  frame: number;
+  renderEpoch: number;
+  atomCount?: number;
+}
+
+function _getTestReady(): MeganeTestReady | null {
+  if (!_testMode) return null;
+  if (typeof window === "undefined") return null;
+  const w = window as Window & { __megane_test_ready?: MeganeTestReady };
+  if (!w.__megane_test_ready) {
+    w.__megane_test_ready = {
+      firstFrame: false,
+      dataLoaded: false,
+      frame: 0,
+      renderEpoch: 0,
+    };
+  }
+  return w.__megane_test_ready;
+}
+
+function _signalRender(hasSnapshot: boolean): void {
+  const r = _getTestReady();
+  if (!r || !hasSnapshot) return;
+  r.firstFrame = true;
+  r.renderEpoch = (r.renderEpoch ?? 0) + 1;
+}
+
 export class MoleculeRenderer {
   private container: HTMLElement | null = null;
   private renderer!: THREE.WebGLRenderer;
@@ -225,6 +269,12 @@ export class MoleculeRenderer {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
+    const _ready = _getTestReady();
+    if (_ready) {
+      _ready.dataLoaded = true;
+      _ready.atomCount = snapshot.nAtoms;
+    }
+
     // Always use impostor rendering for consistent behavior at any atom count
     if (this.atomRenderer === null || !this.useImpostor) {
       this.swapRenderers(true);
@@ -292,6 +342,12 @@ export class MoleculeRenderer {
     this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
+    }
+
+    const _ready = _getTestReady();
+    if (_ready) {
+      const idx = (frame as Frame & { index?: number }).index;
+      _ready.frame = typeof idx === "number" ? idx : (_ready.frame ?? 0);
     }
   }
 
@@ -954,6 +1010,8 @@ export class MoleculeRenderer {
     if (this.labelOverlay) {
       this.labelOverlay.render(this.camera, _size.x, _size.y, _dpr);
     }
+
+    _signalRender(this.snapshot != null);
   }
 
   /**
@@ -1233,6 +1291,8 @@ export class MoleculeRenderer {
     if (this.labelOverlay) {
       this.labelOverlay.render(this.camera, _size.x, _size.y, _dpr);
     }
+
+    _signalRender(this.snapshot != null);
 
     // Performance hooks (no-op unless window.__MEGANE_PERF__ is set)
     perfPushFrame(performance.now());

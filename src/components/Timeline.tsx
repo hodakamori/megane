@@ -47,9 +47,9 @@ export function Timeline({
     >
       {/* Play/Pause button */}
       <button
-        onClick={onPlayPause}
         data-testid="playback-toggle"
         data-playing={playing ? "true" : "false"}
+        onClick={onPlayPause}
         style={{
           background: "none",
           border: "1px solid #e2e8f0",
@@ -68,11 +68,12 @@ export function Timeline({
         }}
         title={playing ? "Pause" : "Play"}
       >
-        {playing ? "\u23F8" : "\u25B6"}
+        {playing ? "⏸" : "▶"}
       </button>
 
       {/* Frame counter */}
       <span
+        data-testid="frame-counter"
         style={{
           minWidth: 80,
           textAlign: "center",
@@ -87,12 +88,12 @@ export function Timeline({
 
       {/* Seek slider */}
       <input
+        data-testid="playback-seekbar"
         type="range"
         min={0}
         max={totalFrames - 1}
         value={currentFrame}
         onChange={(e) => onSeek(parseInt(e.target.value, 10))}
-        data-testid="playback-seekbar"
         style={{
           flex: 1,
           height: 4,
@@ -103,9 +104,9 @@ export function Timeline({
 
       {/* FPS selector */}
       <select
+        data-testid="playback-fps"
         value={fps}
         onChange={(e) => onFpsChange(parseInt(e.target.value, 10))}
-        data-testid="playback-fps"
         style={{
           background: "rgba(255,255,255,0.8)",
           border: "1px solid #e2e8f0",

@@ -76,24 +76,29 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
   }
 
   return (
-    <div data-testid="megane-doc-root" data-state="ready" style={{ width: "100%", height: "100%" }}>
-    <MeganeViewer
-      snapshot={local.snapshot}
-      frame={local.frame}
-      currentFrame={local.currentFrame}
-      totalFrames={local.meta?.nFrames ?? 0}
-      onUploadStructure={handleUploadStructure}
-      onBondSourceChange={(s: string) =>
-        local.setBondSource(s as "structure" | "file" | "distance" | "none")
-      }
-      onLabelSourceChange={(s: string) =>
-        local.setLabelSource(s as "none" | "structure" | "file")
-      }
-      onLoadLabelFile={(f: File) => local.loadLabelFile(f)}
-      onVectorSourceChange={(s: string) => local.setVectorSource(s as "none" | "file" | "demo")}
-      onLoadVectorFile={(f: File) => local.loadVectorFile(f)}
-      onLoadDemoVectors={() => local.loadDemoVectors()}
-    />
+    <div
+      data-testid="megane-doc-root"
+      data-state="ready"
+      style={{ width: "100%", height: "100%" }}
+    >
+      <MeganeViewer
+        testContext="jupyterlab-doc"
+        snapshot={local.snapshot}
+        frame={local.frame}
+        currentFrame={local.currentFrame}
+        totalFrames={local.meta?.nFrames ?? 0}
+        onUploadStructure={handleUploadStructure}
+        onBondSourceChange={(s: string) =>
+          local.setBondSource(s as "structure" | "file" | "distance" | "none")
+        }
+        onLabelSourceChange={(s: string) =>
+          local.setLabelSource(s as "none" | "structure" | "file")
+        }
+        onLoadLabelFile={(f: File) => local.loadLabelFile(f)}
+        onVectorSourceChange={(s: string) => local.setVectorSource(s as "none" | "file" | "demo")}
+        onLoadVectorFile={(f: File) => local.loadVectorFile(f)}
+        onLoadDemoVectors={() => local.loadDemoVectors()}
+      />
     </div>
   );
 }

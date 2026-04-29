@@ -41,6 +41,8 @@ interface MeganeViewerProps {
   onLoadDemoVectors?: () => void;
   width?: string | number;
   height?: string | number;
+  /** Host context tag for E2E tests: "webapp" | "jupyterlab-doc" | "vscode". Defaults to "webapp". */
+  testContext?: string;
 }
 
 export function MeganeViewer({
@@ -63,6 +65,7 @@ export function MeganeViewer({
   onLoadDemoVectors: _onLoadDemoVectors,
   width = "100%",
   height = "100%",
+  testContext = "webapp",
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
@@ -210,7 +213,14 @@ export function MeganeViewer({
   }, [pipelineCollapsed]);
 
   return (
-    <div style={{ width, height, position: "relative", overflow: "hidden" }}>
+    <div
+      data-testid="megane-viewer"
+      data-megane-context={testContext}
+      data-atom-count={snapshot?.nAtoms ?? 0}
+      data-total-frames={totalFrames}
+      data-current-frame={effectiveCurrentFrame}
+      style={{ width, height, position: "relative", overflow: "hidden" }}
+    >
       <Viewport
         snapshot={snapshot}
         frame={effectiveFrame}

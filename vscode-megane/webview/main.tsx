@@ -187,6 +187,7 @@ function App() {
 
   return (
     <MeganeViewer
+      testContext="vscode"
       snapshot={local.snapshot}
       frame={local.frame}
       currentFrame={local.currentFrame}
