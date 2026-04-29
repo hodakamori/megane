@@ -49,6 +49,10 @@ interface AppearancePanelProps {
   hasCell?: boolean;
   cellAxesVisible?: boolean;
   onToggleCellAxes?: () => void;
+  /** Top offset in pixels (default: 12). Use to stack with other panels. */
+  top?: number;
+  /** Right offset in pixels (default: 12). */
+  right?: number;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
@@ -96,11 +100,19 @@ export function AppearancePanel({
   hasCell,
   cellAxesVisible,
   onToggleCellAxes,
+  top,
+  right,
   collapsed,
   onToggleCollapse,
 }: AppearancePanelProps) {
   return (
-    <CollapsiblePanel title="Appearance" collapsed={collapsed} onToggleCollapse={onToggleCollapse}>
+    <CollapsiblePanel
+      title="Appearance"
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+      top={top}
+      right={right}
+    >
       <div
         style={{
           flex: 1,

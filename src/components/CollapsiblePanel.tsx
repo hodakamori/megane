@@ -76,6 +76,10 @@ interface CollapsiblePanelProps {
   onToggleCollapse: () => void;
   /** Panel width (default: 220). */
   width?: number | string;
+  /** Top offset in pixels (default: 12). Use to stack multiple panels. */
+  top?: number;
+  /** Right offset in pixels (default: 12). Use to side-by-side panels. */
+  right?: number;
   /** Extra header content (buttons etc.) placed before the collapse button. */
   headerExtra?: ReactNode;
   /** Extra elements prepended inside the panel container (e.g. resize handle). */
@@ -92,6 +96,8 @@ export function CollapsiblePanel({
   collapsed,
   onToggleCollapse,
   width = 220,
+  top = 12,
+  right = 12,
   headerExtra,
   containerExtra,
   children,
@@ -101,7 +107,7 @@ export function CollapsiblePanel({
   if (collapsed) {
     return (
       <div
-        style={{ position: "absolute", top: 12, right: 12, zIndex: 10 }}
+        style={{ position: "absolute", top, right, zIndex: 10 }}
         data-testid={panelTestId}
         data-collapsed="true"
       >
@@ -121,7 +127,11 @@ export function CollapsiblePanel({
   }
 
   return (
-    <div style={{ ...panelContainerStyle, width }} data-testid={panelTestId} data-collapsed="false">
+    <div
+      style={{ ...panelContainerStyle, width, top, right }}
+      data-testid={panelTestId}
+      data-collapsed="false"
+    >
       {containerExtra}
       <div style={panelHeaderStyle}>
         <span style={panelTitleStyle}>{title}</span>
