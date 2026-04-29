@@ -48,7 +48,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -68,7 +74,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -96,7 +108,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -121,7 +139,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
