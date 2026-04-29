@@ -417,3 +417,29 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     });
   },
 }));
+
+// ── Test-only window hook ──────────────────────────────────────────────
+// When testMode is detected we expose the Zustand store on the global so
+// Playwright specs (under tests/e2e/lib/pipeline.ts) can drive
+// addNode / removeNode / connectEdge / updateNodeParams without scripting
+// React Flow mouse interactions. No-op outside testMode.
+(() => {
+  if (typeof window === "undefined") return;
+  try {
+    const g = globalThis as { __MEGANE_TEST__?: boolean };
+    let testMode = g.__MEGANE_TEST__ === true;
+    if (!testMode) {
+      const params = new URLSearchParams(window.location?.search ?? "");
+      if (params.get("test") === "1") testMode = true;
+    }
+    if (!testMode && window.parent && window.parent !== window) {
+      const pg = (window.parent as Window & { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__;
+      if (pg) testMode = true;
+    }
+    if (!testMode) return;
+    (window as Window & { __megane_test_pipeline_store?: typeof usePipelineStore })
+      .__megane_test_pipeline_store = usePipelineStore;
+  } catch {
+    /* noop — same-origin checks may throw inside cross-origin frames */
+  }
+})();
