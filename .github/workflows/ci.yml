@@ -175,6 +175,9 @@ jobs:
       - run: npm ci
       - run: npm run build:wasm
       - run: npm run build:widget
+      - name: Build webapp (for vite preview in webapp / contract specs)
+        if: matrix.project == 'webapp' || matrix.project == 'contract'
+        run: npx tsc && npx vite build
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

@@ -89,17 +89,17 @@ export default defineConfig({
   webServer: process.env.MEGANE_E2E_NO_WEBSERVER
     ? undefined
     : {
-        // Vite dev server. WASM must be built first (npm run build:wasm).
-        command: `npx vite --port ${PORT_WEBAPP} --host 127.0.0.1`,
+        // Static preview server over the production build. We deliberately
+        // do NOT use `vite` (dev mode) here because in CI the on-demand
+        // module/WASM transformation occasionally fails to ready the page
+        // within the navigation deadline, while `vite preview` just serves
+        // the bundled `python/megane/static/app/` and is fully
+        // deterministic. The build step is `npm run build:app`.
+        command: `npx vite preview --port ${PORT_WEBAPP} --host 127.0.0.1 --strictPort`,
         port: PORT_WEBAPP,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
-        // stdout/stderr piped so server failures end up in the test
-        // output. Hiding stdout previously made CI failures opaque.
         stdout: "pipe",
         stderr: "pipe",
-        env: {
-          NODE_ENV: "development",
-        },
       },
 });
