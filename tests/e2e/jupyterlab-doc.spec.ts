@@ -36,6 +36,8 @@ interface DocFormatFixture {
   id: string;
   file: string;
   expectedAtoms?: number;
+  /** When true, assert that data-total-frames is > 0 (trajectory rendering). */
+  expectTrajectory?: boolean;
 }
 
 const FORMATS: DocFormatFixture[] = [
@@ -44,6 +46,10 @@ const FORMATS: DocFormatFixture[] = [
   { id: "xyz-perovskite", file: "perovskite_srtio3.xyz" },
   { id: "mol-methane", file: "methane.mol" },
   { id: "sdf-ethanol", file: "ethanol.sdf" },
+  { id: "cif-nacl", file: "nacl.cif" },
+  { id: "lammps-water", file: "water.lammps" },
+  { id: "xyz-water-multiframe", file: "water_multiframe.xyz", expectTrajectory: true },
+  { id: "traj-water", file: "water.traj", expectTrajectory: true },
 ];
 
 let lab: JupyterLabHandle | null = null;
@@ -86,9 +92,13 @@ for (const f of FORMATS) {
     await expectFullPageMatch(page, PLATFORM, `${f.id}-doc`);
     await expectViewerRegionMatch(page, PLATFORM, `${f.id}-doc-viewer`);
 
-    const ctx = await page
-      .locator('[data-testid="megane-viewer"]')
-      .getAttribute("data-megane-context");
+    const viewer = page.locator('[data-testid="megane-viewer"]');
+    const ctx = await viewer.getAttribute("data-megane-context");
     expect(ctx).toBe("jupyterlab-doc");
+
+    if (f.expectTrajectory) {
+      const totalFrames = Number(await viewer.getAttribute("data-total-frames"));
+      expect(totalFrames, `${f.id}: expected trajectory frames`).toBeGreaterThan(0);
+    }
   });
 }
