@@ -33,24 +33,43 @@ import {
 } from "./lib/hosts/code-server";
 
 const PLATFORM = "vscode";
-const FIXTURE_PDB = "1crn.pdb";
-const FIXTURE_PDB_ATOMS = 327;
 
 const REPO = join(fileURLToPath(import.meta.url), "..", "..", "..");
 const WORKSPACE = "/workspace";
 const PORT = Number(process.env.MEGANE_VSCODE_PORT ?? 18991);
+
+interface FormatFixture {
+  /** Slug used in baseline filenames. */
+  id: string;
+  /** Filename inside `tests/fixtures/`. */
+  file: string;
+  /** Atom count exposed via data-atom-count when the parser succeeds. */
+  expectedAtoms?: number;
+}
+
+/**
+ * Each format the megane custom editor advertises in
+ * `vscode-megane/package.json` (`customEditors[].selector`). Atom counts
+ * mirror the fixtures used by `format-loading.spec.ts` so a regression
+ * in the WASM parser surfaces here too.
+ */
+const FORMATS: FormatFixture[] = [
+  { id: "pdb-1crn", file: "1crn.pdb", expectedAtoms: 327 },
+  { id: "gro-water", file: "water.gro" },
+  { id: "xyz-perovskite", file: "perovskite_srtio3.xyz" },
+  { id: "mol-methane", file: "methane.mol" },
+  { id: "sdf-ethanol", file: "ethanol.sdf" },
+];
 
 let cs: CodeServerHandle | null = null;
 
 test.describe.configure({ timeout: 300_000 });
 
 test.beforeAll(async () => {
-  // Stage the fixture into the workspace so the relative path works.
   mkdirSync(WORKSPACE, { recursive: true });
-  copyFileSync(
-    join(REPO, "tests", "fixtures", FIXTURE_PDB),
-    join(WORKSPACE, FIXTURE_PDB),
-  );
+  for (const f of FORMATS) {
+    copyFileSync(join(REPO, "tests", "fixtures", f.file), join(WORKSPACE, f.file));
+  }
   cs = await startCodeServer({ port: PORT, workspace: WORKSPACE, e2eMode: true });
 });
 
@@ -59,21 +78,23 @@ test.afterAll(() => {
   cs = null;
 });
 
-test("vscode custom editor opens 1crn.pdb with vscode context", async ({ page }) => {
-  const wv = await openVscodeFile(page, { port: PORT, file: FIXTURE_PDB });
+for (const f of FORMATS) {
+  test(`vscode custom editor opens ${f.id} with vscode context`, async ({ page }) => {
+    const wv = await openVscodeFile(page, { port: PORT, file: f.file });
 
-  await assertDomContract(wv, [
-    ...defaultViewerContract({
-      expectedAtoms: FIXTURE_PDB_ATOMS,
-      context: "vscode",
-    }),
-  ]);
+    await assertDomContract(wv, [
+      ...defaultViewerContract({
+        expectedAtoms: f.expectedAtoms,
+        context: "vscode",
+      }),
+    ]);
 
-  await expectFullPageMatch(page, PLATFORM, "1crn-vscode");
-  await expectViewerRegionMatch(wv, PLATFORM, "1crn-vscode-viewer");
+    await expectFullPageMatch(page, PLATFORM, `${f.id}-vscode`);
+    await expectViewerRegionMatch(wv, PLATFORM, `${f.id}-vscode-viewer`);
 
-  const ctx = await wv
-    .locator('[data-testid="megane-viewer"]')
-    .getAttribute("data-megane-context");
-  expect(ctx).toBe("vscode");
-});
+    const ctx = await wv
+      .locator('[data-testid="megane-viewer"]')
+      .getAttribute("data-megane-context");
+    expect(ctx).toBe("vscode");
+  });
+}
