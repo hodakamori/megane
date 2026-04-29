@@ -186,10 +186,7 @@ function WidgetViewerPipeline({
   // Track pipeline-driven bond updates (initial load, bondSource flips,
   // file-mode bonds). Mirrors MeganeViewer's pattern.
   useEffect(() => {
-    const total = viewportState.bonds.reduce(
-      (sum, b) => sum + b.bondIndices.length / 2,
-      0,
-    );
+    const total = viewportState.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
     setBondCount(total);
   }, [viewportState.bonds]);
 

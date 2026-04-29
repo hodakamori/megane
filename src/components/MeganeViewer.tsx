@@ -130,10 +130,7 @@ export function MeganeViewer({
   // Per-frame distance-mode updates skip viewportState and go direct to the
   // renderer, so they update bondCount in the per-frame effect below instead.
   useEffect(() => {
-    const total = viewportState.bonds.reduce(
-      (sum, b) => sum + b.bondIndices.length / 2,
-      0,
-    );
+    const total = viewportState.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
     setBondCount(total);
   }, [viewportState.bonds]);
 
