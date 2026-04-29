@@ -78,25 +78,29 @@ Verify that the published packages actually work in a clean environment — not 
 
 ### 3.1 Python + npm: widget rendering in fresh virtualenv
 
-Install from PyPI into an isolated virtualenv (no local source files), then run the existing E2E widget test against it. This covers both the Python package (PyO3 native extension, parsers) and the npm package (megane-viewer WASM loaded by anywidget in the browser).
+Install from PyPI into an isolated virtualenv (no local source files), then run the Playwright `widget-jupyterlab` project against it. This covers both the Python package (PyO3 native extension, parsers) and the npm package (megane-viewer WASM loaded by anywidget in the browser).
 
 ```bash
 # Create isolated virtualenv and install from PyPI only
 VENV=/tmp/megane-verify-X.Y.Z
 python -m venv $VENV
-$VENV/bin/pip install megane==X.Y.Z jupyterlab
+$VENV/bin/pip install "megane==X.Y.Z" jupyterlab
 
-# Run the widget E2E test using the PyPI-installed megane
-# PATH override ensures local dev installation is NOT used
-PATH=$VENV/bin:$PATH node tests/e2e/test_widget_render.mjs
+# Make sure local Playwright project deps are present
+npm ci
+npx playwright install chromium
+
+# Run the widget E2E project against the PyPI-installed megane.
+# PATH override ensures the venv `python`/`jupyter` are used, not the local dev install.
+PATH=$VENV/bin:$PATH MEGANE_E2E_MODE=1 npm run test:e2e:widget-jupyterlab
 ```
 
-Expected: all assertions pass — canvas created, non-white pixels rendered (atoms visible), no critical JS errors. Screenshots saved to `tests/e2e/screenshot_1crn.png` and `tests/e2e/screenshot_water_100k.png`.
+Expected: all `widget-jupyterlab` specs pass. Pixel diffs against `tests/e2e/baselines/widget-jupyterlab/` succeed (or are written fresh on first run). On failure, inspect `<name>.diff.png` / `<name>.new.png` next to the baseline.
 
 This test verifies:
-- PyPI install succeeds and PyO3 native extension loads
-- megane-viewer (npm) WASM is bundled correctly and loads in browser
-- Molecule rendering pipeline works end-to-end
+- PyPI install succeeds and the PyO3 native extension loads
+- `megane-viewer` (npm) WASM is bundled correctly and loads in the browser
+- The anywidget rendering pipeline works end-to-end inside JupyterLab
 
 ### 3.2 VS Code extension: rendering via code-server
 
@@ -204,14 +208,17 @@ EOF
 
 ### 4.4 Upload rendering verification screenshots
 
-Attach the screenshots captured in Phase 3 to the release as visual proof that rendering works correctly after install.
+Attach a small set of Phase 3 visual artefacts to the release as proof that rendering works after install.
+
+The Phase 3.1 Playwright run drops baselines/diffs under `tests/e2e/baselines/widget-jupyterlab/`. Pick one representative full-page baseline (e.g. `default.png`) plus the VSCode rendering screenshot from Phase 3.2:
 
 ```bash
 gh release upload vX.Y.Z \
-  tests/e2e/screenshot_1crn.png \
-  tests/e2e/screenshot_water_100k.png \
+  tests/e2e/baselines/widget-jupyterlab/default.png \
   tests/e2e/screenshot_vscode_render.png
 ```
+
+If you want a hero capture in addition to the baselines, run `node scripts/capture-screenshots.mjs` and upload `docs/public/screenshots/hero.png`.
 
 ### 4.5 Confirm the draft is ready
 ```bash
@@ -267,7 +274,7 @@ Once all phases are complete, the release is done. Key verification:
 | All CI workflows | `gh run list --limit 10` (with remote swap) |
 | PyPI version | `pip index versions megane` |
 | npm version | `npm view megane-viewer@X.Y.Z version` |
-| Python + npm rendering (clean venv) | Phase 3.1: install from PyPI → `node tests/e2e/test_widget_render.mjs` |
+| Python + npm rendering (clean venv) | Phase 3.1: install from PyPI → `PATH=$VENV/bin:$PATH MEGANE_E2E_MODE=1 npm run test:e2e:widget-jupyterlab` |
 | VS Code rendering (code-server) | `node tests/e2e/test_vscode_render.mjs X.Y.Z` |
 | Release notes + screenshots uploaded | `gh release view vX.Y.Z` (with remote swap) |
 | Docs site updated | `gh run list --workflow=docs.yml` (with remote swap) |

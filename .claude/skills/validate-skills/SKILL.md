@@ -15,15 +15,16 @@ The following skills must be available in the system reminder:
 3. **dev-setup** — Development environment setup
 4. **build** — Build commands
 5. **testing** — Test runner instructions
-6. **preview** — Screenshot and video capture
-7. **pre-release** — Pre-release checklist (tests, versioning, dry-run, tag)
-8. **post-release** — Post-release checklist (verify packages, docs, live demo)
-9. **validate-skills** — This skill (self-check)
+6. **e2e-coverage** — E2E coverage runbook (5 platforms)
+7. **preview** — Screenshot and video capture
+8. **pre-release** — Pre-release checklist (tests, versioning, dry-run, tag)
+9. **post-release** — Post-release checklist (verify packages, docs, live demo)
+10. **validate-skills** — This skill (self-check)
 
 ## Validation Steps
 
 1. Check the system reminder in the current conversation for the list of available skills.
-2. Verify that all 9 skills listed above appear in the available skills list.
+2. Verify that all 10 skills listed above appear in the available skills list.
 3. Report the result:
    - If all skills are present: confirm and proceed with the task.
    - If any skill is missing: warn the user which skills are missing and suggest restarting the session or checking `.claude/skills/` directory structure.
@@ -37,9 +38,10 @@ Skills validation: OK
   - dev-setup: loaded
   - build: loaded
   - testing: loaded
+  - e2e-coverage: loaded
   - preview: loaded
   - pre-release: loaded
   - post-release: loaded
   - validate-skills: loaded
-All 9 skills are available. Ready to proceed.
+All 10 skills are available. Ready to proceed.
 ```
