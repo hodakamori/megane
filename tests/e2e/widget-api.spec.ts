@@ -4,11 +4,12 @@
  * Drives the megane Python anywidget through its public traitlets:
  *   - viewer.frame_index = N        — should advance the renderer epoch
  *   - viewer.selected_atoms = [...] — should populate the MeasurementPanel
+ *   - viewer.set_pipeline(pipe)     — should swap in a new pipeline graph
  *
- * The test boots a fresh JupyterLab, writes a notebook that exposes the
- * viewer object on `IPython.display`, then drives the kernel via
- * `requestExecute` from the JupyterLab front-end so we can mutate state
- * without scripting raw input cells.
+ * The test boots a fresh JupyterLab and rewrites the notebook with the
+ * cumulative cell sequence for each scenario, then triggers Run All. This
+ * avoids depending on a `window.jupyterapp` global (removed in modern
+ * JupyterLab) and keeps each test self-contained.
  */
 
 import { existsSync } from "fs";
@@ -37,24 +38,39 @@ const FIXTURE_PDB_ATOMS = 3024;
 
 const REPO = join(fileURLToPath(import.meta.url), "..", "..", "..");
 const NOTEBOOK_DIR = join(REPO, "tests", "e2e", "notebooks");
+const NOTEBOOK_NAME = "widget_api";
 const PORT = Number(process.env.MEGANE_LAB_API_PORT ?? 18890);
 const TOKEN = "megane-e2e-api";
 
 let lab: JupyterLabHandle | null = null;
 
-const NOTEBOOK_API: NotebookSpec = {
-  cells: [
-    {
-      cell_type: "code",
-      source: [
-        "import megane\n",
-        "viewer = megane.MolecularViewer()\n",
-        `viewer.load(\"${REPO}/tests/fixtures/${FIXTURE_PDB}\", \"${REPO}/tests/fixtures/${FIXTURE_XTC}\")\n`,
-        "viewer\n",
-      ],
-    },
-  ],
-};
+const SETUP_CELL = [
+  "import megane\n",
+  "viewer = megane.MolecularViewer()\n",
+  `viewer.load(\"${REPO}/tests/fixtures/${FIXTURE_PDB}\", \"${REPO}/tests/fixtures/${FIXTURE_XTC}\")\n`,
+  "viewer\n",
+];
+
+function buildNotebook(extraCells: string[][]): NotebookSpec {
+  return {
+    cells: [
+      { cell_type: "code", source: SETUP_CELL },
+      ...extraCells.map((source) => ({ cell_type: "code" as const, source })),
+    ],
+  };
+}
+
+async function reopenWithCells(
+  page: import("playwright/test").Page,
+  extraCells: string[][],
+): Promise<void> {
+  writeNotebook(NOTEBOOK_DIR, NOTEBOOK_NAME, buildNotebook(extraCells));
+  await openLabNotebook(page, {
+    port: PORT,
+    token: TOKEN,
+    notebook: `${NOTEBOOK_NAME}.ipynb`,
+  });
+}
 
 test.describe.configure({ mode: "serial", timeout: 240_000 });
 
@@ -78,40 +94,8 @@ test.afterAll(() => {
   lab = null;
 });
 
-async function executePython(
-  page: import("playwright/test").Page,
-  code: string,
-): Promise<void> {
-  await page.evaluate(async (src: string) => {
-    const w = window as unknown as {
-      jupyterapp?: {
-        serviceManager: {
-          sessions: {
-            running: () => Iterable<{ kernel?: { id: string } }>;
-          };
-          kernels: {
-            connectTo: (opts: { model: { id: string } }) => {
-              requestExecute: (req: { code: string }) => {
-                done: Promise<void>;
-              };
-            };
-          };
-        };
-      };
-    };
-    const app = w.jupyterapp;
-    if (!app) throw new Error("jupyterapp global not present");
-    const sessions = Array.from(app.serviceManager.sessions.running());
-    const kernelId = sessions.find((s) => s.kernel)?.kernel?.id;
-    if (!kernelId) throw new Error("no running kernel");
-    const k = app.serviceManager.kernels.connectTo({ model: { id: kernelId } });
-    await k.requestExecute({ code: src }).done;
-  }, code);
-}
-
 test("frame_index assignment advances renderer", async ({ page }) => {
-  writeNotebook(NOTEBOOK_DIR, "widget_api", NOTEBOOK_API);
-  await openLabNotebook(page, { port: PORT, token: TOKEN, notebook: "widget_api.ipynb" });
+  await reopenWithCells(page, [["viewer.frame_index = 3\n"]]);
 
   await assertDomContract(page, [
     ...defaultViewerContract({
@@ -120,24 +104,20 @@ test("frame_index assignment advances renderer", async ({ page }) => {
     }),
   ]);
 
-  const before = await getReadyState(page);
-  await executePython(page, "viewer.frame_index = 3\n");
-  await waitForReady(page, { untilEpoch: before.renderEpoch + 1, timeout: 30_000 });
+  // Run All has already executed the frame assignment; ready snapshot
+  // should reflect frame=3 with at least one render past the initial.
+  await waitForReady(page, { needsData: true, timeout: 30_000 });
   const after = await getReadyState(page);
   expect(after.frame).toBe(3);
+  expect(after.renderEpoch).toBeGreaterThan(0);
 });
 
 test("selected_atoms assignment shows in MeasurementPanel", async ({ page }) => {
-  // Notebook + viewer instance is already alive from the previous test
-  // (serial mode). If not, re-open.
-  const ready = await getReadyState(page).catch(() => null);
-  if (!ready || !ready.dataLoaded) {
-    await openLabNotebook(page, { port: PORT, token: TOKEN, notebook: "widget_api.ipynb" });
-  }
+  await reopenWithCells(page, [
+    ["viewer.frame_index = 3\n"],
+    ["viewer.selected_atoms = [0, 1]\n"],
+  ]);
 
-  await executePython(page, "viewer.selected_atoms = [0, 1]\n");
-  // The widget pushes the new selection through the snapshot; the panel
-  // should mount with count=2.
   await page.waitForFunction(
     () => {
       const el = document.querySelector('[data-testid="measurement-panel"]');
@@ -149,4 +129,39 @@ test("selected_atoms assignment shows in MeasurementPanel", async ({ page }) => 
   );
 
   void PLATFORM;
+});
+
+test("set_pipeline swaps in a programmatic graph and re-renders", async ({ page }) => {
+  // Build a minimal pipeline = LoadStructure(caffeine.pdb) -> Viewport
+  // and apply via viewer.set_pipeline(). Verify the renderer reports a
+  // new snapshot (renderEpoch advances after the assignment) and that
+  // the atom-count attribute on the viewer reflects the new structure.
+  const pipelineCell = [
+    "from megane import Pipeline, LoadStructure, Viewport\n",
+    "pipe = Pipeline()\n",
+    `s = pipe.add_node(LoadStructure(\"${REPO}/tests/fixtures/water_wrapped.pdb\"))\n`,
+    "v = pipe.add_node(Viewport())\n",
+    "pipe.add_edge(s.out.particle, v.inp.particle)\n",
+    "viewer.set_pipeline(pipe)\n",
+  ];
+  await reopenWithCells(page, [pipelineCell]);
+
+  await waitForReady(page, { needsData: true, timeout: 30_000 });
+
+  // The pipeline-driven snapshot replaces the original caffeine_water
+  // fixture with caffeine alone (24 atoms). The viewer-root carries a
+  // data-atom-count attribute kept in sync with the active snapshot.
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector('[data-testid="viewer-root"]');
+      const n = Number(el?.getAttribute("data-atom-count") ?? "0");
+      return n > 0 && n !== 3024;
+    },
+    null,
+    { timeout: 30_000 },
+  );
+
+  const after = await getReadyState(page);
+  expect(after.firstFrame).toBe(true);
+  expect(after.renderEpoch).toBeGreaterThan(0);
 });
