@@ -8,7 +8,6 @@
  * test will catch a regression where the host context is misreported.
  */
 
-import { spawn, ChildProcess } from "child_process";
 import { existsSync, mkdirSync, copyFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
@@ -18,8 +17,13 @@ import {
   defaultViewerContract,
   expectFullPageMatch,
   expectViewerRegionMatch,
-  waitForReady,
 } from "./lib/setup";
+import {
+  startJupyterLab,
+  stopJupyterLab,
+  openLabFile,
+  type JupyterLabHandle,
+} from "./lib/hosts/jupyterlab";
 
 const PLATFORM = "jupyterlab-doc";
 const FIXTURE_PDB = "1crn.pdb";
@@ -30,69 +34,7 @@ const NOTEBOOK_DIR = join(REPO, "tests", "e2e", "notebooks");
 const PORT = Number(process.env.MEGANE_LAB_DOC_PORT ?? 18889);
 const TOKEN = "megane-e2e-doc";
 
-let labProc: ChildProcess | null = null;
-
-function startJupyterLab(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    mkdirSync(NOTEBOOK_DIR, { recursive: true });
-    // Ensure the fixture is reachable from the notebook root.
-    copyFileSync(
-      join(REPO, "tests", "fixtures", FIXTURE_PDB),
-      join(NOTEBOOK_DIR, FIXTURE_PDB),
-    );
-    labProc = spawn(
-      "jupyter",
-      [
-        "lab",
-        "--no-browser",
-        "--allow-root",
-        `--port=${PORT}`,
-        `--IdentityProvider.token=${TOKEN}`,
-        "--PasswordIdentityProvider.hashed_password=",
-        "--ServerApp.allow_origin=*",
-        `--notebook-dir=${NOTEBOOK_DIR}`,
-      ],
-      {
-        cwd: REPO,
-        env: { ...process.env, JUPYTER_RUNTIME_DIR: "/tmp/megane-jupyter-doc-runtime" },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-
-    let resolved = false;
-    const timer = setTimeout(() => {
-      if (!resolved) reject(new Error("JupyterLab did not start"));
-    }, 60_000);
-    const onData = (data: Buffer) => {
-      const line = data.toString();
-      if (
-        !resolved &&
-        (line.includes(`http://127.0.0.1:${PORT}`) ||
-          line.includes(`http://localhost:${PORT}`) ||
-          line.includes("Jupyter Server"))
-      ) {
-        resolved = true;
-        clearTimeout(timer);
-        setTimeout(resolve, 1500);
-      }
-    };
-    labProc.stdout?.on("data", onData);
-    labProc.stderr?.on("data", onData);
-    labProc.on("error", (err) => {
-      if (!resolved) {
-        clearTimeout(timer);
-        reject(err);
-      }
-    });
-  });
-}
-
-function stopJupyterLab(): void {
-  if (labProc && !labProc.killed) {
-    labProc.kill("SIGTERM");
-    labProc = null;
-  }
-}
+let lab: JupyterLabHandle | null = null;
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -100,22 +42,27 @@ test.beforeAll(async () => {
   if (!existsSync(join(REPO, "wheel-share/data/share/jupyter/labextensions/megane-jupyterlab"))) {
     throw new Error("megane labextension not built. Run `npm run build:lab`.");
   }
-  await startJupyterLab();
+  mkdirSync(NOTEBOOK_DIR, { recursive: true });
+  copyFileSync(
+    join(REPO, "tests", "fixtures", FIXTURE_PDB),
+    join(NOTEBOOK_DIR, FIXTURE_PDB),
+  );
+  lab = await startJupyterLab({
+    port: PORT,
+    token: TOKEN,
+    notebookDir: NOTEBOOK_DIR,
+    cwd: REPO,
+    runtimeDir: "/tmp/megane-jupyter-doc-runtime",
+  });
 });
 
 test.afterAll(() => {
-  stopJupyterLab();
+  stopJupyterLab(lab);
+  lab = null;
 });
 
 test("DocWidget renders 1crn.pdb with jupyterlab-doc context", async ({ page }) => {
-  await page.addInitScript(() => {
-    (globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__ = true;
-  });
-  const url = `http://127.0.0.1:${PORT}/lab/tree/${FIXTURE_PDB}?token=${TOKEN}&test=1&reset`;
-  await page.goto(url, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("#jp-main-dock-panel", { timeout: 30_000 });
-
-  await waitForReady(page, { needsData: true, timeout: 60_000 });
+  await openLabFile(page, { port: PORT, token: TOKEN, file: FIXTURE_PDB });
 
   await assertDomContract(page, [
     ...defaultViewerContract({
@@ -127,11 +74,6 @@ test("DocWidget renders 1crn.pdb with jupyterlab-doc context", async ({ page }) 
   await expectFullPageMatch(page, PLATFORM, "1crn-doc");
   await expectViewerRegionMatch(page, PLATFORM, "1crn-doc-viewer");
 
-  // Cross-host parity: the viewer pixels should be (close to) identical
-  // to the WebApp's caffeine_water-default contract baseline... except
-  // here the fixture is 1crn, not caffeine_water. We therefore add a
-  // 1crn-specific contract baseline to compare other platforms against.
-  // (This is generated on first run via `compareToBaseline` in setup.ts.)
   const ctx = await page
     .locator('[data-testid="megane-viewer"]')
     .getAttribute("data-megane-context");
