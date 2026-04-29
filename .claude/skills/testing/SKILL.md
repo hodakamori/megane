@@ -89,7 +89,42 @@ npm run test:e2e:webapp
 npm run test:e2e:contract
 npm run test:e2e:widget-jupyterlab
 npm run test:e2e:jupyterlab-doc
+npm run test:e2e:widget-vscode       # requires MEGANE_E2E_MODE=1 + code-server
+npm run test:e2e:vscode              # requires MEGANE_E2E_MODE=1 + code-server
 ```
+
+### E2E project map (5 distribution platforms)
+
+The viewer ships through 5 hosts. Each is a Playwright project with its own
+boot prerequisites. Cross-platform parity is asserted via `contract`.
+
+| Project | Host | Port | Prereqs | Command |
+|---|---|---|---|---|
+| `webapp` | Vite static | 15173 | `npm run build` | `npm run test:e2e:webapp` |
+| `contract` | webapp baseline | 15173 | `npm run build` | `npm run test:e2e:contract` |
+| `widget-jupyterlab` | anywidget in `jupyter lab` | 18888 | `npm run build:widget` | `npm run test:e2e:widget-jupyterlab` |
+| `jupyterlab-doc` | DocWidget in `jupyter lab` | 18889 | `npm run build:lab` + labextension copy | `npm run test:e2e:jupyterlab-doc` |
+| `widget-vscode` | anywidget in code-server + ms-toolsai.jupyter | dynamic | `scripts/install-code-server.sh` + VSIX | `MEGANE_E2E_MODE=1 npm run test:e2e:widget-vscode` |
+| `vscode` | VSCode custom editor | dynamic | `scripts/install-code-server.sh` + VSIX | `MEGANE_E2E_MODE=1 npm run test:e2e:vscode` |
+
+`MEGANE_E2E_MODE=1` causes the megane VSCode extension to inject
+`window.__MEGANE_TEST__ = true` into the webview, which is what triggers
+`MoleculeRenderer` testMode. Without it, the webview-hosted projects time out
+in `waitForReady`.
+
+### Cross-host feature specs
+
+Feature-oriented specs (`format-loading`, `playback`, `measurement`,
+`appearance`, `sidebar`, `widget-api`, `pipeline-editor`, `pipeline-file`,
+`render-modal`) are parametrized via `MEGANE_HOST`:
+
+```sh
+MEGANE_HOST=widget-jupyterlab npm run test:e2e:measurement
+```
+
+`MEGANE_HOST` accepts `webapp | widget-jupyterlab | widget-vscode |
+jupyterlab-doc | vscode`. Default is `webapp`. See
+`.claude/skills/e2e-coverage/SKILL.md` for the full per-feature runbook.
 
 ### Running everything
 
