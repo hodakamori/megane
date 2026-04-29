@@ -99,17 +99,23 @@ npx playwright test          # all projects
 
 ### CI vs. local split
 
-`webapp` and `contract` are **local-only** — Playwright's webServer
-manager has a non-deterministic port-bind race against the Node static
-server on `ubuntu-latest` GH runners that we could not stabilise. The
-JupyterLab-hosted projects (`widget-jupyterlab`, `jupyterlab-doc`) DO
-run in CI per `.github/workflows/ci.yml`.
+**All four E2E projects are local-only.** We attempted to run them on
+GH-hosted ubuntu-latest runners but ran into two
+CI-environment-specific issues we don't want to maintain workarounds
+for:
+
+  - `webapp` / `contract`: Playwright's webServer manager hits a
+    non-deterministic port-bind race against the Node static server,
+    failing within 5 seconds before any spec runs.
+  - `widget-jupyterlab` / `jupyterlab-doc`: pixel-diff baseline drift
+    between the dev-container Chromium and the CI Chromium
+    fonts/fontconfig (small but enough to exceed our 2 % tolerance).
 
 The expected pre-merge workflow is:
 
-1. Run all 4 projects locally as part of the change.
-2. CI re-runs the JupyterLab projects on PR for redundancy.
-3. Commit any updated baselines under `tests/e2e/baselines/<project>/`.
+1. Run all 4 projects locally as part of any UI-touching change.
+2. Commit any updated baselines under `tests/e2e/baselines/<project>/`.
+3. CI does NOT re-run E2E. Reviewers verify locally if needed.
 
 ### Updating baselines
 
@@ -177,6 +183,6 @@ git remote set-url origin "$ORIG_REMOTE"
 - If CI is still running, wait and re-check.
 - If CI has failed, inspect with `gh run view <run-id> --log-failed`, fix the issue, and push again.
 - Only report success after CI passes.
-- Note: `webapp` and `contract` E2E projects are local-only; they are
-  not part of CI. Verify them locally before pushing changes that
-  touch the WebApp / Viewport / MoleculeRenderer paths.
+- Note: **All E2E projects are local-only**; CI does not run any of
+  them. Verify locally before pushing changes that touch
+  WebApp / Viewport / MoleculeRenderer / Widget / DocWidget paths.

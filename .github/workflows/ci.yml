@@ -146,72 +146,17 @@ jobs:
       - name: Build image
         run: docker build -t megane:ci .
 
-  e2e:
-    # Cross-platform 3-layer E2E — JupyterLab-hosted projects only.
-    #
-    # `webapp` and `contract` are NOT in this matrix because the
-    # Playwright `webServer` manager hits a non-deterministic port-bind
-    # race against the Node static server on ubuntu-latest runners
-    # (failure within 5 seconds of test-runner start, before any spec
-    # executes). The race could not be reproduced or stabilised on
-    # GH-hosted runners after several attempts; running them locally is
-    # both reliable and the preferred workflow per the Claude `testing`
-    # skill. See `.claude/skills/testing/SKILL.md` for the local
-    # commands.
-    name: E2E (${{ matrix.project }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - widget-jupyterlab
-          - jupyterlab-doc
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run build:wasm
-      - run: npm run build:widget
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install Python package + JupyterLab
-        run: pip install -e ".[dev]" jupyterlab
-      - name: Build labextension (jupyterlab-doc only)
-        if: matrix.project == 'jupyterlab-doc'
-        run: npm run build:lab
-      - name: Install megane labextension into JupyterLab
-        if: matrix.project == 'jupyterlab-doc'
-        run: |
-          mkdir -p $(jupyter --data-dir)/labextensions
-          cp -r wheel-share/data/share/jupyter/labextensions/megane-jupyterlab \
-                $(jupyter --data-dir)/labextensions/
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-      - name: Run E2E (${{ matrix.project }})
-        env:
-          # JupyterLab-hosted specs spawn their own server (jupyter lab),
-          # so Playwright's `webServer` config in playwright.config.ts
-          # must be skipped for these projects.
-          MEGANE_E2E_NO_WEBSERVER: "1"
-        run: npx playwright test --project=${{ matrix.project }} --reporter=list,html
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-${{ matrix.project }}
-          path: |
-            playwright-report/
-            test-results/
-            tests/e2e/baselines/${{ matrix.project }}/*.diff.png
-            tests/e2e/baselines/${{ matrix.project }}/*.new.png
-          if-no-files-found: ignore
-          retention-days: 14
+  # Cross-platform 3-layer E2E (`tests/e2e/*.spec.ts`) is **local-only**.
+  #
+  # We attempted to run the suite on GH-hosted ubuntu-latest runners but
+  # the `webapp` / `contract` projects hit a non-deterministic port-bind
+  # race against Playwright's webServer manager (5-second fast-fails),
+  # and the JupyterLab-hosted projects suffered baseline drift between
+  # the dev container Chromium and the CI Chromium fonts/fontconfig.
+  # Stabilising both required CI-environment-specific patches that we
+  # don't want to maintain.
+  #
+  # The expectation is that contributors run the E2E suite locally before
+  # pushing changes that touch the WebApp / Viewport / MoleculeRenderer
+  # / Widget / DocWidget paths. See `.claude/skills/testing/SKILL.md`
+  # for the commands.

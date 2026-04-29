@@ -91,21 +91,26 @@ or in the spec call — never widen the tolerance.
 
 | Project           | State        | Where it runs    | Notes                                                  |
 |-------------------|--------------|------------------|--------------------------------------------------------|
-| webapp            | active       | **local-only**   | Vite preview / Node static server. CI port-bind race.  |
+| webapp            | active       | **local-only**   | Vite preview / Node static server                      |
 | contract          | active       | **local-only**   | WebApp viewer-region baseline used by all platforms    |
-| widget-jupyterlab | active       | local + CI       | anywidget + JupyterLab                                 |
-| jupyterlab-doc    | active       | local + CI       | DocWidget direct-open path                             |
+| widget-jupyterlab | active       | **local-only**   | anywidget + JupyterLab                                 |
+| jupyterlab-doc    | active       | **local-only**   | DocWidget direct-open path                             |
 | widget-vscode     | scaffold     | n/a (skipped)    | needs code-server + ms-toolsai.jupyter                 |
 | vscode            | scaffold     | n/a (skipped)    | needs local VSIX + code-server                         |
 
-**WebApp and Contract are local-only:** Playwright's `webServer`
-manager hits a non-deterministic port-bind race against our Node
-static server on GitHub Actions `ubuntu-latest` runners (failure within
-~5 seconds, before any spec runs). After several stabilisation
-attempts we moved them out of CI. Run them locally before pushing any
-change that touches `MeganeViewer`, `Viewport`, `MoleculeRenderer`, or
-the widget bundle. See `.claude/skills/testing/SKILL.md` for the local
-commands.
+**All four E2E projects are local-only.** Two CI-environment-specific
+issues made GH-hosted runs unreliable:
+
+  - `webapp` / `contract`: Playwright's `webServer` manager hits a
+    non-deterministic port-bind race against our Node static server
+    (failure within ~5 seconds, before any spec runs).
+  - `widget-jupyterlab` / `jupyterlab-doc`: pixel-diff baseline drift
+    between the dev-container Chromium and the CI Chromium fonts /
+    fontconfig (small but enough to exceed our 2 % tolerance).
+
+Run all four projects locally before pushing changes to MeganeViewer,
+Viewport, MoleculeRenderer, the widget bundle, or DocWidget. See
+`.claude/skills/testing/SKILL.md` for commands.
 
 Follow-up milestones (more interaction matrices, more dynamic-update
 matrices, more host options) are tracked in the planning doc.
