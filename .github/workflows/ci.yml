@@ -196,35 +196,10 @@ jobs:
                 $(jupyter --data-dir)/labextensions/
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - name: Diagnose build outputs
-        if: matrix.project == 'webapp' || matrix.project == 'contract'
-        run: |
-          echo "## Pre-test diagnostics for ${{ matrix.project }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "ls python/megane/static/app/:" >> $GITHUB_STEP_SUMMARY
-          ls -la python/megane/static/app/ 2>&1 | head -20 >> $GITHUB_STEP_SUMMARY || true
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "node -e \"new (require('http').createServer(...).listen(15173, ...))\" check:" >> $GITHUB_STEP_SUMMARY
-          node tests/e2e/lib/serve-static.mjs python/megane/static/app 15173 127.0.0.1 &
-          SERVER_PID=$!
-          sleep 2
-          curl -sv --max-time 5 "http://127.0.0.1:15173/" 2>&1 | head -30 >> $GITHUB_STEP_SUMMARY || true
-          echo "" >> $GITHUB_STEP_SUMMARY
-          curl -sv --max-time 5 "http://127.0.0.1:15173/?test=1" 2>&1 | head -20 >> $GITHUB_STEP_SUMMARY || true
-          kill $SERVER_PID 2>/dev/null || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
       - name: Run E2E (${{ matrix.project }})
         env:
           MEGANE_E2E_NO_WEBSERVER: ${{ (matrix.project == 'webapp' || matrix.project == 'contract') && '' || '1' }}
-        run: |
-          set +e
-          npx playwright test --project=${{ matrix.project }} --reporter=list,html 2>&1 | tee playwright-output.log
-          EXIT=$?
-          echo "## E2E (${{ matrix.project }}) — exit=$EXIT" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -120 playwright-output.log >> $GITHUB_STEP_SUMMARY 2>&1 || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $EXIT
+        run: npx playwright test --project=${{ matrix.project }} --reporter=list,html
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
