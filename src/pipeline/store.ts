@@ -437,8 +437,9 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       if (pg) testMode = true;
     }
     if (!testMode) return;
-    (window as Window & { __megane_test_pipeline_store?: typeof usePipelineStore })
-      .__megane_test_pipeline_store = usePipelineStore;
+    (
+      window as Window & { __megane_test_pipeline_store?: typeof usePipelineStore }
+    ).__megane_test_pipeline_store = usePipelineStore;
   } catch {
     /* noop — same-origin checks may throw inside cross-origin frames */
   }

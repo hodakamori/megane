@@ -1469,10 +1469,8 @@ export class MoleculeRenderer {
   testGetVisibleSubsystems(): MeganeSubsystemVisibility {
     const layers = Array.from(this.layers.values());
     return {
-      atoms:
-        (this.atomRenderer?.mesh.visible ?? false) || layers.some((l) => l.isAtomsVisible()),
-      bonds:
-        (this.bondRenderer?.mesh.visible ?? false) || layers.some((l) => l.isBondsVisible()),
+      atoms: (this.atomRenderer?.mesh.visible ?? false) || layers.some((l) => l.isAtomsVisible()),
+      bonds: (this.bondRenderer?.mesh.visible ?? false) || layers.some((l) => l.isBondsVisible()),
       cell: (this.cellRenderer?.mesh.visible ?? false) || layers.some((l) => l.isCellVisible()),
       cellAxes: this.cellAxesRenderer?.isVisible() ?? false,
       vectors: this.arrowRenderer?.mesh.visible ?? false,
