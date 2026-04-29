@@ -23,6 +23,8 @@ sidebar_position: 1
 | **CLI (Docker)** | `docker pull hodakamori/megane` | [CLI Guide](./guide/cli) |
 | **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline/index) |
 
+For a side-by-side comparison of which formats and UI features each environment supports — including known gaps — see [Platform Support](./platform-support).
+
 ## Supported file formats
 
 | Format | Extension |
