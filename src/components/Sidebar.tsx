@@ -76,9 +76,12 @@ export function Sidebar({
           left: 12,
           zIndex: 10,
         }}
+        data-testid="sidebar-root"
+        data-collapsed="true"
       >
         <button
           onClick={onToggleCollapse}
+          data-testid="sidebar-toggle"
           style={{
             background: "rgba(255, 255, 255, 0.88)",
             backdropFilter: "blur(16px)",
@@ -107,6 +110,8 @@ export function Sidebar({
 
   return (
     <div
+      data-testid="sidebar-root"
+      data-collapsed="false"
       style={{
         position: "absolute",
         top: 12,
@@ -148,6 +153,7 @@ export function Sidebar({
         </span>
         <button
           onClick={onToggleCollapse}
+          data-testid="sidebar-toggle"
           style={{
             background: "none",
             border: "none",
@@ -230,6 +236,7 @@ export function Sidebar({
             exts={STRUCTURE_EXTS}
             onFile={onUploadStructure}
             label="Change..."
+            testId="structure-upload"
           >
             {structure.fileName ? (
               <>
@@ -263,6 +270,7 @@ export function Sidebar({
               exts={BOND_FILE_EXTS}
               onFile={bonds.onUploadFile}
               label="Load PDB/TOP..."
+              testId="bonds-upload"
             >
               {bonds.fileName && <div style={fileNameStyle}>{bonds.fileName}</div>}
             </DropZone>
@@ -292,6 +300,7 @@ export function Sidebar({
               exts={[".xtc", ".lammpstrj", ".dump"]}
               onFile={trajectory.onUploadXtc}
               label="Load trajectory..."
+              testId="trajectory-upload"
             >
               {trajectory.fileName ? (
                 <>

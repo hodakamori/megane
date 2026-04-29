@@ -36,11 +36,11 @@ test.describe("webapp: caffeine_water default", () => {
         expectedAtoms: ATOM_COUNT_CAFFEINE,
         context: "webapp",
       }),
-      { testid: "timeline", visible: true },
-      { testid: "frame-slider", visible: true, enabled: true },
-      { testid: "play-button", visible: true, enabled: true },
+      { testid: "timeline-root", visible: true },
+      { testid: "playback-seekbar", visible: true, enabled: true },
+      { testid: "playback-toggle", visible: true, enabled: true },
       { testid: "frame-counter", visible: true },
-      { testid: "fps-select", visible: true, enabled: true },
+      { testid: "playback-fps", visible: true, enabled: true },
     ]);
 
     await expectFullPageMatch(page, PLATFORM, "default-view");
@@ -50,7 +50,7 @@ test.describe("webapp: caffeine_water default", () => {
   test("frame slider seek advances renderer state", async ({ page }) => {
     const before = await getReadyState(page);
 
-    await page.locator('[data-testid="frame-slider"]').evaluate((el: HTMLInputElement) => {
+    await page.locator('[data-testid="playback-seekbar"]').evaluate((el: HTMLInputElement) => {
       el.value = "3";
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -63,7 +63,7 @@ test.describe("webapp: caffeine_water default", () => {
         expectedAtoms: ATOM_COUNT_CAFFEINE,
         context: "webapp",
       }),
-      { testid: "frame-slider", visible: true },
+      { testid: "playback-seekbar", visible: true },
     ]);
 
     // The viewer-root pixels must change after a frame seek; if the

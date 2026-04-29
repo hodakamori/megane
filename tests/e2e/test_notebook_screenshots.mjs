@@ -12,15 +12,13 @@
  *   - jupyterlab installed and `megane` pip-installed
  */
 
-import { createRequire } from "module";
 import { execSync, spawn } from "child_process";
 import { randomBytes } from "crypto";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { getChromium } from "./utils/playwright.mjs";
 
-// Playwright is installed globally; resolve it explicitly.
-const _require = createRequire("/opt/node22/lib/node_modules/");
-const { chromium } = _require("playwright");
+const chromium = getChromium();
 
 const TOKEN = randomBytes(16).toString("hex");
 const PORT = 28888 + Math.floor(Math.random() * 1000);

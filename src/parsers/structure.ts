@@ -6,6 +6,7 @@
 
 import type { Snapshot, Frame, TrajectoryMeta, VectorChannel } from "../types";
 import { deserializeVectorChannels } from "./vectorChannels";
+import { perfMark, perfMeasure } from "../perf";
 
 export interface StructureParseResult {
   snapshot: Snapshot;
@@ -60,11 +61,14 @@ async function ensureInit(): Promise<void> {
   if (wasmModule) return;
   if (!initPromise) {
     initPromise = (async () => {
+      perfMark("megane:wasm:start");
       const wasm = await import("../../crates/megane-wasm/pkg");
       const wasmUrl = (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ as
         | string
         | undefined;
       await wasm.default(wasmUrl);
+      perfMark("megane:wasm:end");
+      perfMeasure("megane:wasm-init", "megane:wasm:start", "megane:wasm:end");
       wasmModule = {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
@@ -126,18 +130,25 @@ export async function parseStructureFile(file: File): Promise<StructureParseResu
   await ensureInit();
 
   const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb";
+  const tag = `${file.name.replace(/[^A-Za-z0-9._-]/g, "_")}-${Date.now()}`;
+  perfMark(`megane:parse:start:${tag}`);
 
-  // .traj files are binary (ULM format) — parse as Uint8Array
+  let parseResult: StructureParseResult;
   if (ext === ".traj") {
+    // .traj files are binary (ULM format) — parse as Uint8Array
     const buffer = await file.arrayBuffer();
     const data = new Uint8Array(buffer);
     const result = wasmModule!.parse_traj(data);
-    return parseWithFn(() => result, "");
+    parseResult = parseWithFn(() => result, "");
+  } else {
+    const text = await file.text();
+    const parseFn = getParserForExtension(ext);
+    parseResult = parseWithFn(parseFn, text);
   }
 
-  const text = await file.text();
-  const parseFn = getParserForExtension(ext);
-  return parseWithFn(parseFn, text);
+  perfMark(`megane:parse:end:${tag}`);
+  perfMeasure(`megane:parse:${tag}`, `megane:parse:start:${tag}`, `megane:parse:end:${tag}`);
+  return parseResult;
 }
 
 function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {

@@ -17,16 +17,14 @@
  *   - Internet access to download VSIX from VS Code Marketplace
  */
 
-import { createRequire } from "module";
 import { spawn, execSync, execFileSync } from "child_process";
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { createWriteStream } from "fs";
 import { get as httpsGet } from "https";
+import { getChromium } from "./utils/playwright.mjs";
 
-// Playwright is installed globally; resolve it explicitly.
-const _require = createRequire("/opt/node22/lib/node_modules/");
-const { chromium } = _require("playwright");
+const chromium = getChromium();
 
 const VERSION = process.argv[2];
 if (!VERSION) {

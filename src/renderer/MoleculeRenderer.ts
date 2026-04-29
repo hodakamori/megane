@@ -32,6 +32,7 @@ import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel } from "./Picking";
 import { computeMeasurement } from "./Selection";
+import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
 import {
   fitCameraToView,
   applyFrustumInsets,
@@ -148,6 +149,9 @@ export class MoleculeRenderer {
 
   private wheelZoomHandler: ((e: WheelEvent) => void) | null = null;
 
+  /** True until the first frame has been rendered after mount; used for perf hook. */
+  private firstFramePending = true;
+
   /** Structure layers for multi-structure overlay rendering. */
   private layers = new Map<string, StructureLayer>();
 
@@ -159,6 +163,7 @@ export class MoleculeRenderer {
 
   /** Mount the viewer into a DOM element. */
   mount(container: HTMLElement): void {
+    perfMark("megane:mount:start");
     this.container = container;
 
     // Renderer
@@ -1288,6 +1293,15 @@ export class MoleculeRenderer {
     }
 
     _signalRender(this.snapshot != null);
+
+    // Performance hooks (no-op unless window.__MEGANE_PERF__ is set)
+    perfPushFrame(performance.now());
+    if (this.firstFramePending) {
+      this.firstFramePending = false;
+      perfMark("megane:mount:firstFrame");
+      perfMeasure("megane:first-render", "megane:mount:start", "megane:mount:firstFrame");
+      perfRendererReady();
+    }
   };
 
   /** Clean up all resources. */
