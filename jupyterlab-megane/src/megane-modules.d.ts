@@ -16,4 +16,13 @@ declare module "@megane/hooks/useMeganeLocal" {
   export function useMeganeLocal(): any;
 }
 
+declare module "@megane/pipeline/store" {
+  export const usePipelineStore: {
+    getState(): {
+      openFile(file: File, opts?: { mode?: "replace" | "merge"; companions?: File[] }): Promise<void>;
+      [key: string]: any;
+    };
+  };
+}
+
 declare module "@megane/styles/megane.css";

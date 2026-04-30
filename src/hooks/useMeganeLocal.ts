@@ -119,12 +119,15 @@ export function useMeganeLocal(): MeganeLocalState {
   }, []);
 
   const applyResult = useCallback(
-    (result: {
-      snapshot: Snapshot;
-      frames: Frame[];
-      meta: TrajectoryMeta | null;
-      labels: string[] | null;
-    }) => {
+    (
+      result: {
+        snapshot: Snapshot;
+        frames: Frame[];
+        meta: TrajectoryMeta | null;
+        labels: string[] | null;
+      },
+      filename?: string,
+    ) => {
       const prevSnapshot = baseSnapshotRef.current;
       baseSnapshotRef.current = result.snapshot;
       structureFramesRef.current = result.frames;
@@ -174,6 +177,39 @@ export function useMeganeLocal(): MeganeLocalState {
         pipeStore.setStructureFrames(null, null);
       }
 
+      // Keep the pipeline's load_structure (and trajectory, when the file
+      // carries embedded frames) nodes in sync with whatever was just
+      // loaded. Without this the editor would show stale demo filenames
+      // (e.g. "caffeine_water.pdb") even though the viewer is rendering
+      // the user's file.
+      if (filename) {
+        const loaderNode = pipeStore.nodes.find((n) => n.type === "load_structure");
+        if (loaderNode) {
+          pipeStore.setNodeSnapshot(loaderNode.id, {
+            snapshot: result.snapshot,
+            frames: result.frames.length > 0 ? result.frames : null,
+            meta: result.meta,
+            labels: result.labels,
+          });
+          pipeStore.updateNodeParams(loaderNode.id, {
+            fileName: filename,
+            hasTrajectory: result.frames.length > 0,
+            hasCell: !!result.snapshot.box,
+          });
+        }
+        const trajNode = pipeStore.nodes.find((n) => n.type === "load_trajectory");
+        if (trajNode) {
+          // Multi-frame structure files (.traj, multi-MODEL PDB,
+          // multi-frame XYZ) have their trajectory embedded in the
+          // structure file itself — surface that by reusing the same
+          // filename. Otherwise clear it so a previously-loaded XTC name
+          // doesn't linger across structure swaps.
+          pipeStore.updateNodeParams(trajNode.id, {
+            fileName: result.frames.length > 0 ? filename : "",
+          });
+        }
+      }
+
       // Reset sub-hook state
       bonds.reset(result.snapshot);
       labels.reset(result.labels);
@@ -196,7 +232,7 @@ export function useMeganeLocal(): MeganeLocalState {
   const loadFile = useCallback(
     async (pdb: File) => {
       const result = await parseStructureFile(pdb);
-      applyResult(result);
+      applyResult(result, pdb.name);
       setPdbFileName(pdb.name);
       setXtcFileName(result.meta ? "PDB models" : null);
     },
@@ -206,8 +242,9 @@ export function useMeganeLocal(): MeganeLocalState {
   const loadText = useCallback(
     async (text: string, fileName?: string) => {
       const result = await parseStructureText(text, fileName);
-      applyResult(result);
-      setPdbFileName(fileName ?? "caffeine_water.pdb");
+      const effectiveName = fileName ?? "caffeine_water.pdb";
+      applyResult(result, effectiveName);
+      setPdbFileName(effectiveName);
       setXtcFileName(result.meta ? "PDB models" : null);
       return result;
     },
@@ -241,6 +278,13 @@ export function useMeganeLocal(): MeganeLocalState {
       // Feed parsed frames into the pipeline store so executeLoadTrajectory produces output.
       const store = usePipelineStore.getState();
       store.setFileFrames(frames, xtcMeta ?? null);
+
+      // Sync the load_trajectory node's displayed fileName so the pipeline
+      // editor reflects the actually-loaded XTC/dump.
+      const trajNode = store.nodes.find((n) => n.type === "load_trajectory");
+      if (trajNode) {
+        store.updateNodeParams(trajNode.id, { fileName: xtc.name });
+      }
 
       // Auto-load first embedded vector channel (e.g. LAMMPS dump vx/vy/vz) into pipeline.
       if (vectorChannels.length > 0) {
