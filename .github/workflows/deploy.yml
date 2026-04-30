@@ -1,4 +1,4 @@
-name: Deploy demo to Cloudflare Pages
+name: Deploy demo to AWS S3 + CloudFront
 
 on:
   push:
@@ -7,10 +7,10 @@ on:
 
 permissions:
   contents: read
-  deployments: write
 
 env:
-  CLOUDFLARE_PROJECT_NAME: megane-demo
+  AWS_REGION: ap-northeast-1
+  APP_NAME: megane
 
 jobs:
   deploy:
@@ -46,18 +46,68 @@ jobs:
       - name: Verify build artifacts
         run: test -f python/megane/static/app/index.html
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy python/megane/static/app --project-name=${{ env.CLOUDFLARE_PROJECT_NAME }} --branch=${{ github.ref_name }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Ensure S3 state bucket exists
+        run: |
+          set -euo pipefail
+          aws s3api head-bucket --bucket "${APP_NAME}-terraform-state" 2>/dev/null || \
+            aws s3 mb "s3://${APP_NAME}-terraform-state" --region "$AWS_REGION"
+
+      - name: Terraform init
+        working-directory: deploy/terraform
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: deploy/terraform
+        run: terraform apply -auto-approve
+
+      - name: Export Terraform outputs
+        id: tf
+        working-directory: deploy/terraform
+        run: |
+          set -euo pipefail
+          {
+            echo "bucket_name=$(terraform output -raw bucket_name)"
+            echo "distribution_id=$(terraform output -raw cloudfront_distribution_id)"
+            echo "service_url=$(terraform output -raw service_url)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sync static site to S3
+        run: |
+          set -euo pipefail
+          # Long cache for hashed Vite assets, short cache for index.html so
+          # users always pick up the latest entrypoint after deploy.
+          aws s3 sync python/megane/static/app/ "s3://${{ steps.tf.outputs.bucket_name }}/" \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 cp python/megane/static/app/index.html \
+            "s3://${{ steps.tf.outputs.bucket_name }}/index.html" \
+            --cache-control "public,max-age=0,must-revalidate" \
+            --content-type "text/html; charset=utf-8"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          set -euo pipefail
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.tf.outputs.distribution_id }}" \
+            --paths "/*" \
+            --no-cli-pager
 
       - name: Print deployment summary
         run: |
           {
             echo "## Deployment Complete"
-            echo "Project: ${CLOUDFLARE_PROJECT_NAME}"
-            echo "Branch: ${GITHUB_REF_NAME}"
-            echo "Custom domain: https://megane.tech-office-mori.com (after DNS cutover)"
+            echo "URL: ${{ steps.tf.outputs.service_url }}"
+            echo "Bucket: ${{ steps.tf.outputs.bucket_name }}"
+            echo "Distribution: ${{ steps.tf.outputs.distribution_id }}"
           } >> "$GITHUB_STEP_SUMMARY"

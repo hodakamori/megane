@@ -1,21 +1,16 @@
-output "alb_dns_name" {
-  description = "DNS name of the ALB"
-  value       = aws_lb.app.dns_name
+output "bucket_name" {
+  description = "S3 bucket hosting the static demo"
+  value       = aws_s3_bucket.site.id
 }
 
-output "ecr_repository_url" {
-  description = "ECR repository URL"
-  value       = aws_ecr_repository.app.repository_url
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (for cache invalidation)"
+  value       = aws_cloudfront_distribution.site.id
 }
 
-output "ecs_cluster_name" {
-  description = "ECS cluster name"
-  value       = aws_ecs_cluster.app.name
-}
-
-output "ecs_service_name" {
-  description = "ECS service name"
-  value       = aws_ecs_service.app.name
+output "cloudfront_domain_name" {
+  description = "CloudFront-assigned domain name"
+  value       = aws_cloudfront_distribution.site.domain_name
 }
 
 output "service_url" {
