@@ -1,8 +1,9 @@
 import type { DocumentRegistry } from "@jupyterlab/docregistry";
 
 export const FACTORY_NAME = "megane Molecular Viewer";
+export const FACTORY_NAME_BINARY = "megane Molecular Viewer (binary)";
 
-export const STRUCTURE_FILETYPES: DocumentRegistry.IFileType[] = [
+export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
   {
     name: "megane-pdb",
     displayName: "PDB",
@@ -51,6 +52,26 @@ export const STRUCTURE_FILETYPES: DocumentRegistry.IFileType[] = [
     fileFormat: "text",
     contentType: "file",
   },
+  {
+    name: "megane-lammps-data",
+    displayName: "LAMMPS data",
+    extensions: [".data", ".lammps"],
+    mimeTypes: ["chemical/x-lammps-data"],
+    fileFormat: "text",
+    contentType: "file",
+  },
 ];
 
-export const STRUCTURE_FILETYPE_NAMES = STRUCTURE_FILETYPES.map((f) => f.name);
+export const STRUCTURE_FILETYPES_BINARY: DocumentRegistry.IFileType[] = [
+  {
+    name: "megane-ase-traj",
+    displayName: "ASE trajectory",
+    extensions: [".traj"],
+    mimeTypes: ["application/octet-stream"],
+    fileFormat: "base64",
+    contentType: "file",
+  },
+];
+
+export const STRUCTURE_FILETYPE_NAMES_TEXT = STRUCTURE_FILETYPES_TEXT.map((f) => f.name);
+export const STRUCTURE_FILETYPE_NAMES_BINARY = STRUCTURE_FILETYPES_BINARY.map((f) => f.name);

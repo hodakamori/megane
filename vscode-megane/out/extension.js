@@ -158,9 +158,12 @@ class MeganeEditorProvider {
                 vscode.workspace.fs.readFile(document.uri),
                 vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
             ]);
+            // Send raw bytes (not decoded text) so binary formats like .traj survive
+            // the trip into the webview. The webview builds a File and the shared
+            // parser dispatches by extension to either text() or arrayBuffer().
             payload = {
                 type: "loadFile",
-                content: new TextDecoder("utf-8").decode(fileData),
+                contentBytes: Array.from(fileData),
                 filename: path.basename(document.uri.fsPath),
                 wasmBytes: Array.from(wasmData),
             };

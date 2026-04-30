@@ -45,13 +45,16 @@ interface FormatFixture {
   file: string;
   /** Atom count exposed via data-atom-count when the parser succeeds. */
   expectedAtoms?: number;
+  /** When true, assert that data-total-frames is > 0 (trajectory rendering). */
+  expectTrajectory?: boolean;
 }
 
 /**
  * Each format the megane custom editor advertises in
  * `vscode-megane/package.json` (`customEditors[].selector`). Atom counts
  * mirror the fixtures used by `format-loading.spec.ts` so a regression
- * in the WASM parser surfaces here too.
+ * in the WASM parser surfaces here too. Trajectory fixtures additionally
+ * verify that frames are detected and the playback bar can engage.
  */
 const FORMATS: FormatFixture[] = [
   { id: "pdb-1crn", file: "1crn.pdb", expectedAtoms: 327 },
@@ -59,6 +62,10 @@ const FORMATS: FormatFixture[] = [
   { id: "xyz-perovskite", file: "perovskite_srtio3.xyz" },
   { id: "mol-methane", file: "methane.mol" },
   { id: "sdf-ethanol", file: "ethanol.sdf" },
+  { id: "cif-nacl", file: "nacl.cif" },
+  { id: "lammps-water", file: "water.lammps" },
+  { id: "xyz-water-multiframe", file: "water_multiframe.xyz", expectTrajectory: true },
+  { id: "traj-water", file: "water.traj", expectTrajectory: true },
 ];
 
 let cs: CodeServerHandle | null = null;
@@ -92,9 +99,13 @@ for (const f of FORMATS) {
     await expectFullPageMatch(page, PLATFORM, `${f.id}-vscode`);
     await expectViewerRegionMatch(wv, PLATFORM, `${f.id}-vscode-viewer`);
 
-    const ctx = await wv
-      .locator('[data-testid="megane-viewer"]')
-      .getAttribute("data-megane-context");
+    const viewer = wv.locator('[data-testid="megane-viewer"]');
+    const ctx = await viewer.getAttribute("data-megane-context");
     expect(ctx).toBe("vscode");
+
+    if (f.expectTrajectory) {
+      const totalFrames = Number(await viewer.getAttribute("data-total-frames"));
+      expect(totalFrames, `${f.id}: expected trajectory frames`).toBeGreaterThan(0);
+    }
   });
 }

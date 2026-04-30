@@ -5,6 +5,11 @@ import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
+import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
+
+const BINARY_EXTENSIONS = new Set(
+  STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
+);
 
 interface DocBodyProps {
   context: DocumentRegistry.Context;
@@ -23,8 +28,21 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
         await ensureWasmUrl();
         await context.ready;
         const filename = context.path.split("/").pop() ?? "structure";
-        const text = context.model.toString();
-        const file = new File([text], filename, { type: "text/plain" });
+        const raw = context.model.toString();
+        // Binary file types (e.g. ASE .traj) are registered with
+        // fileFormat: "base64" in filetypes.ts, so the model serializes to a
+        // base64 string. Decode to bytes and let parseStructureFile dispatch
+        // to the right WASM parser via file.arrayBuffer(). We check both the
+        // contentsModel format and the file extension as a safety net,
+        // because contentsModel can be null in some restore paths.
+        const dot = filename.lastIndexOf(".");
+        const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : "";
+        const isBase64 =
+          context.contentsModel?.format === "base64" || BINARY_EXTENSIONS.has(ext);
+        const bytes = isBase64
+          ? Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
+          : new TextEncoder().encode(raw);
+        const file = new File([bytes], filename);
         await local.loadFile(file);
         if (!cancelled) setState("ready");
       } catch (err) {

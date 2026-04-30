@@ -26,7 +26,7 @@ function App() {
     const handler = (event: MessageEvent) => {
       const message = event.data;
       if (message.type === "loadFile") {
-        const { content, filename, wasmBytes } = message;
+        const { contentBytes, filename, wasmBytes } = message;
         // If WASM bytes were sent from the extension host, create a blob URL
         // so the shared WASM init path can keep treating this as a URL string.
         if (wasmBytes) {
@@ -34,8 +34,11 @@ function App() {
           (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
             URL.createObjectURL(wasmBlob);
         }
-        // Create a File object so parseStructureFile can detect format from extension
-        const file = new File([content], filename, { type: "text/plain" });
+        // Build a File from raw bytes so binary formats like .traj round-trip
+        // unmodified. parseStructureFile picks text() or arrayBuffer() based
+        // on extension, and both work over a Uint8Array-backed File.
+        const bytes = new Uint8Array(contentBytes);
+        const file = new File([bytes], filename);
         local.loadFile(file).then(() => {
           setLoaded(true);
           // Update the LoadStructure node's fileName for display
