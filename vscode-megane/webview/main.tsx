@@ -1,7 +1,15 @@
 /**
  * VSCode webview entry point for megane.
- * Receives structure file content from the extension host via postMessage,
- * parses it using the WASM parser, and renders the megane viewer.
+ *
+ * The extension host posts either a single structure file or a pipeline
+ * (.megane.json + companion files) into the webview. Both flows are funneled
+ * through the canonical `usePipelineStore.openFile` ingestion path so the
+ * pipeline graph stays in sync with whatever was opened — exactly the same
+ * contract the webapp drag-drop and the JupyterLab DocWidget use.
+ *
+ * `useMeganeLocal` is still instantiated to keep `MeganeViewer.snapshot` /
+ * `frame` props populated for atom selection and measurement until PR-B
+ * removes those props in favour of subscribing to pipeline state directly.
  */
 
 import { StrictMode, useState, useEffect, useCallback } from "react";
@@ -9,13 +17,17 @@ import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
-import { parseStructureFile } from "../../src/parsers/structure";
-import { parseXTCFile, parseLammpstrjFile } from "../../src/parsers/xtc";
 import type { SerializedPipeline } from "../../src/pipeline/types";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
 const vscode = acquireVsCodeApi();
+
+function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
+  if (!wasmBytes) return;
+  const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
+  (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ = URL.createObjectURL(wasmBlob);
+}
 
 function App() {
   const local = useMeganeLocal();
@@ -25,109 +37,83 @@ function App() {
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const message = event.data;
+
       if (message.type === "loadFile") {
         const { contentBytes, filename, wasmBytes } = message;
-        // If WASM bytes were sent from the extension host, create a blob URL
-        // so the shared WASM init path can keep treating this as a URL string.
-        if (wasmBytes) {
-          const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
-          (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
-            URL.createObjectURL(wasmBlob);
-        }
+        setWasmUrlFromBytes(wasmBytes);
         // Build a File from raw bytes so binary formats like .traj round-trip
-        // unmodified. parseStructureFile picks text() or arrayBuffer() based
-        // on extension, and both work over a Uint8Array-backed File.
+        // unmodified. The shared parser dispatches by extension to text() or
+        // arrayBuffer() and both work over a Uint8Array-backed File.
         const bytes = new Uint8Array(contentBytes);
         const file = new File([bytes], filename);
-        local.loadFile(file).then(() => {
-          setLoaded(true);
-          // Update the LoadStructure node's fileName for display
-          const { nodes, updateNodeParams } = usePipelineStore.getState();
-          const loaderNode = nodes.find((n) => n.type === "load_structure");
-          if (loaderNode) {
-            updateNodeParams(loaderNode.id, { fileName: filename });
-          }
-        }).catch((err) => {
-          console.error("Failed to load file:", err);
-          setError(`Failed to load file: ${err instanceof Error ? err.message : String(err)}`);
-        });
-      } else if (message.type === "error") {
+        // useMeganeLocal.loadFile internally drives the pipeline (via
+        // applyResult: setNodeSnapshot + load_structure / load_trajectory
+        // fileName updates) so we no longer need a manual
+        // updateNodeParams patch here.
+        local
+          .loadFile(file)
+          .then(() => setLoaded(true))
+          .catch((err) => {
+            console.error("Failed to load file:", err);
+            setError(`Failed to load file: ${err instanceof Error ? err.message : String(err)}`);
+          });
+        return;
+      }
+
+      if (message.type === "error") {
         setError(message.message || "Unknown error from extension host");
-      } else if (message.type === "loadPipeline") {
+        return;
+      }
+
+      if (message.type === "loadPipeline") {
         const { pipeline, structureFiles, trajectoryFiles, wasmBytes } = message as {
           pipeline: SerializedPipeline;
           structureFiles: Array<{ nodeId: string; content: string; filename: string }>;
           trajectoryFiles: Array<{ nodeId: string; content: ArrayBuffer; filename: string }>;
           wasmBytes?: number[];
         };
-        // If WASM bytes were sent from the extension host, create a blob URL for them
-        if (wasmBytes) {
-          const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
-          (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ =
-            URL.createObjectURL(wasmBlob);
-        }
+        setWasmUrlFromBytes(wasmBytes);
 
         (async () => {
-          const store = usePipelineStore.getState();
+          const companions: File[] = [
+            ...structureFiles.map(
+              (sf) => new File([sf.content], sf.filename, { type: "text/plain" }),
+            ),
+            ...trajectoryFiles.map(
+              (tf) => new File([new Uint8Array(tf.content)], tf.filename),
+            ),
+          ];
 
-          // Restore the full pipeline configuration (nodes, edges, viewport settings, etc.)
-          store.deserialize(pipeline);
+          // Re-stringify the pipeline payload into a File so the canonical
+          // openFile entry point sees the same .megane.json contract that
+          // every other host uses.
+          const meganeFile = new File(
+            [JSON.stringify(pipeline)],
+            "pipeline.megane.json",
+            { type: "application/json" },
+          );
+          await usePipelineStore.getState().openFile(meganeFile, { companions });
 
-          // Parse all structure files first, collect results
-          let firstFile: File | null = null;
-          const parsed: Array<{
-            sf: (typeof structureFiles)[0];
-            file: File;
-            result: Awaited<ReturnType<typeof parseStructureFile>>;
-          }> = [];
-          for (const sf of structureFiles) {
-            const file = new File([sf.content], sf.filename, { type: "text/plain" });
-            const result = await parseStructureFile(file);
-            parsed.push({ sf, file, result });
-            if (!firstFile) firstFile = file;
-          }
-
-          // Populate useMeganeLocal for the primary structure so MeganeViewer
-          // props (atom selection, measurements) work. local.loadFile triggers
-          // execute() before per-node snapshots are set, so we apply them after.
-          if (firstFile) {
-            await local.loadFile(firstFile);
-          }
-
-          // Apply all per-node snapshots after local.loadFile
-          let firstSnapshot = null;
-          for (const { sf, result } of parsed) {
-            store.setNodeSnapshot(sf.nodeId, {
-              snapshot: result.snapshot,
-              frames: result.frames.length > 0 ? result.frames : null,
-              meta: result.meta,
-              labels: result.labels,
-            });
-            store.updateNodeParams(sf.nodeId, {
-              fileName: sf.filename,
-              hasTrajectory: result.frames.length > 0,
-              hasCell: !!result.snapshot.box,
-            });
-            if (!firstSnapshot) firstSnapshot = result.snapshot;
-          }
-
-          // Load only the first trajectory file (store supports a single global trajectory)
-          if (firstSnapshot && trajectoryFiles.length > 0) {
-            const tf = trajectoryFiles[0];
-            const bytes = new Uint8Array(tf.content);
-            const file = new File([bytes], tf.filename);
-            const ext = tf.filename.toLowerCase();
-            const isLammps = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
-            const parseFn = isLammps ? parseLammpstrjFile : parseXTCFile;
-            const { frames, meta } = await parseFn(file, firstSnapshot.nAtoms);
-            store.setFileFrames(frames, meta ?? null);
-            store.updateNodeParams(tf.nodeId, { fileName: tf.filename });
+          // Populate useMeganeLocal so MeganeViewer props (atom selection,
+          // measurements) keep working in pipeline mode. applyResult re-runs
+          // setNodeSnapshot on the first load_structure node — that's
+          // idempotent because openFile already set the same snapshot for
+          // that node a moment ago. PR-B will drop these props entirely.
+          if (structureFiles.length > 0) {
+            const firstStructure = new File(
+              [structureFiles[0].content],
+              structureFiles[0].filename,
+              { type: "text/plain" },
+            );
+            await local.loadFile(firstStructure);
           }
 
           setLoaded(true);
         })().catch((err) => {
           console.error("Failed to load pipeline:", err);
-          setLoaded(true); // Show viewer even on error so user can recover manually
+          // Surface the viewer anyway so the user can recover via node file
+          // pickers rather than facing a permanent loading screen.
+          setLoaded(true);
         });
       }
     };
