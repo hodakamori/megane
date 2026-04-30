@@ -2,7 +2,12 @@
    viewer (Inter font, slate text, blue/violet accents, soft shadow). */
 
 .driver-popover.megane-tour {
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   box-shadow:
