@@ -1,117 +1,63 @@
-name: Deploy to AWS ECS
+name: Deploy demo to Cloudflare Pages
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+  deployments: write
 
 env:
-  TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  APP_NAME: megane
+  CLOUDFLARE_PROJECT_NAME: megane-demo
 
 jobs:
   deploy:
-    name: Provision and deploy
+    name: Build and deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          terraform_wrapper: false
+          targets: wasm32-unknown-unknown
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Install wasm-pack
+        run: |
+          # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
+
+      - uses: actions/setup-node@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          node-version: "22"
+          cache: "npm"
 
-      - name: Ensure S3 state bucket exists
+      - run: npm ci
+
+      - run: npm run build:wasm
+
+      - run: npm run build:app
+
+      - name: Verify build artifacts
+        run: test -f python/megane/static/app/index.html
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy python/megane/static/app --project-name=${{ env.CLOUDFLARE_PROJECT_NAME }} --branch=${{ github.ref_name }}
+
+      - name: Print deployment summary
         run: |
-          set -euo pipefail
-          aws s3api head-bucket --bucket ${{ env.APP_NAME }}-terraform-state 2>/dev/null || \
-            aws s3 mb s3://${{ env.APP_NAME }}-terraform-state --region "$AWS_REGION" || \
-            echo "Bucket may already exist, continuing..."
-
-      - name: Terraform init
-        working-directory: deploy/terraform
-        run: terraform init
-
-      - name: Terraform apply
-        working-directory: deploy/terraform
-        run: terraform apply -auto-approve
-
-      - name: Export Terraform outputs
-        id: tf-output
-        working-directory: deploy/terraform
-        run: |
-          set -euo pipefail
-          echo "ecr_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
-          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
-          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> "$GITHUB_OUTPUT"
-          echo "service_url=$(terraform output -raw service_url)" >> "$GITHUB_OUTPUT"
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push Docker image
-        run: |
-          set -euo pipefail
-          ECR_URL="${{ steps.tf-output.outputs.ecr_url }}"
-          docker build -t "${ECR_URL}:${GITHUB_SHA}" -t "${ECR_URL}:latest" .
-          docker push "${ECR_URL}:${GITHUB_SHA}"
-          docker push "${ECR_URL}:latest"
-
-      - name: Update ECS task definition
-        id: task-def
-        run: |
-          set -euo pipefail
-          ECR_URL="${{ steps.tf-output.outputs.ecr_url }}"
-          CLUSTER="${{ steps.tf-output.outputs.ecs_cluster }}"
-          SERVICE="${{ steps.tf-output.outputs.ecs_service }}"
-
-          TASK_DEF=$(aws ecs describe-services \
-            --cluster "$CLUSTER" \
-            --services "$SERVICE" \
-            --query 'services[0].taskDefinition' --output text)
-
-          aws ecs describe-task-definition --task-definition "$TASK_DEF" \
-            --query 'taskDefinition' > /tmp/taskdef.json
-
-          jq --arg IMAGE "${ECR_URL}:${GITHUB_SHA}" \
-            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = $IMAGE' \
-            /tmp/taskdef.json > /tmp/new-taskdef.json
-
-          NEW_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file:///tmp/new-taskdef.json \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-
-          echo "task_def_arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy to ECS
-        run: |
-          set -euo pipefail
-          aws ecs update-service \
-            --cluster "${{ steps.tf-output.outputs.ecs_cluster }}" \
-            --service "${{ steps.tf-output.outputs.ecs_service }}" \
-            --task-definition "${{ steps.task-def.outputs.task_def_arn }}" \
-            --force-new-deployment \
-            --no-cli-pager
-
-      - name: Wait for service stability
-        run: |
-          set -euo pipefail
-          aws ecs wait services-stable \
-            --cluster "${{ steps.tf-output.outputs.ecs_cluster }}" \
-            --services "${{ steps.tf-output.outputs.ecs_service }}"
-
-      - name: Print service URL
-        run: |
-          set -euo pipefail
-          SERVICE_URL="${{ steps.tf-output.outputs.service_url }}"
-          echo "::notice::Deployed to ${SERVICE_URL}"
-          echo "## Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
-          echo "URL: ${SERVICE_URL}" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Deployment Complete"
+            echo "Project: ${CLOUDFLARE_PROJECT_NAME}"
+            echo "Branch: ${GITHUB_REF_NAME}"
+            echo "Custom domain: https://megane.tech-office-mori.com (after DNS cutover)"
+          } >> "$GITHUB_STEP_SUMMARY"
