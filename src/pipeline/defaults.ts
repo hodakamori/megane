@@ -117,6 +117,122 @@ export function createDefaultPipeline(): {
 }
 
 /**
+ * Create a minimal pipeline for hosting an externally-loaded structure file.
+ *
+ * The shape mirrors `createDefaultPipeline` (LoadStructure → AddBond → Viewport
+ * with a LoadTrajectory branch), but every `fileName` is left empty so that
+ * `usePipelineStore.openFile` (or another caller) can populate it from the
+ * actually-clicked file. Used as the seed graph by `openFile` whenever the
+ * current pipeline has no `load_structure` node or `mode: "replace"` is
+ * requested.
+ */
+export function createMinimalStructurePipeline(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "loader-1",
+        type: "load_structure",
+        position: { x: 425, y: 0 },
+        data: {
+          params: {
+            type: "load_structure",
+            fileName: "",
+            hasTrajectory: false,
+            hasCell: false,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "traj-1",
+        type: "load_trajectory",
+        position: { x: 85, y: 310 },
+        data: {
+          params: {
+            type: "load_trajectory",
+            fileName: "",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "addbond-1",
+        type: "add_bond",
+        position: { x: 425, y: 310 },
+        data: {
+          params: {
+            type: "add_bond",
+            bondSource: "structure",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 425, y: 615 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+            pivotMarkerVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "traj-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e4",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+      {
+        id: "e5",
+        source: "addbond-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e6",
+        source: "traj-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+    ],
+  };
+}
+
+/**
  * Create a basic pipeline with LoadStructure → AddBond → Viewport.
  * Used as the default in the VSCode extension where files are loaded externally.
  * The LoadStructure node reads from the pipeline store's snapshot (set by the
