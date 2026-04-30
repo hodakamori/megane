@@ -97,7 +97,6 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const frameIndex = (model.get("frame_index") as number) || 0;
     const totalFrames = (model.get("total_frames") as number) || 0;
     const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
-    const pipelineEnabled = (model.get("_pipeline_enabled") as boolean) || false;
     const pipelineJson = (model.get("_pipeline_json") as string) || "";
     const nodeSnapshotsData = (model.get("_node_snapshots_data") as Record<string, DataView>) || {};
 
@@ -110,7 +109,6 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         onSeek: handleSeek,
         selectedAtoms: selectedAtoms,
         onMeasurementChange: handleMeasurementChange,
-        pipeline: pipelineEnabled,
         pipelineJson: pipelineJson,
         nodeSnapshotsData: nodeSnapshotsData,
         onPipelineChange: handlePipelineChange,
@@ -159,10 +157,6 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   });
 
   model.on("change:selected_atoms", () => {
-    renderApp();
-  });
-
-  model.on("change:_pipeline_enabled", () => {
     renderApp();
   });
 
