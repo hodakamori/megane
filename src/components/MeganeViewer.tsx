@@ -223,16 +223,33 @@ export function MeganeViewer({
     setPipelineCollapsed((prev) => !prev);
   }, []);
 
-  const handlePipelineWidthChange = useCallback((w: number) => {
-    pipelineWidthRef.current = w;
-    if (!pipelineCollapsedRef.current) {
-      rendererRef.current?.setViewInsets(0, w + 12);
-    }
+  // Tour anchor — invisible rectangle the guide tour highlights when it
+  // points to the Viewport. Sized to fill the visible 3D canvas region,
+  // staying clear of the Pipeline panel on the right and the Timeline at
+  // the bottom. Updated imperatively (no re-render) when the panel resizes.
+  const tourAnchorRef = useRef<HTMLDivElement | null>(null);
+  const updateTourAnchor = useCallback(() => {
+    const el = tourAnchorRef.current;
+    if (!el) return;
+    const right = pipelineCollapsedRef.current ? 60 : pipelineWidthRef.current + 24;
+    el.style.right = `${right}px`;
   }, []);
+
+  const handlePipelineWidthChange = useCallback(
+    (w: number) => {
+      pipelineWidthRef.current = w;
+      if (!pipelineCollapsedRef.current) {
+        rendererRef.current?.setViewInsets(0, w + 12);
+      }
+      updateTourAnchor();
+    },
+    [updateTourAnchor],
+  );
 
   useEffect(() => {
     rendererRef.current?.setViewInsets(0, pipelineCollapsed ? 0 : pipelineWidthRef.current + 12);
-  }, [pipelineCollapsed]);
+    updateTourAnchor();
+  }, [pipelineCollapsed, updateTourAnchor]);
 
   return (
     <div
@@ -253,6 +270,20 @@ export function MeganeViewer({
         onHover={setHoverInfo}
         onAtomRightClick={handleAtomRightClick}
         onFrameUpdated={handleFrameUpdated}
+      />
+      <div
+        ref={tourAnchorRef}
+        data-tour-anchor="viewport"
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: 24,
+          left: 24,
+          right: pipelineCollapsed ? 60 : pipelineWidthRef.current + 24,
+          bottom: 80,
+          pointerEvents: "none",
+          opacity: 0,
+        }}
       />
       <PipelineEditor
         collapsed={pipelineCollapsed}

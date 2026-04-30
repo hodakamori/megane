@@ -15,6 +15,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
+import { useTour } from "./tour/useTour";
 import { parseXTCFile } from "./parsers/xtc";
 import { MemoryFrameProvider } from "./pipeline/types";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
@@ -28,6 +29,7 @@ export type { DataMode };
 function App() {
   const [mode] = useState<DataMode>("local");
   const ds = useDataSource(mode);
+  useTour({ host: "webapp" });
 
   // Playback store state
   const playing = usePlaybackStore((s) => s.playing);

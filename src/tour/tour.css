@@ -1,0 +1,367 @@
+/* megane tour theme — overrides driver.js defaults to match the rest of the
+   viewer (Inter font, slate text, blue/violet accents, soft shadow). */
+
+.driver-popover.megane-tour {
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.18),
+    0 2px 6px rgba(15, 23, 42, 0.08);
+  padding: 18px 20px 14px;
+  max-width: 360px;
+  color: #1e293b;
+  background: #ffffff;
+}
+
+.driver-popover.megane-tour .driver-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 6px;
+  padding-right: 24px;
+}
+
+.driver-popover.megane-tour .driver-popover-description {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.driver-popover.megane-tour .driver-popover-close-btn {
+  color: #94a3b8;
+  font-size: 18px;
+  top: 8px;
+  right: 8px;
+}
+.driver-popover.megane-tour .driver-popover-close-btn:hover {
+  color: #475569;
+}
+
+.driver-popover.megane-tour .driver-popover-footer {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.driver-popover.megane-tour .driver-popover-progress-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+.driver-popover.megane-tour .driver-popover-navigation-btns {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.driver-popover.megane-tour .driver-popover-prev-btn,
+.driver-popover.megane-tour .driver-popover-next-btn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-shadow: none;
+  line-height: 1.2;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.driver-popover.megane-tour .driver-popover-prev-btn {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #475569;
+}
+.driver-popover.megane-tour .driver-popover-prev-btn:hover {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.driver-popover.megane-tour .driver-popover-next-btn {
+  background: #3b82f6;
+  border: 1px solid #3b82f6;
+  color: #ffffff;
+}
+.driver-popover.megane-tour .driver-popover-next-btn:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+/* Last step: the Next button doubles as the Done button. Tint it violet to
+   match the Templates accent and signal completion. */
+.driver-popover.megane-tour:has(.driver-popover-progress-text:not(:empty))
+  .driver-popover-next-btn[disabled],
+.driver-popover.megane-tour .driver-popover-next-btn.driver-popover-btn-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.driver-popover.megane-tour .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #ffffff;
+}
+.driver-popover.megane-tour .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #ffffff;
+}
+.driver-popover.megane-tour .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #ffffff;
+}
+.driver-popover.megane-tour .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #ffffff;
+}
+
+/* "Don't show again" checkbox injected into the popover footer. */
+.megane-tour-dont-show {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+}
+.megane-tour-dont-show input {
+  margin: 0;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+/* Welcome (intro) step formatting. */
+.megane-tour-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.megane-tour-welcome-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.megane-tour-welcome-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  background: linear-gradient(120deg, #3b82f6 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.megane-tour-welcome-version {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
+
+.megane-tour-welcome-tagline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  font-style: italic;
+}
+
+.megane-tour-welcome-blurb {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.megane-tour-welcome-author {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.megane-tour-welcome-author-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.megane-tour-welcome-author-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.megane-tour-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #475569;
+  border: 1px solid transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.megane-tour-icon-link:hover {
+  color: #0f172a;
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Mouse-controls step formatting. */
+.megane-tour-keys {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+.megane-tour-keys li {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #334155;
+}
+.megane-tour-key {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 5px;
+  padding: 2px 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Links step formatting — card layout with icons. */
+.megane-tour-links-intro {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.megane-tour-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.megane-tour-link-card {
+  display: grid;
+  grid-template-columns: 36px 1fr 18px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.megane-tour-link-card:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.04);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.megane-tour-link-card-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.05);
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.megane-tour-link-card:hover .megane-tour-link-card-icon {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+.megane-tour-link-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.megane-tour-link-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.megane-tour-link-card-subtitle {
+  font-size: 11.5px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.megane-tour-link-card-host {
+  margin-top: 2px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+}
+
+.megane-tour-link-card-arrow {
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.megane-tour-link-card:hover .megane-tour-link-card-arrow {
+  color: #3b82f6;
+  transform: translateX(2px);
+}
+
+/* Highlight ring colour to match the primary accent. */
+.driver-overlay {
+  pointer-events: auto;
+}

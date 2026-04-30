@@ -18,6 +18,7 @@ import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
 import type { SerializedPipeline } from "../../src/pipeline/types";
+import { useTour } from "../../src/tour/useTour";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -31,6 +32,7 @@ function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
 
 function App() {
   const local = useMeganeLocal();
+  useTour({ host: "vscode" });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

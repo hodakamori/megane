@@ -41,6 +41,7 @@ import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
+import { startTour } from "../tour/MeganeTour";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 
 const nodeTypes = {
@@ -131,6 +132,14 @@ const IconPlus = (
   <svg {...iconProps} strokeWidth="2.5">
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+const IconGuide = (
+  <svg {...iconProps}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12" y2="17" />
   </svg>
 );
 
@@ -315,6 +324,13 @@ const importBtnStyle: React.CSSProperties = {
   background: "rgba(99, 102, 241, 0.08)",
   border: "1px solid rgba(99, 102, 241, 0.25)",
   color: "#6366f1",
+};
+
+const guideBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(100, 116, 139, 0.08)",
+  border: "1px solid rgba(100, 116, 139, 0.3)",
+  color: "#64748b",
 };
 
 const dropdownStyle: React.CSSProperties = {
@@ -603,9 +619,19 @@ function PipelineEditorInner({
         {IconImport} Import
       </button>
 
-      {/* Group 3: Templates & Add Node */}
+      {/* Group 3: Guide, Templates & Add Node */}
+      <button
+        data-testid="pipeline-editor-guide"
+        onClick={() => startTour()}
+        style={guideBtnStyle}
+        title="Show user guide"
+        aria-label="Show user guide"
+      >
+        {IconGuide} Guide
+      </button>
       <div style={{ position: "relative" }}>
         <button
+          data-testid="pipeline-editor-templates"
           onClick={() => {
             setShowTemplateMenu(!showTemplateMenu);
             setShowAddMenu(false);
