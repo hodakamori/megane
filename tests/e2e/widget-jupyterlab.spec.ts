@@ -108,7 +108,7 @@ for (const f of FORMATS) {
     await assertDomContract(page, [
       ...defaultViewerContract({
         expectedAtoms: f.expectedAtoms,
-        context: "widget-simple",
+        context: "widget-pipeline",
       }),
     ]);
 

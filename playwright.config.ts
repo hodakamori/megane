@@ -158,7 +158,6 @@ export default defineConfig({
     // Each Phase 2 spec runs against all 5 hosts via metadata.meganeHost.
     // Specs read the host from test.info().project.metadata.meganeHost
     // (or fall back to MEGANE_HOST env var for single-project filtered runs).
-    ...phase2Matrix("appearance", /appearance\.spec\.ts$/),
     ...phase2Matrix("modify-node", /modify-node\.spec\.ts$/),
     ...phase2Matrix("camera", /camera\.spec\.ts$/),
     ...phase2Matrix("measurement", /measurement\.spec\.ts$/),

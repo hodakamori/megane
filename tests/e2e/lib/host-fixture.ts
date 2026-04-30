@@ -56,9 +56,8 @@ export const HOST_CONTEXT: Record<HostName, string> = {
   webapp: "webapp",
   "jupyterlab-doc": "jupyterlab-doc",
   vscode: "vscode",
-  // Widget hosts boot in set_pipeline mode so the React Flow store is
-  // populated (modify-node + subsystem-rendering specs need it). That
-  // path renders WidgetViewerPipeline which emits "widget-pipeline".
+  // WidgetViewer always emits "widget-pipeline" — the legacy non-pipeline
+  // ("widget-simple") variant was removed alongside the AppearancePanel.
   "widget-jupyterlab": "widget-pipeline",
   "widget-vscode": "widget-pipeline",
 };
