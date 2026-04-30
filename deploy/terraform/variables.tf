@@ -15,9 +15,3 @@ variable "domain_name" {
   type        = string
   default     = "megane.tech-office-mori.com"
 }
-
-variable "github_repo" {
-  description = "GitHub repository (owner/name) allowed to assume the CI deploy role via OIDC"
-  type        = string
-  default     = "hodakamori/megane"
-}
