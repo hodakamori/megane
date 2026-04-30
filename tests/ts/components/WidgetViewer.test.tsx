@@ -54,7 +54,7 @@ const defaultProps = {
   onSeek: vi.fn(),
 };
 
-describe("WidgetViewer (simple mode)", () => {
+describe("WidgetViewer", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -107,28 +107,7 @@ describe("WidgetViewer (simple mode)", () => {
   });
 });
 
-describe("WidgetViewer (pipeline mode)", () => {
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
-
-  it("passes non-noop handlers to Viewport", () => {
-    render(<WidgetViewer {...defaultProps} pipeline />);
-    const props = mockViewport.mock.calls[0][0];
-    expect(props.onHover).toBeTypeOf("function");
-    expect(props.onAtomRightClick).toBeTypeOf("function");
-    expect(props.onFrameUpdated).toBeTypeOf("function");
-  });
-
-  it("renders Tooltip and MeasurementPanel in pipeline mode", () => {
-    render(<WidgetViewer {...defaultProps} pipeline />);
-    expect(mockTooltip).toHaveBeenCalled();
-    expect(mockMeasurementPanel).toHaveBeenCalled();
-  });
-});
-
-describe("WidgetViewer (pipeline mode) — per-frame bond recalc", () => {
+describe("WidgetViewer — per-frame bond recalc", () => {
   // Build a minimal O–H snapshot (no bonds yet — distance mode infers them).
   function makeSnapshot(): Snapshot {
     return {
@@ -216,7 +195,6 @@ describe("WidgetViewer (pipeline mode) — per-frame bond recalc", () => {
     const { rerender } = render(
       <WidgetViewer
         {...defaultProps}
-        pipeline
         snapshot={null}
         frame={frame1}
         currentFrame={0}
@@ -249,7 +227,6 @@ describe("WidgetViewer (pipeline mode) — per-frame bond recalc", () => {
       rerender(
         <WidgetViewer
           {...defaultProps}
-          pipeline
           snapshot={null}
           frame={frame2}
           currentFrame={1}
@@ -283,7 +260,6 @@ describe("WidgetViewer (pipeline mode) — per-frame bond recalc", () => {
     const { rerender } = render(
       <WidgetViewer
         {...defaultProps}
-        pipeline
         snapshot={null}
         frame={frame1}
         currentFrame={0}
@@ -306,7 +282,6 @@ describe("WidgetViewer (pipeline mode) — per-frame bond recalc", () => {
       rerender(
         <WidgetViewer
           {...defaultProps}
-          pipeline
           snapshot={null}
           frame={frame2}
           currentFrame={1}

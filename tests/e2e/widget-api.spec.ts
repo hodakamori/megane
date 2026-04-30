@@ -100,7 +100,7 @@ test("frame_index assignment advances renderer", async ({ page }) => {
   await assertDomContract(page, [
     ...defaultViewerContract({
       expectedAtoms: FIXTURE_PDB_ATOMS,
-      context: "widget-simple",
+      context: "widget-pipeline",
     }),
   ]);
 
