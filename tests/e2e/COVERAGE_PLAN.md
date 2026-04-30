@@ -25,6 +25,45 @@ ones.
 
 Everything below is **not** in PR #307.
 
+## Phase 2 — landed in PR #309
+
+Phase 2 (sections 2.1–2.5) plus the Phase 1.4 / 1.7 source-side
+prerequisites landed in PR #309 on branch
+`claude/e2e-coverage-phase-2-sKNgQ`. 11 source/test commits + 1
+prettier autofix; all 8 CI checks green on the merge head.
+
+Highlights:
+- `__megane_test` namespace + `__megane_test_pipeline_store` exposing
+  `getProjectedAtomPositions`, `getCameraState`,
+  `getVisibleSubsystems`, `setCameraMode`, `resetCamera`, and
+  programmatic pipeline editing.
+- `AppearancePanel` mounted in `MeganeViewer` (webapp /
+  jupyterlab-doc / vscode shell).
+- `MolecularViewer.load()` dispatches by extension (PDB / GRO / XYZ /
+  MOL / SDF / CIF / LAMMPS data / .traj).
+- New helper modules: `host-fixture.ts` (cross-host boot),
+  `pipeline.ts` (graph editing), `widget-api.ts` (notebook rewrite +
+  Run All), `render-utils.ts` (typed `__megane_test` wrappers).
+- New playwright project matrix: `<feature>__<host>` for 5 features ×
+  5 hosts = 25 entries.
+- 5 new specs: `appearance.spec.ts`, `modify-node.spec.ts`,
+  `camera.spec.ts`, `measurement.spec.ts`,
+  `subsystem-rendering.spec.ts`.
+- Baselines: 50 → 65 (+15 webapp baselines). Cross-host baselines for
+  jupyterlab-doc / vscode / widget-jupyterlab / widget-vscode are a
+  mechanical follow-up (`MEGANE_E2E_UPDATE=1 npx playwright test
+  --project=...`).
+
+What is still OPEN after PR #309 (tracked below):
+- All of Phase 1 except 1.4 / 1.7.
+- Phase 2.5 vector / arrow rendering (label_generator and
+  polyhedron_generator landed; the vector overlay needs a fixture
+  `.vec` file that isn't bundled today).
+- AppearancePanel mount inside `WidgetViewer` so the appearance spec
+  can light up on widget-jupyterlab / widget-vscode (currently
+  skipped with an explanatory message).
+- Cross-host baseline seeding for the 4 non-webapp hosts.
+
 ---
 
 ## Phase 1 — easy wins (no source changes required)
@@ -64,8 +103,10 @@ Currently widget-jupyterlab / widget-vscode are PDB-only because
 `MolecularViewer.load()` is hard-wired. Two paths:
 - [ ] Use `viewer.set_pipeline(megane.Pipeline.load(json))` for
       non-PDB formats (programmatic, no API change).
-- [ ] Or extend `MolecularViewer.load()` to dispatch on extension
-      (small Python change in `python/megane/widget.py:86`).
+- [x] Or extend `MolecularViewer.load()` to dispatch on extension
+      (small Python change in `python/megane/widget.py:86`). **(PR #309)**
+      Widget hosts now run an `xyz-si-diamond` regression alongside the
+      legacy PDB fixtures.
 
 ### 1.5 Pipeline file format on remaining hosts
 - [ ] `.megane.json` open in **vscode pipelineViewer** (a custom editor
@@ -80,13 +121,14 @@ Currently widget-jupyterlab / widget-vscode are PDB-only because
       through the renderer.
 
 ### 1.7 Widget API quick fixes
-- [ ] Fix `widget-api.spec.ts:103` failure. The `jupyterapp` global
-      isn't on `window` in modern JupyterLab; expose it via
-      `addInitScript` or use `Jupyter.notebook` shim. Reuse the
-      kernel-discovery pattern from
-      `tests/e2e/lib/hosts/jupyterlab.ts:openLabNotebook`.
-- [ ] Add coverage for `viewer.set_pipeline(...)` programmatic
-      assignment.
+- [x] Fix `widget-api.spec.ts:103` failure. **(PR #309)** Replaced the
+      `window.jupyterapp` lookup with a notebook-rewrite + Run All
+      pattern via the existing `openLabNotebook` helper, removing the
+      shim entirely.
+- [x] Add coverage for `viewer.set_pipeline(...)` programmatic
+      assignment. **(PR #309)** Builds a minimal LoadStructure →
+      Viewport pipeline pointing at `water_wrapped.pdb` and asserts
+      `data-atom-count` flips from the original fixture's 3024 atoms.
 
 ---
 
@@ -102,53 +144,77 @@ Source state:
 - The panel does **not** mount in the webapp shell currently.
 
 Plan:
-- [ ] Mount `AppearancePanel` inside the webapp's right sidebar (under
-      a CollapsiblePanel). Already mounted in widget hosts.
-- [ ] Add `appearance` Playwright project + spec: drag each slider,
+- [x] Mount `AppearancePanel` inside the webapp's right sidebar (under
+      a CollapsiblePanel). **(PR #309)** Mounted in `MeganeViewer.tsx`
+      with `top=60` so it stacks below the pipeline-editor chip.
+      `WidgetViewer` mount is open as a follow-up (the
+      "AppearancePanel already mounted in widget hosts" assumption
+      turned out to be wrong).
+- [x] Add `appearance` Playwright project + spec: drag each slider,
       confirm `data-megane-context="webapp"`,
       `expectViewerRegionMatch` baselines per slider end-position.
-- [ ] Cross-host: same spec runs under `jupyterlab-doc` and
-      `widget-jupyterlab` via `MEGANE_HOST` env var (host-fixture
-      mechanism described below).
+      **(PR #309)** `tests/e2e/appearance.spec.ts` — 7 webapp
+      baselines.
+- [x] Cross-host scaffold: same spec routed via `host-fixture.ts`.
+      **(PR #309)** Webapp / jupyterlab-doc / vscode wired through
+      `phase2Matrix`. Webapp baselines committed; the other two host
+      baselines are a mechanical follow-up. Widget hosts skip until
+      `WidgetViewer` mounts AppearancePanel.
 
 ### 2.2 Modify-node sliders
 - 2 testids already in `src/components/nodes/ModifyNode.tsx`
   (`modify-node-opacity`, `modify-node-scale`).
-- [ ] Insert a Modify node into the default pipeline graph (extends
-      Phase 1.1).
-- [ ] Slide each, assert renderEpoch advances, capture baseline.
+- [x] Insert a Modify node into the default pipeline graph (extends
+      Phase 1.1). **(PR #309)** `tests/e2e/modify-node.spec.ts` uses
+      `pipeline.insertNode(scope, "modify")` + `connectEdge` to wire
+      `loader-1 → modify → viewport-1` programmatically.
+- [x] Slide each, assert renderEpoch advances, capture baseline.
+      **(PR #309)** Sliders driven via `setNodeParam` (avoids React
+      Flow node-DOM coupling); `renderEpoch` advance + viewer-region
+      baseline per slider value. 3 webapp baselines committed.
 
 ### 2.3 Camera operations
 The OrbitControls drag path is non-deterministic. Either:
-- [ ] Add a `viewer.setCameraMode(...)` and
+- [x] Add a `viewer.setCameraMode(...)` and
       `viewer.resetCamera()` programmatic API on the renderer (already
       partially in place, just not exposed) and drive it from the test.
+      **(PR #309)** Public `setCameraMode` / `resetCamera` methods on
+      `MoleculeRenderer` + `__megane_test` namespace bindings.
 - [ ] Or add `data-camera-state` attribute on `viewer-root` so the test
-      can poll position / target rather than driving the mouse.
+      can poll position / target rather than driving the mouse. — not
+      needed; `__megane_test.getCameraState()` provides typed state
+      reads.
 - Tests:
-  - perspective ↔ ortho switch baseline parity
-  - pivot animation (smooth lerp) renderEpoch increments
-  - frustum-inset baseline (camera respects sidebar width)
+  - [x] perspective ↔ ortho switch baseline parity **(PR #309)**
+  - [x] resetCamera restores fitted target (delta < 1e-3) **(PR #309)**
+  - [ ] pivot animation (smooth lerp) renderEpoch increments
+  - [ ] frustum-inset baseline (camera respects sidebar width)
 
 ### 2.4 Atom selection / measurement
 Per `e2e-coverage` skill notes, this was pulled from the previous PR
 because the renderer does not expose projected atom positions. Plan:
-- [ ] Add `viewer.getProjectedAtomPositions()` to the renderer, gated on
-      `_testMode` (already used by other hooks).
-- [ ] Expose it on `window.__megane_test` (alongside
-      `__megane_test_ready`).
-- [ ] Spec: query positions, click on the atom whose projected (x,y)
+- [x] Add `viewer.getProjectedAtomPositions()` to the renderer, gated on
+      `_testMode` (already used by other hooks). **(PR #309)**
+- [x] Expose it on `window.__megane_test` (alongside
+      `__megane_test_ready`). **(PR #309)**
+- [x] Spec: query positions, click on the atom whose projected (x,y)
       matches, assert `[data-testid="measurement-panel"]` shows
-      `data-selection-count="1"`.
-- [ ] Coverage for `measurement-clear`, multi-atom selection (count=2,3).
+      `data-selection-count="1"`. **(PR #309)**
+- [x] Coverage for `measurement-clear`, multi-atom selection (count=2).
+      **(PR #309)** Count=3 / dihedral coverage left as a follow-up.
 
 ### 2.5 Vector / arrow / label / polyhedron rendering
 Each of these is a separate Renderer subsystem. They mount when the
 pipeline contains a corresponding node.
-- [ ] Add fixture pipelines that include each kind of node + matching
-      data file.
-- [ ] Cross-host viewer-region baselines.
-- [ ] Toggle visibility via the AppearancePanel slider for each subsystem.
+- [x] Add fixture pipelines that include each kind of node + matching
+      data file. **(PR #309)** label_generator and polyhedron_generator
+      injected programmatically via `pipeline.insertNode`. The vector
+      overlay still needs a bundled `.vec` fixture — left open.
+- [x] Cross-host viewer-region baselines. **(PR #309)** Webapp
+      baselines committed; cross-host seeding mechanical.
+- [ ] Toggle visibility via the AppearancePanel slider for each
+      subsystem — depends on `WidgetViewer` mount of AppearancePanel
+      and exposing per-subsystem toggles in the panel UI.
 
 ---
 
@@ -207,14 +273,22 @@ Recorded here so we don't lose track:
 
 These are "hot-path" utilities. Doing them once unblocks many tests.
 
-- [ ] `tests/e2e/lib/host-fixture.ts` — `MEGANE_HOST`-driven fixture.
-- [ ] `tests/e2e/lib/pipeline.ts` — programmatic pipeline editing
-      helpers (insertNode, connectEdge, setNodeParam).
-- [ ] `tests/e2e/lib/widget-api.ts` — wrapper around the
+- [x] `tests/e2e/lib/host-fixture.ts` — `MEGANE_HOST`-driven fixture.
+      **(PR #309)** Reads `test.info().project.metadata.meganeHost`
+      first, falls back to the env var; returns `{scope, host,
+      context, teardown}`.
+- [x] `tests/e2e/lib/pipeline.ts` — programmatic pipeline editing
+      helpers (insertNode, connectEdge, setNodeParam, removeNode,
+      listNodes). **(PR #309)** Drives `window.__megane_test_pipeline_store`
+      exposed by the Zustand store under testMode.
+- [x] `tests/e2e/lib/widget-api.ts` — wrapper around the
       `viewer.frame_index = N` / `viewer.selected_atoms = ...`
-      patterns, hiding the `executePython` plumbing.
-- [ ] `tests/e2e/lib/render-utils.ts` — shared helpers for camera
-      reset, frame swap, screenshot wait.
+      patterns, hiding the `executePython` plumbing. **(PR #309)**
+      `reopenWithCells` + builders for setFrameIndex / setSelectedAtoms /
+      setPipelineCells.
+- [x] `tests/e2e/lib/render-utils.ts` — shared helpers for camera
+      reset, frame swap, screenshot wait. **(PR #309)** Typed
+      wrappers over the `__megane_test` namespace.
 
 ---
 
@@ -222,18 +296,24 @@ These are "hot-path" utilities. Doing them once unblocks many tests.
 
 Single-PR-sized changes that unblock multiple test categories at once.
 
-- [ ] **Mount `AppearancePanel` in the webapp shell.** (Phase 2.1)
-- [ ] **Renderer hooks** behind `_testMode`:
-  - [ ] `getProjectedAtomPositions()`
-  - [ ] `getCameraState()`
-  - [ ] `getVisibleSubsystems()` (atoms / bonds / cell / vectors / labels / polyhedra)
-- [ ] **`__megane_test` namespaced object** exposing the above, attached
+- [x] **Mount `AppearancePanel` in the webapp shell.** (Phase 2.1)
+      **(PR #309)** Mounted in `MeganeViewer.tsx`. Widget hosts still
+      need the same mount inside `WidgetViewer` — open follow-up.
+- [x] **Renderer hooks** behind `_testMode`:
+  - [x] `getProjectedAtomPositions()` **(PR #309)**
+  - [x] `getCameraState()` **(PR #309)**
+  - [x] `getVisibleSubsystems()` (atoms / bonds / cell / vectors /
+        labels / polyhedra) **(PR #309)**
+- [x] **`__megane_test` namespaced object** exposing the above, attached
       next to `__megane_test_ready` so tests have one canonical entry
-      point.
-- [ ] **`MolecularViewer.load()` extension dispatch** in
-      `python/megane/widget.py:86` to enable Phase 1.4.
-- [ ] **`jupyterapp` global shim** in
+      point. **(PR #309)** Plus `__megane_test_pipeline_store` exposed
+      by the Zustand store for graph editing helpers.
+- [x] **`MolecularViewer.load()` extension dispatch** in
+      `python/megane/widget.py:86` to enable Phase 1.4. **(PR #309)**
+- [x] **`jupyterapp` global shim** in
       `tests/e2e/lib/hosts/jupyterlab.ts:openLabNotebook` for Phase 1.7.
+      **(PR #309)** — replaced with notebook-rewrite + Run All
+      pattern; the shim is no longer needed.
 
 ---
 

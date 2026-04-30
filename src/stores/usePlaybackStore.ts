@@ -131,3 +131,28 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
     }
   },
 }));
+
+// Expose the playback store for E2E tests that need to drive playback
+// without a Timeline UI (e.g., the JupyterLab DocWidget host does not
+// mount Timeline). Mirrors the pipeline store hook in src/pipeline/store.ts.
+(() => {
+  if (typeof window === "undefined") return;
+  try {
+    const g = globalThis as { __MEGANE_TEST__?: boolean };
+    let testMode = g.__MEGANE_TEST__ === true;
+    if (!testMode) {
+      const params = new URLSearchParams(window.location?.search ?? "");
+      if (params.get("test") === "1") testMode = true;
+    }
+    if (!testMode && window.parent && window.parent !== window) {
+      const pg = (window.parent as Window & { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__;
+      if (pg) testMode = true;
+    }
+    if (!testMode) return;
+    (
+      window as Window & { __megane_test_playback_store?: typeof usePlaybackStore }
+    ).__megane_test_playback_store = usePlaybackStore;
+  } catch {
+    /* noop — same-origin checks may throw inside cross-origin frames */
+  }
+})();

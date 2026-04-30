@@ -226,12 +226,20 @@ export function defaultViewerContract(opts: {
  * sources of pixel jitter (animations, blinking caret, scrollbars).
  */
 export async function captureFullPage(
-  page: Page,
+  scope: Page | Frame,
   outPath: string,
   opts: { mask?: Locator[] } = {},
 ): Promise<Buffer> {
-  await stabilizeUi(page);
-  const buf = await page.screenshot({
+  await stabilizeUi(scope);
+  // For Frame inputs (vscode webview, widget-vscode notebook output),
+  // resolve up to the owning Page so the screenshot covers the entire
+  // host window (IDE chrome + the embedded viewer), not just the
+  // iframe contents.
+  const ownerPage =
+    "screenshot" in scope && "mouse" in scope
+      ? (scope as Page)
+      : (scope as Frame).page();
+  const buf = await ownerPage.screenshot({
     path: outPath,
     fullPage: true,
     animations: "disabled",
@@ -341,7 +349,7 @@ export async function compareToBaseline(
  * `<repoRoot>/tests/e2e/baselines/<platform>/<name>.png`.
  */
 export async function expectFullPageMatch(
-  page: Page,
+  scope: Page | Frame,
   platform: string,
   name: string,
   opts: { maxDiffPercent?: number; mask?: Locator[]; updateBaselines?: boolean } = {},
@@ -356,7 +364,7 @@ export async function expectFullPageMatch(
     } catch {}
   }
   const tmp = baseline.replace(/\.png$/, ".current.png");
-  const buf = await captureFullPage(page, tmp, { mask: opts.mask });
+  const buf = await captureFullPage(scope, tmp, { mask: opts.mask });
   const r = await compareToBaseline(baseline, buf, { maxDiffPercent: opts.maxDiffPercent });
   expect(
     r.ok,
@@ -408,10 +416,16 @@ function repoRoot(): string {
 /**
  * Reduce sources of pixel jitter before screenshotting. Per the plan, we do
  * NOT loosen pixel diff tolerance to hide flakiness — we mask it.
+ *
+ * Accepts a Page or Frame — for Frame inputs we resolve the parent Page
+ * to drive the mouse, then run the evaluate within the Frame so the
+ * stabilising stylesheet lands in the right document.
  */
-export async function stabilizeUi(page: Page): Promise<void> {
-  await page.mouse.move(0, 0).catch(() => {});
-  await page
+export async function stabilizeUi(scope: Page | Frame): Promise<void> {
+  const ownerPage =
+    "mouse" in scope ? (scope as Page) : (scope as Frame).page?.() ?? null;
+  await ownerPage?.mouse.move(0, 0).catch(() => {});
+  await scope
     .evaluate(() => {
       try {
         window.scrollTo(0, 0);

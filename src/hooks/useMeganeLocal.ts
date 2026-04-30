@@ -125,11 +125,54 @@ export function useMeganeLocal(): MeganeLocalState {
       meta: TrajectoryMeta | null;
       labels: string[] | null;
     }) => {
+      const prevSnapshot = baseSnapshotRef.current;
       baseSnapshotRef.current = result.snapshot;
       structureFramesRef.current = result.frames;
       fileFramesRef.current = [];
       fileTrajMetaRef.current = null;
       xtcFileNameRef.current = null;
+
+      // If the new structure itself carries multiple frames (multi-frame
+      // XYZ, multi-MODEL PDB, etc.), feed them through the pipeline's
+      // file-trajectory channel so the default LoadTrajectory →
+      // Viewport edge picks them up — there is no LoadStructure edge to
+      // viewport.traj in the standard graph.
+      //
+      // executeLoadTrajectory builds a MemoryFrameProvider WITHOUT
+      // basePositions, so its index 0 must be a real frame. The XYZ
+      // parser puts frame 0 into `snapshot.positions` and frames 1..N-1
+      // into `result.frames`; prepend a synthetic frame 0 so the
+      // provider-emitted indices match the file's frame numbering.
+      //
+      // Otherwise, only clear when we are replacing a prior structure
+      // with incompatible atom count; never clear during the very first
+      // load (no prior structure) to avoid racing against a follow-up
+      // loadXtc() in the auto-load.
+      const pipeStore = usePipelineStore.getState();
+      if (result.frames.length > 0) {
+        const allFrames: Frame[] = [
+          {
+            frameId: 0,
+            nAtoms: result.snapshot.nAtoms,
+            positions: result.snapshot.positions,
+          },
+          ...result.frames,
+        ];
+        const trajectoryMeta: TrajectoryMeta = {
+          nFrames: allFrames.length,
+          timestepPs: 1.0,
+          nAtoms: result.snapshot.nAtoms,
+        };
+        // Feed both channels: the default web/widget pipelines wire
+        // through LoadTrajectory (consumes fileFrames); the empty
+        // pipeline used by the VSCode custom editor wires LoadStructure
+        // directly to Viewport.traj (consumes structureFrames).
+        pipeStore.setFileFrames(allFrames, trajectoryMeta);
+        pipeStore.setStructureFrames(result.frames, trajectoryMeta);
+      } else if (prevSnapshot && prevSnapshot.nAtoms !== result.snapshot.nAtoms) {
+        pipeStore.setFileFrames(null, null);
+        pipeStore.setStructureFrames(null, null);
+      }
 
       // Reset sub-hook state
       bonds.reset(result.snapshot);

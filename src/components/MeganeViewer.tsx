@@ -10,6 +10,7 @@ import { PipelineEditor } from "./PipelineEditor";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
+import { AppearancePanel } from "./AppearancePanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -18,6 +19,7 @@ import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
+import { useAppearancePanelState } from "../hooks/useAppearancePanelState";
 import type { Snapshot, Frame, HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
@@ -69,11 +71,14 @@ export function MeganeViewer({
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
+  const [bondCount, setBondCount] = useState<number>(0);
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
   const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
   const pipelineCollapsedRef = useRef(isNarrow);
   const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+
+  const appearance = useAppearancePanelState(rendererRef, isNarrow);
 
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
@@ -97,6 +102,7 @@ export function MeganeViewer({
   // Push snapshot to pipeline store for selection queries
   useEffect(() => {
     setSnapshot(snapshot);
+    setBondCount(snapshot?.nBonds ?? 0);
     // Viewport's loadSnapshot (child effect) resets per-atom overrides;
     // re-apply pipeline viewport state immediately after execution
     const renderer = rendererRef.current;
@@ -119,6 +125,14 @@ export function MeganeViewer({
     );
     prevViewportStateRef.current = viewportState;
   }, [viewportState]);
+
+  // Track pipeline-driven bond updates (initial load, bondSource flips, etc.).
+  // Per-frame distance-mode updates skip viewportState and go direct to the
+  // renderer, so they update bondCount in the per-frame effect below instead.
+  useEffect(() => {
+    const total = viewportState.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
+    setBondCount(total);
+  }, [viewportState.bonds]);
 
   // Connect pipeline trajectories to the playback store
   const setPlaybackProvider = usePlaybackStore((s) => s.setProvider);
@@ -173,6 +187,7 @@ export function MeganeViewer({
       result.elements,
       result.nAtoms,
     );
+    setBondCount(result.bondIndices.length / 2);
   }, [effectiveFrame, snapshot]);
 
   // Per-frame vector update
@@ -217,6 +232,7 @@ export function MeganeViewer({
       data-testid="megane-viewer"
       data-megane-context={testContext}
       data-atom-count={snapshot?.nAtoms ?? 0}
+      data-bond-count={bondCount}
       data-total-frames={totalFrames}
       data-current-frame={effectiveCurrentFrame}
       style={{ width, height, position: "relative", overflow: "hidden" }}
@@ -257,6 +273,17 @@ export function MeganeViewer({
         measurement={measurement}
         elements={snapshot?.elements ?? null}
         onClear={handleClearSelection}
+      />
+      <AppearancePanel
+        {...appearance}
+        labels={{
+          source: "none",
+          onSourceChange: () => {},
+          onUploadFile: () => {},
+          fileName: null,
+          hasStructureLabels: false,
+        }}
+        top={60}
       />
     </div>
   );

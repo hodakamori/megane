@@ -198,6 +198,13 @@ export function createEmptyPipeline(): {
         sourceHandle: "cell",
         targetHandle: "cell",
       },
+      {
+        id: "e5",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
     ],
   };
 }

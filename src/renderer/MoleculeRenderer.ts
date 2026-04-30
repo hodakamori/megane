@@ -30,7 +30,7 @@ import { StructureLayer } from "./StructureLayer";
 import { PivotMarker } from "./PivotMarker";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
-import { pickAtPixel } from "./Picking";
+import { pickAtPixel, projectToScreen } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
 import {
@@ -70,6 +70,74 @@ interface MeganeTestReady {
   frame: number;
   renderEpoch: number;
   atomCount?: number;
+}
+
+export interface MeganeProjectedAtom {
+  index: number;
+  sx: number;
+  sy: number;
+  depth: number;
+  element: number;
+}
+
+export type MeganeCameraMode = "perspective" | "orthographic";
+
+export interface MeganeCameraState {
+  mode: MeganeCameraMode;
+  position: [number, number, number];
+  target: [number, number, number];
+  zoom: number;
+}
+
+export interface MeganeSubsystemVisibility {
+  atoms: boolean;
+  bonds: boolean;
+  cell: boolean;
+  cellAxes: boolean;
+  vectors: boolean;
+  labels: boolean;
+  polyhedra: boolean;
+}
+
+export interface MeganeTestApi {
+  getProjectedAtomPositions: () => MeganeProjectedAtom[];
+  getCameraState: () => MeganeCameraState | null;
+  getVisibleSubsystems: () => MeganeSubsystemVisibility;
+  setCameraMode: (mode: MeganeCameraMode) => void;
+  resetCamera: () => void;
+}
+
+let _activeRenderer: MoleculeRenderer | null = null;
+
+function _setActiveRenderer(r: MoleculeRenderer | null): void {
+  _activeRenderer = r;
+  if (!_testMode || typeof window === "undefined") return;
+  const w = window as Window & { __megane_test?: MeganeTestApi };
+  if (r === null) {
+    delete w.__megane_test;
+    return;
+  }
+  if (!w.__megane_test) {
+    w.__megane_test = {
+      getProjectedAtomPositions: () =>
+        _activeRenderer ? _activeRenderer.testGetProjectedAtomPositions() : [],
+      getCameraState: () => (_activeRenderer ? _activeRenderer.testGetCameraState() : null),
+      getVisibleSubsystems: () =>
+        _activeRenderer
+          ? _activeRenderer.testGetVisibleSubsystems()
+          : {
+              atoms: false,
+              bonds: false,
+              cell: false,
+              cellAxes: false,
+              vectors: false,
+              labels: false,
+              polyhedra: false,
+            },
+      setCameraMode: (mode) => _activeRenderer?.setCameraMode(mode),
+      resetCamera: () => _activeRenderer?.resetCamera(),
+    };
+  }
 }
 
 function _getTestReady(): MeganeTestReady | null {
@@ -272,6 +340,9 @@ export class MoleculeRenderer {
 
     // Start render loop
     this.animate();
+
+    // Expose this instance to the test API (no-op outside _testMode).
+    _setActiveRenderer(this);
   }
 
   /** Load a molecular snapshot (topology + positions). */
@@ -1347,5 +1418,87 @@ export class MoleculeRenderer {
     if (this.container && this.renderer.domElement.parentNode) {
       this.container.removeChild(this.renderer.domElement);
     }
+    if (_activeRenderer === this) {
+      _setActiveRenderer(null);
+    }
+  }
+
+  // ---- Test-only API (gated on _testMode via _setActiveRenderer) ----
+  // These methods exist so Playwright specs can observe renderer state
+  // without driving non-deterministic mouse paths. They are wired to
+  // window.__megane_test only when _testMode is true; outside tests they
+  // are harmless instance methods.
+
+  /** Switch projection mode by name (wraps setPerspective for symmetry). */
+  setCameraMode(mode: MeganeCameraMode): void {
+    this.setPerspective(mode === "perspective");
+  }
+
+  /** Re-fit the camera to the current snapshot's bounding box. */
+  resetCamera(): void {
+    if (!this.snapshot) return;
+    this.lastExtent = fitCameraToView(this.camera, this.controls, this.snapshot);
+    if (this.camera instanceof THREE.OrthographicCamera && this.container) {
+      applyFrustumInsets(
+        this.camera,
+        this.container.clientWidth,
+        this.container.clientHeight,
+        this.viewInsetLeft,
+        this.viewInsetRight,
+        this.lastExtent,
+      );
+    }
+    this._frustumPanX = 0;
+    this._frustumPanY = 0;
+  }
+
+  /** Read camera state for tests. Returns null before mount/snapshot. */
+  testGetCameraState(): MeganeCameraState | null {
+    if (!this.camera || !this.controls) return null;
+    const pos = this.camera.position;
+    const tgt = this.controls.target;
+    return {
+      mode: this.perspectiveMode ? "perspective" : "orthographic",
+      position: [pos.x, pos.y, pos.z],
+      target: [tgt.x, tgt.y, tgt.z],
+      zoom: this.camera.zoom,
+    };
+  }
+
+  /** Aggregate visibility booleans for each renderer subsystem. */
+  testGetVisibleSubsystems(): MeganeSubsystemVisibility {
+    const layers = Array.from(this.layers.values());
+    return {
+      atoms: (this.atomRenderer?.mesh.visible ?? false) || layers.some((l) => l.isAtomsVisible()),
+      bonds: (this.bondRenderer?.mesh.visible ?? false) || layers.some((l) => l.isBondsVisible()),
+      cell: (this.cellRenderer?.mesh.visible ?? false) || layers.some((l) => l.isCellVisible()),
+      cellAxes: this.cellAxesRenderer?.isVisible() ?? false,
+      vectors: this.arrowRenderer?.mesh.visible ?? false,
+      labels: this.labelOverlay != null && this.snapshot != null,
+      polyhedra: this.polyhedronRenderer?.group.visible ?? false,
+    };
+  }
+
+  /** Project every atom of the primary snapshot to viewer-space pixels. */
+  testGetProjectedAtomPositions(): MeganeProjectedAtom[] {
+    if (!this.snapshot || !this.container) return [];
+    const positions = this.currentPositions ?? this.snapshot.positions;
+    const elements = this.snapshot.elements;
+    const n = this.snapshot.nAtoms;
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    const out: MeganeProjectedAtom[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const { sx, sy, depth } = projectToScreen(
+        this.camera,
+        positions[i * 3],
+        positions[i * 3 + 1],
+        positions[i * 3 + 2],
+        w,
+        h,
+      );
+      out[i] = { index: i, sx, sy, depth, element: elements[i] };
+    }
+    return out;
   }
 }
