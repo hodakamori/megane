@@ -179,23 +179,6 @@ export function Viewport({
         position: "relative",
         background: "#ffffff",
       }}
-    >
-      {/* Invisible anchor that frames a representative region of the 3D
-          canvas (away from the right-hand Pipeline panel) so the guide tour
-          can highlight just the viewport area instead of the whole view. */}
-      <div
-        data-tour-anchor="viewport"
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          top: "18%",
-          left: "12%",
-          width: "46%",
-          height: "60%",
-          pointerEvents: "none",
-          opacity: 0,
-        }}
-      />
-    </div>
+    />
   );
 }
