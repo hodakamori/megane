@@ -177,10 +177,6 @@ function App() {
   return (
     <MeganeViewer
       testContext="vscode"
-      snapshot={local.snapshot}
-      frame={local.frame}
-      currentFrame={local.currentFrame}
-      totalFrames={local.meta?.nFrames ?? 0}
       onUploadStructure={handleUploadStructure}
       onBondSourceChange={(s) =>
         local.setBondSource(s as "structure" | "file" | "distance" | "none")

@@ -1,7 +1,11 @@
 /**
  * Main megane viewer React component.
+ *
  * Combines Viewport, PipelineEditor, Timeline, Tooltip, and MeasurementPanel.
- * The pipeline store drives all appearance settings via ViewportState.
+ * The pipeline store drives all rendering state — snapshot, frames, viewport
+ * appearance — so the viewer is fully governed by the pipeline graph that the
+ * user sees. Hosts (webapp / VSCode webview / JupyterLab DocWidget) supply
+ * only the file-ingestion callbacks; viewer state is derived internally.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,14 +22,10 @@ import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
-import type { Snapshot, Frame, HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
+import type { HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 
 interface MeganeViewerProps {
-  snapshot: Snapshot | null;
-  frame?: Frame | null;
-  currentFrame?: number;
-  totalFrames?: number;
   playing?: boolean;
   fps?: number;
   onSeek?: (frame: number) => void;
@@ -46,10 +46,6 @@ interface MeganeViewerProps {
 }
 
 export function MeganeViewer({
-  snapshot,
-  frame = null,
-  currentFrame = 0,
-  totalFrames = 0,
   playing = false,
   fps = 30,
   onSeek,
@@ -84,9 +80,11 @@ export function MeganeViewer({
     pipelineCollapsedRef.current = pipelineCollapsed;
   }, [pipelineCollapsed]);
 
-  // Subscribe to pipeline store's viewportState
+  // Subscribe to pipeline store: viewportState drives the renderer, and the
+  // primary particle's source carries the canonical snapshot (set by
+  // setNodeSnapshot in usePipelineStore.openFile).
   const viewportState = usePipelineStore((s) => s.viewportState);
-  const setSnapshot = usePipelineStore((s) => s.setSnapshot);
+  const snapshot = usePipelineStore((s) => s.viewportState.particles[0]?.source ?? null);
 
   // Wire up node load handlers (structure, trajectory, vector) and track primary node
   const primaryNodeIdRef = useNodeLoadHandlers({
@@ -95,19 +93,18 @@ export function MeganeViewer({
     onUploadTrajectory,
   });
 
-  // Push snapshot to pipeline store for selection queries
+  // When the snapshot identity changes, the Viewport's child loadSnapshot
+  // effect resets per-atom overrides, so we re-apply the pipeline viewport
+  // state immediately afterwards.
   useEffect(() => {
-    setSnapshot(snapshot);
     setBondCount(snapshot?.nBonds ?? 0);
-    // Viewport's loadSnapshot (child effect) resets per-atom overrides;
-    // re-apply pipeline viewport state immediately after execution
     const renderer = rendererRef.current;
     if (renderer) {
       const vs = usePipelineStore.getState().viewportState;
       applyViewportState(renderer, vs, null, primaryNodeIdRef.current);
       prevViewportStateRef.current = vs;
     }
-  }, [snapshot, setSnapshot]);
+  }, [snapshot]);
 
   // Apply viewportState changes to the renderer
   useEffect(() => {
@@ -143,11 +140,10 @@ export function MeganeViewer({
     }
   }, [viewportState.trajectories, setPlaybackProvider]);
 
-  // Use playback store's frame for rendering (prefer over prop)
-  const playbackFrame = usePlaybackStore((s) => s.currentFrameData);
-  const playbackCurrentFrame = usePlaybackStore((s) => s.currentFrame);
-  const effectiveFrame = playbackFrame ?? frame;
-  const effectiveCurrentFrame = playbackFrame ? playbackCurrentFrame : currentFrame;
+  // Frame, currentFrame, and totalFrames come straight from the playback store.
+  const frame = usePlaybackStore((s) => s.currentFrameData);
+  const currentFrame = usePlaybackStore((s) => s.currentFrame);
+  const totalFrames = usePlaybackStore((s) => s.totalFrames);
 
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
@@ -156,12 +152,12 @@ export function MeganeViewer({
     if (!bondNode) return;
     const params = bondNode.data.params;
     if (params.type !== "add_bond" || (params as AddBondParams).bondSource !== "distance") return;
-    if (!snapshot || !effectiveFrame) return;
+    if (!snapshot || !frame) return;
     const renderer = rendererRef.current;
     if (!renderer) return;
 
     const newBonds = inferBondsVdwJS(
-      effectiveFrame.positions,
+      frame.positions,
       snapshot.elements,
       snapshot.nAtoms,
       0.6,
@@ -171,7 +167,7 @@ export function MeganeViewer({
     const result = processPbcBonds(
       newBonds,
       null,
-      effectiveFrame.positions,
+      frame.positions,
       snapshot.elements,
       snapshot.nAtoms,
       snapshot.box,
@@ -184,7 +180,7 @@ export function MeganeViewer({
       result.nAtoms,
     );
     setBondCount(result.bondIndices.length / 2);
-  }, [effectiveFrame, snapshot]);
+  }, [frame, snapshot]);
 
   // Per-frame vector update
   useEffect(() => {
@@ -192,9 +188,9 @@ export function MeganeViewer({
     if (!renderer) return;
     const vs = usePipelineStore.getState().viewportState;
     if (vs.vectors.length > 0) {
-      applyVectorsForFrame(renderer, vs.vectors, effectiveCurrentFrame);
+      applyVectorsForFrame(renderer, vs.vectors, currentFrame);
     }
-  }, [effectiveCurrentFrame]);
+  }, [currentFrame]);
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
@@ -230,12 +226,12 @@ export function MeganeViewer({
       data-atom-count={snapshot?.nAtoms ?? 0}
       data-bond-count={bondCount}
       data-total-frames={totalFrames}
-      data-current-frame={effectiveCurrentFrame}
+      data-current-frame={currentFrame}
       style={{ width, height, position: "relative", overflow: "hidden" }}
     >
       <Viewport
         snapshot={snapshot}
-        frame={effectiveFrame}
+        frame={frame}
         atomLabels={null}
         atomVectors={null}
         onRendererReady={handleRendererReady}
@@ -249,12 +245,12 @@ export function MeganeViewer({
         onWidthChange={handlePipelineWidthChange}
         rendererRef={rendererRef}
         totalFrames={totalFrames}
-        currentFrame={effectiveCurrentFrame}
+        currentFrame={currentFrame}
         onSeek={onSeek}
       />
       {onSeek && onPlayPause && onFpsChange && (
         <Timeline
-          currentFrame={effectiveCurrentFrame}
+          currentFrame={currentFrame}
           totalFrames={totalFrames}
           playing={playing}
           fps={fps}

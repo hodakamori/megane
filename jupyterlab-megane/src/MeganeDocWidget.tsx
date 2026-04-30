@@ -101,10 +101,6 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
     >
       <MeganeViewer
         testContext="jupyterlab-doc"
-        snapshot={local.snapshot}
-        frame={local.frame}
-        currentFrame={local.currentFrame}
-        totalFrames={local.meta?.nFrames ?? 0}
         onUploadStructure={handleUploadStructure}
         onBondSourceChange={(s: string) =>
           local.setBondSource(s as "structure" | "file" | "distance" | "none")

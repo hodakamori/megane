@@ -32,7 +32,6 @@ function App() {
   // Playback store state
   const playing = usePlaybackStore((s) => s.playing);
   const fps = usePlaybackStore((s) => s.fps);
-  const totalFrames = usePlaybackStore((s) => s.totalFrames);
   const togglePlayPause = usePlaybackStore((s) => s.togglePlayPause);
   const setFps = usePlaybackStore((s) => s.setFps);
   const seekFrame = usePlaybackStore((s) => s.seekFrame);
@@ -147,10 +146,6 @@ function App() {
   return (
     <div style={{ width: "100%", height: "100%" }} onDragOver={handleDragOver} onDrop={handleDrop}>
       <MeganeViewer
-        snapshot={ds.snapshot}
-        frame={ds.frame}
-        currentFrame={ds.currentFrame}
-        totalFrames={totalFrames}
         playing={playing}
         fps={fps}
         onSeek={handleSeek}
