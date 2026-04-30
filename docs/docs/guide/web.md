@@ -17,58 +17,18 @@ npm install megane-viewer
 The easiest way to get started is the `MeganeViewer` component. It includes the 3D viewport, sidebar, appearance panel, timeline, tooltip, and measurement panel — everything you need in a single component.
 
 ```tsx
-import { useState, useCallback, useMemo } from "react";
-import { MeganeViewer, parseStructureFile } from "megane-viewer/lib";
-import type { Snapshot, BondSource } from "megane-viewer/lib";
+import { useCallback } from "react";
+import { MeganeViewer } from "megane-viewer/lib";
+import { usePipelineStore } from "megane-viewer/lib";
 
 function App() {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [pdbFileName, setPdbFileName] = useState<string | null>(null);
-  const [bondSource, setBondSource] = useState<BondSource>("structure");
-
-  const handleUpload = useCallback(async (file: File) => {
-    const result = await parseStructureFile(file);
-    setSnapshot(result.snapshot);
-    setPdbFileName(file.name);
+  const handleUpload = useCallback((file: File) => {
+    usePipelineStore.getState().openFile(file);
   }, []);
-
-  const bonds = useMemo(() => ({
-    source: bondSource,
-    onSourceChange: setBondSource,
-    onUploadFile: () => {},
-    fileName: null,
-    count: snapshot?.nBonds ?? 0,
-  }), [bondSource, snapshot?.nBonds]);
-
-  const trajectory = useMemo(() => ({
-    source: "structure" as const,
-    onSourceChange: () => {},
-    hasStructureFrames: false,
-    hasFileFrames: false,
-    fileName: null,
-    totalFrames: 0,
-    timestepPs: 0,
-    onUploadXtc: () => {},
-  }), []);
-
-  const labels = useMemo(() => ({
-    source: "none" as const,
-    onSourceChange: () => {},
-    onUploadFile: () => {},
-    fileName: null,
-    hasStructureLabels: false,
-  }), []);
 
   return (
     <MeganeViewer
-      snapshot={snapshot}
-      mode="local"
-      onToggleMode={() => {}}
       onUploadStructure={handleUpload}
-      pdbFileName={pdbFileName}
-      bonds={bonds}
-      trajectory={trajectory}
-      labels={labels}
       width="100%"
       height="600px"
     />
@@ -78,28 +38,24 @@ function App() {
 
 ### `MeganeViewer` Props
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `snapshot` | `Snapshot \| null` | Parsed molecular structure data |
-| `frame` | `Frame \| null` | Current trajectory frame |
-| `currentFrame` | `number` | Current frame index |
-| `totalFrames` | `number` | Total number of frames |
-| `playing` | `boolean` | Playback state |
-| `fps` | `number` | Playback speed |
-| `mode` | `"streaming" \| "local"` | Data source mode |
-| `onToggleMode` | `() => void` | Toggle streaming/local mode |
-| `pdbFileName` | `string \| null` | Name of the loaded structure file |
-| `bonds` | `BondConfig` | Bond display configuration |
-| `trajectory` | `TrajectoryConfig` | Trajectory configuration |
-| `labels` | `LabelConfig` | Atom label configuration |
-| `vectors` | `VectorConfig` | Vector arrow configuration |
-| `atomLabels` | `string[] \| null` | Resolved atom label strings |
-| `atomVectors` | `Float32Array \| null` | Resolved vector arrow data |
-| `width` / `height` | `string \| number` | Viewer dimensions |
-| `onUploadStructure` | `(file: File) => void` | File upload handler |
-| `onSeek` | `(frame: number) => void` | Frame seek handler |
-| `onPlayPause` | `() => void` | Play/pause toggle |
-| `onFpsChange` | `(fps: number) => void` | FPS change handler |
+`MeganeViewer` is pipeline-store-driven: it manages its own rendering state internally. Host apps supply only the file-ingestion callbacks; viewer state (snapshot, bonds, labels, vectors, etc.) is derived from the internal pipeline graph.
+
+| Prop | Type | Required | Description |
+|------|------|:--------:|-------------|
+| `onUploadStructure` | `(file: File) => void` | ✓ | Called when the user uploads a structure file |
+| `onUploadTrajectory` | `(file: File) => void` | | Called when the user uploads a trajectory file |
+| `onBondSourceChange` | `(source: BondSource) => void` | | Bond source change callback |
+| `onLabelSourceChange` | `(source: LabelSource) => void` | | Label source change callback |
+| `onLoadLabelFile` | `(file: File) => void` | | Called when the user uploads a label file |
+| `onVectorSourceChange` | `(source: VectorSource) => void` | | Vector source change callback |
+| `onLoadVectorFile` | `(file: File) => void` | | Called when the user uploads a vector file |
+| `onLoadDemoVectors` | `() => void` | | Called when the user requests demo vectors |
+| `playing` | `boolean` | | Playback state (default: `false`) |
+| `fps` | `number` | | Playback speed (default: `30`) |
+| `onSeek` | `(frame: number) => void` | | Frame seek handler |
+| `onPlayPause` | `() => void` | | Play/pause toggle |
+| `onFpsChange` | `(fps: number) => void` | | FPS change handler |
+| `width` / `height` | `string \| number` | | Viewer dimensions (default: `"100%"`) |
 
 See the [TypeScript API Reference](/api/typescript/) for the complete interface.
 
@@ -114,8 +70,8 @@ See the [TypeScript API Reference](/api/typescript/) for the complete interface.
 | Feature | `MeganeViewer` | `PipelineViewer` |
 |---------|---------------|-----------------|
 | UI panels (sidebar, appearance) | Yes | No |
-| Pipeline-driven rendering | No | Yes |
-| Multiple instances per page | Conflicts | Fully independent |
+| Pipeline control | Internal editor UI | `pipeline` prop |
+| Multiple instances per page | Conflicts (global store) | Fully independent |
 | File loading | Upload / drag-drop | URL fetch via `fileUrl` |
 | Trajectory playback | Yes | Yes (Timeline shown automatically) |
 
@@ -357,23 +313,25 @@ function MinimalViewer({ snapshot }: { snapshot: Snapshot }) {
 }
 ```
 
-### `Sidebar`, `Timeline`, `AppearancePanel`
+### `Sidebar`, `Timeline`
 
 Combine individual panels for a custom layout:
 
 ```tsx
-import { Viewport, Sidebar, Timeline, AppearancePanel } from "megane-viewer/lib";
+import { useState } from "react";
+import { Viewport, Sidebar, Timeline } from "megane-viewer/lib";
+import type { BondConfig, TrajectoryConfig } from "megane-viewer/lib";
 
-function CustomLayout({ snapshot, frame }) {
+function CustomLayout({ bondConfig, trajectoryConfig, handleUpload }) {
   const [renderer, setRenderer] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      {/* Left panel */}
+    <div style={{ position: "relative", width: "100%", height: "100vh" }}>
+      {/* Left sidebar */}
       <Sidebar
         mode="local"
-        onToggleMode={() => {}}
-        structure={{ atomCount: snapshot?.nAtoms ?? 0, fileName: "protein.pdb" }}
+        structure={{ atomCount: 0, fileName: null }}
         bonds={bondConfig}
         trajectory={trajectoryConfig}
         onUploadStructure={handleUpload}
@@ -381,33 +339,15 @@ function CustomLayout({ snapshot, frame }) {
         hasCell={false}
         cellVisible={false}
         onToggleCell={() => {}}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((c) => !c)}
       />
 
       {/* 3D viewport */}
-      <div style={{ flex: 1 }}>
-        <Viewport
-          snapshot={snapshot}
-          frame={frame}
-          onRendererReady={setRenderer}
-        />
-      </div>
-
-      {/* Right panel */}
-      <AppearancePanel
-        atomScale={1.0}
-        onAtomScaleChange={(s) => renderer?.setAtomScale(s)}
-        atomOpacity={1.0}
-        onAtomOpacityChange={(o) => renderer?.setAtomOpacity(o)}
-        bondScale={1.0}
-        onBondScaleChange={(s) => renderer?.setBondScale(s)}
-        bondOpacity={1.0}
-        onBondOpacityChange={(o) => renderer?.setBondOpacity(o)}
-        labels={labelConfig}
-        perspective={false}
-        onPerspectiveChange={(p) => renderer?.setPerspective(p)}
-        hasCell={false}
-        cellAxesVisible={false}
-        onToggleCellAxes={() => {}}
+      <Viewport
+        snapshot={null}
+        frame={null}
+        onRendererReady={setRenderer}
       />
     </div>
   );
@@ -625,10 +565,8 @@ import type {
   SelectionState,      // Current atom selection
   Measurement,         // Distance/angle/dihedral result
   BondSource,          // "structure" | "file" | "distance" | "none"
-  BondConfig,          // Bond panel configuration
-  TrajectoryConfig,    // Trajectory panel configuration
-  LabelConfig,         // Label panel configuration
-  VectorConfig,        // Vector arrow configuration
+  BondConfig,          // Bond panel configuration (for Sidebar)
+  TrajectoryConfig,    // Trajectory panel configuration (for Sidebar)
   StructureParseResult,// Parse result from parseStructureFile/Text
 } from "megane-viewer/lib";
 ```
