@@ -144,6 +144,21 @@ export function MeganeViewer({
   const frame = usePlaybackStore((s) => s.currentFrameData);
   const currentFrame = usePlaybackStore((s) => s.currentFrame);
   const totalFrames = usePlaybackStore((s) => s.totalFrames);
+  const storePlaying = usePlaybackStore((s) => s.playing);
+  const storeFps = usePlaybackStore((s) => s.fps);
+  const storeSeek = usePlaybackStore((s) => s.seekFrame);
+  const storeTogglePlayPause = usePlaybackStore((s) => s.togglePlayPause);
+  const storeSetFps = usePlaybackStore((s) => s.setFps);
+
+  // Hosts may forward custom playback callbacks (the webapp wraps them to
+  // pause on file uploads). When omitted (VSCode webview, JupyterLab
+  // DocWidget), wire Timeline directly to the playback store so the user
+  // always gets playback controls for multi-frame structures.
+  const effectivePlaying = onPlayPause ? playing : storePlaying;
+  const effectiveFps = onFpsChange ? fps : storeFps;
+  const effectiveOnSeek = onSeek ?? storeSeek;
+  const effectiveOnPlayPause = onPlayPause ?? storeTogglePlayPause;
+  const effectiveOnFpsChange = onFpsChange ?? storeSetFps;
 
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
@@ -246,19 +261,17 @@ export function MeganeViewer({
         rendererRef={rendererRef}
         totalFrames={totalFrames}
         currentFrame={currentFrame}
-        onSeek={onSeek}
+        onSeek={effectiveOnSeek}
       />
-      {onSeek && onPlayPause && onFpsChange && (
-        <Timeline
-          currentFrame={currentFrame}
-          totalFrames={totalFrames}
-          playing={playing}
-          fps={fps}
-          onSeek={onSeek}
-          onPlayPause={onPlayPause}
-          onFpsChange={onFpsChange}
-        />
-      )}
+      <Timeline
+        currentFrame={currentFrame}
+        totalFrames={totalFrames}
+        playing={effectivePlaying}
+        fps={effectiveFps}
+        onSeek={effectiveOnSeek}
+        onPlayPause={effectiveOnPlayPause}
+        onFpsChange={effectiveOnFpsChange}
+      />
       <Tooltip info={hoverInfo} />
       <MeasurementPanel
         selection={selection}
