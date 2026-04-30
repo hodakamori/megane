@@ -1,0 +1,80 @@
+/**
+ * Thin wrapper around driver.js that owns tour lifecycle: configuring steps,
+ * rendering a "don't show again" checkbox in the footer, and forwarding state
+ * changes to the tour store so React components stay in sync.
+ */
+import { driver, type Driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import "./tour.css";
+import { useTourStore } from "./tourStore";
+import { buildTourSteps } from "./tourSteps";
+
+const CHECKBOX_ID = "megane-tour-dont-show";
+
+let activeDriver: Driver | null = null;
+
+function injectDontShowCheckbox(footer: HTMLElement): void {
+  if (footer.querySelector(`#${CHECKBOX_ID}`)) return;
+
+  const wrapper = document.createElement("label");
+  wrapper.className = "megane-tour-dont-show";
+  wrapper.htmlFor = CHECKBOX_ID;
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.id = CHECKBOX_ID;
+  input.checked = useTourStore.getState().dontShowAgain;
+  input.addEventListener("change", () => {
+    useTourStore.getState().setDontShowAgain(input.checked);
+  });
+
+  const text = document.createElement("span");
+  text.textContent = "Don't show this again";
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(text);
+
+  // Place the checkbox at the very start of the footer so it sits left of
+  // the progress text and navigation buttons.
+  footer.insertBefore(wrapper, footer.firstChild);
+}
+
+export function startTour(): void {
+  // Re-create the driver on every start so steps reflect the latest DOM
+  // (panels can be collapsed/expanded between sessions).
+  if (activeDriver) {
+    activeDriver.destroy();
+    activeDriver = null;
+  }
+
+  const tour = driver({
+    showProgress: true,
+    progressText: "{{current}} / {{total}}",
+    nextBtnText: "Next",
+    prevBtnText: "Back",
+    doneBtnText: "Done",
+    allowClose: true,
+    overlayOpacity: 0.55,
+    overlayColor: "#0f172a",
+    stagePadding: 6,
+    stageRadius: 10,
+    popoverClass: "megane-tour",
+    steps: buildTourSteps(),
+    onPopoverRender: (popover) => {
+      injectDontShowCheckbox(popover.footer);
+    },
+    onDestroyed: () => {
+      useTourStore.getState().setActive(false);
+      activeDriver = null;
+    },
+  });
+
+  activeDriver = tour;
+  useTourStore.getState().setActive(true);
+  tour.drive();
+}
+
+export function stopTour(): void {
+  activeDriver?.destroy();
+  activeDriver = null;
+}

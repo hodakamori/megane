@@ -3,6 +3,7 @@ import type { DocumentRegistry } from "@jupyterlab/docregistry";
 import { useCallback, useEffect, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
+import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
@@ -20,6 +21,7 @@ type LoadState = "loading" | "ready" | { error: string };
 function DocBody({ context }: DocBodyProps): JSX.Element {
   const local = useMeganeLocal();
   const [state, setState] = useState<LoadState>("loading");
+  useTour({ host: "jupyterlab" });
 
   useEffect(() => {
     let cancelled = false;

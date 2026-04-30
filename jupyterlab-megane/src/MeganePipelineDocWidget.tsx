@@ -4,6 +4,7 @@ import type { Contents } from "@jupyterlab/services";
 import { useCallback, useEffect, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { usePipelineStore } from "@megane/pipeline/store";
+import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 
@@ -68,6 +69,7 @@ async function fetchCompanion(
 
 function DocBody({ context, contents }: DocBodyProps): JSX.Element {
   const [state, setState] = useState<LoadState>("loading");
+  useTour({ host: "jupyterlab" });
 
   useEffect(() => {
     let cancelled = false;

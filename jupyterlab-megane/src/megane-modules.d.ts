@@ -26,3 +26,10 @@ declare module "@megane/pipeline/store" {
 }
 
 declare module "@megane/styles/megane.css";
+
+declare module "@megane/tour/useTour" {
+  export function useTour(opts: {
+    host: "webapp" | "vscode" | "jupyterlab" | "ipywidget";
+    autoStartDelayMs?: number;
+  }): { startTour: () => void };
+}
