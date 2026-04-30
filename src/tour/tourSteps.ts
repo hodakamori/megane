@@ -13,9 +13,14 @@
  * them centred so they work on every host even when no anchor is present.
  */
 import type { DriveStep } from "driver.js";
+import packageJson from "../../package.json";
+
+const APP_VERSION = (packageJson as { version: string }).version;
 
 const REPO_URL = "https://github.com/hodakamori/megane";
-const DOCS_URL = "https://github.com/hodakamori/megane#readme";
+const DOCS_URL = "https://hodakamori.github.io/megane/";
+const AUTHOR_GITHUB_URL = "https://github.com/hodakamori";
+const AUTHOR_LINKEDIN_URL = "https://www.linkedin.com/in/hodaka-mori-146b61ba/";
 
 const ICON_GITHUB = `
   <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -28,6 +33,11 @@ const ICON_DOCS = `
     <path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/>
     <path d="M8 7h8"/>
     <path d="M8 11h6"/>
+  </svg>`;
+
+const ICON_LINKEDIN = `
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <path fill="currentColor" d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.37V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.26 2.37 4.26 5.45v6.29ZM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.72v20.55C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0Z"/>
   </svg>`;
 
 const ICON_ARROW = `
@@ -64,8 +74,38 @@ function linkCard(opts: {
     </a>`;
 }
 
+function welcomeDescription(): string {
+  return `
+    <div class="megane-tour-welcome">
+      <div class="megane-tour-welcome-header">
+        <span class="megane-tour-welcome-name">megane</span>
+        <span class="megane-tour-welcome-version">v${escapeHtml(APP_VERSION)}</span>
+      </div>
+      <p class="megane-tour-welcome-tagline">Spectacles for atomistic data.</p>
+      <p class="megane-tour-welcome-blurb">
+        A fast, beautiful molecular viewer — render millions of atoms at 60fps,
+        build visual pipelines, and embed it in Jupyter, the browser, React, or VSCode.
+      </p>
+      <div class="megane-tour-welcome-author">
+        <span class="megane-tour-welcome-author-label">Built by hodakamori</span>
+        <span class="megane-tour-welcome-author-icons">
+          <a class="megane-tour-icon-link" href="${escapeHtml(AUTHOR_GITHUB_URL)}" target="_blank" rel="noopener noreferrer" aria-label="Author on GitHub" title="GitHub">${ICON_GITHUB}</a>
+          <a class="megane-tour-icon-link" href="${escapeHtml(AUTHOR_LINKEDIN_URL)}" target="_blank" rel="noopener noreferrer" aria-label="Author on LinkedIn" title="LinkedIn">${ICON_LINKEDIN}</a>
+        </span>
+      </div>
+    </div>`;
+}
+
 export function buildTourSteps(): DriveStep[] {
   return [
+    {
+      popover: {
+        title: "Welcome",
+        description: welcomeDescription(),
+        side: "over",
+        align: "center",
+      },
+    },
     {
       element: '[data-tour-anchor="viewport"]',
       popover: {

@@ -136,6 +136,102 @@
   cursor: pointer;
 }
 
+/* Welcome (intro) step formatting. */
+.megane-tour-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.megane-tour-welcome-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.megane-tour-welcome-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  background: linear-gradient(120deg, #3b82f6 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.megane-tour-welcome-version {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
+
+.megane-tour-welcome-tagline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  font-style: italic;
+}
+
+.megane-tour-welcome-blurb {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.megane-tour-welcome-author {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.megane-tour-welcome-author-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.megane-tour-welcome-author-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.megane-tour-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #475569;
+  border: 1px solid transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.megane-tour-icon-link:hover {
+  color: #0f172a;
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+
 /* Mouse-controls step formatting. */
 .megane-tour-keys {
   list-style: none;
