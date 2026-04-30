@@ -17,6 +17,7 @@ import { serializePipeline, deserializePipeline } from "./serialize";
 import { createDefaultPipeline, createDemoPipeline, createEmptyPipeline } from "./defaults";
 import { PIPELINE_TEMPLATES } from "./templates";
 import { getLayoutedElements } from "./layout";
+import { performOpenFile, type OpenFileOptions } from "./openFile";
 
 let nextNodeId = 1;
 
@@ -73,6 +74,10 @@ export interface PipelineStore {
   // Pipeline execution
   execute: () => void;
 
+  // Single canonical file ingestion entry. Classifies by extension and
+  // configures the pipeline accordingly. See openFile.ts for details.
+  openFile: (file: File, opts?: OpenFileOptions) => Promise<void>;
+
   // Serialization
   serialize: () => SerializedPipeline;
   deserialize: (json: SerializedPipeline) => void;
@@ -112,7 +117,7 @@ const CLEARED_EXECUTION_CONTEXT = {
   nodeStreamingData: {} as Record<string, NodeStreamingData>,
 } as const;
 
-export const usePipelineStore = create<PipelineStore>((set, get) => ({
+export const usePipelineStore = create<PipelineStore>((set, get, api) => ({
   nodes: defaultState.nodes,
   edges: defaultState.edges,
   viewportState: { ...DEFAULT_VIEWPORT_STATE },
@@ -367,6 +372,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     }
 
     set({ viewportState, nodeErrors: merged });
+  },
+
+  openFile: async (file, opts) => {
+    await performOpenFile(api, file, opts);
   },
 
   serialize: () => {
