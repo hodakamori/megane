@@ -46,7 +46,10 @@ const STRUCTURE_CASES: StructureCase[] = [
   { name: "sdf-ethanol", file: "ethanol.sdf", mime: "chemical/x-mdl-sdfile" },
   { name: "cif-nacl", file: "nacl.cif", mime: "chemical/x-cif" },
   { name: "lammps-water", file: "water.lammps", mime: "text/plain" },
-  { name: "lammpstrj-water", file: "water.lammpstrj", mime: "text/plain" },
+  // .lammpstrj is a *trajectory* format, not a structure — the LoadStructure
+  // node's file input rejects it by extension, so dropping it here was
+  // silently a no-op. Trajectory loading is exercised by the
+  // "trajectory companion" suite below.
 ];
 
 async function dropStructure(
@@ -91,6 +94,13 @@ test.describe("format loading: webapp drag-drop", () => {
         .getAttribute("data-atom-count");
       expect(Number(atomAttr)).toBeGreaterThan(0);
 
+      // The pipeline editor's LoadStructure node header must display the
+      // file the user actually opened — guards against the
+      // `caffeine_water.pdb` ghost-name regression that PR-A2 fixed.
+      await expect(
+        page.locator('[data-testid="load-structure-filename"]').first(),
+      ).toHaveText(c.file);
+
       await expectViewerRegionMatch(page, PLATFORM, `${c.name}-viewer`);
     });
   }
@@ -101,17 +111,39 @@ test.describe("format loading: trajectory companion", () => {
     await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
     await waitForReady(page);
 
-    // Default load already includes caffeine_water + .xtc — assert the
-    // Timeline mounts and the frame counter > 1.
-    const total = await page
-      .locator('[data-testid="megane-viewer"]')
-      .getAttribute("data-total-frames");
-    expect(Number(total)).toBeGreaterThan(1);
+    // Default load already includes caffeine_water + .xtc. waitForReady
+    // returns once the structure snapshot is bound, but the bundled XTC is
+    // fetched in a follow-up Promise and the playback provider is wired
+    // through a useEffect — so totalFrames lands a few microtasks later.
+    // Poll the attribute until the trajectory makes it through the
+    // pipeline rather than reading once and racing the load.
+    await expect
+      .poll(
+        async () =>
+          Number(
+            (await page
+              .locator('[data-testid="megane-viewer"]')
+              .getAttribute("data-total-frames")) ?? 0,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(1);
 
     await assertDomContract(page, [
       ...defaultViewerContract({ context: "webapp" }),
       { testid: "timeline-root", visible: true },
       { testid: "playback-seekbar", visible: true, enabled: true },
     ]);
+
+    // Pipeline must reflect the actually-loaded files — not the seed
+    // graph's literal defaults. After demo init both should display the
+    // bundled file basenames, but updating via openFile / applyResult is
+    // what guarantees the names track real loads going forward.
+    await expect(
+      page.locator('[data-testid="load-structure-filename"]').first(),
+    ).toHaveText("caffeine_water.pdb");
+    await expect(
+      page.locator('[data-testid="load-trajectory-filename"]').first(),
+    ).toHaveText("caffeine_water_vibration.xtc");
   });
 });

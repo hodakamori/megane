@@ -100,5 +100,14 @@ for (const f of FORMATS) {
       const totalFrames = Number(await viewer.getAttribute("data-total-frames"));
       expect(totalFrames, `${f.id}: expected trajectory frames`).toBeGreaterThan(0);
     }
+
+    // The pipeline editor's LoadStructure node must reflect the file the
+    // user actually opened, not the seed graph's literal default — guards
+    // the bug PR-A2 fixed (clicking bond_change.traj while the pipeline
+    // still showed caffeine_water.pdb).
+    await expect(
+      page.locator('[data-testid="load-structure-filename"]').first(),
+      `${f.id}: load_structure node should display the opened file`,
+    ).toHaveText(f.file);
   });
 }
