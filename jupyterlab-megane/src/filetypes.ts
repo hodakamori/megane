@@ -2,6 +2,18 @@ import type { DocumentRegistry } from "@jupyterlab/docregistry";
 
 export const FACTORY_NAME = "megane Molecular Viewer";
 export const FACTORY_NAME_BINARY = "megane Molecular Viewer (binary)";
+export const FACTORY_NAME_PIPELINE = "megane Pipeline Viewer";
+
+export const PIPELINE_FILETYPE_NAME = "megane-pipeline";
+
+export const PIPELINE_FILETYPE: DocumentRegistry.IFileType = {
+  name: PIPELINE_FILETYPE_NAME,
+  displayName: "megane Pipeline",
+  extensions: [".megane.json"],
+  mimeTypes: ["application/json"],
+  fileFormat: "text",
+  contentType: "file",
+};
 
 export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
   {

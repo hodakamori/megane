@@ -16,4 +16,26 @@ declare module "@megane/hooks/useMeganeLocal" {
   export function useMeganeLocal(): any;
 }
 
+declare module "@megane/parsers/structure" {
+  export function parseStructureFile(file: File): Promise<any>;
+}
+
+declare module "@megane/parsers/xtc" {
+  export function parseXTCFile(file: File, expectedNAtoms: number): Promise<any>;
+  export function parseLammpstrjFile(
+    file: File,
+    expectedNAtoms: number,
+  ): Promise<any>;
+}
+
+declare module "@megane/pipeline/store" {
+  export const usePipelineStore: {
+    getState(): any;
+  };
+}
+
+declare module "@megane/pipeline/types" {
+  export type SerializedPipeline = any;
+}
+
 declare module "@megane/styles/megane.css";
