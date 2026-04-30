@@ -83,9 +83,14 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
     >
       <div onDrop={handleDrop} onDragOver={handleDragOver}>
         {params.fileName ? (
-          <div style={fileNameStyle}>{params.fileName}</div>
+          <div data-testid="load-structure-filename" style={fileNameStyle}>
+            {params.fileName}
+          </div>
         ) : (
-          <div style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}>
+          <div
+            data-testid="load-structure-filename"
+            style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}
+          >
             No structure loaded
           </div>
         )}

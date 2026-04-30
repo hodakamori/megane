@@ -63,9 +63,14 @@ export function LoadTrajectoryNode({ id, data }: NodeProps<Node<PipelineNodeData
     <NodeShell id={id} nodeType="load_trajectory" enabled={data.enabled}>
       <div onDrop={handleDrop} onDragOver={handleDragOver}>
         {params.fileName ? (
-          <div style={fileNameStyle}>{params.fileName}</div>
+          <div data-testid="load-trajectory-filename" style={fileNameStyle}>
+            {params.fileName}
+          </div>
         ) : (
-          <div style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}>
+          <div
+            data-testid="load-trajectory-filename"
+            style={{ fontSize: 20, color: "#94a3b8", fontStyle: "italic" }}
+          >
             No trajectory loaded
           </div>
         )}

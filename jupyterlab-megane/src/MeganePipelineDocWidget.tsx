@@ -3,7 +3,6 @@ import type { DocumentRegistry } from "@jupyterlab/docregistry";
 import type { Contents } from "@jupyterlab/services";
 import { useCallback, useEffect, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
-import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
 import { usePipelineStore } from "@megane/pipeline/store";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
@@ -68,11 +67,6 @@ async function fetchCompanion(
 }
 
 function DocBody({ context, contents }: DocBodyProps): JSX.Element {
-  // useMeganeLocal is shared across the host so MeganeViewer can keep
-  // accepting snapshot/frame/selection props until PR-B drops them. The
-  // actual rendering goes through usePipelineStore.viewportState (set by
-  // openFile() below), so the props starting null is fine.
-  const local = useMeganeLocal();
   const [state, setState] = useState<LoadState>("loading");
 
   useEffect(() => {
@@ -162,14 +156,7 @@ function DocBody({ context, contents }: DocBodyProps): JSX.Element {
       data-state="ready"
       style={{ width: "100%", height: "100%" }}
     >
-      <MeganeViewer
-        testContext="jupyterlab-pipeline"
-        snapshot={local.snapshot}
-        frame={local.frame}
-        currentFrame={local.currentFrame}
-        totalFrames={local.meta?.nFrames ?? 0}
-        onUploadStructure={handleUploadStructure}
-      />
+      <MeganeViewer testContext="jupyterlab-pipeline" onUploadStructure={handleUploadStructure} />
     </div>
   );
 }
