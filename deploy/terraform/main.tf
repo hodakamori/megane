@@ -7,6 +7,9 @@ terraform {
     }
   }
 
+  # Same state path as the previous ECS stack so a single `terraform apply`
+  # destroys ECS/ALB/Fargate/VPC and creates the new S3+CloudFront stack
+  # atomically (no orphaned resources).
   backend "s3" {
     bucket = "megane-terraform-state"
     key    = "ecs/terraform.tfstate"
@@ -18,412 +21,219 @@ provider "aws" {
   region = var.aws_region
 }
 
-# ---------------------------------------------------------------------------
-# Locals
-# ---------------------------------------------------------------------------
+# CloudFront viewer certificates must live in us-east-1.
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
+data "aws_caller_identity" "current" {}
+
 locals {
+  bucket_name = "${var.app_name}-demo-${data.aws_caller_identity.current.account_id}"
   common_tags = {
     App       = var.app_name
     ManagedBy = "terraform"
   }
-  subnet_cidrs = [for i in range(2) : cidrsubnet(var.vpc_cidr, 8, i)]
 }
 
 # ---------------------------------------------------------------------------
-# Network (dedicated VPC)
+# S3 bucket (private, served via CloudFront OAC)
 # ---------------------------------------------------------------------------
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+resource "aws_s3_bucket" "site" {
+  bucket = local.bucket_name
 
   tags = merge(local.common_tags, {
-    Name = "${var.app_name}-vpc"
+    Name = local.bucket_name
   })
 }
 
-resource "aws_subnet" "public" {
-  count             = 2
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = local.subnet_cidrs[count.index]
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+resource "aws_s3_bucket_public_access_block" "site" {
+  bucket = aws_s3_bucket.site.id
 
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-public-${count.index}"
-  })
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+resource "aws_s3_bucket_ownership_controls" "site" {
+  bucket = aws_s3_bucket.site.id
 
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-igw"
-  })
-}
-
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
   }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-public-rt"
-  })
 }
 
-resource "aws_route_table_association" "public" {
-  count          = 2
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
-}
+resource "aws_s3_bucket_versioning" "site" {
+  bucket = aws_s3_bucket.site.id
 
-# ---------------------------------------------------------------------------
-# Security Groups
-# ---------------------------------------------------------------------------
-resource "aws_security_group" "alb" {
-  name                   = "${var.app_name}-alb-sg"
-  description            = "Allow HTTP/HTTPS traffic to ALB"
-  vpc_id                 = aws_vpc.main.id
-  revoke_rules_on_delete = true
-
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-alb-sg"
-  })
-}
-
-resource "aws_security_group" "ecs" {
-  name                   = "${var.app_name}-ecs-sg"
-  description            = "Allow traffic from ALB to ECS tasks"
-  vpc_id                 = aws_vpc.main.id
-  revoke_rules_on_delete = true
-
-  ingress {
-    description     = "App port from ALB"
-    from_port       = var.container_port
-    to_port         = var.container_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-ecs-sg"
-  })
-}
-
-# ---------------------------------------------------------------------------
-# ECR Repository
-# ---------------------------------------------------------------------------
-resource "aws_ecr_repository" "app" {
-  name                 = var.app_name
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true
-
-  image_scanning_configuration {
-    scan_on_push = false
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-ecr"
-  })
-}
-
-resource "aws_ecr_lifecycle_policy" "app" {
-  repository = aws_ecr_repository.app.name
-
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 5 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 5
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  })
-}
-
-# ---------------------------------------------------------------------------
-# ALB
-# ---------------------------------------------------------------------------
-resource "aws_lb" "app" {
-  name               = "${var.app_name}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
-  idle_timeout       = 4000
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-alb"
-  })
-}
-
-resource "aws_lb_target_group" "app" {
-  name        = "${var.app_name}-tg"
-  port        = var.container_port
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/health"
-    protocol            = "HTTP"
-    port                = "traffic-port"
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 30
-    matcher             = "200"
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-tg"
-  })
-}
-
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.app.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+  versioning_configuration {
+    status = "Disabled"
   }
 }
 
 # ---------------------------------------------------------------------------
-# DNS & TLS
+# ACM certificate (must be in us-east-1 for CloudFront)
 # ---------------------------------------------------------------------------
-data "aws_route53_zone" "main" {
-  name         = "tech-office-mori.com."
-  private_zone = false
-}
-
-resource "aws_acm_certificate" "app" {
+resource "aws_acm_certificate" "site" {
+  provider          = aws.us_east_1
   domain_name       = var.domain_name
   validation_method = "DNS"
-  tags              = local.common_tags
+
+  tags = local.common_tags
 
   lifecycle {
     create_before_destroy = true
   }
 }
 
+data "aws_route53_zone" "main" {
+  name         = "tech-office-mori.com."
+  private_zone = false
+}
+
 resource "aws_route53_record" "cert_validation" {
   for_each = {
-    for dvo in aws_acm_certificate.app.domain_validation_options : dvo.domain_name => {
+    for dvo in aws_acm_certificate.site.domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
       type   = dvo.resource_record_type
     }
   }
 
-  zone_id = data.aws_route53_zone.main.zone_id
-  name    = each.value.name
-  type    = each.value.type
-  records = [each.value.record]
-  ttl     = 60
-
+  zone_id         = data.aws_route53_zone.main.zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = [each.value.record]
+  ttl             = 60
   allow_overwrite = true
 }
 
-resource "aws_acm_certificate_validation" "app" {
-  certificate_arn         = aws_acm_certificate.app.arn
+resource "aws_acm_certificate_validation" "site" {
+  provider                = aws.us_east_1
+  certificate_arn         = aws_acm_certificate.site.arn
   validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
 }
 
-resource "aws_lb_listener" "https" {
-  load_balancer_arn = aws_lb.app.arn
-  port              = 443
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate_validation.app.certificate_arn
+# ---------------------------------------------------------------------------
+# CloudFront Origin Access Control + distribution
+# ---------------------------------------------------------------------------
+resource "aws_cloudfront_origin_access_control" "site" {
+  name                              = "${var.app_name}-oac"
+  description                       = "OAC for ${local.bucket_name}"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
+resource "aws_cloudfront_distribution" "site" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "${var.app_name} demo site"
+  default_root_object = "index.html"
+  price_class         = "PriceClass_200" # NA, EU, Asia (excludes SA, AU, AF, IN)
+
+  aliases = [var.domain_name]
+
+  origin {
+    domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
+    origin_id                = "s3-${local.bucket_name}"
+    origin_access_control_id = aws_cloudfront_origin_access_control.site.id
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "s3-${local.bucket_name}"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    # AWS managed policy: CachingOptimized
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  }
+
+  # Single-page demo: serve index.html for any 403/404 from S3 so refresh on
+  # arbitrary path still works. (S3 with OAC returns 403 for missing keys.)
+  custom_error_response {
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 10
+  }
+
+  custom_error_response {
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 10
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate_validation.site.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-cdn"
+  })
+}
+
+# Bucket policy: allow CloudFront OAC to read objects.
+data "aws_iam_policy_document" "site_bucket" {
+  statement {
+    sid       = "AllowCloudFrontServicePrincipalReadOnly"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.site.arn}/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.site.arn]
+    }
   }
 }
 
-resource "aws_route53_record" "app" {
+resource "aws_s3_bucket_policy" "site" {
+  bucket = aws_s3_bucket.site.id
+  policy = data.aws_iam_policy_document.site_bucket.json
+}
+
+# ---------------------------------------------------------------------------
+# Route53 alias to CloudFront
+# ---------------------------------------------------------------------------
+resource "aws_route53_record" "site" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = var.domain_name
   type    = "A"
 
   alias {
-    name                   = aws_lb.app.dns_name
-    zone_id                = aws_lb.app.zone_id
-    evaluate_target_health = true
+    name                   = aws_cloudfront_distribution.site.domain_name
+    zone_id                = aws_cloudfront_distribution.site.hosted_zone_id
+    evaluate_target_health = false
   }
 }
 
-# ---------------------------------------------------------------------------
-# IAM (ECS Task Execution Role)
-# ---------------------------------------------------------------------------
-resource "aws_iam_role" "ecs_execution" {
-  name = "${var.app_name}-ecs-execution-role"
+resource "aws_route53_record" "site_aaaa" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = var.domain_name
+  type    = "AAAA"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-ecs-execution-role"
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_execution" {
-  role       = aws_iam_role.ecs_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-# ---------------------------------------------------------------------------
-# CloudWatch Logs
-# ---------------------------------------------------------------------------
-resource "aws_cloudwatch_log_group" "app" {
-  name              = "/ecs/${var.app_name}"
-  retention_in_days = 14
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-logs"
-  })
-}
-
-# ---------------------------------------------------------------------------
-# ECS Cluster
-# ---------------------------------------------------------------------------
-resource "aws_ecs_cluster" "app" {
-  name = "${var.app_name}-cluster"
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-cluster"
-  })
-}
-
-# ---------------------------------------------------------------------------
-# ECS Task Definition
-# ---------------------------------------------------------------------------
-resource "aws_ecs_task_definition" "app" {
-  family                   = var.app_name
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
-  execution_role_arn       = aws_iam_role.ecs_execution.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = var.app_name
-      image     = "${aws_ecr_repository.app.repository_url}:latest"
-      essential = true
-
-      portMappings = [
-        {
-          containerPort = var.container_port
-          protocol      = "tcp"
-        }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.app.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "ecs"
-        }
-      }
-    }
-  ])
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-task"
-  })
-}
-
-# ---------------------------------------------------------------------------
-# ECS Service
-# ---------------------------------------------------------------------------
-resource "aws_ecs_service" "app" {
-  name            = "${var.app_name}-service"
-  cluster         = aws_ecs_cluster.app.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = aws_subnet.public[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = true
+  alias {
+    name                   = aws_cloudfront_distribution.site.domain_name
+    zone_id                = aws_cloudfront_distribution.site.hosted_zone_id
+    evaluate_target_health = false
   }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.app.arn
-    container_name   = var.app_name
-    container_port   = var.container_port
-  }
-
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-service"
-  })
 }

@@ -1,4 +1,20 @@
-.PHONY: build build-frontend install dev test test-widget test-e2e test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean lint lint-python lint-rust lint-fix lint-rust-fix
+.PHONY: build build-frontend install dev test test-widget test-e2e test-ts test-rust test-integration test-all coverage coverage-ts coverage-rust coverage-all clean preview preview-screenshot preview-video preview-clean lint lint-python lint-rust lint-fix lint-rust-fix setup-local setup-local-python setup-local-vscode setup-local-doctor setup-local-clean
+
+# Local install for manual / extension testing
+setup-local:
+	scripts/setup-local.sh all
+
+setup-local-python:
+	scripts/setup-local.sh python
+
+setup-local-vscode:
+	scripts/setup-local.sh vscode
+
+setup-local-doctor:
+	scripts/setup-local.sh doctor
+
+setup-local-clean:
+	scripts/setup-local.sh clean
 
 # Build frontend assets (WASM + TypeScript)
 build-frontend:
