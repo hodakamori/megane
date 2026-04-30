@@ -13,10 +13,6 @@ export { Timeline } from "./components/Timeline";
 // Sidebar config types
 export type { BondConfig, TrajectoryConfig } from "./components/Sidebar";
 
-// Appearance panel & config types (legacy, kept for widget compatibility)
-export { AppearancePanel } from "./components/AppearancePanel";
-export type { LabelConfig, VectorConfig } from "./components/AppearancePanel";
-
 // Pipeline
 export { PipelineEditor } from "./components/PipelineEditor";
 export { usePipelineStore } from "./pipeline/store";
