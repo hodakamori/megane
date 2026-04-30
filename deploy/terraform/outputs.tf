@@ -17,3 +17,13 @@ output "service_url" {
   description = "Public URL of the application"
   value       = "https://${var.domain_name}"
 }
+
+output "ci_deploy_role_arn" {
+  description = "ARN of the IAM role assumed by GitHub Actions via OIDC"
+  value       = aws_iam_role.ci_deploy.arn
+}
+
+output "github_oidc_provider_arn" {
+  description = "ARN of the GitHub Actions OIDC provider"
+  value       = aws_iam_openid_connect_provider.github_actions.arn
+}
