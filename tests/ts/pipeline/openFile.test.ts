@@ -78,7 +78,7 @@ describe("usePipelineStore.openFile — single structure file", () => {
     expect(state.nodeSnapshots[loader!.id]?.snapshot.nAtoms).toBe(5);
   });
 
-  it("marks hasTrajectory and clears stale load_trajectory fileName for multi-frame .traj", async () => {
+  it("drops the redundant load_trajectory node and rewires for multi-frame .traj", async () => {
     mockParseStructureFile.mockResolvedValueOnce({
       snapshot: makeSnapshot(8),
       frames: [makeFrame(1), makeFrame(2), makeFrame(3)],
@@ -92,14 +92,22 @@ describe("usePipelineStore.openFile — single structure file", () => {
 
     const state = usePipelineStore.getState();
     const loader = state.nodes.find((n) => n.type === "load_structure")!;
-    const traj = state.nodes.find((n) => n.type === "load_trajectory");
     expect((loader.data.params as { fileName: string }).fileName).toBe("bond_change.traj");
     expect((loader.data.params as { hasTrajectory: boolean }).hasTrajectory).toBe(true);
     expect(state.nodeSnapshots[loader.id]?.frames?.length).toBe(3);
-    // Minimal graph seeds a load_trajectory node with empty fileName; an
-    // embedded-frame structure file should leave it cleared rather than
-    // letting any prior caffeine_water_vibration.xtc remain.
-    expect((traj!.data.params as { fileName: string }).fileName).toBe("");
+    // Multi-frame structure files carry their trajectory in the structure
+    // node itself, so the seed LoadTrajectory node should be removed and
+    // its downstream consumers rewired to LoadStructure.trajectory.
+    expect(state.nodes.find((n) => n.type === "load_trajectory")).toBeUndefined();
+    const viewport = state.nodes.find((n) => n.type === "viewport")!;
+    const trajEdge = state.edges.find(
+      (e) =>
+        e.source === loader.id &&
+        e.sourceHandle === "trajectory" &&
+        e.target === viewport.id &&
+        e.targetHandle === "trajectory",
+    );
+    expect(trajEdge).toBeDefined();
     expect(state.fileFrames).toBeNull();
   });
 
