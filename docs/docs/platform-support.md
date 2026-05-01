@@ -33,15 +33,15 @@ Legend:
 | XYZ | `.xyz` | ✓ | API | ✓ | ✓ | ✓ |
 | MOL | `.mol` | ✓ | API | ✓ | ✓ | ✓ |
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ |
-| CIF | `.cif` | ✓ | API | ✓ | — | ✓ |
-| LAMMPS data | `.data`, `.lammps` | ✓ | API | — | — | ✓ |
+| CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
+| LAMMPS data | `.data`, `.lammps` | ✓ | API | — | ✓ | ✓ |
 
 ### Trajectory formats
 
 | Format | Extensions | Standalone | Jupyter widget | JupyterLab | VSCode | Python |
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | — | — | ✓ |
-| ASE trajectory | `.traj` | ✓ | API | — | — | ✓ |
+| ASE trajectory | `.traj` | ✓ | API | — | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | — | — | ✓ |
 
 Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VSCode `customEditors`).
@@ -81,9 +81,7 @@ How data gets into the viewer on each platform:
 
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
-- **VSCode does not register `.cif`.** The `customEditors` selector lists only `.pdb / .gro / .xyz / .mol / .sdf`. CIF files parse correctly when loaded via WASM, but VS Code will not auto-open them in the megane viewer.
-- **VSCode does not register any trajectory format.** `.xtc`, `.traj`, and `.lammpstrj` cannot be opened via the VS Code custom editor.
-- **VSCode does not register LAMMPS data.** `.data` / `.lammps` cannot be opened via the VS Code custom editor.
+- **VSCode does not register XTC or LAMMPS dump trajectories.** `.xtc` and `.lammpstrj` cannot be opened via the VS Code custom editor. ASE `.traj` files are registered and can be opened directly.
 - **JupyterLab does not register any trajectory format.** Only the six structure file types in `jupyterlab-megane/src/filetypes.ts` are registered.
 - **JupyterLab does not register LAMMPS data.** `.data` / `.lammps` is not in the `IFileType` list.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
