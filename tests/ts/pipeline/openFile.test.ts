@@ -291,3 +291,90 @@ describe("usePipelineStore.openFile — error cases", () => {
     );
   });
 });
+
+describe("usePipelineStore — cross-document state isolation", () => {
+  it("deserialize clears stale node snapshots from a previous open", async () => {
+    // Simulate: user opens a structure file (populates load_structure
+    // snapshot), then opens a .megane.json with a different pipeline.
+    // The previous pipeline's per-node data must NOT leak into the new
+    // execution context — JupyterLab and VSCode share this singleton
+    // store across documents.
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(11),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<pdb>"], "first.pdb"), {
+      mode: "replace",
+    });
+    expect(Object.keys(usePipelineStore.getState().nodeSnapshots).length).toBeGreaterThan(0);
+
+    const pipeline = {
+      version: 3 as const,
+      nodes: [
+        {
+          id: "fresh-loader",
+          type: "load_structure",
+          fileName: null,
+          hasTrajectory: false,
+          hasCell: false,
+          position: { x: 0, y: 0 },
+          enabled: true,
+        },
+      ],
+      edges: [],
+    };
+    const meganeFile = new File([JSON.stringify(pipeline)], "second.megane.json");
+    await usePipelineStore.getState().openFile(meganeFile);
+
+    const after = usePipelineStore.getState();
+    expect(after.nodeSnapshots).toEqual({});
+    expect(after.snapshot).toBeNull();
+    expect(after.structureFrames).toBeNull();
+    expect(after.fileFrames).toBeNull();
+  });
+
+  it("opens a structure file even when the current graph has no load_structure node", async () => {
+    // Simulate the JupyterLab failure mode: a previous .megane.json
+    // installed a graph without a load_structure node (or a broken
+    // one). Opening a regular .pdb in the same session must still
+    // render — the canonical openFile path installs a minimal
+    // pipeline and injects the parsed result.
+    const pipeline = {
+      version: 3 as const,
+      nodes: [
+        {
+          id: "viewport-1",
+          type: "viewport",
+          perspective: false,
+          cellAxesVisible: false,
+          pivotMarkerVisible: false,
+          position: { x: 0, y: 0 },
+          enabled: true,
+        },
+      ],
+      edges: [],
+    };
+    await usePipelineStore
+      .getState()
+      .openFile(new File([JSON.stringify(pipeline)], "loaderless.megane.json"));
+    expect(usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")).toBeUndefined();
+
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(5),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<pdb>"], "rescue.pdb"));
+
+    const state = usePipelineStore.getState();
+    const loader = state.nodes.find((n) => n.type === "load_structure");
+    expect(loader).toBeDefined();
+    expect((loader!.data.params as { fileName: string }).fileName).toBe("rescue.pdb");
+    expect(state.nodeSnapshots[loader!.id]?.snapshot.nAtoms).toBe(5);
+  });
+});

@@ -454,7 +454,18 @@ export const usePipelineStore = create<PipelineStore>((set, get, api) => ({
 
   deserialize: (json) => {
     const { nodes, edges } = deserializePipeline(json);
-    set({ nodes, edges });
+    // Clear all execution context tied to the previous graph: per-node
+    // snapshots are keyed by node ID and would orphan across opens, but
+    // worse, the global snapshot/frames/vectors fields would silently
+    // bleed into the new pipeline's execution. Hosts (JupyterLab,
+    // VSCode) reuse this singleton store across documents, so every
+    // .megane.json open must start from a clean slate.
+    set({
+      nodes,
+      edges,
+      viewportState: { ...DEFAULT_VIEWPORT_STATE },
+      ...CLEARED_EXECUTION_CONTEXT,
+    });
     get().execute();
   },
 

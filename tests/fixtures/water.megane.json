@@ -23,9 +23,9 @@
   "edges": [
     {
       "source": "load-1",
-      "sourceHandle": "particles",
+      "sourceHandle": "particle",
       "target": "viewport-1",
-      "targetHandle": "particles"
+      "targetHandle": "particle"
     }
   ]
 }

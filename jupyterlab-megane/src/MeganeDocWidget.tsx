@@ -3,6 +3,7 @@ import type { DocumentRegistry } from "@jupyterlab/docregistry";
 import { useCallback, useEffect, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
+import { usePipelineStore } from "@megane/pipeline/store";
 import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
@@ -29,6 +30,14 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
       try {
         await ensureWasmUrl();
         await context.ready;
+        // Reset the global pipeline store before loading. The same
+        // singleton store is shared across every JupyterLab document
+        // tab, so a previously-opened .megane.json (or a failed open)
+        // would otherwise leave its graph + node snapshots in place,
+        // and useMeganeLocal.applyResult would inject this file's data
+        // into a foreign pipeline — or silently no-op if that graph
+        // had no load_structure node.
+        usePipelineStore.getState().reset();
         const filename = context.path.split("/").pop() ?? "structure";
         const raw = context.model.toString();
         // Binary file types (e.g. ASE .traj) are registered with

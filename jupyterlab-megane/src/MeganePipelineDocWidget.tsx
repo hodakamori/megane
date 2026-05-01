@@ -78,6 +78,13 @@ function DocBody({ context, contents }: DocBodyProps): JSX.Element {
         await ensureWasmUrl();
         await context.ready;
 
+        // Same reasoning as MeganeDocWidget: the pipeline store is a
+        // singleton shared across documents, so we start every open
+        // from a clean default before deserialize installs the new
+        // graph. If JSON.parse below throws, we still want subsequent
+        // documents to land in a sane state.
+        usePipelineStore.getState().reset();
+
         const pipelineText = context.model.toString();
         const pipeline = JSON.parse(pipelineText) as MinimalSerializedPipeline;
         const dir = dirname(context.path);
@@ -110,6 +117,10 @@ function DocBody({ context, contents }: DocBodyProps): JSX.Element {
 
         if (!cancelled) setState("ready");
       } catch (err) {
+        // Reset the store again so a half-deserialized pipeline (e.g.
+        // deserialize ran but a companion parse threw) doesn't leak
+        // into the next document the user opens.
+        usePipelineStore.getState().reset();
         if (!cancelled) {
           setState({ error: err instanceof Error ? err.message : String(err) });
         }

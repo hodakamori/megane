@@ -13,6 +13,8 @@ import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
 import { usePipelineStore } from "../pipeline/store";
+import { createMinimalStructurePipeline } from "../pipeline/defaults";
+import { getLayoutedElements } from "../pipeline/layout";
 import type {
   Snapshot,
   Frame,
@@ -181,8 +183,22 @@ export function useMeganeLocal(): MeganeLocalState {
       // just loaded. Without this the editor would show stale demo
       // filenames (e.g. "caffeine_water.pdb") even though the viewer is
       // rendering the user's file.
+      //
+      // If the current graph has no load_structure node — e.g. a previous
+      // .megane.json open replaced the pipeline with one that lacks one,
+      // or an empty/broken graph is in the store — install a minimal
+      // pipeline first so the parsed file actually reaches the viewer.
+      // Without this, the WASM parse succeeds but the snapshot is dropped
+      // and the viewport stays empty (the symptom users see as "the next
+      // file I open is broken").
       if (filename) {
-        const loaderNode = pipeStore.nodes.find((n) => n.type === "load_structure");
+        let loaderNode = pipeStore.nodes.find((n) => n.type === "load_structure");
+        if (!loaderNode) {
+          const raw = createMinimalStructurePipeline();
+          const { nodes, edges } = getLayoutedElements(raw.nodes, raw.edges);
+          usePipelineStore.setState({ nodes, edges });
+          loaderNode = usePipelineStore.getState().nodes.find((n) => n.type === "load_structure");
+        }
         if (loaderNode) {
           pipeStore.setNodeSnapshot(loaderNode.id, {
             snapshot: result.snapshot,
