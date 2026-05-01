@@ -6,23 +6,36 @@ from pathlib import Path
 
 import pytest
 
-NOTEBOOK_DIR = Path(__file__).parent.parent / "notebooks"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+TEST_NOTEBOOK_DIR = REPO_ROOT / "tests" / "notebooks"
+EXAMPLES_DIR = REPO_ROOT / "examples"
 
-NOTEBOOKS = [
-    "test_visualization.ipynb",
-    "test_pipeline.ipynb",
-    "test_render_setup.ipynb",
+# (directory, filename) pairs. Notebooks under `examples/` use relative paths
+# like "../tests/fixtures/..." so they must execute with their own directory
+# as the cwd; nbconvert's ExecutePreprocessor uses the notebook's parent
+# directory when --output-dir is also that directory.
+NOTEBOOKS: list[tuple[Path, str]] = [
+    (TEST_NOTEBOOK_DIR, "test_visualization.ipynb"),
+    (TEST_NOTEBOOK_DIR, "test_pipeline.ipynb"),
+    (TEST_NOTEBOOK_DIR, "test_render_setup.ipynb"),
+    (EXAMPLES_DIR, "demo.ipynb"),
+    (EXAMPLES_DIR, "external_events.ipynb"),
+    (EXAMPLES_DIR, "pipeline.ipynb"),
 ]
 
 
-@pytest.mark.parametrize("notebook", NOTEBOOKS)
-def test_notebook_executes(notebook):
+@pytest.mark.parametrize(
+    "notebook_dir,notebook",
+    NOTEBOOKS,
+    ids=[f"{d.name}/{n}" for d, n in NOTEBOOKS],
+)
+def test_notebook_executes(notebook_dir: Path, notebook: str):
     """Execute notebook with nbconvert and assert zero exit code."""
-    nb_path = NOTEBOOK_DIR / notebook
+    nb_path = notebook_dir / notebook
     assert nb_path.exists(), f"Notebook not found: {nb_path}"
 
     executed_name = f"_executed_{notebook}"
-    executed_path = NOTEBOOK_DIR / executed_name
+    executed_path = notebook_dir / executed_name
 
     try:
         result = subprocess.run(
@@ -34,17 +47,17 @@ def test_notebook_executes(notebook):
                 "--to",
                 "notebook",
                 "--execute",
-                "--ExecutePreprocessor.timeout=120",
+                "--ExecutePreprocessor.timeout=180",
                 "--ExecutePreprocessor.kernel_name=python3",
                 "--output-dir",
-                str(NOTEBOOK_DIR),
+                str(notebook_dir),
                 "--output",
                 executed_name,
                 str(nb_path),
             ],
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=240,
         )
 
         assert result.returncode == 0, (

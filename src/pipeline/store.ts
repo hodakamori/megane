@@ -3,7 +3,8 @@
  * Manages xyflow nodes/edges, pipeline execution, and serialization.
  */
 
-import { create } from "zustand";
+import { create, type StateCreator, type StoreApi } from "zustand";
+import { createStore } from "zustand/vanilla";
 import type { Node, Edge, OnNodesChange, OnEdgesChange, Connection } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } from "./execute";
@@ -134,7 +135,7 @@ const CLEARED_EXECUTION_CONTEXT = {
   nodeStreamingData: {} as Record<string, NodeStreamingData>,
 } as const;
 
-export const usePipelineStore = create<PipelineStore>((set, get, api) => ({
+const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
   nodes: defaultState.nodes,
   edges: defaultState.edges,
   viewportState: { ...DEFAULT_VIEWPORT_STATE },
@@ -533,7 +534,21 @@ export const usePipelineStore = create<PipelineStore>((set, get, api) => ({
       ...CLEARED_EXECUTION_CONTEXT,
     });
   },
-}));
+});
+
+// Default app-wide singleton — used by the webapp, PipelineEditor, node
+// components, and any host that wants a shared global pipeline. The Jupyter
+// widget intentionally does NOT use this: each MolecularViewer needs an
+// isolated store so that two viewers in the same notebook don't stomp on
+// each other's pipeline (loadPipeline replaces nodes/edges/snapshot).
+export const usePipelineStore = create<PipelineStore>(pipelineStateCreator);
+
+// Factory for hosts that need a private pipeline store (e.g. each Jupyter
+// widget instance). Returns a vanilla Zustand store; consume with `useStore`
+// from "zustand" inside React.
+export function createPipelineStore(): StoreApi<PipelineStore> {
+  return createStore<PipelineStore>(pipelineStateCreator);
+}
 
 // ── Test-only window hook ──────────────────────────────────────────────
 // When testMode is detected we expose the Zustand store on the global so

@@ -10,6 +10,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useStore } from "zustand";
+import type { StoreApi } from "zustand";
 import { Viewport } from "./Viewport";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
@@ -18,7 +20,7 @@ import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
-import { usePipelineStore } from "../pipeline/store";
+import { createPipelineStore, type PipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
@@ -35,6 +37,10 @@ interface WidgetViewerProps {
   pipelineJson?: string;
   nodeSnapshotsData?: Record<string, DataView>;
   onPipelineChange?: (json: string) => void;
+  // Optional pipeline store override. Each Jupyter widget mount creates its
+  // own private store so multiple MolecularViewers in the same notebook do
+  // not share state. Tests pass their own store to inspect internal state.
+  pipelineStore?: StoreApi<PipelineStore>;
 }
 
 /** Decode a binary DataView into a Snapshot. */
@@ -59,7 +65,16 @@ export function WidgetViewer({
   onMeasurementChange,
   pipelineJson,
   nodeSnapshotsData,
+  pipelineStore: pipelineStoreProp,
 }: WidgetViewerProps) {
+  // Each WidgetViewer instance owns a private pipeline store. The webapp
+  // singleton (`usePipelineStore`) is intentionally avoided here so that
+  // multiple MolecularViewers in one notebook do not share state — without
+  // this, the second viewer's loadPipeline() overwrites the first viewer's
+  // pipeline, leaving it blank.
+  const [defaultStore] = useState(() => createPipelineStore());
+  const pipelineStore = pipelineStoreProp ?? defaultStore;
+
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -85,9 +100,9 @@ export function WidgetViewer({
   useEffect(() => {
     setExternalSelection(selectedAtoms ?? []);
   }, [selectedAtoms, setExternalSelection]);
-  const viewportState = usePipelineStore((s) => s.viewportState);
-  const storeSnapshot = usePipelineStore((s) => s.snapshot);
-  const setSnapshot = usePipelineStore((s) => s.setSnapshot);
+  const viewportState = useStore(pipelineStore, (s) => s.viewportState);
+  const storeSnapshot = useStore(pipelineStore, (s) => s.snapshot);
+  const setSnapshot = useStore(pipelineStore, (s) => s.setSnapshot);
 
   // Apply pipeline + per-node snapshots from Python.
   //
@@ -101,7 +116,7 @@ export function WidgetViewer({
   // matching snapshots.
   const prevPipelineJsonRef = useRef<string>("");
   useEffect(() => {
-    const store = usePipelineStore.getState();
+    const store = pipelineStore.getState();
     const decodedSnapshots: Record<string, Parameters<typeof store.setNodeSnapshot>[1]> = {};
     if (nodeSnapshotsData) {
       for (const [nodeId, data] of Object.entries(nodeSnapshotsData)) {
@@ -140,11 +155,11 @@ export function WidgetViewer({
 
     const renderer = rendererRef.current;
     if (renderer) {
-      const vs = usePipelineStore.getState().viewportState;
+      const vs = pipelineStore.getState().viewportState;
       applyViewportState(renderer, vs, null);
       prevViewportStateRef.current = vs;
     }
-  }, [snapshot, nodeSnapshotsData, pipelineJson, setSnapshot]);
+  }, [snapshot, nodeSnapshotsData, pipelineJson, setSnapshot, pipelineStore]);
 
   // Apply viewportState changes to the renderer
   useEffect(() => {
@@ -156,7 +171,7 @@ export function WidgetViewer({
 
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
-    const nodes = usePipelineStore.getState().nodes;
+    const nodes = pipelineStore.getState().nodes;
     const bondNode = nodes.find((n) => n.type === "add_bond");
     if (!bondNode) return;
     const params = bondNode.data.params;
@@ -193,7 +208,7 @@ export function WidgetViewer({
       result.nAtoms,
     );
     setBondCount(result.bondIndices.length / 2);
-  }, [frame, storeSnapshot, snapshot]);
+  }, [frame, storeSnapshot, snapshot, pipelineStore]);
 
   // Track pipeline-driven bond updates (initial load, bondSource flips,
   // file-mode bonds). Mirrors MeganeViewer's pattern.
@@ -205,12 +220,12 @@ export function WidgetViewer({
   const handleRendererReady = useCallback(
     (renderer: MoleculeRenderer) => {
       rendererRef.current = renderer;
-      applyViewportState(renderer, usePipelineStore.getState().viewportState, null);
-      prevViewportStateRef.current = usePipelineStore.getState().viewportState;
+      applyViewportState(renderer, pipelineStore.getState().viewportState, null);
+      prevViewportStateRef.current = pipelineStore.getState().viewportState;
       // Apply initial selectedAtoms that may have arrived before the renderer was ready
       setExternalSelection(selectedAtomsRef.current ?? []);
     },
-    [setExternalSelection],
+    [setExternalSelection, pipelineStore],
   );
 
   const handlePlayPause = useCallback(() => {

@@ -39,7 +39,7 @@ import { Viewport } from "@/components/Viewport";
 import { Tooltip } from "@/components/Tooltip";
 import { MeasurementPanel } from "@/components/MeasurementPanel";
 import { inferBondsVdwJS } from "@/parsers/inferBondsJS";
-import { usePipelineStore } from "@/pipeline/store";
+import { createPipelineStore } from "@/pipeline/store";
 
 const mockViewport = vi.mocked(Viewport);
 const mockTooltip = vi.mocked(Tooltip);
@@ -122,9 +122,12 @@ describe("WidgetViewer — per-frame bond recalc", () => {
     };
   }
 
-  function seedDistanceBondPipeline(snapshot: Snapshot | null) {
+  function seedDistanceBondPipeline(
+    store: ReturnType<typeof createPipelineStore>,
+    snapshot: Snapshot | null,
+  ) {
     // Replace the default pipeline with a single add_bond(distance) node.
-    usePipelineStore.setState({
+    store.setState({
       nodes: [
         {
           id: "bond-test",
@@ -177,14 +180,13 @@ describe("WidgetViewer — per-frame bond recalc", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
-    // Restore the default pipeline so we don't leak state to other test files.
-    usePipelineStore.getState().reset();
   });
 
   it("recomputes bonds per frame when store snapshot is set and prop snapshot is null", () => {
     // Reproduce the bug: in pipeline mode `snapshot` prop is null,
     // but the store snapshot is populated from `_node_snapshots_data`.
-    seedDistanceBondPipeline(null);
+    const store = createPipelineStore();
+    seedDistanceBondPipeline(store, null);
 
     const frame1: Frame = {
       frameId: 0,
@@ -199,6 +201,7 @@ describe("WidgetViewer — per-frame bond recalc", () => {
         frame={frame1}
         currentFrame={0}
         totalFrames={6}
+        pipelineStore={store}
       />,
     );
 
@@ -214,7 +217,7 @@ describe("WidgetViewer — per-frame bond recalc", () => {
     // legacy-fallback effect resets store.snapshot to the (null) prop.
     const storeSnap = makeSnapshot();
     act(() => {
-      usePipelineStore.getState().setSnapshot(storeSnap);
+      store.getState().setSnapshot(storeSnap);
     });
 
     // Advance to a new frame where the O–H distance has grown past the cutoff.
@@ -231,6 +234,7 @@ describe("WidgetViewer — per-frame bond recalc", () => {
           frame={frame2}
           currentFrame={1}
           totalFrames={6}
+          pipelineStore={store}
         />,
       );
     });
@@ -287,7 +291,7 @@ describe("WidgetViewer — per-frame bond recalc", () => {
     // snapshots in the same store transaction as the deserialize, otherwise
     // executeLoadStructure runs with a null snapshot and the canvas stays
     // blank (only the pivot crosshair shows).
-    usePipelineStore.getState().reset();
+    const store = createPipelineStore();
 
     const snapshot = makeSnapshot();
     const pipelineJson = JSON.stringify({
@@ -370,10 +374,11 @@ describe("WidgetViewer — per-frame bond recalc", () => {
         snapshot={null}
         pipelineJson={pipelineJson}
         nodeSnapshotsData={nodeSnapshotsData}
+        pipelineStore={store}
       />,
     );
 
-    const state = usePipelineStore.getState();
+    const state = store.getState();
     expect(state.viewportState.particles.length).toBeGreaterThan(0);
     expect(state.viewportState.particles[0].source.nAtoms).toBe(snapshot.nAtoms);
     // The legacy global snapshot must also be set so Viewport.loadSnapshot
@@ -384,7 +389,8 @@ describe("WidgetViewer — per-frame bond recalc", () => {
 
   it("does not call inferBondsVdwJS when both prop and store snapshot are null", () => {
     // Guards must still work: no snapshot from either source → no bond recalc.
-    seedDistanceBondPipeline(null);
+    const store = createPipelineStore();
+    seedDistanceBondPipeline(store, null);
 
     const frame1: Frame = {
       frameId: 0,
@@ -398,6 +404,7 @@ describe("WidgetViewer — per-frame bond recalc", () => {
         frame={frame1}
         currentFrame={0}
         totalFrames={6}
+        pipelineStore={store}
       />,
     );
 
@@ -420,10 +427,113 @@ describe("WidgetViewer — per-frame bond recalc", () => {
           frame={frame2}
           currentFrame={1}
           totalFrames={6}
+          pipelineStore={store}
         />,
       );
     });
 
     expect(mockInferBondsVdwJS).not.toHaveBeenCalled();
+  });
+
+  it("two WidgetViewers with separate stores do not stomp on each other (multi-viewport regression)", () => {
+    // Repro of the multi-viewport bug: rendering two MolecularViewers in the
+    // same notebook used to share a singleton pipeline store, so the second
+    // viewer's loadPipeline() would clobber the first viewer's pipeline and
+    // leave the first canvas blank. With per-instance stores, each viewer
+    // keeps its own pipeline.
+    const storeA = createPipelineStore();
+    const storeB = createPipelineStore();
+
+    const snapshotA = makeSnapshot();
+    const snapshotB = makeSnapshot();
+
+    const pipelineJsonA = JSON.stringify({
+      version: 3,
+      nodes: [
+        {
+          type: "load_structure",
+          id: "loader-a",
+          position: { x: 0, y: 0 },
+          fileName: null,
+          hasTrajectory: false,
+          hasCell: false,
+          enabled: true,
+        },
+        {
+          type: "viewport",
+          id: "viewport-a",
+          position: { x: 200, y: 0 },
+          perspective: false,
+          cellAxesVisible: true,
+          enabled: true,
+        },
+      ],
+      edges: [
+        {
+          source: "loader-a",
+          target: "viewport-a",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+      ],
+    });
+    const pipelineJsonB = JSON.stringify({
+      version: 3,
+      nodes: [
+        {
+          type: "load_structure",
+          id: "loader-b",
+          position: { x: 0, y: 0 },
+          fileName: null,
+          hasTrajectory: false,
+          hasCell: false,
+          enabled: true,
+        },
+        {
+          type: "viewport",
+          id: "viewport-b",
+          position: { x: 200, y: 0 },
+          perspective: false,
+          cellAxesVisible: true,
+          enabled: true,
+        },
+      ],
+      edges: [
+        {
+          source: "loader-b",
+          target: "viewport-b",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+      ],
+    });
+
+    render(
+      <WidgetViewer
+        {...defaultProps}
+        snapshot={null}
+        pipelineJson={pipelineJsonA}
+        nodeSnapshotsData={{ "loader-a": encodeSnapshot(snapshotA) }}
+        pipelineStore={storeA}
+      />,
+    );
+    render(
+      <WidgetViewer
+        {...defaultProps}
+        snapshot={null}
+        pipelineJson={pipelineJsonB}
+        nodeSnapshotsData={{ "loader-b": encodeSnapshot(snapshotB) }}
+        pipelineStore={storeB}
+      />,
+    );
+
+    const stateA = storeA.getState();
+    const stateB = storeB.getState();
+    expect(stateA.nodes.find((n) => n.id === "loader-a")).toBeDefined();
+    expect(stateA.nodes.find((n) => n.id === "loader-b")).toBeUndefined();
+    expect(stateB.nodes.find((n) => n.id === "loader-b")).toBeDefined();
+    expect(stateB.nodes.find((n) => n.id === "loader-a")).toBeUndefined();
+    expect(stateA.viewportState.particles.length).toBeGreaterThan(0);
+    expect(stateB.viewportState.particles.length).toBeGreaterThan(0);
   });
 });
