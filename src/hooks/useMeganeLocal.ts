@@ -14,6 +14,7 @@ import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
 import { usePipelineStore } from "../pipeline/store";
 import { createMinimalStructurePipeline } from "../pipeline/defaults";
+import { syncAddBondSourceForLoader } from "../pipeline/openFile";
 import { getLayoutedElements } from "../pipeline/layout";
 import type {
   Snapshot,
@@ -211,6 +212,12 @@ export function useMeganeLocal(): MeganeLocalState {
             hasTrajectory: result.frames.length > 0,
             hasCell: !!result.snapshot.box,
           });
+          // Mirror the openFile path: pick AddBond's Source by file format
+          // ("structure" for PDB/MOL/SDF/LAMMPS, "distance" / VDW otherwise)
+          // so VSCode and JupyterLab single-file viewers — which feed files
+          // through this hook instead of usePipelineStore.openFile — also
+          // start with a sensible default for formats that lack bond info.
+          syncAddBondSourceForLoader(usePipelineStore.getState(), loaderNode.id, filename);
         }
         if (result.frames.length > 0) {
           // Multi-frame structure files (.traj, multi-MODEL PDB,
