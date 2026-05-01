@@ -22,7 +22,13 @@ declare module "@megane/pipeline/store" {
       openFile(file: File, opts?: { mode?: "replace" | "merge"; companions?: File[] }): Promise<void>;
       [key: string]: any;
     };
+    setState(snapshot: any): void;
   };
+}
+
+declare module "@megane/pipeline/storeSnapshot" {
+  export type PipelineStoreSnapshot = Record<string, unknown>;
+  export function capturePipelineStore(state: any): PipelineStoreSnapshot;
 }
 
 declare module "@megane/styles/megane.css";

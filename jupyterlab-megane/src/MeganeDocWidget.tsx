@@ -1,9 +1,13 @@
 import { ReactWidget } from "@jupyterlab/ui-components";
 import type { DocumentRegistry } from "@jupyterlab/docregistry";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
 import { usePipelineStore } from "@megane/pipeline/store";
+import {
+  capturePipelineStore,
+  type PipelineStoreSnapshot,
+} from "@megane/pipeline/storeSnapshot";
 import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
@@ -34,7 +38,13 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
   const [state, setState] = useState<LoadState>("loading");
   useTour({ host: "jupyterlab" });
 
-  const reload = useCallback(
+  // Cached pipeline-store state captured after the first successful parse.
+  // On subsequent tab activations we restore from this cache instead of
+  // re-parsing the file (which dominates open latency for large structures
+  // and trajectories).
+  const cachedRef = useRef<PipelineStoreSnapshot | null>(null);
+
+  const parseAndLoad = useCallback(
     async (token: { cancelled: boolean }) => {
       try {
         await ensureWasmUrl();
@@ -65,7 +75,9 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
           : new TextEncoder().encode(raw);
         const file = new File([bytes], filename);
         await local.loadFile(file);
-        if (!token.cancelled) setState("ready");
+        if (token.cancelled) return;
+        cachedRef.current = capturePipelineStore(usePipelineStore.getState());
+        setState("ready");
       } catch (err) {
         if (!token.cancelled) {
           setState({ error: err instanceof Error ? err.message : String(err) });
@@ -81,22 +93,27 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
 
   useEffect(() => {
     let activeToken = { cancelled: false };
-    void reload(activeToken);
-    // Re-run the load whenever this widget becomes visible again. JupyterLab
-    // keeps every previously-opened tab mounted, so a second tab silently
-    // overwrites the singleton pipeline store. Re-loading on show keeps the
-    // visible tab authoritative.
+    void parseAndLoad(activeToken);
+    // Re-activate this tab's cached state whenever JupyterLab brings the
+    // widget back into view. We only re-parse when no cache is available
+    // yet (initial onAfterShow racing the in-flight parse) — every later
+    // activation just restores the captured store snapshot, which is
+    // effectively instant and avoids the WASM reparse.
     const unsubscribe = subscribeActivation(() => {
-      activeToken.cancelled = true;
-      activeToken = { cancelled: false };
-      setState("loading");
-      void reload(activeToken);
+      const cache = cachedRef.current;
+      if (cache) {
+        usePipelineStore.setState(cache);
+        return;
+      }
+      // No cache yet: an activation fired before the initial load
+      // completed. The in-flight token will populate the cache as soon
+      // as parsing finishes; nothing to do here.
     });
     return () => {
       activeToken.cancelled = true;
       unsubscribe();
     };
-  }, [reload, subscribeActivation]);
+  }, [parseAndLoad, subscribeActivation]);
 
   const handleUploadStructure = useCallback(
     (file: File) => {

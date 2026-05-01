@@ -1,9 +1,13 @@
 import { ReactWidget } from "@jupyterlab/ui-components";
 import type { DocumentRegistry } from "@jupyterlab/docregistry";
 import type { Contents } from "@jupyterlab/services";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { usePipelineStore } from "@megane/pipeline/store";
+import {
+  capturePipelineStore,
+  type PipelineStoreSnapshot,
+} from "@megane/pipeline/storeSnapshot";
 import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
@@ -74,7 +78,11 @@ function DocBody({ context, contents, subscribeActivation }: DocBodyProps): JSX.
   const [state, setState] = useState<LoadState>("loading");
   useTour({ host: "jupyterlab" });
 
-  const reload = useCallback(
+  // Cached store state captured after the first parse. Subsequent tab
+  // activations restore from this cache instead of re-parsing.
+  const cachedRef = useRef<PipelineStoreSnapshot | null>(null);
+
+  const parseAndLoad = useCallback(
     async (token: { cancelled: boolean }) => {
       try {
         await ensureWasmUrl();
@@ -121,7 +129,9 @@ function DocBody({ context, contents, subscribeActivation }: DocBodyProps): JSX.
         });
         await usePipelineStore.getState().openFile(meganeFile, { companions });
 
-        if (!token.cancelled) setState("ready");
+        if (token.cancelled) return;
+        cachedRef.current = capturePipelineStore(usePipelineStore.getState());
+        setState("ready");
       } catch (err) {
         // Reset the store again so a half-deserialized pipeline (e.g.
         // deserialize ran but a companion parse threw) doesn't leak
@@ -136,19 +146,20 @@ function DocBody({ context, contents, subscribeActivation }: DocBodyProps): JSX.
   );
 
   useEffect(() => {
-    let activeToken = { cancelled: false };
-    void reload(activeToken);
+    const activeToken = { cancelled: false };
+    void parseAndLoad(activeToken);
     const unsubscribe = subscribeActivation(() => {
-      activeToken.cancelled = true;
-      activeToken = { cancelled: false };
-      setState("loading");
-      void reload(activeToken);
+      const cache = cachedRef.current;
+      if (cache) {
+        usePipelineStore.setState(cache);
+      }
+      // No cache yet: the in-flight parse will populate it on completion.
     });
     return () => {
       activeToken.cancelled = true;
       unsubscribe();
     };
-  }, [reload, subscribeActivation]);
+  }, [parseAndLoad, subscribeActivation]);
 
   const handleUploadStructure = useCallback(
     (file: File) => {
