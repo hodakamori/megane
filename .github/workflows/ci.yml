@@ -76,7 +76,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           files: coverage/ts/lcov.info
-          flags: typescript,vscode,jupyterlab
+          flags: typescript
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_on_error: false
 
