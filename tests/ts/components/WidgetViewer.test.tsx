@@ -248,6 +248,140 @@ describe("WidgetViewer — per-frame bond recalc", () => {
     expect(updateBondsExt).toHaveBeenCalled();
   });
 
+  /**
+   * Encode a Snapshot into the binary protocol that `decodeNodeSnapshot`
+   * expects. Mirrors python/megane/protocol.py write_snapshot but only
+   * supports the no-bond-orders / no-box subset we need here.
+   */
+  function encodeSnapshot(snap: Snapshot): DataView {
+    const HEADER = 8;
+    const positionsBytes = snap.nAtoms * 3 * 4;
+    let elementsBytes = snap.nAtoms;
+    elementsBytes += (4 - (elementsBytes % 4)) % 4; // pad to 4
+    const bondsBytes = snap.nBonds * 2 * 4;
+    const total = HEADER + 4 + 4 + positionsBytes + elementsBytes + bondsBytes;
+
+    const buffer = new ArrayBuffer(total);
+    const view = new DataView(buffer);
+    view.setUint32(0, 0x4e47454d, true); // "MEGN"
+    view.setUint8(4, 0); // MSG_SNAPSHOT
+    view.setUint8(5, 0); // flags: no bond orders, no box
+    let offset = HEADER;
+    view.setUint32(offset, snap.nAtoms, true);
+    offset += 4;
+    view.setUint32(offset, snap.nBonds, true);
+    offset += 4;
+    new Float32Array(buffer, offset, snap.nAtoms * 3).set(snap.positions);
+    offset += positionsBytes;
+    new Uint8Array(buffer, offset, snap.nAtoms).set(snap.elements);
+    offset += elementsBytes;
+    if (snap.nBonds > 0) {
+      new Uint32Array(buffer, offset, snap.nBonds * 2).set(snap.bonds);
+    }
+    return new DataView(buffer);
+  }
+
+  it("renders particles when AddLabels + AddPolyhedra pipeline + nodeSnapshotsData arrive together (blank-ipywidget regression)", () => {
+    // Repro of the user's bug: set_pipeline pushes both _pipeline_json and
+    // _node_snapshots_data; the WidgetViewer must populate per-node
+    // snapshots in the same store transaction as the deserialize, otherwise
+    // executeLoadStructure runs with a null snapshot and the canvas stays
+    // blank (only the pivot crosshair shows).
+    usePipelineStore.getState().reset();
+
+    const snapshot = makeSnapshot();
+    const pipelineJson = JSON.stringify({
+      version: 3,
+      nodes: [
+        {
+          type: "load_structure",
+          id: "loader-w",
+          position: { x: 0, y: 0 },
+          fileName: null,
+          hasTrajectory: false,
+          hasCell: false,
+          enabled: true,
+        },
+        {
+          type: "label_generator",
+          id: "labels-w",
+          position: { x: 200, y: 0 },
+          source: "element",
+          enabled: true,
+        },
+        {
+          type: "polyhedron_generator",
+          id: "poly-w",
+          position: { x: 200, y: 200 },
+          centerElements: [8],
+          ligandElements: [],
+          maxDistance: 3.0,
+          opacity: 0.6,
+          showEdges: true,
+          enabled: true,
+        },
+        {
+          type: "viewport",
+          id: "viewport-w",
+          position: { x: 400, y: 100 },
+          perspective: false,
+          cellAxesVisible: true,
+          enabled: true,
+        },
+      ],
+      edges: [
+        {
+          source: "loader-w",
+          target: "labels-w",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+        {
+          source: "loader-w",
+          target: "poly-w",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+        {
+          source: "loader-w",
+          target: "viewport-w",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+        {
+          source: "labels-w",
+          target: "viewport-w",
+          sourceHandle: "label",
+          targetHandle: "label",
+        },
+        {
+          source: "poly-w",
+          target: "viewport-w",
+          sourceHandle: "mesh",
+          targetHandle: "mesh",
+        },
+      ],
+    });
+    const nodeSnapshotsData = { "loader-w": encodeSnapshot(snapshot) };
+
+    render(
+      <WidgetViewer
+        {...defaultProps}
+        snapshot={null}
+        pipelineJson={pipelineJson}
+        nodeSnapshotsData={nodeSnapshotsData}
+      />,
+    );
+
+    const state = usePipelineStore.getState();
+    expect(state.viewportState.particles.length).toBeGreaterThan(0);
+    expect(state.viewportState.particles[0].source.nAtoms).toBe(snapshot.nAtoms);
+    // The legacy global snapshot must also be set so Viewport.loadSnapshot
+    // has data to feed to the renderer.
+    expect(state.snapshot).not.toBeNull();
+    expect(state.snapshot?.nAtoms).toBe(snapshot.nAtoms);
+  });
+
   it("does not call inferBondsVdwJS when both prop and store snapshot are null", () => {
     // Guards must still work: no snapshot from either source → no bond recalc.
     seedDistanceBondPipeline(null);

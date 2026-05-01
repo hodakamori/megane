@@ -89,39 +89,62 @@ export function WidgetViewer({
   const storeSnapshot = usePipelineStore((s) => s.snapshot);
   const setSnapshot = usePipelineStore((s) => s.setSnapshot);
 
-  // Push per-node snapshots from Python to the pipeline store
+  // Apply pipeline + per-node snapshots from Python.
+  //
+  // Order matters: `deserialize()` clears `nodeSnapshots` (so opening a new
+  // .megane.json doesn't bleed state across JupyterLab documents), so a
+  // separate effect that calls `setNodeSnapshot` followed by another that
+  // calls `deserialize` would race — the deserialize wins, leaves
+  // nodeSnapshots empty, and `executeLoadStructure` produces no particles
+  // (blank viewport). Using `loadPipeline` performs both updates in a
+  // single store transaction so the post-deserialize execute() sees the
+  // matching snapshots.
+  const prevPipelineJsonRef = useRef<string>("");
   useEffect(() => {
-    if (!nodeSnapshotsData || Object.keys(nodeSnapshotsData).length === 0) {
-      // Fall back to the global snapshot (legacy .load() path)
-      setSnapshot(snapshot);
-    } else {
-      // Decode each per-node snapshot and populate nodeSnapshots
-      const store = usePipelineStore.getState();
+    const store = usePipelineStore.getState();
+    const decodedSnapshots: Record<string, Parameters<typeof store.setNodeSnapshot>[1]> = {};
+    if (nodeSnapshotsData) {
       for (const [nodeId, data] of Object.entries(nodeSnapshotsData)) {
         const decoded = decodeNodeSnapshot(data);
         if (decoded) {
-          store.setNodeSnapshot(nodeId, {
+          decodedSnapshots[nodeId] = {
             snapshot: decoded,
             frames: null,
             meta: null,
             labels: null,
-          });
+          };
         }
       }
-      // Also set the first snapshot as the global one for the renderer
-      const firstData = Object.values(nodeSnapshotsData)[0];
-      if (firstData) {
-        const firstSnapshot = decodeNodeSnapshot(firstData);
-        setSnapshot(firstSnapshot);
-      }
     }
+
+    if (pipelineJson && pipelineJson !== prevPipelineJsonRef.current) {
+      prevPipelineJsonRef.current = pipelineJson;
+      try {
+        const config = JSON.parse(pipelineJson);
+        store.loadPipeline(config, decodedSnapshots);
+      } catch {
+        // Ignore invalid JSON
+      }
+    } else if (Object.keys(decodedSnapshots).length > 0) {
+      // Pipeline JSON is unchanged but the per-node snapshots may have
+      // refreshed (e.g. trajectory tick or a follow-up `.load()` call).
+      for (const [nodeId, data] of Object.entries(decodedSnapshots)) {
+        store.setNodeSnapshot(nodeId, data);
+      }
+      const sortedIds = Object.keys(decodedSnapshots).sort();
+      setSnapshot(decodedSnapshots[sortedIds[0]].snapshot);
+    } else {
+      // Legacy `.load()` path: no pipeline JSON, no per-node snapshots.
+      setSnapshot(snapshot);
+    }
+
     const renderer = rendererRef.current;
     if (renderer) {
       const vs = usePipelineStore.getState().viewportState;
       applyViewportState(renderer, vs, null);
       prevViewportStateRef.current = vs;
     }
-  }, [snapshot, nodeSnapshotsData, setSnapshot]);
+  }, [snapshot, nodeSnapshotsData, pipelineJson, setSnapshot]);
 
   // Apply viewportState changes to the renderer
   useEffect(() => {
@@ -178,19 +201,6 @@ export function WidgetViewer({
     const total = viewportState.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
     setBondCount(total);
   }, [viewportState.bonds]);
-
-  // Apply pipeline JSON from Python
-  const prevPipelineJsonRef = useRef<string>("");
-  useEffect(() => {
-    if (!pipelineJson || pipelineJson === prevPipelineJsonRef.current) return;
-    prevPipelineJsonRef.current = pipelineJson;
-    try {
-      const config = JSON.parse(pipelineJson);
-      usePipelineStore.getState().deserialize(config);
-    } catch {
-      // Ignore invalid JSON
-    }
-  }, [pipelineJson]);
 
   const handleRendererReady = useCallback(
     (renderer: MoleculeRenderer) => {

@@ -224,4 +224,122 @@ describe("usePipelineStore", () => {
       expect(usePipelineStore.getState().nodes.length).toBeGreaterThan(0);
     });
   });
+
+  describe("loadPipeline (anywidget set_pipeline path)", () => {
+    /**
+     * Build a minimal H2O snapshot the executors can consume.
+     */
+    function makeWaterSnapshot() {
+      return {
+        nAtoms: 3,
+        nBonds: 0,
+        nFileBonds: 0,
+        positions: new Float32Array([0, 0, 0, 0.96, 0, 0, -0.24, 0.93, 0]),
+        elements: new Uint8Array([8, 1, 1]),
+        bonds: new Uint32Array(0),
+        bondOrders: null,
+        box: null,
+      };
+    }
+
+    /**
+     * Mirrors the pipeline produced by the user's repro:
+     *   LoadStructure → AddLabels   (label edge to Viewport)
+     *   LoadStructure → AddPolyhedra (mesh edge to Viewport)
+     *   LoadStructure → Viewport    (particle edge — no AddBond)
+     */
+    function labelsAndPolyhedraPipeline() {
+      return {
+        version: 3,
+        nodes: [
+          {
+            type: "load_structure",
+            id: "loader-1",
+            position: { x: 0, y: 0 },
+            fileName: null,
+            hasTrajectory: false,
+            hasCell: false,
+            enabled: true,
+          },
+          {
+            type: "label_generator",
+            id: "labels-1",
+            position: { x: 200, y: 0 },
+            source: "element",
+            enabled: true,
+          },
+          {
+            type: "polyhedron_generator",
+            id: "poly-1",
+            position: { x: 200, y: 200 },
+            centerElements: [8],
+            ligandElements: [],
+            maxDistance: 3.0,
+            opacity: 0.6,
+            showEdges: true,
+            enabled: true,
+          },
+          {
+            type: "viewport",
+            id: "viewport-1",
+            position: { x: 400, y: 100 },
+            perspective: false,
+            cellAxesVisible: true,
+            enabled: true,
+          },
+        ],
+        edges: [
+          { source: "loader-1", target: "labels-1", sourceHandle: "particle", targetHandle: "particle" },
+          { source: "loader-1", target: "poly-1", sourceHandle: "particle", targetHandle: "particle" },
+          { source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+          { source: "labels-1", target: "viewport-1", sourceHandle: "label", targetHandle: "label" },
+          { source: "poly-1", target: "viewport-1", sourceHandle: "mesh", targetHandle: "mesh" },
+        ],
+      };
+    }
+
+    it("renders particles for an AddLabels + AddPolyhedra pipeline (regression for blank ipywidget)", () => {
+      const snapshot = makeWaterSnapshot();
+      usePipelineStore.getState().loadPipeline(labelsAndPolyhedraPipeline(), {
+        "loader-1": { snapshot, frames: null, meta: null, labels: null },
+      });
+
+      const state = usePipelineStore.getState();
+      // The viewer was blank because executeLoadStructure ran with a null
+      // snapshot (deserialize had wiped nodeSnapshots). loadPipeline's
+      // single-transaction update keeps the snapshot, so particles flow
+      // into the viewport.
+      expect(state.viewportState.particles.length).toBeGreaterThan(0);
+      expect(state.viewportState.particles[0].source.nAtoms).toBe(3);
+      // Labels reach the viewport too.
+      expect(state.viewportState.labels.length).toBeGreaterThan(0);
+      expect(state.viewportState.labels[0].labels).toEqual(["O", "H", "H"]);
+    });
+
+    it("populates the legacy global snapshot from the first per-node entry", () => {
+      const snapshot = makeWaterSnapshot();
+      usePipelineStore.getState().loadPipeline(labelsAndPolyhedraPipeline(), {
+        "loader-1": { snapshot, frames: null, meta: null, labels: null },
+      });
+      // The Viewport component reads `effectiveSnapshot = storeSnapshot ?? snapshot`,
+      // so the store snapshot must be set for the renderer to call loadSnapshot.
+      expect(usePipelineStore.getState().snapshot).toBe(snapshot);
+    });
+
+    it("clears nodeSnapshots from a previous pipeline before loading the new one", () => {
+      // Seed an unrelated snapshot to ensure cross-document state cannot bleed.
+      usePipelineStore.getState().setNodeSnapshot("stale-loader", {
+        snapshot: makeWaterSnapshot(),
+        frames: null,
+        meta: null,
+        labels: null,
+      });
+      const snapshot = makeWaterSnapshot();
+      usePipelineStore.getState().loadPipeline(labelsAndPolyhedraPipeline(), {
+        "loader-1": { snapshot, frames: null, meta: null, labels: null },
+      });
+      const finalSnapshots = usePipelineStore.getState().nodeSnapshots;
+      expect(Object.keys(finalSnapshots).sort()).toEqual(["loader-1"]);
+    });
+  });
 });
