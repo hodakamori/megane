@@ -94,6 +94,93 @@ function multiViewerNotebook(): NotebookSpec {
   };
 }
 
+/** Bidirectional Plotly ↔ megane sync, mirroring external_events.ipynb
+ *  cell 16. Setting `viewer.frame_index = N` from Python must:
+ *
+ *    1. update the megane viewer's `data-current-frame` attribute, AND
+ *    2. fire the `frame_change` callback registered on the viewer, which
+ *       in turn moves the red marker on the Plotly chart to (N, energy[N]).
+ *
+ *  The notebook ends with `viewer.frame_index = 50` so we can assert both
+ *  effects after Run All without scripting any browser interaction.
+ *  numpy.random is seeded for deterministic energy values. */
+function bidirectionalSyncNotebook(targetFrame: number): NotebookSpec {
+  return {
+    cells: [
+      {
+        cell_type: "code",
+        source: [
+          "import megane\n",
+          "import numpy as np\n",
+          "import plotly.graph_objects as go\n",
+          "import ipywidgets as widgets\n",
+          "np.random.seed(0)\n",
+        ],
+      },
+      {
+        cell_type: "code",
+        source: [
+          "sync_pipe = megane.Pipeline()\n",
+          `s = sync_pipe.add_node(megane.LoadStructure("${FIXTURES}/caffeine_water.pdb"))\n`,
+          `t = sync_pipe.add_node(megane.LoadTrajectory(xtc="${FIXTURES}/caffeine_water_vibration.xtc"))\n`,
+          'bonds = sync_pipe.add_node(megane.AddBonds(source="structure"))\n',
+          "vp = sync_pipe.add_node(megane.Viewport())\n",
+          "sync_pipe.add_edge(s.out.particle, t.inp.particle)\n",
+          "sync_pipe.add_edge(s.out.particle, bonds.inp.particle)\n",
+          "sync_pipe.add_edge(s.out.particle, vp.inp.particle)\n",
+          "sync_pipe.add_edge(t.out.traj, vp.inp.traj)\n",
+          "sync_pipe.add_edge(bonds.out.bond, vp.inp.bond)\n",
+          "\n",
+          "sync_viewer = megane.MolecularViewer()\n",
+          'sync_viewer.layout = widgets.Layout(width="500px", height="400px")\n',
+          "sync_viewer.set_pipeline(sync_pipe)\n",
+        ],
+      },
+      {
+        cell_type: "code",
+        source: [
+          "n = sync_viewer.total_frames\n",
+          "x = np.arange(n)\n",
+          "y = -500 + 10 * np.sin(x * 0.1) + np.random.randn(n) * 2\n",
+          "\n",
+          "sync_fig = go.FigureWidget(\n",
+          "    data=[\n",
+          '        go.Scatter(x=x, y=y, mode="lines", name="Energy"),\n',
+          '        go.Scatter(x=[0], y=[y[0]], mode="markers",\n',
+          '                   marker=dict(size=12, color="red"), name="Current"),\n',
+          "    ],\n",
+          "    layout=go.Layout(\n",
+          '        title="Bidirectional sync",\n',
+          "        height=300,\n",
+          '        xaxis_title="Frame",\n',
+          '        yaxis_title="Energy (kJ/mol)",\n',
+          "    ),\n",
+          ")\n",
+          "\n",
+          "def on_click(trace, points, state):\n",
+          "    if points.point_inds:\n",
+          "        sync_viewer.frame_index = points.point_inds[0]\n",
+          "\n",
+          "sync_fig.data[0].on_click(on_click)\n",
+          "\n",
+          '@sync_viewer.on_event("frame_change")\n',
+          "def update_marker(data):\n",
+          '    idx = data["frame_index"]\n',
+          "    with sync_fig.batch_update():\n",
+          "        sync_fig.data[1].x = [idx]\n",
+          "        sync_fig.data[1].y = [y[idx]]\n",
+          "\n",
+          "widgets.VBox([sync_fig, sync_viewer])\n",
+        ],
+      },
+      {
+        cell_type: "code",
+        source: [`sync_viewer.frame_index = ${targetFrame}\n`],
+      },
+    ],
+  };
+}
+
 /** Plotly + viewer cell, mirroring external_events.ipynb cell 4 with a
  *  fixed RNG seed so the chart pixels are deterministic. */
 function plotlyLinkNotebook(): NotebookSpec {
@@ -249,4 +336,57 @@ test("examples/external_events.ipynb plotly + viewer VBox — mounts and renders
   // useful here. The viewer surface is the part we actually own.
   await waitForReady(page, { needsData: true, timeout: 30_000 });
   await expectViewerRegionMatch(page, PLATFORM, "plotly-viewer");
+});
+
+test("examples/external_events.ipynb bidirectional sync — frame_index drives Plotly marker (round-trip regression)", async ({
+  page,
+}) => {
+  const TARGET_FRAME = 50;
+
+  writeNotebook(
+    NOTEBOOK_DIR,
+    "widget_examples_bidirectional_sync",
+    bidirectionalSyncNotebook(TARGET_FRAME),
+  );
+  await openLabNotebook(page, {
+    port: PORT,
+    token: TOKEN,
+    notebook: "widget_examples_bidirectional_sync.ipynb",
+    waitTimeoutMs: 120_000,
+  });
+
+  // The viewer must reflect the Python-side frame assignment.
+  const viewer = page.locator('[data-testid="megane-viewer"]');
+  await expect(viewer).toHaveCount(1, { timeout: 60_000 });
+  await expect(viewer).toHaveAttribute("data-current-frame", String(TARGET_FRAME), {
+    timeout: 30_000,
+  });
+
+  // The frame_change event must have fired the registered callback,
+  // which moves the red marker (Scatter trace #1) to x=[TARGET_FRAME].
+  // FigureWidget keeps `data` in sync via ipywidgets, so reading the
+  // live Plotly graph div gives us the post-event state without any
+  // browser interaction.
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const gd = document.querySelector(
+            'div[class*="js-plotly-plot"], div[class*="plotly-graph-div"]',
+          ) as
+            | (HTMLElement & {
+                data?: Array<{ x?: ArrayLike<number>; y?: ArrayLike<number> }>;
+              })
+            | null;
+          if (!gd?.data || gd.data.length < 2) return null;
+          const marker = gd.data[1];
+          if (!marker.x || marker.x.length === 0) return null;
+          return Number(marker.x[0]);
+        }),
+      { timeout: 30_000, message: "Plotly marker x must update to target frame" },
+    )
+    .toBe(TARGET_FRAME);
+
+  await waitForReady(page, { needsData: true, timeout: 30_000 });
+  await expectViewerRegionMatch(page, PLATFORM, "bidirectional-sync-viewer");
 });
