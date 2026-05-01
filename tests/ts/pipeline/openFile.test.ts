@@ -311,7 +311,25 @@ describe("usePipelineStore.openFile — pipeline files", () => {
     await usePipelineStore.getState().openFile(file);
 
     const state = usePipelineStore.getState();
-    expect(state.nodes.map((n) => n.id).sort()).toEqual(["load-1", "viewport-1"]);
+    // The pipeline JSON only wires LoadStructure → Viewport (no AddBond).
+    // deserializePipeline now normalizes that into the canonical
+    // LoadStructure → AddBond → Viewport scaffold, so we expect a
+    // synthesized add_bond node alongside the originals.
+    const ids = state.nodes.map((n) => n.id).sort();
+    expect(ids).toContain("load-1");
+    expect(ids).toContain("viewport-1");
+    expect(state.nodes.some((n) => n.type === "add_bond")).toBe(true);
+
+    // Viewport guide settings (cellAxesVisible / pivotMarkerVisible) saved
+    // in the pipeline JSON must propagate through executePipeline to the
+    // viewportState the renderer reads. Regression: previously deserialize
+    // overwrote viewportState with DEFAULTS and only post-load executes
+    // restored it, leaving a window where guides flicker back on.
+    const viewportNode = state.nodes.find((n) => n.id === "viewport-1")!;
+    expect((viewportNode.data.params as any).cellAxesVisible).toBe(false);
+    expect((viewportNode.data.params as any).pivotMarkerVisible).toBe(false);
+    expect(state.viewportState.cellAxesVisible).toBe(false);
+    expect(state.viewportState.pivotMarkerVisible).toBe(false);
   });
 
   it("attaches companion structure files by basename and applies per-node snapshots", async () => {
