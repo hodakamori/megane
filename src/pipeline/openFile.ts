@@ -74,9 +74,36 @@ const PIPELINE_SUFFIX = ".megane.json";
 // information, so VDW distance inference is the more useful default.
 const FILE_BOND_EXTS = [".pdb", ".ent", ".pdbx", ".mol", ".sdf", ".data", ".lammps"];
 
-function defaultBondSourceForFile(filename: string): "structure" | "distance" {
+export function defaultBondSourceForFile(filename: string): "structure" | "distance" {
   const lower = filename.toLowerCase();
   return FILE_BOND_EXTS.some((ext) => lower.endsWith(ext)) ? "structure" : "distance";
+}
+
+/**
+ * Switch the AddBond node(s) consuming `loaderId`'s `particle` output to a
+ * bondSource that matches the file format: `"structure"` for formats that
+ * embed bonds (PDB/MOL/SDF/LAMMPS data), `"distance"` (VDW inference) for
+ * formats that don't (XYZ/GRO/CIF/traj). Only nodes wired to the targeted
+ * loader are touched; user-customised AddBond nodes wired elsewhere are
+ * left alone.
+ */
+export function syncAddBondSourceForLoader(
+  state: PipelineStore,
+  loaderId: string,
+  filename: string,
+): void {
+  const desired = defaultBondSourceForFile(filename);
+  const targets = new Set<string>();
+  for (const edge of state.edges) {
+    if (edge.source !== loaderId) continue;
+    if (edge.sourceHandle && edge.sourceHandle !== "particle") continue;
+    if (edge.targetHandle && edge.targetHandle !== "particle") continue;
+    const targetNode = state.nodes.find((n) => n.id === edge.target);
+    if (targetNode?.type === "add_bond") targets.add(targetNode.id);
+  }
+  for (const id of targets) {
+    state.updateNodeParams(id, { bondSource: desired });
+  }
 }
 
 function classify(filename: string): FileKind {
@@ -166,25 +193,7 @@ async function openStructure(
     hasCell: !!result.snapshot.box,
   });
 
-  // Switch the AddBond node(s) consuming this loader to a bondSource that
-  // matches the file format: "structure" for formats that embed bonds
-  // (PDB/MOL/SDF/LAMMPS data), "distance" (VDW inference) for formats that
-  // don't (XYZ/GRO/CIF/traj). Only nodes whose `particle` input comes from
-  // the targeted loader are touched; user-customised AddBond nodes wired
-  // elsewhere are left alone.
-  const desiredBondSource = defaultBondSourceForFile(file.name);
-  const stateAfterLoader = api.getState();
-  const addBondTargets = new Set<string>();
-  for (const edge of stateAfterLoader.edges) {
-    if (edge.source !== loaderId) continue;
-    if (edge.sourceHandle && edge.sourceHandle !== "particle") continue;
-    if (edge.targetHandle && edge.targetHandle !== "particle") continue;
-    const targetNode = stateAfterLoader.nodes.find((n) => n.id === edge.target);
-    if (targetNode?.type === "add_bond") addBondTargets.add(targetNode.id);
-  }
-  for (const id of addBondTargets) {
-    state.updateNodeParams(id, { bondSource: desiredBondSource });
-  }
+  syncAddBondSourceForLoader(api.getState(), loaderId, file.name);
 
   if (result.vectorChannels && result.vectorChannels.length > 0) {
     state.setFileVectors(result.vectorChannels[0].frames);
