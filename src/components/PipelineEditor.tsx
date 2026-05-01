@@ -603,9 +603,9 @@ function PipelineEditorInner({
 
   const headerExtra = (
     <>
-      {/* Row 1 — Build: ways to compose the pipeline graph */}
+      {/* Row 1 — Pipeline: compose the graph */}
       <div style={toolbarRowStyle}>
-        <span style={toolbarCategoryLabelStyle}>Build</span>
+        <span style={toolbarCategoryLabelStyle}>Pipeline</span>
         <div style={{ position: "relative" }}>
           <button
             onClick={() => {
@@ -645,6 +645,14 @@ function PipelineEditorInner({
             </div>
           )}
         </div>
+        <button
+          onClick={handleAutoLayout}
+          style={layoutBtnStyle}
+          title="Auto Layout"
+          aria-label="Auto Layout"
+        >
+          {IconLayout} Layout
+        </button>
         <div style={{ position: "relative" }}>
           <button
             data-testid="pipeline-editor-templates"
@@ -678,26 +686,18 @@ function PipelineEditorInner({
             </div>
           )}
         </div>
-        <button
-          onClick={handleAutoLayout}
-          style={layoutBtnStyle}
-          title="Auto Layout"
-          aria-label="Auto Layout"
-        >
-          {IconLayout} Layout
-        </button>
       </div>
 
-      {/* Row 2 — Run & I/O: execute, exchange, and learn */}
+      {/* Row 2 — I/O: exchange and execute */}
       <div style={toolbarRowStyle}>
-        <span style={toolbarCategoryLabelStyle}>Run &amp; I/O</span>
+        <span style={toolbarCategoryLabelStyle}>I/O</span>
         <button
-          data-testid="pipeline-editor-render"
-          onClick={() => setShowRenderModal(true)}
-          style={renderBtnStyle}
-          title="Render"
+          onClick={handleExport}
+          style={exportBtnStyle}
+          title="Export Pipeline"
+          aria-label="Export Pipeline"
         >
-          {IconRender} Render
+          {IconExport} Export
         </button>
         <button
           onClick={handleImportClick}
@@ -708,13 +708,18 @@ function PipelineEditorInner({
           {IconImport} Import
         </button>
         <button
-          onClick={handleExport}
-          style={exportBtnStyle}
-          title="Export Pipeline"
-          aria-label="Export Pipeline"
+          data-testid="pipeline-editor-render"
+          onClick={() => setShowRenderModal(true)}
+          style={renderBtnStyle}
+          title="Render"
         >
-          {IconExport} Export
+          {IconRender} Render
         </button>
+      </div>
+
+      {/* Row 3 — Others: help */}
+      <div style={toolbarRowStyle}>
+        <span style={toolbarCategoryLabelStyle}>Others</span>
         <button
           data-testid="pipeline-editor-guide"
           onClick={() => startTour()}
