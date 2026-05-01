@@ -100,6 +100,11 @@ export default defineConfig({
       timeout: 180_000,
     },
     {
+      name: "widget-examples",
+      testMatch: /widget-examples\.spec\.ts$/,
+      timeout: 240_000,
+    },
+    {
       name: "widget-vscode",
       testMatch: /widget-vscode\.spec\.ts$/,
       timeout: 240_000,
