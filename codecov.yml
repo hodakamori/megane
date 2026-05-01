@@ -1,0 +1,72 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+      python:
+        target: auto
+        threshold: 1%
+        flags:
+          - python
+      typescript:
+        target: auto
+        threshold: 1%
+        flags:
+          - typescript
+      rust:
+        target: auto
+        threshold: 1%
+        flags:
+          - rust
+      vscode:
+        target: auto
+        threshold: 1%
+        flags:
+          - vscode
+      jupyterlab:
+        target: auto
+        threshold: 1%
+        flags:
+          - jupyterlab
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: python
+      paths:
+        - python/megane/
+      carryforward: true
+    - name: typescript
+      paths:
+        - src/
+      carryforward: true
+    - name: rust
+      paths:
+        - crates/
+      carryforward: true
+    - name: vscode
+      paths:
+        - vscode-megane/src/
+      carryforward: true
+    - name: jupyterlab
+      paths:
+        - jupyterlab-megane/src/
+      carryforward: true
+
+ignore:
+  - "python/megane/static/**"
+  - "tests/**"
+  - "docs/**"
+  - "**/*.d.ts"
+  - "src/vite-env.d.ts"

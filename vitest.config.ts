@@ -13,10 +13,19 @@ export default defineConfig({
     setupFiles: ["tests/ts/setup.ts"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "text-summary", "json", "html"],
+      reporter: ["text", "text-summary", "json", "html", "lcov"],
       reportsDirectory: "coverage/ts",
-      include: ["src/**/*.{ts,tsx}"],
-      exclude: ["src/vite-env.d.ts", "src/**/*.d.ts"],
+      include: [
+        "src/**/*.{ts,tsx}",
+        "vscode-megane/src/**/*.ts",
+        "jupyterlab-megane/src/**/*.{ts,tsx}",
+      ],
+      exclude: [
+        "src/vite-env.d.ts",
+        "src/**/*.d.ts",
+        "vscode-megane/src/**/*.d.ts",
+        "jupyterlab-megane/src/**/*.d.ts",
+      ],
     },
   },
 });
