@@ -49,6 +49,7 @@
     "test:e2e:webapp": "playwright test --project=webapp",
     "test:e2e:contract": "playwright test --project=contract",
     "test:e2e:widget-jupyterlab": "playwright test --project=widget-jupyterlab",
+    "test:e2e:widget-examples": "playwright test --project=widget-examples",
     "test:e2e:widget-vscode": "playwright test --project=widget-vscode",
     "test:e2e:jupyterlab-doc": "playwright test --project=jupyterlab-doc",
     "test:e2e:vscode": "playwright test --project=vscode",
