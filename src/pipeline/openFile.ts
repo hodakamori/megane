@@ -160,14 +160,13 @@ async function openStructure(
   }
 
   // When opening a multi-frame structure file (e.g. .traj, multi-MODEL .pdb,
-  // multi-frame .xyz), clear any stale companion `load_trajectory` fileName
-  // so the pipeline UI doesn't show a leftover name from the seed template.
+  // multi-frame .xyz), the embedded frames flow through the LoadStructure
+  // node's `trajectory` port, so any LoadTrajectory node from the seed
+  // template is redundant. Drop it and rewire its downstream consumers
+  // directly to LoadStructure.trajectory.
   if (result.frames.length > 0) {
-    const trajId = findNodeId(api, "load_trajectory");
-    if (trajId) {
-      state.updateNodeParams(trajId, { fileName: "" });
-      state.setFileFrames(null, null);
-    }
+    state.setFileFrames(null, null);
+    api.getState().removeLoadTrajectoryAndRewire();
   }
 }
 

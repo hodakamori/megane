@@ -177,11 +177,10 @@ export function useMeganeLocal(): MeganeLocalState {
         pipeStore.setStructureFrames(null, null);
       }
 
-      // Keep the pipeline's load_structure (and trajectory, when the file
-      // carries embedded frames) nodes in sync with whatever was just
-      // loaded. Without this the editor would show stale demo filenames
-      // (e.g. "caffeine_water.pdb") even though the viewer is rendering
-      // the user's file.
+      // Keep the pipeline's load_structure node in sync with whatever was
+      // just loaded. Without this the editor would show stale demo
+      // filenames (e.g. "caffeine_water.pdb") even though the viewer is
+      // rendering the user's file.
       if (filename) {
         const loaderNode = pipeStore.nodes.find((n) => n.type === "load_structure");
         if (loaderNode) {
@@ -197,16 +196,18 @@ export function useMeganeLocal(): MeganeLocalState {
             hasCell: !!result.snapshot.box,
           });
         }
-        const trajNode = pipeStore.nodes.find((n) => n.type === "load_trajectory");
-        if (trajNode) {
+        if (result.frames.length > 0) {
           // Multi-frame structure files (.traj, multi-MODEL PDB,
-          // multi-frame XYZ) have their trajectory embedded in the
-          // structure file itself — surface that by reusing the same
-          // filename. Otherwise clear it so a previously-loaded XTC name
-          // doesn't linger across structure swaps.
-          pipeStore.updateNodeParams(trajNode.id, {
-            fileName: result.frames.length > 0 ? filename : "",
-          });
+          // multi-frame XYZ) carry their trajectory in the structure file
+          // itself, so a separate LoadTrajectory node is redundant.
+          pipeStore.removeLoadTrajectoryAndRewire();
+        } else {
+          const trajNode = pipeStore.nodes.find((n) => n.type === "load_trajectory");
+          if (trajNode) {
+            // Clear any previously-loaded XTC name so it doesn't linger
+            // across structure swaps.
+            pipeStore.updateNodeParams(trajNode.id, { fileName: "" });
+          }
         }
       }
 
