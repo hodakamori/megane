@@ -13,23 +13,33 @@ const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
 );
 
+/**
+ * Subscription channel used by `DocBody` to re-load when the host
+ * `MeganeReactView` widget becomes visible. Re-loading on activation is
+ * required because the pipeline store is a singleton shared across every
+ * open document tab — without a re-load on tab switch, the most recently
+ * opened tab silently mutates earlier tabs' rendered state.
+ */
+type ActivationSubscribe = (cb: () => void) => () => void;
+
 interface DocBodyProps {
   context: DocumentRegistry.Context;
+  subscribeActivation: ActivationSubscribe;
 }
 
 type LoadState = "loading" | "ready" | { error: string };
 
-function DocBody({ context }: DocBodyProps): JSX.Element {
+function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
   const local = useMeganeLocal();
   const [state, setState] = useState<LoadState>("loading");
   useTour({ host: "jupyterlab" });
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const reload = useCallback(
+    async (token: { cancelled: boolean }) => {
       try {
         await ensureWasmUrl();
         await context.ready;
+        if (token.cancelled) return;
         // Reset the global pipeline store before loading. The same
         // singleton store is shared across every JupyterLab document
         // tab, so a previously-opened .megane.json (or a failed open)
@@ -55,22 +65,38 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
           : new TextEncoder().encode(raw);
         const file = new File([bytes], filename);
         await local.loadFile(file);
-        if (!cancelled) setState("ready");
+        if (!token.cancelled) setState("ready");
       } catch (err) {
-        if (!cancelled) {
+        if (!token.cancelled) {
           setState({ error: err instanceof Error ? err.message : String(err) });
         }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    },
     // `local` is intentionally omitted: useMeganeLocal returns a fresh
     // object on every render, so including it would re-fire this effect
-    // on every state update and re-parse the file in a loop. We only
-    // want to load when the document context is first ready.
+    // on every state update and re-parse the file in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [context]);
+    [context],
+  );
+
+  useEffect(() => {
+    let activeToken = { cancelled: false };
+    void reload(activeToken);
+    // Re-run the load whenever this widget becomes visible again. JupyterLab
+    // keeps every previously-opened tab mounted, so a second tab silently
+    // overwrites the singleton pipeline store. Re-loading on show keeps the
+    // visible tab authoritative.
+    const unsubscribe = subscribeActivation(() => {
+      activeToken.cancelled = true;
+      activeToken = { cancelled: false };
+      setState("loading");
+      void reload(activeToken);
+    });
+    return () => {
+      activeToken.cancelled = true;
+      unsubscribe();
+    };
+  }, [reload, subscribeActivation]);
 
   const handleUploadStructure = useCallback(
     (file: File) => {
@@ -129,12 +155,33 @@ function DocBody({ context }: DocBodyProps): JSX.Element {
 }
 
 export class MeganeReactView extends ReactWidget {
+  private readonly listeners = new Set<() => void>();
+
   constructor(private readonly context: DocumentRegistry.Context) {
     super();
     this.addClass("megane-jupyter-doc");
   }
 
+  /** Notify subscribers that this widget has become visible. */
+  protected onAfterShow(msg: import("@lumino/messaging").Message): void {
+    super.onAfterShow(msg);
+    for (const cb of this.listeners) {
+      try {
+        cb();
+      } catch {
+        /* swallow — a noisy listener shouldn't break others */
+      }
+    }
+  }
+
+  private subscribeActivation = (cb: () => void): (() => void) => {
+    this.listeners.add(cb);
+    return () => {
+      this.listeners.delete(cb);
+    };
+  };
+
   protected render(): JSX.Element {
-    return <DocBody context={this.context} />;
+    return <DocBody context={this.context} subscribeActivation={this.subscribeActivation} />;
   }
 }

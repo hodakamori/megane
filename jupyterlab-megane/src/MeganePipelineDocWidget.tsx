@@ -8,9 +8,12 @@ import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 
+type ActivationSubscribe = (cb: () => void) => () => void;
+
 interface DocBodyProps {
   context: DocumentRegistry.Context;
   contents: Contents.IManager;
+  subscribeActivation: ActivationSubscribe;
 }
 
 type LoadState = "loading" | "ready" | { error: string };
@@ -67,16 +70,16 @@ async function fetchCompanion(
   }
 }
 
-function DocBody({ context, contents }: DocBodyProps): JSX.Element {
+function DocBody({ context, contents, subscribeActivation }: DocBodyProps): JSX.Element {
   const [state, setState] = useState<LoadState>("loading");
   useTour({ host: "jupyterlab" });
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const reload = useCallback(
+    async (token: { cancelled: boolean }) => {
       try {
         await ensureWasmUrl();
         await context.ready;
+        if (token.cancelled) return;
 
         // Same reasoning as MeganeDocWidget: the pipeline store is a
         // singleton shared across documents, so we start every open
@@ -91,11 +94,11 @@ function DocBody({ context, contents }: DocBodyProps): JSX.Element {
 
         // Resolve every load_structure / load_trajectory node's referenced
         // file under the pipeline file's directory and pull it through the
-        // Jupyter Contents service. We delegate the rest (deserialize,
-        // parse, setNodeSnapshot) to the shared `usePipelineStore.openFile`
-        // entry point so the JupyterLab path matches the webapp and VSCode
-        // hosts.
-        const companions: File[] = [];
+        // Jupyter Contents service in parallel — the previous serial loop
+        // dominated open latency for pipelines with multiple companions.
+        // We delegate the rest (deserialize, parse, setNodeSnapshot) to the
+        // shared `usePipelineStore.openFile` entry point.
+        const companionTargets: string[] = [];
         for (const node of pipeline.nodes ?? []) {
           if (
             node.type !== "load_structure" &&
@@ -105,31 +108,47 @@ function DocBody({ context, contents }: DocBodyProps): JSX.Element {
           }
           if (!node.fileName) continue;
           const target = joinUnderDir(dir, String(node.fileName));
-          if (!target) continue;
-          const file = await fetchCompanion(contents, target);
-          if (file) companions.push(file);
+          if (target) companionTargets.push(target);
         }
+        const fetched = await Promise.all(
+          companionTargets.map((p) => fetchCompanion(contents, p)),
+        );
+        if (token.cancelled) return;
+        const companions: File[] = fetched.filter((f): f is File => f !== null);
 
         const meganeFile = new File([pipelineText], basename(context.path), {
           type: "application/json",
         });
         await usePipelineStore.getState().openFile(meganeFile, { companions });
 
-        if (!cancelled) setState("ready");
+        if (!token.cancelled) setState("ready");
       } catch (err) {
         // Reset the store again so a half-deserialized pipeline (e.g.
         // deserialize ran but a companion parse threw) doesn't leak
         // into the next document the user opens.
         usePipelineStore.getState().reset();
-        if (!cancelled) {
+        if (!token.cancelled) {
           setState({ error: err instanceof Error ? err.message : String(err) });
         }
       }
-    })();
+    },
+    [context, contents],
+  );
+
+  useEffect(() => {
+    let activeToken = { cancelled: false };
+    void reload(activeToken);
+    const unsubscribe = subscribeActivation(() => {
+      activeToken.cancelled = true;
+      activeToken = { cancelled: false };
+      setState("loading");
+      void reload(activeToken);
+    });
     return () => {
-      cancelled = true;
+      activeToken.cancelled = true;
+      unsubscribe();
     };
-  }, [context, contents]);
+  }, [reload, subscribeActivation]);
 
   const handleUploadStructure = useCallback(
     (file: File) => {
@@ -175,6 +194,8 @@ function DocBody({ context, contents }: DocBodyProps): JSX.Element {
 }
 
 export class MeganePipelineReactView extends ReactWidget {
+  private readonly listeners = new Set<() => void>();
+
   constructor(
     private readonly context: DocumentRegistry.Context,
     private readonly contents: Contents.IManager,
@@ -183,7 +204,31 @@ export class MeganePipelineReactView extends ReactWidget {
     this.addClass("megane-jupyter-doc");
   }
 
+  protected onAfterShow(msg: import("@lumino/messaging").Message): void {
+    super.onAfterShow(msg);
+    for (const cb of this.listeners) {
+      try {
+        cb();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  private subscribeActivation = (cb: () => void): (() => void) => {
+    this.listeners.add(cb);
+    return () => {
+      this.listeners.delete(cb);
+    };
+  };
+
   protected render(): JSX.Element {
-    return <DocBody context={this.context} contents={this.contents} />;
+    return (
+      <DocBody
+        context={this.context}
+        contents={this.contents}
+        subscribeActivation={this.subscribeActivation}
+      />
+    );
   }
 }

@@ -71,10 +71,11 @@ export function applyViewportState(
     renderer.setCellVisible(cellVisible);
   }
 
-  const cellAxesVisible = hasCells && primaryCells.some((c) => c.axesVisible);
-  if (!previous || cellAxesVisible !== (previous?.cellAxesVisible ?? true)) {
-    renderer.setCellAxesVisible(cellAxesVisible);
-  }
+  // Note: cell axes visibility is governed solely by the Viewport node's
+  // `cellAxesVisible` parameter (applied near the bottom of this function).
+  // We deliberately don't derive it from CellData.axesVisible here because
+  // the load_structure executor hardcodes that field to `true`, which would
+  // overwrite the user's saved Viewport setting on every cell-data update.
 
   // Primary bonds visibility
   const bondsVisible = primaryBonds.length > 0;
