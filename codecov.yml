@@ -19,6 +19,16 @@ coverage:
         threshold: 1%
         flags:
           - rust
+      vscode:
+        target: auto
+        threshold: 1%
+        flags:
+          - vscode
+      jupyterlab:
+        target: auto
+        threshold: 1%
+        flags:
+          - jupyterlab
     patch:
       default:
         target: auto
@@ -44,6 +54,14 @@ flag_management:
     - name: rust
       paths:
         - crates/
+      carryforward: true
+    - name: vscode
+      paths:
+        - vscode-megane/src/
+      carryforward: true
+    - name: jupyterlab
+      paths:
+        - jupyterlab-megane/src/
       carryforward: true
 
 ignore:
