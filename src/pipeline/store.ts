@@ -97,10 +97,7 @@ export interface PipelineStore {
   // `deserialize` therefore loses the snapshot. `loadPipeline` performs both
   // updates inside a single store transaction so the post-deserialize
   // execute() sees the matching per-node snapshots.
-  loadPipeline: (
-    json: SerializedPipeline,
-    nodeSnapshots: Record<string, NodeSnapshotData>,
-  ) => void;
+  loadPipeline: (json: SerializedPipeline, nodeSnapshots: Record<string, NodeSnapshotData>) => void;
 
   // Templates
   pendingTemplateId: string | null;
