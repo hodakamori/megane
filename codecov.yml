@@ -4,6 +4,21 @@ coverage:
       default:
         target: auto
         threshold: 1%
+      python:
+        target: auto
+        threshold: 1%
+        flags:
+          - python
+      typescript:
+        target: auto
+        threshold: 1%
+        flags:
+          - typescript
+      rust:
+        target: auto
+        threshold: 1%
+        flags:
+          - rust
     patch:
       default:
         target: auto
@@ -14,7 +29,26 @@ comment:
   behavior: default
   require_changes: true
 
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: python
+      paths:
+        - python/megane/
+      carryforward: true
+    - name: typescript
+      paths:
+        - src/
+      carryforward: true
+    - name: rust
+      paths:
+        - crates/
+      carryforward: true
+
 ignore:
   - "python/megane/static/**"
   - "tests/**"
   - "docs/**"
+  - "**/*.d.ts"
+  - "src/vite-env.d.ts"

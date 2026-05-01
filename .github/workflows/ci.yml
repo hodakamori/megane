@@ -37,7 +37,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -p megane-core
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - run: cargo llvm-cov --package megane-core --lcov --output-path lcov.info
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_on_error: false
 
   test-ts:
     name: TypeScript tests
@@ -63,7 +72,13 @@ jobs:
       - run: npm run build:wasm
       - run: npm run format:check
       - run: npm run lint
-      - run: npm test
+      - run: npm test -- --coverage
+      - uses: codecov/codecov-action@v5
+        with:
+          files: coverage/ts/lcov.info
+          flags: typescript
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_on_error: false
 
   test-python:
     name: Python tests
@@ -97,6 +112,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
+          flags: python
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_on_error: false
 
