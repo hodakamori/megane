@@ -23,8 +23,11 @@ import { fileURLToPath } from "url";
 import { test, expect } from "playwright/test";
 import {
   assertDomContract,
+  baselinePath,
+  compareToBaseline,
   expectFullPageMatch,
   expectViewerRegionMatch,
+  stabilizeUi,
   waitForReady,
 } from "./lib/setup";
 import {
@@ -336,6 +339,30 @@ test("examples/external_events.ipynb plotly + viewer VBox — mounts and renders
   // useful here. The viewer surface is the part we actually own.
   await waitForReady(page, { needsData: true, timeout: 30_000 });
   await expectViewerRegionMatch(page, PLATFORM, "plotly-viewer");
+
+  // Cell-output snapshot: VBox containing both the Plotly chart AND the
+  // viewer in a single image so the baseline visibly confirms they are
+  // co-rendered (not just "the viewer mounted somewhere on the page").
+  const cellOutput = page
+    .locator(".jp-Cell")
+    .filter({ hasText: "widgets.VBox" })
+    .locator(".jp-OutputArea")
+    .first();
+  await cellOutput.scrollIntoViewIfNeeded();
+  await cellOutput.waitFor({ state: "visible", timeout: 10_000 });
+  await stabilizeUi(page);
+  const baseline = baselinePath(PLATFORM, "plotly-link-cell");
+  const buf = await cellOutput.screenshot({
+    animations: "disabled",
+    caret: "hide",
+  });
+  const r = await compareToBaseline(baseline, buf, { maxDiffPercent: 5.0 });
+  expect(
+    r.ok,
+    r.sizeMismatch
+      ? `${PLATFORM}/plotly-link-cell: size mismatch`
+      : `${PLATFORM}/plotly-link-cell: diff ${r.diffPercent.toFixed(2)}%`,
+  ).toBe(true);
 });
 
 test("examples/external_events.ipynb bidirectional sync — frame_index drives Plotly marker (round-trip regression)", async ({
@@ -389,4 +416,31 @@ test("examples/external_events.ipynb bidirectional sync — frame_index drives P
 
   await waitForReady(page, { needsData: true, timeout: 30_000 });
   await expectViewerRegionMatch(page, PLATFORM, "bidirectional-sync-viewer");
+
+  // Cell-output snapshot: captures the VBox containing both the Plotly
+  // chart and the viewer in the same image, so the baseline visibly
+  // confirms they are stacked vertically as the example intends.
+  // The output cell is the one whose source contains "widgets.VBox".
+  const cellOutput = page
+    .locator(".jp-Cell")
+    .filter({ hasText: "widgets.VBox" })
+    .locator(".jp-OutputArea")
+    .first();
+  await cellOutput.scrollIntoViewIfNeeded();
+  await cellOutput.waitFor({ state: "visible", timeout: 10_000 });
+  await stabilizeUi(page);
+  const baseline = baselinePath(PLATFORM, "bidirectional-sync-cell");
+  const buf = await cellOutput.screenshot({
+    animations: "disabled",
+    caret: "hide",
+  });
+  // Looser threshold (5%) because Plotly's SVG anti-aliasing and font
+  // hinting can shift sub-pixel between runs even with a fixed RNG seed.
+  const r = await compareToBaseline(baseline, buf, { maxDiffPercent: 5.0 });
+  expect(
+    r.ok,
+    r.sizeMismatch
+      ? `${PLATFORM}/bidirectional-sync-cell: size mismatch`
+      : `${PLATFORM}/bidirectional-sync-cell: diff ${r.diffPercent.toFixed(2)}%`,
+  ).toBe(true);
 });
