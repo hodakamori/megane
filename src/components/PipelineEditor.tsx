@@ -393,7 +393,7 @@ const toolbarCategoryLabelStyle: React.CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.08em",
   marginRight: 2,
-  minWidth: 38,
+  width: 64,
   flexShrink: 0,
 };
 
