@@ -89,6 +89,19 @@ export interface PipelineStore {
   serialize: () => SerializedPipeline;
   deserialize: (json: SerializedPipeline) => void;
 
+  // Atomically replace the graph and per-node snapshots. Used by anywidget
+  // hosts (Jupyter widget, VSCode webview) when Python pushes a new pipeline
+  // alongside the per-node binary snapshot blobs. `deserialize` alone wipes
+  // `nodeSnapshots` (so that opening a new .megane.json doesn't bleed state
+  // across documents in JupyterLab); calling `setNodeSnapshot` *before*
+  // `deserialize` therefore loses the snapshot. `loadPipeline` performs both
+  // updates inside a single store transaction so the post-deserialize
+  // execute() sees the matching per-node snapshots.
+  loadPipeline: (
+    json: SerializedPipeline,
+    nodeSnapshots: Record<string, NodeSnapshotData>,
+  ) => void;
+
   // Templates
   pendingTemplateId: string | null;
   applyTemplate: (templateId: string) => void;
@@ -465,6 +478,24 @@ export const usePipelineStore = create<PipelineStore>((set, get, api) => ({
       edges,
       viewportState: { ...DEFAULT_VIEWPORT_STATE },
       ...CLEARED_EXECUTION_CONTEXT,
+    });
+    get().execute();
+  },
+
+  loadPipeline: (json, nodeSnapshots) => {
+    const { nodes, edges } = deserializePipeline(json);
+    // Pick a primary snapshot for the legacy `snapshot` field so the
+    // Viewport's loadSnapshot path still has data to render. Iterate in
+    // node-id order to be deterministic across hosts.
+    const sortedIds = Object.keys(nodeSnapshots).sort();
+    const primarySnapshot = sortedIds.length > 0 ? nodeSnapshots[sortedIds[0]].snapshot : null;
+    set({
+      nodes,
+      edges,
+      viewportState: { ...DEFAULT_VIEWPORT_STATE },
+      ...CLEARED_EXECUTION_CONTEXT,
+      nodeSnapshots: { ...nodeSnapshots },
+      snapshot: primarySnapshot,
     });
     get().execute();
   },
