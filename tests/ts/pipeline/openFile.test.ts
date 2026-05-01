@@ -133,6 +133,81 @@ describe("usePipelineStore.openFile — single structure file", () => {
   });
 });
 
+describe("usePipelineStore.openFile — AddBond default by file format", () => {
+  function bondSourceFor(loaderId: string): string | undefined {
+    const state = usePipelineStore.getState();
+    const addBondId = state.edges.find(
+      (e) => e.source === loaderId && (e.sourceHandle ?? "particle") === "particle",
+    )?.target;
+    if (!addBondId) return undefined;
+    const node = state.nodes.find((n) => n.id === addBondId && n.type === "add_bond");
+    return node ? (node.data.params as { bondSource: string }).bondSource : undefined;
+  }
+
+  const formatsWithBonds: Array<[string, string]> = [
+    ["water.pdb", "structure"],
+    ["entry.ent", "structure"],
+    ["model.pdbx", "structure"],
+    ["caffeine.mol", "structure"],
+    ["library.sdf", "structure"],
+    ["system.data", "structure"],
+    ["system.lammps", "structure"],
+  ];
+  const formatsWithoutBonds: Array<[string, string]> = [
+    ["water.gro", "distance"],
+    ["coords.xyz", "distance"],
+    ["entry.cif", "distance"],
+    ["frames.traj", "distance"],
+  ];
+
+  for (const [filename, expected] of [...formatsWithBonds, ...formatsWithoutBonds]) {
+    it(`sets AddBond.bondSource="${expected}" for ${filename}`, async () => {
+      mockParseStructureFile.mockResolvedValueOnce({
+        snapshot: makeSnapshot(3),
+        frames: [],
+        meta: null,
+        labels: null,
+        vectorChannels: [],
+      });
+
+      const file = new File(["<data>"], filename);
+      await usePipelineStore.getState().openFile(file, { mode: "replace" });
+
+      const loader = usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")!;
+      expect(bondSourceFor(loader.id)).toBe(expected);
+    });
+  }
+
+  it("updates AddBond.bondSource in merge mode too (re-opening a different format)", async () => {
+    // First load a .pdb so the seed AddBond is "structure" (matches file).
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(3),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<pdb>"], "first.pdb"), {
+      mode: "replace",
+    });
+
+    // Then merge in a .gro — AddBond should switch to VDW inference.
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(3),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<gro>"], "second.gro"), {
+      mode: "merge",
+    });
+
+    const loader = usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")!;
+    expect(bondSourceFor(loader.id)).toBe("distance");
+  });
+});
+
 describe("usePipelineStore.openFile — trajectory files", () => {
   it("rejects when no load_structure snapshot has been loaded yet", async () => {
     // Reset clears nodeSnapshots, so even though the default graph has a
