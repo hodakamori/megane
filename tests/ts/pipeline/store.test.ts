@@ -83,6 +83,61 @@ describe("usePipelineStore", () => {
       const node = usePipelineStore.getState().nodes.find((n) => n.id === id)!;
       expect((node.data.params as any).query).toBe("element == 'C'");
     });
+
+    /**
+     * Regression: changing AddBond.bondSource used to invalidate the React
+     * `snapshot` selector in MeganeViewer because every executePipeline run
+     * produced a fresh ParticleData object whose `source` happened to share
+     * the underlying Snapshot — the selector returned the same value, but
+     * any consumer that subscribed to the whole `viewportState` re-rendered
+     * the entire React tree, including PipelineEditor's xyflow canvas.
+     *
+     * The fix is twofold:
+     *  - MeganeViewer subscribes to viewportState via the vanilla zustand
+     *    `subscribe` API inside an effect (no render-path coupling).
+     *  - The Snapshot reference exposed via the `particles[0].source`
+     *    selector is preserved across bondSource flips so the React-level
+     *    selector stays referentially stable.
+     *
+     * This test guards the second invariant.
+     */
+    it("preserves the primary Snapshot reference when AddBond.bondSource changes", async () => {
+      // Seed the store with a real snapshot so the LoadStructure executor
+      // emits a particle output.
+      const { createMinimalStructurePipeline } = await import("@/pipeline/defaults");
+      const { nodes, edges } = createMinimalStructurePipeline();
+      usePipelineStore.setState({ nodes, edges });
+
+      const loader = usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")!;
+      const addBond = usePipelineStore.getState().nodes.find((n) => n.type === "add_bond")!;
+      const fakeSnapshot = {
+        nAtoms: 4,
+        nBonds: 0,
+        nFileBonds: 0,
+        positions: new Float32Array(12),
+        elements: new Uint8Array(4),
+        bonds: new Uint32Array(0),
+        bondOrders: new Uint8Array(0),
+        box: null,
+      };
+      usePipelineStore.getState().setNodeSnapshot(loader.id, {
+        snapshot: fakeSnapshot,
+        frames: null,
+        meta: null,
+        labels: null,
+      });
+
+      const before = usePipelineStore.getState().viewportState.particles[0]?.source;
+      expect(before, "expected the loader's snapshot to flow into viewport.particles").toBe(
+        fakeSnapshot,
+      );
+
+      // Flip bondSource — this would historically rebuild the entire
+      // pipeline output graph but must not allocate a new Snapshot.
+      usePipelineStore.getState().updateNodeParams(addBond.id, { bondSource: "distance" });
+      const after = usePipelineStore.getState().viewportState.particles[0]?.source;
+      expect(after).toBe(before);
+    });
   });
 
   describe("toggleNode", () => {

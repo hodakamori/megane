@@ -111,3 +111,54 @@ for (const f of FORMATS) {
     ).toHaveText(f.file);
   });
 }
+
+/**
+ * Regression: opening a second structure file after a first one used to
+ * leave the singleton pipeline store in an inconsistent state because every
+ * DocBody mutates it on mount and the previously-opened tab continued to
+ * subscribe. The current tab's `MeganeReactView.onAfterShow` now re-runs
+ * the load when activated, so switching tabs deterministically restores
+ * the active document's data.
+ */
+test("DocWidget recovers when switching between two open files", async ({ page }) => {
+  await openLabFile(page, { port: PORT, token: TOKEN, file: "1crn.pdb" });
+
+  // Open a second file via Jupyter's docmanager. We dispatch the same
+  // route the file-browser uses so JupyterLab routes it to the megane
+  // factory.
+  await page.evaluate(async (fileName) => {
+    const w = window as unknown as {
+      jupyterapp?: { commands: { execute: (id: string, args?: unknown) => Promise<unknown> } };
+    };
+    await w.jupyterapp?.commands.execute("docmanager:open", {
+      path: fileName,
+      factory: "Megane Viewer",
+    });
+  }, "water.gro");
+
+  // Wait for the second viewer to come up and report a non-zero atom count.
+  await page.waitForFunction(
+    () => {
+      const viewers = document.querySelectorAll('[data-testid="megane-viewer"]');
+      const last = viewers[viewers.length - 1];
+      const atoms = Number(last?.getAttribute("data-atom-count") ?? "0");
+      return atoms > 0;
+    },
+    null,
+    { timeout: 30_000 },
+  );
+
+  // The currently-visible tab's atom count must reflect water.gro, not 1crn.
+  // We can't directly identify visibility, but Jupyter sets the active tab
+  // as the last-rendered widget — assert any visible viewer reports the
+  // small water.gro atom count instead of 1crn's 327.
+  const visibleAtoms = await page.evaluate(() => {
+    const viewers = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="megane-viewer"]'),
+    );
+    const visible = viewers.find((v) => v.offsetParent !== null);
+    return Number(visible?.getAttribute("data-atom-count") ?? "0");
+  });
+  expect(visibleAtoms, "second-opened file should drive the visible viewer").toBeGreaterThan(0);
+  expect(visibleAtoms).not.toBe(327);
+});

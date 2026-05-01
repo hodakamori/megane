@@ -83,7 +83,16 @@ export function MeganeViewer({
   // Subscribe to pipeline store: viewportState drives the renderer, and the
   // primary particle's source carries the canonical snapshot (set by
   // setNodeSnapshot in usePipelineStore.openFile).
-  const viewportState = usePipelineStore((s) => s.viewportState);
+  //
+  // We deliberately do NOT subscribe to `viewportState` itself in the React
+  // render path — every node-param change (e.g. AddBond bondSource flip)
+  // produces a new viewportState reference, and a render-path subscription
+  // would cascade into a re-render of every child (PipelineEditor, Timeline,
+  // Sidebar, …). Instead, the effect below subscribes via
+  // `usePipelineStore.subscribe`, which only fires the callback without
+  // triggering a render. The `snapshot` selector still drives the React
+  // tree because it changes identity only on file load (snapshots are
+  // pinned to the LoadStructure's NodeSnapshotData).
   const snapshot = usePipelineStore((s) => s.viewportState.particles[0]?.source ?? null);
 
   // Wire up node load handlers (structure, trajectory, vector) and track primary node
@@ -106,39 +115,41 @@ export function MeganeViewer({
     }
   }, [snapshot]);
 
-  // Apply viewportState changes to the renderer
-  useEffect(() => {
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-    applyViewportState(
-      renderer,
-      viewportState,
-      prevViewportStateRef.current,
-      primaryNodeIdRef.current,
-    );
-    prevViewportStateRef.current = viewportState;
-  }, [viewportState]);
-
-  // Track pipeline-driven bond updates (initial load, bondSource flips, etc.).
-  // Per-frame distance-mode updates skip viewportState and go direct to the
-  // renderer, so they update bondCount in the per-frame effect below instead.
-  useEffect(() => {
-    const total = viewportState.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
-    setBondCount(total);
-  }, [viewportState.bonds]);
-
-  // Connect pipeline trajectories to the playback store
+  // Apply viewportState changes to the renderer + drive playback / bond-count
+  // updates without triggering a React re-render of MeganeViewer. Subscribing
+  // through the vanilla zustand API (instead of `usePipelineStore(selector)`)
+  // means a full pipeline execute flushes only effect callbacks here.
   const setPlaybackProvider = usePlaybackStore((s) => s.setProvider);
-  const prevTrajectoryRef = useRef<unknown>(null);
   useEffect(() => {
-    const traj = viewportState.trajectories[0] ?? null;
-    // Only update if the trajectory provider actually changed
-    const provider = traj?.provider ?? null;
-    if (provider !== prevTrajectoryRef.current) {
-      prevTrajectoryRef.current = provider;
-      setPlaybackProvider(provider);
-    }
-  }, [viewportState.trajectories, setPlaybackProvider]);
+    let prevBondsRef: ViewportState["bonds"] | null = null;
+    let prevTrajRef: unknown = null;
+
+    const apply = (vs: ViewportState) => {
+      const renderer = rendererRef.current;
+      if (renderer) {
+        applyViewportState(renderer, vs, prevViewportStateRef.current, primaryNodeIdRef.current);
+        prevViewportStateRef.current = vs;
+      }
+
+      if (vs.bonds !== prevBondsRef) {
+        prevBondsRef = vs.bonds;
+        const total = vs.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
+        setBondCount((current) => (current === total ? current : total));
+      }
+
+      const traj = vs.trajectories[0] ?? null;
+      const provider = traj?.provider ?? null;
+      if (provider !== prevTrajRef) {
+        prevTrajRef = provider;
+        setPlaybackProvider(provider);
+      }
+    };
+
+    apply(usePipelineStore.getState().viewportState);
+    return usePipelineStore.subscribe((state, prev) => {
+      if (state.viewportState !== prev.viewportState) apply(state.viewportState);
+    });
+  }, [setPlaybackProvider]);
 
   // Frame, currentFrame, and totalFrames come straight from the playback store.
   const frame = usePlaybackStore((s) => s.currentFrameData);

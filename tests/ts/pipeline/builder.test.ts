@@ -396,7 +396,15 @@ describe("Pipeline.toJSON", () => {
 
     const { nodes, edges } = deserializePipeline(pipe.toObject());
     expect(nodes).toHaveLength(4);
-    expect(edges).toHaveLength(4);
+    // deserialize normalizes the graph by adding a loader.cell → viewport.cell
+    // edge so saved files render their simulation cell when present. The
+    // builder fixture didn't wire cell, so we expect 4 + 1 normalize edges.
+    expect(edges).toHaveLength(5);
+    expect(
+      edges.some(
+        (e) => e.source === s._id && e.sourceHandle === "cell" && e.target === v._id,
+      ),
+    ).toBe(true);
 
     const filterNode = nodes.find((n) => n.type === "filter")!;
     expect((filterNode.data.params as any).query).toBe("element == 'C'");
