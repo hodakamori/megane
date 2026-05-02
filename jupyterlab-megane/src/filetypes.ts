@@ -72,6 +72,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     fileFormat: "text",
     contentType: "file",
   },
+  {
+    name: "megane-lammps-dump",
+    displayName: "LAMMPS dump",
+    extensions: [".lammpstrj", ".dump"],
+    mimeTypes: ["chemical/x-lammps-dump"],
+    fileFormat: "text",
+    contentType: "file",
+  },
 ];
 
 export const STRUCTURE_FILETYPES_BINARY: DocumentRegistry.IFileType[] = [
@@ -80,6 +88,14 @@ export const STRUCTURE_FILETYPES_BINARY: DocumentRegistry.IFileType[] = [
     displayName: "ASE trajectory",
     extensions: [".traj"],
     mimeTypes: ["application/octet-stream"],
+    fileFormat: "base64",
+    contentType: "file",
+  },
+  {
+    name: "megane-xtc",
+    displayName: "XTC trajectory",
+    extensions: [".xtc"],
+    mimeTypes: ["chemical/x-xtc"],
     fileFormat: "base64",
     contentType: "file",
   },

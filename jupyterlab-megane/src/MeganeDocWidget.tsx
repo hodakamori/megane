@@ -17,6 +17,8 @@ const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
 );
 
+const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".lammpstrj", ".dump"]);
+
 /**
  * Subscription channel used by `DocBody` to re-load when the host
  * `MeganeReactView` widget becomes visible. Re-loading on activation is
@@ -74,7 +76,21 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
           ? Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
           : new TextEncoder().encode(raw);
         const file = new File([bytes], filename);
-        await local.loadFile(file);
+        if (TRAJECTORY_ONLY_EXTENSIONS.has(ext)) {
+          // Trajectory-only formats need a topology already loaded. Surface
+          // an actionable error; the always-mounted pipeline editor lets the
+          // user wire a Load Structure node to recover.
+          try {
+            await local.loadXtc(file);
+          } catch (err) {
+            const base = err instanceof Error ? err.message : String(err);
+            throw new Error(
+              `${base} Open a structure file (PDB, GRO, etc.) first, or use the pipeline editor to wire a Load Structure node.`,
+            );
+          }
+        } else {
+          await local.loadFile(file);
+        }
         if (token.cancelled) return;
         cachedRef.current = capturePipelineStore(usePipelineStore.getState());
         setState("ready");

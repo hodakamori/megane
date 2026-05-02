@@ -78,10 +78,20 @@ class MolecularViewer(anywidget.AnyWidget):
     _structure = None
     _trajectory = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, pipeline: bool = False, **kwargs):
+        """Create a molecular viewer widget.
+
+        Args:
+            pipeline: When True, render the visual pipeline editor inside the
+                widget. Defaults to False (data must be supplied via
+                :meth:`load` or :meth:`set_pipeline`). Note that opting two
+                viewers in the same notebook into ``pipeline=True`` causes
+                them to share editor state.
+        """
         super().__init__(*args, **kwargs)
         self._event_handlers: dict[str, list[Callable]] = defaultdict(list)
         self._pipeline_ref: Pipeline | None = None
+        self._pipeline_enabled = bool(pipeline)
 
     def load(
         self,
