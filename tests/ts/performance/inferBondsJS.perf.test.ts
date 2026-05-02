@@ -47,6 +47,30 @@ describe("performance: inferBondsVdwJS", () => {
     expect(time).toBeLessThan(33);
   });
 
+  it("PBC inner loop is not dominated by per-pair minimum-image math", () => {
+    // Regression guard: a previous version applied the full minimum-image
+    // transform (9 mults + 3 Math.round + 9 mults) to *every* candidate pair
+    // in the PBC inner loop, which made the PBC path 5–6× slower than the
+    // non-PBC path even for medium-sized systems where the cell list should
+    // dominate. The shift-based variant precomputes one shift vector per
+    // visited neighbor cell, so PBC vs non-PBC should run at comparable
+    // speed for the same atom count + density.
+    const { positions, elements } = generateAtoms(10_000, 50);
+    const box = new Float32Array([50, 0, 0, 0, 50, 0, 0, 0, 50]);
+
+    const tNoPbc = benchmark(() => inferBondsVdwJS(positions, elements, 10_000));
+    const tPbc = benchmark(() => inferBondsVdwJS(positions, elements, 10_000, 0.6, box));
+    console.log(
+      `  inferBondsVdwJS 10k atoms: noPbc=${tNoPbc.toFixed(1)}ms, pbc=${tPbc.toFixed(1)}ms, ratio=${(tPbc / Math.max(tNoPbc, 0.5)).toFixed(2)}x`,
+    );
+
+    // Allow up to 4× overhead for PBC vs non-PBC (cushion for noise + the
+    // unavoidable cost of the per-cell shift computation). A regression
+    // re-introducing per-pair min-image math would balloon this to ~5–7×.
+    const ratio = tPbc / Math.max(tNoPbc, 0.5);
+    expect(ratio).toBeLessThan(4);
+  });
+
   it("10,000 atoms completes under 2000ms", () => {
     const { positions, elements } = generateAtoms(10_000, 40);
     const time = benchmark(() => inferBondsVdwJS(positions, elements, 10_000));
