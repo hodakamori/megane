@@ -1,7 +1,9 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use megane_core::{bonds, cif, gro, lammps_data, lammpstrj, mol, parser, top, traj, xtc, xyz};
+use megane_core::{
+    bonds, cif, gro, lammps_data, lammpstrj, mol, mol2, parser, top, traj, xtc, xyz,
+};
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
 /// - A JSON string describing channel metadata (name, n_frames per channel).
@@ -314,6 +316,13 @@ pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_mol(text: &str) -> Result<ParseResult, JsError> {
     let data = mol::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a Tripos MOL2 file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_mol2(text: &str) -> Result<ParseResult, JsError> {
+    let data = mol2::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 

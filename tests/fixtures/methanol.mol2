@@ -1,0 +1,21 @@
+@<TRIPOS>MOLECULE
+methanol
+ 6 5 1 0 0
+SMALL
+GASTEIGER
+
+@<TRIPOS>ATOM
+      1 C1          0.0000    0.0000    0.0000 C.3     1  LIG1        0.0000
+      2 O1          1.4300    0.0000    0.0000 O.3     1  LIG1       -0.3940
+      3 H1         -0.3600    1.0200    0.0000 H       1  LIG1        0.0000
+      4 H2         -0.3600   -0.5100    0.8800 H       1  LIG1        0.0000
+      5 H3         -0.3600   -0.5100   -0.8800 H       1  LIG1        0.0000
+      6 H4          1.8300    0.9300    0.0000 H       1  LIG1        0.2640
+@<TRIPOS>BOND
+     1     1     2    1
+     2     1     3    1
+     3     1     4    1
+     4     1     5    1
+     5     2     6    1
+@<TRIPOS>SUBSTRUCTURE
+     1  LIG1        1 TEMP              0 ****  ****    0 ROOT
