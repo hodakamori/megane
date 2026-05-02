@@ -99,6 +99,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
     const pipelineJson = (model.get("_pipeline_json") as string) || "";
     const nodeSnapshotsData = (model.get("_node_snapshots_data") as Record<string, DataView>) || {};
+    const pipelineEnabled = (model.get("_pipeline_enabled") as boolean) || false;
 
     root.render(
       createElement(WidgetViewer, {
@@ -112,6 +113,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         pipelineJson: pipelineJson,
         nodeSnapshotsData: nodeSnapshotsData,
         onPipelineChange: handlePipelineChange,
+        pipelineEnabled: pipelineEnabled,
       }),
     );
   }
@@ -165,6 +167,10 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   });
 
   model.on("change:_pipeline_json", () => {
+    renderApp();
+  });
+
+  model.on("change:_pipeline_enabled", () => {
     renderApp();
   });
 

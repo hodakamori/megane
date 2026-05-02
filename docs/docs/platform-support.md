@@ -34,15 +34,20 @@ Legend:
 | MOL | `.mol` | ✓ | API | ✓ | ✓ | ✓ |
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ |
 | CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
-| LAMMPS data | `.data`, `.lammps` | ✓ | API | — | ✓ | ✓ |
+| LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
 
 ### Trajectory formats
 
 | Format | Extensions | Standalone | Jupyter widget | JupyterLab | VSCode | Python |
 |---|---|:---:|:---:|:---:|:---:|:---:|
-| XTC | `.xtc` | ✓ | API | — | — | ✓ |
+| XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | ASE trajectory | `.traj` | ✓ | API | — | ✓ | ✓ |
-| LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | — | — | ✓ |
+| LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
+
+¹ Trajectory-only formats need a topology already loaded. Opening a `.xtc` /
+`.lammpstrj` / `.dump` directly surfaces an actionable error; recover by
+opening a structure file (PDB, GRO, …) first or by wiring a Load Structure
+node in the always-mounted pipeline editor.
 
 Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VSCode `customEditors`).
 
@@ -52,18 +57,20 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 |---|:---:|:---:|:---:|:---:|:---:|
 | Drag-and-drop into viewer | ✓ | — | — | — | n/a |
 | Built-in file picker | ✓ | — | host | host | n/a |
-| Visual pipeline editor | ✓ | opt-in | — | ✓ (`.megane.json`) | n/a |
-| Trajectory timeline / scrubbing | ✓ | ✓ | — | — | n/a |
+| Visual pipeline editor | ✓ | opt-in | ✓ | ✓ (`.megane.json`) | n/a |
+| Trajectory timeline / scrubbing | ✓ | ✓ | ✓ | ✓ | n/a |
 | WebSocket trajectory streaming | ✓ | — | — | — | n/a |
-| Multi-layer rendering | ✓ | ✓ (via pipeline) | — | — | n/a |
-| `frame_change` / `selection_change` / `measurement` events | — | ✓ | — | — | n/a |
+| Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
+| `frame_change` callback | ✓ (React prop) | ✓ (Python event) | — | — | n/a |
+| `selection_change` / `measurement` events | — | ✓ | — | — | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | — | — | n/a |
 
 Notes:
 
 - **host** means the parent app provides the file picker (the JupyterLab file browser, the VS Code explorer); megane itself does not render one.
-- **opt-in** for the widget pipeline editor means it is shown only when the widget is instantiated with `pipeline=True` (see `src/components/WidgetViewer.tsx`).
+- **opt-in** for the widget pipeline editor means it is shown only when the widget is instantiated with `pipeline=True` (see `python/megane/widget.py` `MolecularViewer.__init__` and `src/components/WidgetViewer.tsx`). Two viewers in the same notebook with `pipeline=True` share editor state.
 - The standalone app is the only platform with `megane serve` WebSocket streaming; other platforms load full trajectories into memory.
+- The standalone React `MeganeViewer` exposes an `onFrameChange?: (frame: number) => void` prop that fires on every trajectory frame transition — useful for keeping a host Plotly figure in sync.
 
 ## Load methods / APIs
 
@@ -81,9 +88,7 @@ How data gets into the viewer on each platform:
 
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
-- **VSCode does not register XTC or LAMMPS dump trajectories.** `.xtc` and `.lammpstrj` cannot be opened via the VS Code custom editor. ASE `.traj` files are registered and can be opened directly.
-- **JupyterLab does not register any trajectory format.** Only the six structure file types in `jupyterlab-megane/src/filetypes.ts` are registered.
-- **JupyterLab does not register LAMMPS data.** `.data` / `.lammps` is not in the `IFileType` list.
+- **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.lammpstrj` / `.dump` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
-- **Jupyter widget pipeline editor is off by default.** It is rendered only when the widget is created with `pipeline=True`.
-- **Plotly / ipywidgets event integration is widget-only.** Other platforms do not emit `frame_change`, `selection_change`, or `measurement` events to a host.
+- **Jupyter widget pipeline editor is off by default.** It is rendered only when the widget is created with `pipeline=True`. Two viewers in the same notebook both opted in share editor state.
+- **`selection_change` / `measurement` events are widget-only.** Other platforms do not emit these to a host. The standalone React component does expose `onFrameChange` (see UI features table).
