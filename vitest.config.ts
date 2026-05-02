@@ -21,6 +21,10 @@ export default defineConfig({
         __dirname,
         "tests/ts/__stubs__/jupyterlab-services.ts",
       ),
+      // `vscode` is injected by the VS Code extension host at runtime and is
+      // not present in any node_modules. Tests mock it via vi.mock(); the stub
+      // only needs to satisfy resolution.
+      vscode: path.resolve(__dirname, "tests/ts/__stubs__/vscode.ts"),
     },
   },
   test: {
