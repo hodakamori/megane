@@ -1,11 +1,12 @@
 /**
- * Modify node — changes visual properties (scale, opacity) of incoming data.
+ * Modify node — changes visual properties (scale, opacity, color scheme) of incoming data.
  * Accepts particle or bond input.
  */
 
 import type { NodeProps, Node } from "@xyflow/react";
 import type { PipelineNodeData } from "../../pipeline/execute";
 import type { ModifyParams } from "../../pipeline/types";
+import { COLOR_SCHEME_LABELS, type ColorScheme } from "../../constants";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
 
@@ -34,9 +35,24 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 3,
 };
 
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  fontSize: 15,
+  padding: "3px 6px",
+  borderRadius: 4,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  color: "#1e293b",
+  cursor: "pointer",
+  outline: "none",
+};
+
+const COLOR_SCHEMES = Object.entries(COLOR_SCHEME_LABELS) as [ColorScheme, string][];
+
 export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
   const params = data.params as ModifyParams;
+  const colorScheme = params.colorScheme ?? "element";
 
   return (
     <NodeShell id={id} nodeType="modify" enabled={data.enabled}>
@@ -74,6 +90,22 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
             />
             <span style={valueStyle}>{`${Math.round(params.opacity * 100)}%`}</span>
           </div>
+        </div>
+        <div>
+          <div style={labelStyle}>Color Scheme</div>
+          <select
+            data-testid="modify-node-color-scheme"
+            className="nodrag"
+            value={colorScheme}
+            onChange={(e) => updateNodeParams(id, { colorScheme: e.target.value as ColorScheme })}
+            style={selectStyle}
+          >
+            {COLOR_SCHEMES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </NodeShell>

@@ -1,8 +1,10 @@
 import type { PipelineData, ParticleData, BondData, ModifyParams } from "../types";
+import { computeColorOverrides } from "../../constants";
 
 export function executeModify(
   params: ModifyParams,
   inputs: Map<string, PipelineData[]>,
+  atomLabels: string[] | null = null,
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
   const inData = inputs.get("in")?.[0];
@@ -44,10 +46,14 @@ export function executeModify(
       }
     }
 
+    const colorScheme = params.colorScheme ?? "element";
+    const colorOverrides = computeColorOverrides(colorScheme, particle.source, atomLabels);
+
     const modified: ParticleData = {
       ...particle,
       scaleOverrides: scaleArr,
       opacityOverrides: opacityArr,
+      colorOverrides,
     };
     outputs.set("out", modified);
   } else if (inData.type === "bond") {

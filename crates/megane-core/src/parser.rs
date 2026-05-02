@@ -13,6 +13,8 @@ pub struct Atom {
     pub y: f32,
     pub z: f32,
     pub element: u8,
+    pub chain_id: u8,
+    pub bfactor: f32,
 }
 
 /// Common result type for all structure format parsers.
@@ -26,6 +28,12 @@ pub struct ParsedStructure {
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
     pub atom_labels: Option<Vec<String>>,
+    /// Per-atom chain IDs encoded as ASCII bytes (e.g. b'A'=65, b'B'=66).
+    /// Empty vec when the format does not carry chain information.
+    pub chain_ids: Vec<u8>,
+    /// Per-atom B-factors (temperature factors) in Å².
+    /// Empty vec when the format does not carry B-factor information.
+    pub bfactors: Vec<f32>,
     /// Embedded vector channels (e.g. GRO velocities).
     /// Empty for formats that carry no per-atom vector quantities.
     pub vector_channels: Vec<crate::trajectory::VectorChannel>,
@@ -88,7 +96,17 @@ fn parse_atom_line(line: &str) -> Option<(i32, Atom)> {
     let z: f32 = line[46..54].trim().parse().ok()?;
     let element = parse_element(line);
 
-    Some((serial, Atom { x, y, z, element }))
+    // Chain ID: column 21 (0-indexed), single character
+    let chain_id = line.as_bytes().get(21).copied().unwrap_or(b' ');
+
+    // B-factor: columns 60-66 (0-indexed)
+    let bfactor = if line.len() >= 66 {
+        line[60..66].trim().parse().unwrap_or(0.0)
+    } else {
+        0.0
+    };
+
+    Some((serial, Atom { x, y, z, element, chain_id, bfactor }))
 }
 
 /// Parse CRYST1 record and convert cell parameters to a 3x3 matrix.
@@ -199,6 +217,10 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut first_model_labels: Vec<String> = Vec::new();
     let mut has_model_record = false;
     let mut model_count: usize = 0;
+    let mut first_model_chain_ids: Vec<u8> = Vec::new();
+    let mut first_model_bfactors: Vec<f32> = Vec::new();
+    let mut current_chain_ids: Vec<u8> = Vec::new();
+    let mut current_bfactors: Vec<f32> = Vec::new();
 
     for line in text.lines() {
         let record = if line.len() >= 6 {
@@ -212,10 +234,14 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 has_model_record = true;
                 current_model = Vec::new();
                 current_labels = Vec::new();
+                current_chain_ids = Vec::new();
+                current_bfactors = Vec::new();
             }
             "ENDMDL" => {
                 if model_count == 0 {
                     first_model_labels = std::mem::take(&mut current_labels);
+                    first_model_chain_ids = std::mem::take(&mut current_chain_ids);
+                    first_model_bfactors = std::mem::take(&mut current_bfactors);
                 }
                 all_models.push(std::mem::take(&mut current_model));
                 model_count += 1;
@@ -241,6 +267,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         ""
                     };
                     current_labels.push(format!("{}{}", res_name, res_seq));
+                    current_chain_ids.push(atom.chain_id);
+                    current_bfactors.push(atom.bfactor);
                     current_model.push(atom);
                 }
             }
@@ -255,6 +283,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     // If no MODEL/ENDMDL, treat all atoms as a single model
     if !has_model_record && !current_model.is_empty() {
         first_model_labels = current_labels;
+        first_model_chain_ids = current_chain_ids;
+        first_model_bfactors = current_bfactors;
         all_models.push(current_model);
     }
 
@@ -321,6 +351,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions,
         atom_labels,
+        chain_ids: first_model_chain_ids,
+        bfactors: first_model_bfactors,
         vector_channels: vec![],
     })
 }

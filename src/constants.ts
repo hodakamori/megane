@@ -437,3 +437,175 @@ export function getElementSymbol(atomicNum: number): string {
 export function getAtomicMass(atomicNum: number): number {
   return ATOMIC_MASSES[atomicNum] ?? 0;
 }
+
+// ─── Color Schemes ────────────────────────────────────────────────────
+
+/** Available atom color schemes. */
+export type ColorScheme = "element" | "residue" | "chain" | "bfactor";
+
+/** Human-readable label for each color scheme. */
+export const COLOR_SCHEME_LABELS: Record<ColorScheme, string> = {
+  element: "Element (CPK)",
+  residue: "Residue",
+  chain: "Chain",
+  bfactor: "B-Factor",
+};
+
+/**
+ * Shapely-style residue color palette (rasmol-amino).
+ * Keys are three-letter residue name codes.
+ */
+const RESIDUE_COLORS: Record<string, [number, number, number]> = {
+  ALA: [0.784, 0.784, 0.784],
+  ARG: [0.169, 0.169, 1.0],
+  ASN: [0.114, 0.824, 0.824],
+  ASP: [0.902, 0.051, 0.051],
+  CYS: [0.902, 0.902, 0.118],
+  GLN: [0.114, 0.824, 0.824],
+  GLU: [0.902, 0.051, 0.051],
+  GLY: [0.933, 0.933, 0.933],
+  HIS: [0.506, 0.506, 0.824],
+  ILE: [0.588, 0.588, 0.039],
+  LEU: [0.588, 0.588, 0.039],
+  LYS: [0.169, 0.169, 1.0],
+  MET: [0.902, 0.902, 0.118],
+  PHE: [0.333, 0.333, 0.667],
+  PRO: [0.580, 0.333, 0.067],
+  SER: [1.0, 0.498, 0.0],
+  THR: [1.0, 0.498, 0.0],
+  TRP: [0.184, 0.471, 0.471],
+  TYR: [0.184, 0.471, 0.471],
+  VAL: [0.588, 0.588, 0.039],
+  // Nucleic acids
+  A: [0.698, 1.0, 0.212],
+  T: [0.996, 0.227, 0.376],
+  G: [1.0, 0.851, 0.0],
+  C: [0.502, 0.769, 1.0],
+  U: [0.996, 0.227, 0.376],
+  DA: [0.698, 1.0, 0.212],
+  DT: [0.996, 0.227, 0.376],
+  DG: [1.0, 0.851, 0.0],
+  DC: [0.502, 0.769, 1.0],
+};
+const RESIDUE_DEFAULT: [number, number, number] = [0.6, 0.6, 0.6];
+
+/** Categorical palette for chain coloring (up to 16 chains). */
+const CHAIN_PALETTE: [number, number, number][] = [
+  [0.890, 0.102, 0.11],
+  [0.216, 0.494, 0.722],
+  [0.302, 0.686, 0.29],
+  [0.596, 0.306, 0.639],
+  [1.0, 0.498, 0.0],
+  [1.0, 1.0, 0.2],
+  [0.651, 0.337, 0.157],
+  [0.969, 0.506, 0.749],
+  [0.4, 0.761, 0.647],
+  [0.988, 0.553, 0.384],
+  [0.553, 0.627, 0.796],
+  [0.702, 0.702, 0.702],
+  [0.749, 0.357, 0.09],
+  [0.0, 0.502, 0.502],
+  [0.749, 0.749, 0.0],
+  [0.502, 0.0, 0.502],
+];
+
+/** Sample a viridis-like gradient for B-factor coloring. t in [0, 1]. */
+function viridis(t: number): [number, number, number] {
+  // Simplified viridis: purple→blue→green→yellow
+  const stops: [number, [number, number, number]][] = [
+    [0.0, [0.267, 0.004, 0.329]],
+    [0.25, [0.229, 0.322, 0.545]],
+    [0.5, [0.128, 0.566, 0.551]],
+    [0.75, [0.369, 0.788, 0.384]],
+    [1.0, [0.993, 0.906, 0.144]],
+  ];
+  for (let i = 1; i < stops.length; i++) {
+    const [t0, c0] = stops[i - 1];
+    const [t1, c1] = stops[i];
+    if (t <= t1) {
+      const f = (t - t0) / (t1 - t0);
+      return [c0[0] + f * (c1[0] - c0[0]), c0[1] + f * (c1[1] - c0[1]), c0[2] + f * (c1[2] - c0[2])];
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+
+/**
+ * Compute per-atom RGB color overrides (Float32Array of length nAtoms * 3)
+ * for the given color scheme. Returns null for the "element" scheme (default).
+ */
+export function computeColorOverrides(
+  scheme: ColorScheme,
+  snapshot: { nAtoms: number; elements: Uint8Array; chainIds: Uint8Array | null; bFactors: Float32Array | null },
+  atomLabels: string[] | null,
+): Float32Array | null {
+  if (scheme === "element") return null;
+
+  const { nAtoms, elements, chainIds, bFactors } = snapshot;
+  const out = new Float32Array(nAtoms * 3);
+
+  if (scheme === "residue") {
+    for (let i = 0; i < nAtoms; i++) {
+      const label = atomLabels?.[i] ?? "";
+      // Extract 3-letter residue name from label like "ALA42" or just "ALA"
+      const resname = label.replace(/\d+$/, "").trim().toUpperCase();
+      const [r, g, b] = RESIDUE_COLORS[resname] ?? RESIDUE_DEFAULT;
+      out[i * 3] = r;
+      out[i * 3 + 1] = g;
+      out[i * 3 + 2] = b;
+    }
+    return out;
+  }
+
+  if (scheme === "chain") {
+    if (!chainIds || chainIds.length === 0) {
+      // No chain data: fall back to element colors
+      return null;
+    }
+    // Map chain byte → palette index
+    const chainToIdx = new Map<number, number>();
+    let nextIdx = 0;
+    for (let i = 0; i < nAtoms; i++) {
+      const ch = chainIds[i];
+      if (!chainToIdx.has(ch)) {
+        chainToIdx.set(ch, nextIdx % CHAIN_PALETTE.length);
+        nextIdx++;
+      }
+      const [r, g, b] = CHAIN_PALETTE[chainToIdx.get(ch)!];
+      out[i * 3] = r;
+      out[i * 3 + 1] = g;
+      out[i * 3 + 2] = b;
+    }
+    return out;
+  }
+
+  if (scheme === "bfactor") {
+    if (!bFactors || bFactors.length === 0) {
+      return null;
+    }
+    let bMin = Infinity;
+    let bMax = -Infinity;
+    for (let i = 0; i < nAtoms; i++) {
+      if (bFactors[i] < bMin) bMin = bFactors[i];
+      if (bFactors[i] > bMax) bMax = bFactors[i];
+    }
+    const range = bMax - bMin || 1;
+    for (let i = 0; i < nAtoms; i++) {
+      const t = (bFactors[i] - bMin) / range;
+      const [r, g, b] = viridis(Math.max(0, Math.min(1, t)));
+      out[i * 3] = r;
+      out[i * 3 + 1] = g;
+      out[i * 3 + 2] = b;
+    }
+    return out;
+  }
+
+  // Fallback: use element colors (same as "element" scheme)
+  for (let i = 0; i < nAtoms; i++) {
+    const [r, g, b] = getColor(elements[i]);
+    out[i * 3] = r;
+    out[i * 3 + 1] = g;
+    out[i * 3 + 2] = b;
+  }
+  return out;
+}

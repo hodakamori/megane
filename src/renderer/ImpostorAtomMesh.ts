@@ -33,6 +33,7 @@ export class ImpostorAtomMesh {
   private opacityOverrideBuf: Float32Array;
   private nAtoms = 0;
   private capacity: number;
+  private lastElements: Uint8Array | null = null;
 
   constructor(maxAtoms: number = 1_000_000) {
     this.capacity = maxAtoms;
@@ -91,6 +92,7 @@ export class ImpostorAtomMesh {
   loadSnapshot(snapshot: Snapshot): void {
     const { nAtoms, positions, elements } = snapshot;
     this.nAtoms = nAtoms;
+    this.lastElements = elements;
 
     // Grow buffers if needed
     if (nAtoms > this.capacity) {
@@ -168,6 +170,24 @@ export class ImpostorAtomMesh {
       this.material.depthWrite = false;
       this.material.needsUpdate = true;
     }
+  }
+
+  /** Set per-atom color overrides (RGB, length = nAtoms * 3, values in [0,1]). */
+  setColorOverrides(overrides: Float32Array): void {
+    this.colorBuf.set(overrides.subarray(0, this.nAtoms * 3));
+    this.colorAttr.needsUpdate = true;
+  }
+
+  /** Restore element-based colors. */
+  clearColorOverrides(): void {
+    if (!this.nAtoms || !this.lastElements) return;
+    for (let i = 0; i < this.nAtoms; i++) {
+      const [r, g, b] = getColor(this.lastElements[i]);
+      this.colorBuf[i * 3] = r;
+      this.colorBuf[i * 3 + 1] = g;
+      this.colorBuf[i * 3 + 2] = b;
+    }
+    this.colorAttr.needsUpdate = true;
   }
 
   /** Clear all per-atom overrides, reverting to global uniforms. */

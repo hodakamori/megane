@@ -10,6 +10,10 @@ export interface Snapshot {
   bonds: Uint32Array; // length = nBonds * 2
   bondOrders: Uint8Array | null; // length = nBonds (1=single,2=double,3=triple,4=aromatic)
   box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
+  /** Per-atom chain IDs as ASCII bytes (e.g. 65='A', 66='B'). Null when not available. */
+  chainIds: Uint8Array | null; // length = nAtoms
+  /** Per-atom B-factors (temperature factors) in Å². Null when not available. */
+  bFactors: Float32Array | null; // length = nAtoms
 }
 
 /** Data mode for the application. */
@@ -68,6 +72,9 @@ export interface AtomRenderer {
   setOpacity?(opacity: number): void;
   setScaleOverrides?(overrides: Float32Array): void;
   setOpacityOverrides?(overrides: Float32Array): void;
+  /** Per-atom RGB color overrides (length = nAtoms * 3, values in [0,1]). */
+  setColorOverrides?(overrides: Float32Array): void;
+  clearColorOverrides?(): void;
   clearOverrides?(): void;
   dispose(): void;
 }

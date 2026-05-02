@@ -54,6 +54,8 @@ pub struct ParseResult {
     box_matrix: Vec<f32>,
     frame_data: Vec<f32>,
     atom_labels: String,
+    chain_ids: Vec<u8>,
+    bfactors: Vec<f32>,
     vector_channel_count: u32,
     vector_channel_meta: String,
     vector_channel_data: Vec<f32>,
@@ -146,6 +148,28 @@ impl ParseResult {
     pub fn vector_channel_data(&self) -> Float32Array {
         Float32Array::from(&self.vector_channel_data[..])
     }
+
+    /// Per-atom chain IDs as Uint8Array (ASCII bytes; empty when not available).
+    pub fn chain_ids(&self) -> Uint8Array {
+        Uint8Array::from(&self.chain_ids[..])
+    }
+
+    /// Per-atom B-factors as Float32Array (empty when not available).
+    pub fn bfactors(&self) -> Float32Array {
+        Float32Array::from(&self.bfactors[..])
+    }
+
+    /// Whether chain ID data is available (non-empty chain_ids).
+    #[wasm_bindgen(getter)]
+    pub fn has_chain_ids(&self) -> bool {
+        !self.chain_ids.is_empty()
+    }
+
+    /// Whether B-factor data is available (non-empty bfactors).
+    #[wasm_bindgen(getter)]
+    pub fn has_bfactors(&self) -> bool {
+        !self.bfactors.is_empty()
+    }
 }
 
 impl ParseResult {
@@ -188,6 +212,8 @@ impl ParseResult {
             box_matrix,
             frame_data,
             atom_labels,
+            chain_ids: data.chain_ids,
+            bfactors: data.bfactors,
             vector_channel_count,
             vector_channel_meta,
             vector_channel_data,
