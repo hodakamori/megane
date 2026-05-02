@@ -5,6 +5,7 @@
  */
 
 import type { Snapshot, Frame, TrajectoryMeta, BondSource, VectorFrame } from "../types";
+import type { ColorScheme } from "../colorSchemes";
 
 // ─── Pipeline Data Types ──────────────────────────────────────────────
 
@@ -339,6 +340,7 @@ export interface ViewportParams {
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
+  colorScheme: ColorScheme;
 }
 
 export interface FilterParams {
@@ -407,7 +409,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "add_bond":
       return { type, bondSource: "distance" };
     case "viewport":
-      return { type, perspective: false, cellAxesVisible: true, pivotMarkerVisible: true };
+      return { type, perspective: false, cellAxesVisible: true, pivotMarkerVisible: true, colorScheme: "byElement" };
     case "filter":
       return { type, query: "", bond_query: "" };
     case "modify":
@@ -486,6 +488,7 @@ export interface ViewportState {
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
+  colorScheme: ColorScheme;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -499,6 +502,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   perspective: false,
   cellAxesVisible: true,
   pivotMarkerVisible: true,
+  colorScheme: "byElement",
 };
 
 // ─── Node Errors ──────────────────────────────────────────────────────

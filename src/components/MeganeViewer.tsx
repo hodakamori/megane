@@ -117,9 +117,9 @@ export function MeganeViewer({
     setBondCount(snapshot?.nBonds ?? 0);
     const renderer = rendererRef.current;
     if (renderer) {
-      const vs = usePipelineStore.getState().viewportState;
-      applyViewportState(renderer, vs, null, primaryNodeIdRef.current);
-      prevViewportStateRef.current = vs;
+      const state = usePipelineStore.getState();
+      applyViewportState(renderer, state.viewportState, null, primaryNodeIdRef.current, state.atomLabels);
+      prevViewportStateRef.current = state.viewportState;
     }
   }, [snapshot]);
 
@@ -135,7 +135,8 @@ export function MeganeViewer({
     const apply = (vs: ViewportState) => {
       const renderer = rendererRef.current;
       if (renderer) {
-        applyViewportState(renderer, vs, prevViewportStateRef.current, primaryNodeIdRef.current);
+        const atomLabels = usePipelineStore.getState().atomLabels;
+        applyViewportState(renderer, vs, prevViewportStateRef.current, primaryNodeIdRef.current, atomLabels);
         prevViewportStateRef.current = vs;
       }
 
@@ -243,13 +244,15 @@ export function MeganeViewer({
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
     renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
+    const storeState = usePipelineStore.getState();
     applyViewportState(
       renderer,
-      usePipelineStore.getState().viewportState,
+      storeState.viewportState,
       null,
       primaryNodeIdRef.current,
+      storeState.atomLabels,
     );
-    prevViewportStateRef.current = usePipelineStore.getState().viewportState;
+    prevViewportStateRef.current = storeState.viewportState;
   }, []);
 
   const handleTogglePipeline = useCallback(() => {

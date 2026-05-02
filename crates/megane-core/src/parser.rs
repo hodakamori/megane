@@ -26,6 +26,12 @@ pub struct ParsedStructure {
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
     pub atom_labels: Option<Vec<String>>,
+    /// Per-atom chain IDs encoded as raw ASCII bytes (e.g. b'A'=65, b'B'=66).
+    /// None when the format does not carry chain information.
+    pub chain_ids: Option<Vec<u8>>,
+    /// Per-atom B-factors (temperature factors) in Å².
+    /// None when the format does not carry B-factor information.
+    pub bfactors: Option<Vec<f32>>,
     /// Embedded vector channels (e.g. GRO velocities).
     /// Empty for formats that carry no per-atom vector quantities.
     pub vector_channels: Vec<crate::trajectory::VectorChannel>,
@@ -196,7 +202,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut all_models: Vec<Vec<Atom>> = Vec::new();
     let mut current_model: Vec<Atom> = Vec::new();
     let mut current_labels: Vec<String> = Vec::new();
+    let mut current_chain_ids: Vec<u8> = Vec::new();
+    let mut current_bfactors: Vec<f32> = Vec::new();
     let mut first_model_labels: Vec<String> = Vec::new();
+    let mut first_model_chain_ids: Vec<u8> = Vec::new();
+    let mut first_model_bfactors: Vec<f32> = Vec::new();
     let mut has_model_record = false;
     let mut model_count: usize = 0;
 
@@ -212,10 +222,14 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 has_model_record = true;
                 current_model = Vec::new();
                 current_labels = Vec::new();
+                current_chain_ids = Vec::new();
+                current_bfactors = Vec::new();
             }
             "ENDMDL" => {
                 if model_count == 0 {
                     first_model_labels = std::mem::take(&mut current_labels);
+                    first_model_chain_ids = std::mem::take(&mut current_chain_ids);
+                    first_model_bfactors = std::mem::take(&mut current_bfactors);
                 }
                 all_models.push(std::mem::take(&mut current_model));
                 model_count += 1;
@@ -241,6 +255,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         ""
                     };
                     current_labels.push(format!("{}{}", res_name, res_seq));
+                    // Extract chain ID (col 21, 0-indexed)
+                    let chain_id = if line.len() >= 22 {
+                        line.as_bytes()[21]
+                    } else {
+                        b' '
+                    };
+                    current_chain_ids.push(chain_id);
+                    // Extract B-factor (cols 60-66, 0-indexed)
+                    let bfactor = if line.len() >= 66 {
+                        line[60..66].trim().parse::<f32>().unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
+                    current_bfactors.push(bfactor);
                     current_model.push(atom);
                 }
             }
@@ -255,6 +283,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     // If no MODEL/ENDMDL, treat all atoms as a single model
     if !has_model_record && !current_model.is_empty() {
         first_model_labels = current_labels;
+        first_model_chain_ids = current_chain_ids;
+        first_model_bfactors = current_bfactors;
         all_models.push(current_model);
     }
 
@@ -311,6 +341,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    // Only expose chain IDs when at least one is non-space (multi-chain PDB)
+    let chain_ids = if first_model_chain_ids.iter().any(|&c| c != b' ' && c != 0) {
+        Some(first_model_chain_ids)
+    } else {
+        None
+    };
+
+    // Only expose B-factors when at least one is non-zero
+    let bfactors = if first_model_bfactors.iter().any(|&b| b != 0.0) {
+        Some(first_model_bfactors)
+    } else {
+        None
+    };
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -321,6 +365,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions,
         atom_labels,
+        chain_ids,
+        bfactors,
         vector_channels: vec![],
     })
 }

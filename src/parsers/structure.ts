@@ -28,6 +28,8 @@ interface WasmParseResult {
   n_frames: number;
   has_box: boolean;
   has_atom_labels: boolean;
+  has_chain_ids: boolean;
+  has_bfactors: boolean;
   atom_labels: string;
   vector_channel_count: number;
   vector_channel_meta: string;
@@ -37,6 +39,8 @@ interface WasmParseResult {
   bond_orders(): Uint8Array;
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
+  chain_ids(): Uint8Array;
+  bfactors(): Float32Array;
   vector_channel_data(): Float32Array;
   free(): void;
 }
@@ -169,6 +173,8 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
     bonds: result.bonds(),
     bondOrders: result.bond_orders(),
     box: result.has_box ? result.box_matrix() : null,
+    atomChainIds: result.has_chain_ids ? result.chain_ids() : null,
+    atomBFactors: result.has_bfactors ? result.bfactors() : null,
   };
 
   const frames: Frame[] = [];

@@ -69,7 +69,7 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
     offset += 9 * 4;
   }
 
-  return { nAtoms, nBonds, nFileBonds: nBonds, positions, elements, bonds, bondOrders, box };
+  return { nAtoms, nBonds, nFileBonds: nBonds, positions, elements, bonds, bondOrders, box, atomChainIds: null, atomBFactors: null };
 }
 
 export function decodeFrame(buffer: ArrayBuffer): Frame {

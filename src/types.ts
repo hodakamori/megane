@@ -10,6 +10,10 @@ export interface Snapshot {
   bonds: Uint32Array; // length = nBonds * 2
   bondOrders: Uint8Array | null; // length = nBonds (1=single,2=double,3=triple,4=aromatic)
   box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
+  /** Per-atom chain IDs as raw ASCII bytes (e.g. 65='A'). Null for formats without chain info. */
+  atomChainIds: Uint8Array | null;
+  /** Per-atom B-factors (temperature factors) in Å². Null for formats without B-factor info. */
+  atomBFactors: Float32Array | null;
 }
 
 /** Data mode for the application. */
@@ -62,7 +66,7 @@ export interface TrajectoryMeta {
 /** Interface for atom rendering backends. */
 export interface AtomRenderer {
   readonly mesh: THREE.Object3D;
-  loadSnapshot(snapshot: Snapshot): void;
+  loadSnapshot(snapshot: Snapshot, colorCtx?: import("./colorSchemes").ColorContext): void;
   updatePositions(positions: Float32Array): void;
   setScale?(scale: number, snapshot: Snapshot): void;
   setOpacity?(opacity: number): void;
@@ -75,7 +79,7 @@ export interface AtomRenderer {
 /** Interface for bond rendering backends. */
 export interface BondRenderer {
   readonly mesh: THREE.Object3D;
-  loadSnapshot(snapshot: Snapshot): void;
+  loadSnapshot(snapshot: Snapshot, colorCtx?: import("./colorSchemes").ColorContext): void;
   updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void;
   setOpacity?(opacity: number): void;
   setScale?(scale: number, snapshot: Snapshot): void;

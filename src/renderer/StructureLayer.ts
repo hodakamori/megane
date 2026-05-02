@@ -6,6 +6,7 @@
 
 import * as THREE from "three";
 import type { Snapshot, Frame, AtomRenderer, BondRenderer } from "../types";
+import type { ColorContext } from "../colorSchemes";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
@@ -30,7 +31,7 @@ export class StructureLayer {
     this.scene = scene;
   }
 
-  loadSnapshot(snapshot: Snapshot): void {
+  loadSnapshot(snapshot: Snapshot, colorCtx?: ColorContext): void {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
@@ -39,7 +40,7 @@ export class StructureLayer {
       this.atomRenderer = atoms;
       this.scene.add(atoms.mesh);
     }
-    this.atomRenderer.loadSnapshot(snapshot);
+    this.atomRenderer.loadSnapshot(snapshot, colorCtx);
 
     if (this.atomScale !== 1.0 && this.atomRenderer.setScale) {
       this.atomRenderer.setScale(this.atomScale, snapshot);
@@ -64,6 +65,13 @@ export class StructureLayer {
         }
         this.cellRenderer.loadBox(snapshot.box);
       }
+    }
+  }
+
+  /** Recolor the already-loaded snapshot with a new color context (no camera reset). */
+  loadSnapshotWithColor(colorCtx: ColorContext | undefined): void {
+    if (this.snapshot && this.atomRenderer) {
+      this.atomRenderer.loadSnapshot(this.snapshot, colorCtx);
     }
   }
 
