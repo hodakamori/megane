@@ -286,10 +286,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         }
 
         // Y coordinates
-        let y_rec = match reader.read_record() {
-            Ok(r) => r,
-            Err(e) => return Err(e),
-        };
+        let y_rec = reader.read_record()?;
         if y_rec.len() != expected_coord_bytes {
             return Err(format!(
                 "DCD Y-coord record size {} != expected {}",
@@ -299,10 +296,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         }
 
         // Z coordinates
-        let z_rec = match reader.read_record() {
-            Ok(r) => r,
-            Err(e) => return Err(e),
-        };
+        let z_rec = reader.read_record()?;
         if z_rec.len() != expected_coord_bytes {
             return Err(format!(
                 "DCD Z-coord record size {} != expected {}",
