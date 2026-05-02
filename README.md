@@ -157,6 +157,7 @@ function App() {
 | GRO | `.gro` | GROMACS structure file |
 | XYZ | `.xyz` | Cartesian coordinate format |
 | MOL/SDF | `.mol`, `.sdf` | MDL Molfile (V2000) |
+| MOL2 | `.mol2` | Tripos MOL2 (multi-molecule, aromatic bonds) |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | CIF | `.cif` | Crystallographic Information File |
 

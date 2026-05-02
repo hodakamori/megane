@@ -33,6 +33,7 @@ Legend:
 | XYZ | `.xyz` | ✓ | API | ✓ | ✓ | ✓ |
 | MOL | `.mol` | ✓ | API | ✓ | ✓ | ✓ |
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ |
+| MOL2 | `.mol2` | ✓ | API | ✓ | ✓ | ✓ |
 | CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | — | ✓ | ✓ |
 
