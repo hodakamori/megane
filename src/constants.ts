@@ -470,7 +470,7 @@ const RESIDUE_COLORS: Record<string, [number, number, number]> = {
   LYS: [0.169, 0.169, 1.0],
   MET: [0.902, 0.902, 0.118],
   PHE: [0.333, 0.333, 0.667],
-  PRO: [0.580, 0.333, 0.067],
+  PRO: [0.58, 0.333, 0.067],
   SER: [1.0, 0.498, 0.0],
   THR: [1.0, 0.498, 0.0],
   TRP: [0.184, 0.471, 0.471],
@@ -491,7 +491,7 @@ const RESIDUE_DEFAULT: [number, number, number] = [0.6, 0.6, 0.6];
 
 /** Categorical palette for chain coloring (up to 16 chains). */
 const CHAIN_PALETTE: [number, number, number][] = [
-  [0.890, 0.102, 0.11],
+  [0.89, 0.102, 0.11],
   [0.216, 0.494, 0.722],
   [0.302, 0.686, 0.29],
   [0.596, 0.306, 0.639],
@@ -524,7 +524,11 @@ function viridis(t: number): [number, number, number] {
     const [t1, c1] = stops[i];
     if (t <= t1) {
       const f = (t - t0) / (t1 - t0);
-      return [c0[0] + f * (c1[0] - c0[0]), c0[1] + f * (c1[1] - c0[1]), c0[2] + f * (c1[2] - c0[2])];
+      return [
+        c0[0] + f * (c1[0] - c0[0]),
+        c0[1] + f * (c1[1] - c0[1]),
+        c0[2] + f * (c1[2] - c0[2]),
+      ];
     }
   }
   return stops[stops.length - 1][1];
@@ -536,7 +540,12 @@ function viridis(t: number): [number, number, number] {
  */
 export function computeColorOverrides(
   scheme: ColorScheme,
-  snapshot: { nAtoms: number; elements: Uint8Array; chainIds: Uint8Array | null; bFactors: Float32Array | null },
+  snapshot: {
+    nAtoms: number;
+    elements: Uint8Array;
+    chainIds: Uint8Array | null;
+    bFactors: Float32Array | null;
+  },
   atomLabels: string[] | null,
 ): Float32Array | null {
   if (scheme === "element") return null;

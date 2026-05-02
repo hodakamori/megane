@@ -106,7 +106,17 @@ fn parse_atom_line(line: &str) -> Option<(i32, Atom)> {
         0.0
     };
 
-    Some((serial, Atom { x, y, z, element, chain_id, bfactor }))
+    Some((
+        serial,
+        Atom {
+            x,
+            y,
+            z,
+            element,
+            chain_id,
+            bfactor,
+        },
+    ))
 }
 
 /// Parse CRYST1 record and convert cell parameters to a 3x3 matrix.

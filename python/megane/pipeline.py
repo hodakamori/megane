@@ -571,7 +571,11 @@ class Pipeline:
         elif ntype == "filter":
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
         elif ntype == "modify":
-            return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0), color_scheme=nd.get("colorScheme", "element"))
+            return Modify(
+                scale=nd.get("scale", 1.0),
+                opacity=nd.get("opacity", 1.0),
+                color_scheme=nd.get("colorScheme", "element"),
+            )
         elif ntype == "add_bond":
             bond_source = nd.get("bondSource", "distance")
             if bond_source == "file":
