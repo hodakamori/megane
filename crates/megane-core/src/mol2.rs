@@ -68,8 +68,7 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
         }
 
         // Section header
-        if trimmed.starts_with("@<TRIPOS>") {
-            let name = &trimmed["@<TRIPOS>".len()..];
+        if let Some(name) = trimmed.strip_prefix("@<TRIPOS>") {
             if name == "MOLECULE" {
                 molecule_count += 1;
                 if molecule_count > 1 {
