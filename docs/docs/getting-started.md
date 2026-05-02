@@ -90,6 +90,7 @@ function App() {
 | XYZ | `.xyz` | Simple cartesian coordinate format |
 | MOL | `.mol` | MDL Molfile (V2000) — small molecules with bond information |
 | XTC | `.xtc` | GROMACS compressed trajectory |
+| DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | CIF | `.cif` | Crystallographic Information File |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |

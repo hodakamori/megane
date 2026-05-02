@@ -1,6 +1,7 @@
 pub mod atomic;
 pub mod bonds;
 pub mod cif;
+pub mod dcd;
 pub mod gro;
 pub mod lammps_data;
 pub mod lammpstrj;

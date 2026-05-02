@@ -2,7 +2,7 @@ use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    bonds, cif, gro, lammps_data, lammpstrj, mol, mol2, parser, top, traj, xtc, xyz,
+    bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, parser, top, traj, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -406,6 +406,39 @@ pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
         n_atoms: data.n_atoms as u32,
         n_frames: data.n_frames as u32,
         timestep_ps: data.timestep_ps,
+        has_box,
+        box_matrix,
+        frame_data,
+        vector_channel_count,
+        vector_channel_meta,
+        vector_channel_data,
+    })
+}
+
+/// Parse a DCD trajectory binary (CHARMM/NAMD/X-PLOR) and return frame data.
+#[wasm_bindgen]
+pub fn parse_dcd_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
+    let dcd_data = dcd::parse_dcd(data).map_err(|e| JsError::new(&e))?;
+
+    let has_box = dcd_data.box_matrix.is_some();
+    let box_matrix = match dcd_data.box_matrix {
+        Some(m) => m.to_vec(),
+        None => Vec::new(),
+    };
+
+    let mut frame_data: Vec<f32> = Vec::new();
+    for frame in &dcd_data.frame_positions {
+        frame_data.extend_from_slice(frame);
+    }
+
+    let vector_channel_count = dcd_data.vector_channels.len() as u32;
+    let (vector_channel_meta, vector_channel_data) =
+        serialize_vector_channels(&dcd_data.vector_channels);
+
+    Ok(XtcParseResult {
+        n_atoms: dcd_data.n_atoms as u32,
+        n_frames: dcd_data.n_frames as u32,
+        timestep_ps: dcd_data.timestep_ps,
         has_box,
         box_matrix,
         frame_data,

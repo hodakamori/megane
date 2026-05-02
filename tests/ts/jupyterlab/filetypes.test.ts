@@ -67,16 +67,18 @@ describe("jupyterlab filetypes", () => {
     expect(dump?.fileFormat).toBe("text");
   });
 
-  it("ships ASE-traj and XTC binary filetypes", () => {
-    expect(STRUCTURE_FILETYPES_BINARY).toHaveLength(2);
+  it("ships ASE-traj, XTC, and DCD binary filetypes", () => {
+    expect(STRUCTURE_FILETYPES_BINARY).toHaveLength(3);
     const names = STRUCTURE_FILETYPES_BINARY.map((f) => f.name).sort();
-    expect(names).toEqual(["megane-ase-traj", "megane-xtc"]);
+    expect(names).toEqual(["megane-ase-traj", "megane-dcd", "megane-xtc"]);
     for (const ft of STRUCTURE_FILETYPES_BINARY) {
       expect(ft.fileFormat).toBe("base64");
       expect(ft.contentType).toBe("file");
     }
     const xtc = STRUCTURE_FILETYPES_BINARY.find((f) => f.name === "megane-xtc");
     expect(xtc?.extensions).toEqual([".xtc"]);
+    const dcd = STRUCTURE_FILETYPES_BINARY.find((f) => f.name === "megane-dcd");
+    expect(dcd?.extensions).toEqual([".dcd"]);
   });
 
   it("ensures every extension starts with '.' and every name is unique across all arrays", () => {
@@ -101,6 +103,6 @@ describe("jupyterlab filetypes", () => {
       STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
     );
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(8);
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(2);
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(3);
   });
 });
