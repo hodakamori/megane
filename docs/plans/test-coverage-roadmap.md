@@ -7,7 +7,8 @@
 - ✅ Phase 2 — `src/stream/` unit tests (2 files, 361 LOC): commit `61ada6e`
 - ✅ Phase 3 — `src/ai/` unit tests (4 files, 539 LOC) + `parseFrontmatter` export: commit `db0b679`
 - ✅ Phase 4 — `src/renderer/` pure helpers (Selection, Picking, CameraManager, shaders) — 4 files, 788 LOC, 69 tests
-- ⬜ Phase 5 — `src/components/nodes/` UI tests (split: NodeShell + 4, then remaining 8)
+- ✅ Phase 5a — `NodeShell` + 4 node components (commit `a9a0540`)
+- ✅ Phase 5b — remaining 7 node components (LabelGenerator, LoadTrajectory, LoadVector, Modify, PolyhedronGenerator, Streaming, VectorOverlay) — 7 files, 56 tests
 - ⬜ Phase 6 — `jupyterlab-megane/src/` (filetypes, wasmLoader, factory)
 - ⬜ Phase 7 — `vscode-megane/src/extension.ts` with vscode mock
 - ⬜ Phase 8 — codecov threshold tightening (`1% → 2%`) + `fail_ci_on_error: true`
@@ -140,16 +141,23 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **注意**: `three` の `WebGLRenderer` を import すると jsdom で死ぬため、テストは `Selection` / `Picking` / `CameraManager` を **個別 import** し、副作用 import を避ける
 - **規模**: M
 
-## Phase 5 — `src/components/nodes/` (xyflow ノード UI)
+## Phase 5 — `src/components/nodes/` (xyflow ノード UI) ✅ DONE
+
+**実施内容**: 2 PR に分割。`tests/ts/components/nodes/_xyflowMock.tsx` で `<Handle>` を `<div>` に差し替え (xyflow 内部 store 不要)、`tests/ts/components/nodes/_helpers.tsx` の `seedPipelineStore()` で `defaultParams()` ベースのノードを直接 `usePipelineStore.setState` に投入するスキャフォールドを共有。
+
+- **Phase 5a** (commit `a9a0540`, 5 ファイル / 46 tests): `NodeShell` (17), `LoadStructureNode` (9), `AddBondNode` (7), `FilterNode` (8), `ViewportNode` (5)。`setStructureLoadHandler(null)` で各テスト後に副作用クリーンアップ。`AddBondNode` は `parseTopBonds` を `vi.mock`、`FilterNode` は `validateQuery` / `validateBondQuery` を `vi.mock` してネットワーク・WASM 経路を回避
+- **Phase 5b** (本 PR, 7 ファイル / 56 tests): `LabelGeneratorNode` (5), `LoadTrajectoryNode` (9), `LoadVectorNode` (7), `ModifyNode` (7), `PolyhedronGeneratorNode` (14), `StreamingNode` (10), `VectorOverlayNode` (4)
+  - ファイルアップロード系 3 件 (`LoadTrajectory` / `LoadVector` / `LoadStructure` 同パターン): `Object.defineProperty(input, "files", { value: [file] })` → `fireEvent.change` で hidden `<input type="file">` をシム、`fireEvent.drop(dropZone, { dataTransfer: { files } })` で D&D 経路、サポート外拡張子・ハンドラ未設定・ハンドラ解除の 3 ガード、複数ファイルドロップ時の最初の一致選択を検証
+  - `ModifyNode` / `VectorOverlayNode`: スライダ `change` event での `parseFloat` 経路、`%` / 1-decimal フォーマット、`nodrag` クラス保持
+  - `PolyhedronGeneratorNode`: 12 中心 + 5 リガンド chip 列挙、選択トグルのセット差分 (`Set.add` / `Set.delete` → `[...set]` で配列再構築)、`showEdges=false` で edge color/width 非表示、`getAllByRole("slider")` の順序 (max distance → opacity → edge width) で個別検証、color picker 経路
+  - `StreamingNode`: `params.connected` から status 文言・色、`nodeStreamingData[id]` の snapshot / streamProvider から atom/bond/frame カウント文字列 (`"5 atoms, 4 bonds, 123 frames"`)、bond/trajectory/cell ハンドル disable ロジック (`hasBond` / `hasTrajectory` / `hasCell` ゲート)
+  - `LabelGeneratorNode`: `TabSelector<T>` の active/inactive 色 (`#3b82f6` vs `#94a3b8`)、active タブクリックの no-op ガード
 
 12 ファイル (合計 1,359 行)。`NodeShell.tsx` (308) と `PolyhedronGeneratorNode.tsx` (246) が大物。
 
-- **追加テスト** (`@testing-library/react` で props/render のスナップショット的検証):
-  - `tests/ts/components/nodes/NodeShell.test.tsx`: タイトル / ハンドル / 折りたたみトグル
-  - 各ノードタイプの最小レンダ (12 件 → 段階的に追加。最初は `LoadStructureNode`, `AddBondNode`, `FilterNode`, `ViewportNode` の 4 件)
 - **既存契約参照**: `src/pipeline/types.ts` の各 `*Params` 型 (props バリデーション)
 - **既存パターン**: `tests/ts/components/Tooltip.test.tsx` を参照
-- **規模**: M (UI が多いので分割 PR 推奨: `NodeShell + 4 件` → `残り 8 件` の 2 PR)
+- **規模**: M (2 PR 分割で実施)
 
 ## Phase 6 — `jupyterlab-megane/src/` (小ファイル中心)
 
@@ -190,7 +198,7 @@ Phase 0 (codecov flag fix)        ✅ DONE (c17462a)
    └─ Phase 3 (ai)                ✅ DONE (db0b679)
         │
         ├─ Phase 4 (renderer pure helpers)   ✅ DONE
-        └─ Phase 5 (nodes UI)                 ⬜ TODO  ← 2 PR に分割
+        └─ Phase 5 (nodes UI)                 ✅ DONE (2 PR: 5a + 5b)
              │
              ├─ Phase 6 (jupyterlab small files)  ⬜ TODO
              └─ Phase 7 (vscode extension)        ⬜ TODO
