@@ -99,12 +99,18 @@ export interface MeganeSubsystemVisibility {
   polyhedra: boolean;
 }
 
+export interface MeganeRendererMemory {
+  geometries: number;
+  textures: number;
+}
+
 export interface MeganeTestApi {
   getProjectedAtomPositions: () => MeganeProjectedAtom[];
   getCameraState: () => MeganeCameraState | null;
   getVisibleSubsystems: () => MeganeSubsystemVisibility;
   setCameraMode: (mode: MeganeCameraMode) => void;
   resetCamera: () => void;
+  getRendererMemory: () => MeganeRendererMemory | null;
 }
 
 let _activeRenderer: MoleculeRenderer | null = null;
@@ -136,6 +142,10 @@ function _setActiveRenderer(r: MoleculeRenderer | null): void {
             },
       setCameraMode: (mode) => _activeRenderer?.setCameraMode(mode),
       resetCamera: () => _activeRenderer?.resetCamera(),
+      getRendererMemory: () => {
+        const info = _activeRenderer?.getRenderer().info.memory;
+        return info ? { geometries: info.geometries, textures: info.textures } : null;
+      },
     };
   }
 }
