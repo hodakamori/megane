@@ -55,8 +55,7 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
 
     // MOL2 atom IDs are 1-based integers that are not guaranteed to be
     // contiguous, so map them to 0-based indices.
-    let mut atom_id_to_idx: std::collections::HashMap<u32, u32> =
-        std::collections::HashMap::new();
+    let mut atom_id_to_idx: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
 
     let mut molecule_count = 0u32;
 
@@ -102,10 +101,9 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
                         format!("MOL2: cannot parse atom count from '{}'", parts[0])
                     })?);
                     if parts.len() > 1 {
-                        n_bonds_expected =
-                            Some(parts[1].parse::<usize>().map_err(|_| {
-                                format!("MOL2: cannot parse bond count from '{}'", parts[1])
-                            })?);
+                        n_bonds_expected = Some(parts[1].parse::<usize>().map_err(|_| {
+                            format!("MOL2: cannot parse bond count from '{}'", parts[1])
+                        })?);
                     }
                 }
             }
@@ -295,9 +293,9 @@ GASTEIGER
 
         // Carbon at index 0
         assert_eq!(result.elements[0], 6); // C
-        // Oxygen at index 1
+                                           // Oxygen at index 1
         assert_eq!(result.elements[1], 8); // O
-        // Hydrogens
+                                           // Hydrogens
         assert_eq!(result.elements[2], 1); // H
         assert_eq!(result.elements[3], 1);
         assert_eq!(result.elements[4], 1);
@@ -376,10 +374,7 @@ SMALL
 
     #[test]
     fn parse_multi_molecule_returns_first() {
-        let mol2 = format!(
-            "{}\n{}",
-            METHANOL_MOL2, BENZENE_MOL2
-        );
+        let mol2 = format!("{}\n{}", METHANOL_MOL2, BENZENE_MOL2);
         let result = parse(&mol2).unwrap();
         // Should return methanol (6 atoms), not benzene (12 atoms)
         assert_eq!(result.n_atoms, 6);
@@ -416,11 +411,7 @@ SMALL
         let Err(msg) = parse(mol2) else {
             panic!("expected parse to fail for too-short atom line");
         };
-        assert!(
-            msg.contains("too few fields"),
-            "unexpected error: {}",
-            msg
-        );
+        assert!(msg.contains("too few fields"), "unexpected error: {}", msg);
     }
 
     #[test]
@@ -439,11 +430,7 @@ SMALL
         let Err(msg) = parse(mol2) else {
             panic!("expected parse to fail for unknown bond atom id");
         };
-        assert!(
-            msg.contains("unknown atom id"),
-            "unexpected error: {}",
-            msg
-        );
+        assert!(msg.contains("unknown atom id"), "unexpected error: {}", msg);
     }
 
     #[test]

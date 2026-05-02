@@ -1,7 +1,9 @@
 use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
-use megane_core::{bonds, cif, gro, lammps_data, lammpstrj, mol, mol2, parser, top, traj, xtc, xyz};
+use megane_core::{
+    bonds, cif, gro, lammps_data, lammpstrj, mol, mol2, parser, top, traj, xtc, xyz,
+};
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
 /// - A JSON string describing channel metadata (name, n_frames per channel).
