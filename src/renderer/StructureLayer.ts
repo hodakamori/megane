@@ -122,6 +122,14 @@ export class StructureLayer {
     this.atomRenderer?.setOpacityOverrides?.(overrides);
   }
 
+  setAtomColorOverrides(colors: Float32Array): void {
+    this.atomRenderer?.setColorOverrides?.(colors);
+  }
+
+  clearAtomColorOverrides(): void {
+    this.atomRenderer?.clearColorOverrides?.();
+  }
+
   clearAtomOverrides(): void {
     this.atomRenderer?.clearOverrides?.();
   }

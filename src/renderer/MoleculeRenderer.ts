@@ -609,6 +609,16 @@ export class MoleculeRenderer {
     this.atomRenderer?.setOpacityOverrides?.(overrides);
   }
 
+  /** Set per-atom color overrides. colors is Float32Array of length nAtoms*3 (RGB). */
+  setAtomColorOverrides(colors: Float32Array): void {
+    this.atomRenderer?.setColorOverrides?.(colors);
+  }
+
+  /** Clear per-atom color overrides, reverting to element-based colors. */
+  clearAtomColorOverrides(): void {
+    this.atomRenderer?.clearColorOverrides?.();
+  }
+
   /** Clear all per-atom overrides, reverting to global uniforms. */
   clearAtomOverrides(): void {
     this.atomRenderer?.clearOverrides?.();

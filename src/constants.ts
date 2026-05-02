@@ -330,6 +330,121 @@ export function getColor(atomicNum: number): [number, number, number] {
   return ELEMENT_COLORS[atomicNum] ?? DEFAULT_COLOR;
 }
 
+// ─── Color Schemes ────────────────────────────────────────────────────
+
+/** Available atom color schemes. */
+export type ColorScheme = "element" | "residue" | "chain" | "bfactor";
+
+export const COLOR_SCHEME_LABELS: Record<ColorScheme, string> = {
+  element: "Element",
+  residue: "Residue",
+  chain: "Chain",
+  bfactor: "B-factor",
+};
+
+/**
+ * RasMol / Jmol Shapely amino-acid color palette.
+ * Keys are 3-letter residue codes (uppercase). Values are [r, g, b] in 0-1 range.
+ */
+export const RESIDUE_COLORS: Record<string, [number, number, number]> = {
+  // Standard amino acids
+  ALA: [0.784, 0.784, 0.784], // gray
+  ARG: [0.078, 0.353, 1.0], // blue
+  ASN: [0.0, 0.863, 0.863], // cyan
+  ASP: [0.902, 0.039, 0.039], // red
+  CYS: [0.902, 0.902, 0.0], // yellow
+  GLN: [0.0, 0.863, 0.863], // cyan
+  GLU: [0.902, 0.039, 0.039], // red
+  GLY: [0.922, 0.922, 0.922], // light gray
+  HIS: [0.510, 0.510, 0.824], // blue-purple
+  ILE: [0.059, 0.510, 0.059], // green
+  LEU: [0.059, 0.510, 0.059], // green
+  LYS: [0.078, 0.353, 1.0], // blue
+  MET: [0.902, 0.902, 0.0], // yellow
+  PHE: [0.196, 0.196, 0.667], // dark blue
+  PRO: [0.863, 0.588, 0.510], // salmon
+  SER: [0.980, 0.588, 0.0], // orange
+  THR: [0.980, 0.588, 0.0], // orange
+  TRP: [0.706, 0.353, 0.706], // pink-purple
+  TYR: [0.196, 0.196, 0.667], // dark blue
+  VAL: [0.059, 0.510, 0.059], // green
+  // Common non-standard / modified residues
+  MSE: [0.902, 0.902, 0.0], // selenomethionine → yellow (like MET)
+  // DNA
+  DA: [0.902, 0.039, 0.039], // red
+  DC: [0.902, 0.902, 0.0], // yellow
+  DG: [0.059, 0.510, 0.059], // green
+  DT: [0.0, 0.863, 0.863], // cyan
+  // RNA
+  A: [0.902, 0.039, 0.039], // red
+  C: [0.902, 0.902, 0.0], // yellow
+  G: [0.059, 0.510, 0.059], // green
+  U: [0.0, 0.863, 0.863], // cyan
+};
+
+/** Default color for unknown residues. */
+export const RESIDUE_DEFAULT_COLOR: [number, number, number] = [0.6, 0.6, 0.6];
+
+/**
+ * Categorical chain colors (up to 26 chains A-Z, then wraps around).
+ */
+export const CHAIN_COLORS: [number, number, number][] = [
+  [0.122, 0.471, 0.706], // A - blue
+  [0.855, 0.145, 0.114], // B - red
+  [0.047, 0.565, 0.125], // C - green
+  [0.961, 0.675, 0.067], // D - gold
+  [0.584, 0.282, 0.573], // E - purple
+  [0.549, 0.337, 0.294], // F - brown
+  [0.890, 0.467, 0.761], // G - pink
+  [0.502, 0.502, 0.502], // H - gray
+  [0.737, 0.741, 0.133], // I - olive
+  [0.086, 0.686, 0.694], // J - teal
+];
+
+/**
+ * Viridis colormap sample (perceptually uniform, colorblind-friendly).
+ * Maps a normalized value t ∈ [0, 1] to an RGB color.
+ */
+export function viridis(t: number): [number, number, number] {
+  const clamp = Math.max(0, Math.min(1, t));
+  // Key colors sampled from the viridis colormap
+  const keypoints: [number, number, number, number][] = [
+    [0.0, 0.267, 0.004, 0.329],
+    [0.25, 0.282, 0.341, 0.569],
+    [0.5, 0.129, 0.565, 0.551],
+    [0.75, 0.369, 0.788, 0.384],
+    [1.0, 0.993, 0.906, 0.144],
+  ];
+  for (let i = 0; i < keypoints.length - 1; i++) {
+    const [t0, r0, g0, b0] = keypoints[i];
+    const [t1, r1, g1, b1] = keypoints[i + 1];
+    if (clamp >= t0 && clamp <= t1) {
+      const s = (clamp - t0) / (t1 - t0);
+      return [r0 + s * (r1 - r0), g0 + s * (g1 - g0), b0 + s * (b1 - b0)];
+    }
+  }
+  return [0.993, 0.906, 0.144];
+}
+
+/**
+ * Parse the 3-letter residue name from an atom label (e.g. "ALA42" → "ALA").
+ */
+export function parseResname(label: string): string {
+  return label.replace(/\d+$/, "").trim().toUpperCase();
+}
+
+/** Look up a residue color given the raw atom label (e.g. "ALA42"). */
+export function getResidueColor(atomLabel: string): [number, number, number] {
+  const resname = parseResname(atomLabel);
+  return RESIDUE_COLORS[resname] ?? RESIDUE_DEFAULT_COLOR;
+}
+
+/** Look up a chain color given a chain ID byte (0=A, 1=B, …). */
+export function getChainColor(chainId: number): [number, number, number] {
+  if (chainId === 255) return RESIDUE_DEFAULT_COLOR;
+  return CHAIN_COLORS[chainId % CHAIN_COLORS.length];
+}
+
 export function getRadius(atomicNum: number): number {
   return VDW_RADII[atomicNum] ?? DEFAULT_RADIUS;
 }

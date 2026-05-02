@@ -1,5 +1,5 @@
 /**
- * Modify node — changes visual properties (scale, opacity) of incoming data.
+ * Modify node — changes visual properties (scale, opacity, color scheme) of incoming data.
  * Accepts particle or bond input.
  */
 
@@ -8,6 +8,7 @@ import type { PipelineNodeData } from "../../pipeline/execute";
 import type { ModifyParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
+import { COLOR_SCHEME_LABELS, type ColorScheme } from "../../constants";
 
 const sliderStyle: React.CSSProperties = {
   width: "100%",
@@ -34,9 +35,12 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 3,
 };
 
+const colorSchemes = Object.entries(COLOR_SCHEME_LABELS) as [ColorScheme, string][];
+
 export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
   const params = data.params as ModifyParams;
+  const currentScheme: ColorScheme = params.colorScheme ?? "element";
 
   return (
     <NodeShell id={id} nodeType="modify" enabled={data.enabled}>
@@ -73,6 +77,37 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
               style={sliderStyle}
             />
             <span style={valueStyle}>{`${Math.round(params.opacity * 100)}%`}</span>
+          </div>
+        </div>
+        <div>
+          <div style={labelStyle}>Color</div>
+          <div
+            className="nodrag"
+            style={{ display: "flex", gap: 4, flexWrap: "wrap" }}
+          >
+            {colorSchemes.map(([scheme, label]) => {
+              const active = currentScheme === scheme;
+              return (
+                <button
+                  key={scheme}
+                  data-testid={`modify-node-color-${scheme}`}
+                  onClick={() => updateNodeParams(id, { colorScheme: scheme })}
+                  style={{
+                    padding: "3px 8px",
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 400,
+                    borderRadius: 4,
+                    border: active ? "2px solid #3b82f6" : "1.5px solid #cbd5e1",
+                    background: active ? "#eff6ff" : "#ffffff",
+                    color: active ? "#1d4ed8" : "#475569",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

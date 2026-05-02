@@ -33,6 +33,7 @@ export class ImpostorAtomMesh {
   private opacityOverrideBuf: Float32Array;
   private nAtoms = 0;
   private capacity: number;
+  private snapshotElements: Uint8Array | null = null;
 
   constructor(maxAtoms: number = 1_000_000) {
     this.capacity = maxAtoms;
@@ -60,7 +61,7 @@ export class ImpostorAtomMesh {
 
     this.centerAttr.setUsage(THREE.DynamicDrawUsage);
     this.radiusAttr.setUsage(THREE.StaticDrawUsage);
-    this.colorAttr.setUsage(THREE.StaticDrawUsage);
+    this.colorAttr.setUsage(THREE.DynamicDrawUsage);
     this.scaleOverrideAttr.setUsage(THREE.DynamicDrawUsage);
     this.opacityOverrideAttr.setUsage(THREE.DynamicDrawUsage);
 
@@ -91,6 +92,7 @@ export class ImpostorAtomMesh {
   loadSnapshot(snapshot: Snapshot): void {
     const { nAtoms, positions, elements } = snapshot;
     this.nAtoms = nAtoms;
+    this.snapshotElements = elements;
 
     // Grow buffers if needed
     if (nAtoms > this.capacity) {
@@ -170,6 +172,24 @@ export class ImpostorAtomMesh {
     }
   }
 
+  /** Replace per-atom colors. colors is a Float32Array of length nAtoms*3 (RGB). */
+  setColorOverrides(colors: Float32Array): void {
+    this.colorBuf.set(colors.subarray(0, this.nAtoms * 3));
+    this.colorAttr.needsUpdate = true;
+  }
+
+  /** Revert per-atom colors to element-based defaults. */
+  clearColorOverrides(): void {
+    if (!this.snapshotElements) return;
+    for (let i = 0; i < this.nAtoms; i++) {
+      const [r, g, b] = getColor(this.snapshotElements[i]);
+      this.colorBuf[i * 3] = r;
+      this.colorBuf[i * 3 + 1] = g;
+      this.colorBuf[i * 3 + 2] = b;
+    }
+    this.colorAttr.needsUpdate = true;
+  }
+
   /** Clear all per-atom overrides, reverting to global uniforms. */
   clearOverrides(): void {
     this.scaleOverrideBuf.fill(1.0, 0, this.nAtoms);
@@ -208,7 +228,7 @@ export class ImpostorAtomMesh {
 
     this.centerAttr.setUsage(THREE.DynamicDrawUsage);
     this.radiusAttr.setUsage(THREE.StaticDrawUsage);
-    this.colorAttr.setUsage(THREE.StaticDrawUsage);
+    this.colorAttr.setUsage(THREE.DynamicDrawUsage);
     this.scaleOverrideAttr.setUsage(THREE.DynamicDrawUsage);
     this.opacityOverrideAttr.setUsage(THREE.DynamicDrawUsage);
 

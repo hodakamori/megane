@@ -26,6 +26,11 @@ pub struct ParsedStructure {
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
     pub atom_labels: Option<Vec<String>>,
+    /// Per-atom chain IDs encoded as 0-based index (0=A, 1=B, …, 25=Z).
+    /// 255 means unknown/no chain.
+    pub chain_ids: Option<Vec<u8>>,
+    /// Per-atom B-factor (temperature factor) in Å².
+    pub b_factors: Option<Vec<f32>>,
     /// Embedded vector channels (e.g. GRO velocities).
     /// Empty for formats that carry no per-atom vector quantities.
     pub vector_channels: Vec<crate::trajectory::VectorChannel>,
@@ -187,6 +192,16 @@ fn parse_conect_line(line: &str, serial_to_index: &HashMap<i32, usize>) -> Vec<(
     bonds
 }
 
+/// Encode a chain character as a 0-based index (A=0, B=1, …, Z=25).
+/// Returns 255 for space, '?' or other non-alpha characters.
+fn encode_chain_id(ch: char) -> u8 {
+    if ch.is_ascii_alphabetic() {
+        ch.to_ascii_uppercase() as u8 - b'A'
+    } else {
+        255
+    }
+}
+
 /// Parse a PDB file text into structured data.
 pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut box_matrix: Option<[f32; 9]> = None;
@@ -196,7 +211,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut all_models: Vec<Vec<Atom>> = Vec::new();
     let mut current_model: Vec<Atom> = Vec::new();
     let mut current_labels: Vec<String> = Vec::new();
+    let mut current_chain_ids: Vec<u8> = Vec::new();
+    let mut current_b_factors: Vec<f32> = Vec::new();
     let mut first_model_labels: Vec<String> = Vec::new();
+    let mut first_model_chain_ids: Vec<u8> = Vec::new();
+    let mut first_model_b_factors: Vec<f32> = Vec::new();
     let mut has_model_record = false;
     let mut model_count: usize = 0;
 
@@ -212,12 +231,19 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 has_model_record = true;
                 current_model = Vec::new();
                 current_labels = Vec::new();
+                current_chain_ids = Vec::new();
+                current_b_factors = Vec::new();
             }
             "ENDMDL" => {
                 if model_count == 0 {
                     first_model_labels = std::mem::take(&mut current_labels);
+                    first_model_chain_ids = std::mem::take(&mut current_chain_ids);
+                    first_model_b_factors = std::mem::take(&mut current_b_factors);
                 }
                 all_models.push(std::mem::take(&mut current_model));
+                current_labels = Vec::new();
+                current_chain_ids = Vec::new();
+                current_b_factors = Vec::new();
                 model_count += 1;
             }
             "CRYST1" if box_matrix.is_none() => {
@@ -241,6 +267,19 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         ""
                     };
                     current_labels.push(format!("{}{}", res_name, res_seq));
+
+                    // Chain ID: column 21 (0-indexed), single character
+                    let chain_ch = line.chars().nth(21).unwrap_or(' ');
+                    current_chain_ids.push(encode_chain_id(chain_ch));
+
+                    // B-factor: columns 60-66 (0-indexed)
+                    let b_factor = if line.len() >= 66 {
+                        line[60..66].trim().parse::<f32>().unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
+                    current_b_factors.push(b_factor);
+
                     current_model.push(atom);
                 }
             }
@@ -255,6 +294,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     // If no MODEL/ENDMDL, treat all atoms as a single model
     if !has_model_record && !current_model.is_empty() {
         first_model_labels = current_labels;
+        first_model_chain_ids = current_chain_ids;
+        first_model_b_factors = current_b_factors;
         all_models.push(current_model);
     }
 
@@ -311,6 +352,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    // Chain IDs: expose only when at least one atom has a valid chain (not 255)
+    let chain_ids = if first_model_chain_ids.iter().any(|&c| c != 255) {
+        Some(first_model_chain_ids)
+    } else {
+        None
+    };
+
+    // B-factors: expose only when at least one atom has a non-zero value
+    let b_factors = if first_model_b_factors.iter().any(|&b| b != 0.0) {
+        Some(first_model_b_factors)
+    } else {
+        None
+    };
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -321,6 +376,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions,
         atom_labels,
+        chain_ids,
+        b_factors,
         vector_channels: vec![],
     })
 }

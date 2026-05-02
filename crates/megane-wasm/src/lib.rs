@@ -47,6 +47,8 @@ pub struct ParseResult {
     n_frames: u32,
     has_box: bool,
     has_atom_labels: bool,
+    has_chain_ids: bool,
+    has_b_factors: bool,
     positions: Vec<f32>,
     elements: Vec<u8>,
     bonds: Vec<u32>,
@@ -54,6 +56,8 @@ pub struct ParseResult {
     box_matrix: Vec<f32>,
     frame_data: Vec<f32>,
     atom_labels: String,
+    chain_ids: Vec<u8>,
+    b_factors: Vec<f32>,
     vector_channel_count: u32,
     vector_channel_meta: String,
     vector_channel_data: Vec<f32>,
@@ -91,10 +95,30 @@ impl ParseResult {
         self.has_atom_labels
     }
 
+    #[wasm_bindgen(getter)]
+    pub fn has_chain_ids(&self) -> bool {
+        self.has_chain_ids
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn has_b_factors(&self) -> bool {
+        self.has_b_factors
+    }
+
     /// Per-atom labels as newline-delimited string.
     #[wasm_bindgen(getter)]
     pub fn atom_labels(&self) -> String {
         self.atom_labels.clone()
+    }
+
+    /// Per-atom chain IDs as Uint8Array (0=A, 1=B, …, 255=unknown).
+    pub fn chain_ids(&self) -> Uint8Array {
+        Uint8Array::from(&self.chain_ids[..])
+    }
+
+    /// Per-atom B-factors as Float32Array.
+    pub fn b_factors(&self) -> Float32Array {
+        Float32Array::from(&self.b_factors[..])
     }
 
     /// Number of embedded vector channels (0 when none).
@@ -169,6 +193,10 @@ impl ParseResult {
             .collect();
         let has_atom_labels = data.atom_labels.is_some();
         let atom_labels = data.atom_labels.map(|l| l.join("\n")).unwrap_or_default();
+        let has_chain_ids = data.chain_ids.is_some();
+        let chain_ids = data.chain_ids.unwrap_or_default();
+        let has_b_factors = data.b_factors.is_some();
+        let b_factors = data.b_factors.unwrap_or_default();
 
         let vector_channel_count = data.vector_channels.len() as u32;
         let (vector_channel_meta, vector_channel_data) =
@@ -181,6 +209,8 @@ impl ParseResult {
             n_frames,
             has_box,
             has_atom_labels,
+            has_chain_ids,
+            has_b_factors,
             positions: data.positions,
             elements: data.elements,
             bonds: bonds_flat,
@@ -188,6 +218,8 @@ impl ParseResult {
             box_matrix,
             frame_data,
             atom_labels,
+            chain_ids,
+            b_factors,
             vector_channel_count,
             vector_channel_meta,
             vector_channel_data,
