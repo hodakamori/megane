@@ -356,29 +356,29 @@ export const RESIDUE_COLORS: Record<string, [number, number, number]> = {
   GLN: [0.0, 0.863, 0.863], // cyan
   GLU: [0.902, 0.039, 0.039], // red
   GLY: [0.922, 0.922, 0.922], // light gray
-  HIS: [0.510, 0.510, 0.824], // blue-purple
-  ILE: [0.059, 0.510, 0.059], // green
-  LEU: [0.059, 0.510, 0.059], // green
+  HIS: [0.51, 0.51, 0.824], // blue-purple
+  ILE: [0.059, 0.51, 0.059], // green
+  LEU: [0.059, 0.51, 0.059], // green
   LYS: [0.078, 0.353, 1.0], // blue
   MET: [0.902, 0.902, 0.0], // yellow
   PHE: [0.196, 0.196, 0.667], // dark blue
-  PRO: [0.863, 0.588, 0.510], // salmon
-  SER: [0.980, 0.588, 0.0], // orange
-  THR: [0.980, 0.588, 0.0], // orange
+  PRO: [0.863, 0.588, 0.51], // salmon
+  SER: [0.98, 0.588, 0.0], // orange
+  THR: [0.98, 0.588, 0.0], // orange
   TRP: [0.706, 0.353, 0.706], // pink-purple
   TYR: [0.196, 0.196, 0.667], // dark blue
-  VAL: [0.059, 0.510, 0.059], // green
+  VAL: [0.059, 0.51, 0.059], // green
   // Common non-standard / modified residues
   MSE: [0.902, 0.902, 0.0], // selenomethionine → yellow (like MET)
   // DNA
   DA: [0.902, 0.039, 0.039], // red
   DC: [0.902, 0.902, 0.0], // yellow
-  DG: [0.059, 0.510, 0.059], // green
+  DG: [0.059, 0.51, 0.059], // green
   DT: [0.0, 0.863, 0.863], // cyan
   // RNA
   A: [0.902, 0.039, 0.039], // red
   C: [0.902, 0.902, 0.0], // yellow
-  G: [0.059, 0.510, 0.059], // green
+  G: [0.059, 0.51, 0.059], // green
   U: [0.0, 0.863, 0.863], // cyan
 };
 
@@ -395,7 +395,7 @@ export const CHAIN_COLORS: [number, number, number][] = [
   [0.961, 0.675, 0.067], // D - gold
   [0.584, 0.282, 0.573], // E - purple
   [0.549, 0.337, 0.294], // F - brown
-  [0.890, 0.467, 0.761], // G - pink
+  [0.89, 0.467, 0.761], // G - pink
   [0.502, 0.502, 0.502], // H - gray
   [0.737, 0.741, 0.133], // I - olive
   [0.086, 0.686, 0.694], // J - teal

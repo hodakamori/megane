@@ -15,7 +15,12 @@ import {
  * are baked into the renderer on loadSnapshot).
  */
 function computeColorOverrides(
-  snapshot: { nAtoms: number; elements: Uint8Array; chainIds: Uint8Array | null; bFactors: Float32Array | null },
+  snapshot: {
+    nAtoms: number;
+    elements: Uint8Array;
+    chainIds: Uint8Array | null;
+    bFactors: Float32Array | null;
+  },
   colorScheme: ColorScheme,
   atomLabels: string[] | null,
   indices: Uint32Array | null,
