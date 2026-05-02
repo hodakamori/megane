@@ -141,7 +141,7 @@ npx playwright test          # all projects
 
 ### CI vs. local split
 
-**All four E2E projects are local-only.** We attempted to run them on
+**All E2E projects are local-only.** We attempted to run them on
 GH-hosted ubuntu-latest runners but ran into two
 CI-environment-specific issues we don't want to maintain workarounds
 for:
@@ -155,7 +155,7 @@ for:
 
 The expected pre-merge workflow is:
 
-1. Run all 4 projects locally as part of any UI-touching change.
+1. Run the relevant Playwright projects locally as part of any UI-touching change.
 2. Commit any updated baselines under `tests/e2e/baselines/<project>/`.
 3. CI does NOT re-run E2E. Reviewers verify locally if needed.
 
