@@ -81,10 +81,7 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         </div>
         <div>
           <div style={labelStyle}>Color</div>
-          <div
-            className="nodrag"
-            style={{ display: "flex", gap: 4, flexWrap: "wrap" }}
-          >
+          <div className="nodrag" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {colorSchemes.map(([scheme, label]) => {
               const active = currentScheme === scheme;
               return (
