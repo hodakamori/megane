@@ -39,6 +39,13 @@ interface MeganeViewerProps {
   onVectorSourceChange?: (source: VectorSource) => void;
   onLoadVectorFile?: (file: File) => void;
   onLoadDemoVectors?: () => void;
+  /**
+   * Fired whenever the active trajectory frame changes (user scrub, playback
+   * tick, or programmatic seek). Mirrors the Jupyter widget's `frame_change`
+   * event so a host React app can stay in sync — useful for Plotly traces
+   * keyed on the same frame index.
+   */
+  onFrameChange?: (frame: number) => void;
   width?: string | number;
   height?: string | number;
   /** Host context tag for E2E tests: "webapp" | "jupyterlab-doc" | "vscode". Defaults to "webapp". */
@@ -59,6 +66,7 @@ export function MeganeViewer({
   onVectorSourceChange: _onVectorSourceChange,
   onLoadVectorFile: _onLoadVectorFile,
   onLoadDemoVectors: _onLoadDemoVectors,
+  onFrameChange,
   width = "100%",
   height = "100%",
   testContext = "webapp",
@@ -155,6 +163,20 @@ export function MeganeViewer({
   const frame = usePlaybackStore((s) => s.currentFrameData);
   const currentFrame = usePlaybackStore((s) => s.currentFrame);
   const totalFrames = usePlaybackStore((s) => s.totalFrames);
+
+  // Surface frame changes to host React apps (e.g. Plotly integration). We
+  // skip the synthetic 0-on-mount value so consumers only receive transitions
+  // they caused, matching the Jupyter widget's `frame_change` semantics.
+  const lastFrameRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!onFrameChange) return;
+    if (lastFrameRef.current === currentFrame) return;
+    if (lastFrameRef.current !== null) {
+      onFrameChange(currentFrame);
+    }
+    lastFrameRef.current = currentFrame;
+  }, [currentFrame, onFrameChange]);
+
   const storePlaying = usePlaybackStore((s) => s.playing);
   const storeFps = usePlaybackStore((s) => s.fps);
   const storeSeek = usePlaybackStore((s) => s.seekFrame);
