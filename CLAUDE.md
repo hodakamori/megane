@@ -56,17 +56,21 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 | `npm test` | TypeScript unit tests (vitest) |
 | `cargo test -p megane-core` | Rust parser tests |
 | `python -m pytest` | Python tests (needs maturin develop first) |
-| `npm run test:e2e` | Full Playwright suite (all projects) |
-| `npm run test:e2e:webapp` | Webapp project (Vite static, port 15173) |
-| `npm run test:e2e:contract` | Cross-platform contract project |
-| `npm run test:e2e:widget-jupyterlab` | anywidget in JupyterLab |
-| `npm run test:e2e:widget-vscode` | anywidget in code-server (`MEGANE_E2E_MODE=1`) |
-| `npm run test:e2e:jupyterlab-doc` | DocWidget in JupyterLab |
-| `npm run test:e2e:vscode` | VSCode custom editor (`MEGANE_E2E_MODE=1`) |
-| `npm run test:e2e:vscode:legacy[:update]` | Legacy `vscode_full_screen.test.mjs` runner |
-| `MEGANE_E2E_UPDATE=1 npm run test:e2e:<project>` | Re-baseline a project's PNGs |
 | `npm run test:all` | vitest + full Playwright suite |
 | `make test-all` | Python + TypeScript + Rust + active Playwright projects + notebooks + integration |
+
+#### E2E (Playwright)
+
+E2E is **local-only by policy** — CI does not run any E2E project (port-bind races + font/fontconfig pixel drift on hosted runners). Re-baseline locally and commit PNGs under `tests/e2e/baselines/<project>/`. Full runbook including environment setup, per-host quirks, and matrix expansion lives in `.claude/skills/e2e-coverage/SKILL.md`.
+
+| Category | Scripts | Notes |
+|---|---|---|
+| Full sweep | `npm run test:e2e` | All Playwright projects |
+| Host projects | `:webapp`, `:contract`, `:widget-jupyterlab`, `:widget-vscode`, `:jupyterlab-doc`, `:vscode` | `:webapp` / `:contract` run a Vite static server on port 15173; `:widget-vscode` / `:vscode` need `MEGANE_E2E_MODE=1` |
+| Feature × 5-host matrices | `:modify-node`, `:camera`, `:measurement`, `:subsystems`, `:trajectory-bonds` | Each runs the feature on `webapp`, `jupyterlab-doc`, `vscode`, `widget-jupyterlab`, `widget-vscode`. Per-host variants exist (e.g. `:trajectory-bonds:webapp`, `:camera:webapp`) |
+| Single-feature projects | `:format-loading`, `:playback`, `:sidebar`, `:widget-api`, `:widget-examples`, `:pipeline-editor`, `:pipeline-file`, `:render-modal`, `:phase2` | Webapp host unless the project name encodes another |
+| Legacy mjs runner | `:vscode:legacy`, `:vscode:legacy:update` | `tests/e2e/vscode_full_screen.test.mjs` |
+| Re-baseline flag | `MEGANE_E2E_UPDATE=1 npm run test:e2e:<project>` | Unlinks the existing baseline before capture |
 
 ### Lint / Format / Preview
 
@@ -79,11 +83,23 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 
 ## Skills
 
-Project-specific skills are defined in `.claude/skills/`. Each skill provides instructions for a specific workflow.
+Project-specific skills are defined in `.claude/skills/`. Each skill provides instructions for a specific workflow. Always follow the skill's instructions when performing the corresponding task.
 
-- **At the start of a task**, run the `validate-skills` skill to confirm all skills are loaded.
-- **Always follow the instructions** in each skill when performing the corresponding workflow.
-- Skills cover: committing (`commit`), GitHub CLI usage (`github-cli`), dev environment setup (`dev-setup`), building (`build`), testing (`testing`), E2E coverage runbook (`e2e-coverage`), preview capture (`preview`), pre-release checklist (`pre-release`), post-release verification (`post-release`), and skill validation (`validate-skills`). Total: 10 skills.
+A SessionStart hook (`.claude/hooks/session-start.sh`) injects a reminder pointing here at the start of every session and asks the agent to verify the skills below appear in the system reminder's `available skills` list.
+
+| Skill | What it covers |
+|---|---|
+| `commit` | Git commit guidelines (English-only messages, conventional style, post-commit CI verification) |
+| `github-cli` | `gh` CLI usage, including the remote-URL workaround for sandboxed envs |
+| `dev-setup` | Verifying / installing the dev toolchain (wasm-pack, maturin, uv, Node 22+) |
+| `build` | Build commands and required ordering (WASM first) |
+| `testing` | Test taxonomy across TypeScript, Rust, Python, and E2E |
+| `e2e-coverage` | Full Playwright matrix runbook across the 5 host platforms |
+| `preview` | Screenshot/video capture for visual review |
+| `pre-release` | Pre-release checklist (tests, version bump, dry-run, tag) |
+| `post-release` | Post-release verification (publish workflows, package availability, docs) |
+
+Total: 9 skills.
 
 ## Architecture
 

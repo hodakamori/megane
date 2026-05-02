@@ -30,7 +30,7 @@ Must produce a wheel without errors.
 
 ## Phase 2: Version Consistency
 
-### 2.1 Run bumpversion
+### 2.1 Run bump-my-version
 Install if not already available:
 ```bash
 uv tool install bump-my-version
@@ -172,7 +172,7 @@ Only proceed here after all phases above are green.
 ```bash
 git status
 ```
-Only bumpversion and CHANGELOG changes should be present (no unrelated modifications).
+Only bump-my-version and CHANGELOG changes should be present (no unrelated modifications).
 
 ### 7.2 Create release commit
 ```bash
