@@ -9,6 +9,14 @@ export default defineConfig({
       // not the root, so vitest's import-analysis can't resolve bare specifiers
       // referenced by `jupyterlab-megane/src/`. Tests mock these via vi.mock();
       // the stubs only need to satisfy resolution, not provide behavior.
+      "@jupyterlab/application": path.resolve(
+        __dirname,
+        "tests/ts/__stubs__/jupyterlab-application.ts",
+      ),
+      "@jupyterlab/apputils": path.resolve(
+        __dirname,
+        "tests/ts/__stubs__/jupyterlab-apputils.ts",
+      ),
       "@jupyterlab/coreutils": path.resolve(
         __dirname,
         "tests/ts/__stubs__/jupyterlab-coreutils.ts",

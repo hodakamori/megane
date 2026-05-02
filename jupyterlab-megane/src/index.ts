@@ -5,6 +5,7 @@ import {
 } from "@jupyterlab/application";
 import { WidgetTracker } from "@jupyterlab/apputils";
 import type { IDocumentWidget } from "@jupyterlab/docregistry";
+import { exposeAppForTests } from "./testHook";
 import { MeganeDocFactory, MeganePipelineDocFactory } from "./factory";
 import type { MeganeReactView } from "./MeganeDocWidget";
 import type { MeganePipelineReactView } from "./MeganePipelineDocWidget";
@@ -31,6 +32,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
   autoStart: true,
   requires: [ILayoutRestorer],
   activate: (app: JupyterFrontEnd, restorer: ILayoutRestorer) => {
+    exposeAppForTests(app);
+
     for (const ft of [...STRUCTURE_FILETYPES_TEXT, ...STRUCTURE_FILETYPES_BINARY]) {
       app.docRegistry.addFileType(ft);
     }
