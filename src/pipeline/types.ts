@@ -340,7 +340,7 @@ export interface ViewportParams {
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
-  colorScheme: ColorScheme;
+  colorScheme?: ColorScheme;
 }
 
 export interface FilterParams {
