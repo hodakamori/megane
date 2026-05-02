@@ -255,14 +255,9 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         ""
                     };
                     current_labels.push(format!("{}{}", res_name, res_seq));
-                    // Extract chain ID (col 21, 0-indexed)
-                    let chain_id = if line.len() >= 22 {
-                        line.as_bytes()[21]
-                    } else {
-                        b' '
-                    };
-                    current_chain_ids.push(chain_id);
-                    // Extract B-factor (cols 60-66, 0-indexed)
+                    // parse_atom_line guarantees line.len() >= 54, so col 21 is always safe
+                    current_chain_ids.push(line.as_bytes()[21]);
+                    // Extract B-factor (cols 60-66, 0-indexed); absent in truncated lines
                     let bfactor = if line.len() >= 66 {
                         line[60..66].trim().parse::<f32>().unwrap_or(0.0)
                     } else {
@@ -427,5 +422,27 @@ mod tests {
         assert!(result.elements.contains(&7)); // N
         assert!(result.elements.contains(&8)); // O
         assert!(result.elements.contains(&16)); // S
+    }
+
+    #[test]
+    fn test_parse_pdb_chain_id_and_bfactor() {
+        // Standard 80-col line: chain B, B-factor 42.50
+        let pdb = "ATOM      1  CA  ALA B   1      17.047  14.099   3.625  1.00 42.50           C  \nEND\n";
+        let result = parse(pdb).expect("parse failed");
+        let chain_ids = result.chain_ids.expect("chain_ids should be Some");
+        assert_eq!(chain_ids[0], b'B');
+        let bfactors = result.bfactors.expect("bfactors should be Some");
+        assert!((bfactors[0] - 42.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_pdb_truncated_no_bfactor() {
+        // 54-char line: valid coordinates but no occupancy/B-factor columns
+        // (exactly at the minimum length accepted by parse_atom_line)
+        let pdb = "ATOM      1  CA  ALA A   1      17.047  14.099   3.625\nEND\n";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.n_atoms, 1);
+        // No non-zero B-factor => bfactors should be None
+        assert!(result.bfactors.is_none());
     }
 }
