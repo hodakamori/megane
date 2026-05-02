@@ -16,7 +16,6 @@
 ///   offset 44 – 47 : HAS_CELL (CHARMM only, overlaps DELTA padding)
 ///   offset 48 – 79 : eight int32 zeros
 ///   offset 80 – 83 : CHARMM_VERSION (0 = X-PLOR)
-
 use crate::trajectory::TrajectoryData;
 
 pub type DcdData = TrajectoryData;
@@ -168,10 +167,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         ));
     }
     if &hdr[0..4] != b"CORD" && &hdr[0..4] != b"VELD" {
-        return Err(format!(
-            "DCD magic not found (got {:?})",
-            &hdr[0..4]
-        ));
+        return Err(format!("DCD magic not found (got {:?})", &hdr[0..4]));
     }
 
     let read_i32 = |off: usize| -> i32 {
