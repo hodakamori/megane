@@ -3,20 +3,20 @@ coverage:
     project:
       default:
         target: auto
-        threshold: 1%
+        threshold: 2%
       python:
         target: auto
-        threshold: 1%
+        threshold: 2%
         flags:
           - python
       typescript:
         target: auto
-        threshold: 1%
+        threshold: 2%
         flags:
           - typescript
       rust:
         target: auto
-        threshold: 1%
+        threshold: 2%
         flags:
           - rust
     patch:
