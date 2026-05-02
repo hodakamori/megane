@@ -41,7 +41,7 @@ import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
-import { startTour } from "../tour/MeganeTour";
+import { startTour, startPipelineTutorial } from "../tour/MeganeTour";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 
 const nodeTypes = {
@@ -140,6 +140,13 @@ const IconGuide = (
     <circle cx="12" cy="12" r="10" />
     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
     <line x1="12" y1="17" x2="12" y2="17" />
+  </svg>
+);
+
+const IconTutorial = (
+  <svg {...iconProps}>
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
   </svg>
 );
 
@@ -331,6 +338,13 @@ const guideBtnStyle: React.CSSProperties = {
   background: "rgba(100, 116, 139, 0.08)",
   border: "1px solid rgba(100, 116, 139, 0.3)",
   color: "#64748b",
+};
+
+const tutorialBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(59, 130, 246, 0.08)",
+  border: "1px solid rgba(59, 130, 246, 0.3)",
+  color: "#1d4ed8",
 };
 
 const dropdownStyle: React.CSSProperties = {
@@ -728,6 +742,15 @@ function PipelineEditorInner({
           aria-label="Show user guide"
         >
           {IconGuide} Guide
+        </button>
+        <button
+          data-testid="pipeline-editor-tutorial"
+          onClick={() => startPipelineTutorial()}
+          style={tutorialBtnStyle}
+          title="Walk through how to build a pipeline"
+          aria-label="Open pipeline tutorial"
+        >
+          {IconTutorial} Tutorial
         </button>
       </div>
     </>

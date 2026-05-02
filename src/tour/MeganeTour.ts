@@ -7,7 +7,7 @@ import { driver, type Driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import "./tour.css";
 import { useTourStore } from "./tourStore";
-import { buildTourSteps } from "./tourSteps";
+import { buildTourSteps, buildPipelineTutorialSteps } from "./tourSteps";
 
 const CHECKBOX_ID = "megane-tour-dont-show";
 
@@ -39,7 +39,12 @@ function injectDontShowCheckbox(footer: HTMLElement): void {
   footer.insertBefore(wrapper, footer.firstChild);
 }
 
-export function startTour(): void {
+interface RunTourOptions {
+  steps: ReturnType<typeof buildTourSteps>;
+  showProgress: boolean;
+}
+
+function runTour({ steps, showProgress }: RunTourOptions): void {
   // Re-create the driver on every start so steps reflect the latest DOM
   // (panels can be collapsed/expanded between sessions).
   if (activeDriver) {
@@ -48,7 +53,7 @@ export function startTour(): void {
   }
 
   const tour = driver({
-    showProgress: true,
+    showProgress,
     progressText: "{{current}} / {{total}}",
     nextBtnText: "Next",
     prevBtnText: "Back",
@@ -59,7 +64,7 @@ export function startTour(): void {
     stagePadding: 6,
     stageRadius: 10,
     popoverClass: "megane-tour",
-    steps: buildTourSteps(),
+    steps,
     onPopoverRender: (popover) => {
       injectDontShowCheckbox(popover.footer);
     },
@@ -72,6 +77,14 @@ export function startTour(): void {
   activeDriver = tour;
   useTourStore.getState().setActive(true);
   tour.drive();
+}
+
+export function startTour(): void {
+  runTour({ steps: buildTourSteps(), showProgress: true });
+}
+
+export function startPipelineTutorial(): void {
+  runTour({ steps: buildPipelineTutorialSteps(), showProgress: true });
 }
 
 export function stopTour(): void {

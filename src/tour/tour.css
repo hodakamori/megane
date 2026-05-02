@@ -361,6 +361,17 @@
   transform: translateX(2px);
 }
 
+/* Plain paragraph inside descriptions that mix prose with action buttons. */
+.megane-tour-paragraph {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+.megane-tour-paragraph:last-child {
+  margin-bottom: 0;
+}
+
 /* Highlight ring colour to match the primary accent. */
 .driver-overlay {
   pointer-events: auto;
