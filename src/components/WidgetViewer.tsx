@@ -21,11 +21,7 @@ import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
-import {
-  createPipelineStore,
-  type PipelineStore,
-  usePipelineStore,
-} from "../pipeline/store";
+import { createPipelineStore, type PipelineStore, usePipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
@@ -92,8 +88,7 @@ export function WidgetViewer({
   // `usePipelineStore` directly, so the editor and the widget's effects must
   // both target the same store or the editor's edits silently do nothing.
   const [defaultStore] = useState(() => createPipelineStore());
-  const pipelineStore =
-    pipelineStoreProp ?? (pipelineEnabled ? usePipelineStore : defaultStore);
+  const pipelineStore = pipelineStoreProp ?? (pipelineEnabled ? usePipelineStore : defaultStore);
 
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
