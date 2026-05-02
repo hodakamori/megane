@@ -6,13 +6,13 @@
 - ✅ Phase 1 — `src/tour/` unit tests (3 files, 277 LOC): commit `b03bf04`
 - ✅ Phase 2 — `src/stream/` unit tests (2 files, 361 LOC): commit `61ada6e`
 - ✅ Phase 3 — `src/ai/` unit tests (4 files, 539 LOC) + `parseFrontmatter` export: commit `db0b679`
-- ⬜ Phase 4 — `src/renderer/` pure helpers (Selection, Picking, CameraManager, shaders)
+- ✅ Phase 4 — `src/renderer/` pure helpers (Selection, Picking, CameraManager, shaders) — 4 files, 788 LOC, 69 tests
 - ⬜ Phase 5 — `src/components/nodes/` UI tests (split: NodeShell + 4, then remaining 8)
 - ⬜ Phase 6 — `jupyterlab-megane/src/` (filetypes, wasmLoader, factory)
 - ⬜ Phase 7 — `vscode-megane/src/extension.ts` with vscode mock
 - ⬜ Phase 8 — codecov threshold tightening (`1% → 2%`) + `fail_ci_on_error: true`
 
-Total new tests added in Phases 0–3: **100** tests across 9 files (1,177 LOC test source).
+Total new tests added in Phases 0–4: **169** tests across 13 files (1,965 LOC test source).
 
 ## Context
 
@@ -113,7 +113,20 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **既存利用箇所**: `src/components/PipelineChatBox.tsx:?` (テスト時に AI 経路をスタブできる import 構造を確保)
 - **規模**: M (`client.ts` の SSE パーサ周りはやや厚い)
 
-## Phase 4 — `src/renderer/` 純粋ヘルパのみ (WebGL は除外)
+## Phase 4 — `src/renderer/` 純粋ヘルパのみ (WebGL は除外) ✅ DONE
+
+**実施内容**: 以下 4 ファイル / 69 テストを追加。`tests/ts/renderer/` を新規作成。`three` の math 系クラス (`OrthographicCamera`, `PerspectiveCamera`, `Vector3`) のみを使い、`WebGLRenderer` 経路は触らない。`src/renderer/` 側の export 追加はゼロ (元から全 helper が export 済み)。
+
+- `tests/ts/renderer/Selection.test.ts` (196 LOC, 20 tests): `computeDistance` (対称性 / 同一点 / 負座標) / `computeAngle` (90°/180°/0°/60° 正三角形 / `acos` の `Math.max(-1, Math.min(1, ...))` クランプによる NaN 防止) / `computeDihedral` (cis 0° / trans ±180° / out-of-plane ±90° / 鏡映による符号反転) / `computeMeasurement` (arity ゲート, `5.000 Å` / `90.0°` ラベル整形, `atoms` が入力配列を共有しない不変条件)
+- `tests/ts/renderer/Picking.test.ts` (251 LOC, 15 tests): `projectToScreen` (原点中心化 / 上下 Y 反転 / カメラ背後で depth<0) / `screenRadius` (ortho は zoom 反映・depth 不変, perspective は depth に反比例) / `pickAtPixel` (アトムヒット, ミス, container 左上オフセット減算, `atomScale` 乗数によるヒット域縮小, 2 アトム重なり時の depth tie-break, 結合中点フォールスルー, `bondOrders=null` での bondOrder=1 フォールバック, `currentPositions` が `snapshot.positions` ではなくライブフレームを使うこと)
+- `tests/ts/renderer/CameraManager.test.ts` (254 LOC, 21 tests): `computeViewBounds` (atom centroid / 立方セル / 全 0 セル → atom フォールバック / 0 atom → -∞ extent / 三斜セル) / `fitCameraToView` (target 設定, -y 軸方向 1.2× 距離, 最小距離 0.1 クランプ, ortho zoom リセット + near/far, perspective `updateProjectionMatrix`, 戻り値 extent) / `applyFrustumInsets` (退化 0×0 で no-op, 対称インセットでセンタリング, 非対称シフト, padding 1.2 × extent, 最小高 0.1, 30% 幅クランプ) / `createSwitchedCamera` (ortho⇄persp ファクトリ, position/up 保持, 入力カメラ非破壊)
+- `tests/ts/renderer/shaders.test.ts` (113 LOC, 13 tests): 全 4 シェーダの `precision highp float`, `gl_Position` 書き込み, `out vec4 fragColor` 宣言, atom impostor の per-instance attribute (`instanceCenter`/`Radius`/`Color`/`ScaleOverride`/`OpacityOverride`) と varying contract (`vColor`/`vUv`/`vRadius`/`vViewCenter`/`vOpacityOverride`), `gl_FragDepth` 書き込み, `dot(vUv,vUv)>1.0` impostor disk 破棄, bond shader の `uPositionTex`/`texelFetch` 経路, dashed bond / per-bond opacity ゲート
+
+**注記** (今後フェーズで参考にできるテストスキャフォールド):
+- `getBoundingClientRect` をプレーンオブジェクトで stub (`document.createElement("div")` は jsdom で全 0 を返すため不可)
+- `OrthographicCamera(-5,5,5,-5,0.1,1000)` を `(0,0,10)` から原点に向け, `updateMatrixWorld(true)` + `updateProjectionMatrix()` を呼んでから `projectToScreen` に渡す → 100×100 viewport で 10 px/Å の換算が成り立つ
+- 二面角は `atan2(y, x)` の符号規則上、`a=(0,1,0), b=(0,0,0), c=(1,0,0), d=(1,0,1)` で **−90°** を返す。テストは絶対値で検証し、符号反転は鏡映ペアで個別検証
+- OrbitControls は `{ target: new THREE.Vector3(), update: vi.fn() }` の最小モックで足りる
 
 `MoleculeRenderer.ts` (1504) は WebGL 直結のため単体不可。**math / state / 純粋クラス** だけ拾う。
 
@@ -176,7 +189,7 @@ Phase 0 (codecov flag fix)        ✅ DONE (c17462a)
    ├─ Phase 2 (stream)            ✅ DONE (61ada6e)
    └─ Phase 3 (ai)                ✅ DONE (db0b679)
         │
-        ├─ Phase 4 (renderer pure helpers)   ⬜ TODO
+        ├─ Phase 4 (renderer pure helpers)   ✅ DONE
         └─ Phase 5 (nodes UI)                 ⬜ TODO  ← 2 PR に分割
              │
              ├─ Phase 6 (jupyterlab small files)  ⬜ TODO
