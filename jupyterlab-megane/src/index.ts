@@ -31,6 +31,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
   autoStart: true,
   requires: [ILayoutRestorer],
   activate: (app: JupyterFrontEnd, restorer: ILayoutRestorer) => {
+    // Expose the JupyterFrontEnd app on `window.jupyterapp` only when
+    // `__MEGANE_TEST__` is set so E2E specs can drive `docmanager:open`
+    // and similar commands. JupyterLab itself never exposes the app, so
+    // without this hook the E2E suite can't script multi-tab flows.
+    if ((globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__) {
+      (globalThis as { jupyterapp?: JupyterFrontEnd }).jupyterapp = app;
+    }
+
     for (const ft of [...STRUCTURE_FILETYPES_TEXT, ...STRUCTURE_FILETYPES_BINARY]) {
       app.docRegistry.addFileType(ft);
     }

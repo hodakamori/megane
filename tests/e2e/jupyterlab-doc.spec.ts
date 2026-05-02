@@ -120,23 +120,24 @@ for (const f of FORMATS) {
  * the load when activated, so switching tabs deterministically restores
  * the active document's data.
  */
-// TODO(#release-followup): JupyterLab no longer exposes its app instance on
-// window.jupyterapp, so this test cannot drive docmanager:open programmatically.
-// A correct rewrite needs to either dispatch via the file-browser context menu
-// or expose the app via a small labextension hook. Skipped until the rewrite
-// lands so it doesn't gate the release.
-test.skip("DocWidget recovers when switching between two open files", async ({ page }) => {
+test("DocWidget recovers when switching between two open files", async ({ page }) => {
   await openLabFile(page, { port: PORT, token: TOKEN, file: "1crn.pdb" });
 
-  await page.evaluate(async (fileName) => {
+  // JupyterLab does not expose its app instance globally; the megane
+  // labextension publishes it on `window.jupyterapp` only when the page
+  // sets `__MEGANE_TEST__=true` (set by `openLabFile`).
+  const opened = await page.evaluate(async (fileName) => {
     const w = window as unknown as {
       jupyterapp?: { commands: { execute: (id: string, args?: unknown) => Promise<unknown> } };
     };
-    await w.jupyterapp?.commands.execute("docmanager:open", {
+    if (!w.jupyterapp) return false;
+    await w.jupyterapp.commands.execute("docmanager:open", {
       path: fileName,
       factory: "megane Molecular Viewer",
     });
+    return true;
   }, "water.gro");
+  expect(opened, "labextension must expose window.jupyterapp under __MEGANE_TEST__").toBe(true);
 
   // Wait for a second viewer instance to mount and report a non-zero atom count.
   await page.waitForFunction(
