@@ -67,6 +67,7 @@ megane serve [PDB_FILE] [OPTIONS]
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--xtc PATH` | — | Path to an XTC trajectory file |
+| `--traj PATH` | — | Path to an ASE `.traj` trajectory file |
 | `--port PORT` | `8765` | Server port |
 | `--no-browser` | `false` | Don't automatically open the browser |
 | `--dev` | `false` | Development mode (use Vite dev server for frontend) |
