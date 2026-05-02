@@ -10,7 +10,6 @@ import { useTourStore } from "./tourStore";
 import { buildTourSteps, buildPipelineTutorialSteps } from "./tourSteps";
 
 const CHECKBOX_ID = "megane-tour-dont-show";
-const PIPELINE_TUTORIAL_ACTION = "open-pipeline-tutorial";
 
 let activeDriver: Driver | null = null;
 
@@ -38,26 +37,6 @@ function injectDontShowCheckbox(footer: HTMLElement): void {
   // Place the checkbox at the very start of the footer so it sits left of
   // the progress text and navigation buttons.
   footer.insertBefore(wrapper, footer.firstChild);
-}
-
-/**
- * Wire any in-popover action buttons (e.g. the "Open the pipeline tutorial"
- * launcher injected in tourSteps.ts). Buttons opt in via
- * `data-megane-tour-action="<name>"`.
- */
-function wireActionButtons(description: HTMLElement): void {
-  const buttons = description.querySelectorAll<HTMLElement>("[data-megane-tour-action]");
-  buttons.forEach((btn) => {
-    if (btn.dataset.meganeTourActionWired === "true") return;
-    btn.dataset.meganeTourActionWired = "true";
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const action = btn.dataset.meganeTourAction;
-      if (action === PIPELINE_TUTORIAL_ACTION) {
-        startPipelineTutorial();
-      }
-    });
-  });
 }
 
 interface RunTourOptions {
@@ -88,7 +67,6 @@ function runTour({ steps, showProgress }: RunTourOptions): void {
     steps,
     onPopoverRender: (popover) => {
       injectDontShowCheckbox(popover.footer);
-      wireActionButtons(popover.description);
     },
     onDestroyed: () => {
       useTourStore.getState().setActive(false);

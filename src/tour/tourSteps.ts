@@ -19,6 +19,8 @@
  *                                      include the Pipeline panel)
  *  - [data-testid="panel-pipeline"]  — CollapsiblePanel for PipelineEditor
  *  - [data-testid="pipeline-editor-templates"] — Templates button
+ *  - [data-testid="pipeline-editor-tutorial"]  — Tutorial button (launches
+ *                                                the pipeline tutorial)
  *  - [data-testid="pipeline-node-load_structure"] — Load Structure node card
  *  - [data-testid="pipeline-node-add_bond"]      — Add Bond node card
  *  - [data-testid="pipeline-node-viewport"]      — Viewport node card
@@ -138,15 +140,20 @@ export function buildTourSteps(): DriveStep[] {
       element: '[data-testid="panel-pipeline"]',
       popover: {
         title: "Pipeline",
-        description: `
-          <p class="megane-tour-paragraph">Build a rendering pipeline by connecting nodes: load files, apply bonds, attach trajectories, and choose a visual style.</p>
-          <p class="megane-tour-paragraph">Want to see how a pipeline is wired up step by step?</p>
-          <button type="button" class="megane-tour-action-btn" data-megane-tour-action="open-pipeline-tutorial">
-            Open the pipeline tutorial
-            <span class="megane-tour-action-btn-arrow">${ICON_ARROW}</span>
-          </button>`,
+        description:
+          "Build a rendering pipeline by connecting nodes: load files, apply bonds, attach trajectories, and choose a visual style.",
         side: "left",
         align: "start",
+      },
+    },
+    {
+      element: '[data-testid="pipeline-editor-tutorial"]',
+      popover: {
+        title: "Want a deeper walk-through?",
+        description:
+          "Click the highlighted <strong>Tutorial</strong> button anytime for a step-by-step guide to building a pipeline — load → connect → toggle → viewport.",
+        side: "bottom",
+        align: "end",
       },
     },
     {

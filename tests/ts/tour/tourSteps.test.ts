@@ -6,7 +6,7 @@ describe("buildTourSteps", () => {
   const steps = buildTourSteps();
 
   it("returns the expected number of steps", () => {
-    expect(steps).toHaveLength(6);
+    expect(steps).toHaveLength(7);
   });
 
   it("first step is the welcome screen with no anchor element", () => {
@@ -57,17 +57,21 @@ describe("buildTourSteps", () => {
       .filter((v): v is string => typeof v === "string");
     expect(selectors).toContain('[data-tour-anchor="viewport"]');
     expect(selectors).toContain('[data-testid="panel-pipeline"]');
+    expect(selectors).toContain('[data-testid="pipeline-editor-tutorial"]');
     expect(selectors).toContain('[data-testid="pipeline-editor-templates"]');
   });
 
-  it("pipeline step exposes a launcher for the pipeline tutorial", () => {
-    const pipelineStep = steps.find(
+  it("highlights the toolbar Tutorial button immediately after the Pipeline step", () => {
+    const pipelineIdx = steps.findIndex(
       (s) => s.element === '[data-testid="panel-pipeline"]',
     );
-    expect(pipelineStep).toBeDefined();
-    const desc = pipelineStep!.popover?.description as string;
-    expect(desc).toContain('data-megane-tour-action="open-pipeline-tutorial"');
-    expect(desc).toContain("Open the pipeline tutorial");
+    const tutorialIdx = steps.findIndex(
+      (s) => s.element === '[data-testid="pipeline-editor-tutorial"]',
+    );
+    expect(pipelineIdx).toBeGreaterThan(-1);
+    expect(tutorialIdx).toBe(pipelineIdx + 1);
+    const desc = steps[tutorialIdx].popover?.description as string;
+    expect(desc.toLowerCase()).toContain("tutorial");
   });
 });
 
