@@ -8,9 +8,16 @@
  *                                      include the Pipeline panel)
  *  - [data-testid="panel-pipeline"]  — CollapsiblePanel for PipelineEditor
  *  - [data-testid="pipeline-editor-templates"] — Templates button
+ *  - [data-testid="pipeline-node-load_structure"] — Load Structure node card
+ *  - [data-testid="pipeline-node-add_bond"]      — Add Bond node card
+ *  - [data-testid="pipeline-node-viewport"]      — Viewport node card
  *
- * The final two steps are unattached modals (no `element`); driver.js renders
- * them centred so they work on every host even when no anchor is present.
+ * The Load Structure / Add Bond / Viewport node anchors are present in every
+ * default pipeline (web default, demo, and the vscode empty graph all seed
+ * these three node types), so the assembly walk-through works on every host.
+ *
+ * Centered (un-anchored) modal steps have no `element`; driver.js renders them
+ * centred so they work on every host even when no anchor is present.
  */
 import type { DriveStep } from "driver.js";
 import packageJson from "../../package.json";
@@ -121,7 +128,47 @@ export function buildTourSteps(): DriveStep[] {
       popover: {
         title: "Pipeline",
         description:
-          "Build a rendering pipeline by connecting nodes: load files, apply bonds, attach trajectories, and choose a visual style.",
+          "Build a rendering pipeline by connecting nodes: load files, apply bonds, attach trajectories, and choose a visual style. The next four steps walk through how data flows from a file all the way to the viewport.",
+        side: "left",
+        align: "start",
+      },
+    },
+    {
+      element: '[data-testid="pipeline-node-load_structure"]',
+      popover: {
+        title: "1. Load a structure",
+        description:
+          "Every pipeline starts here. The <strong>Load Structure</strong> node reads a structure file (PDB, CIF, GRO, XYZ, MOL, LAMMPS data, …) and emits typed outputs — particles, optional cell, optional trajectory — that downstream nodes can consume.",
+        side: "left",
+        align: "start",
+      },
+    },
+    {
+      element: '[data-testid="pipeline-node-add_bond"]',
+      popover: {
+        title: "2. Connect outputs to inputs",
+        description:
+          "Drag from a node's <strong>bottom handle (output)</strong> to the next node's <strong>top handle (input)</strong> to route data downstream. Handle colors mark the data type — particle is blue, bond is amber, trajectory is cyan, cell is green — and only matching types snap together, so the graph stays valid by construction.",
+        side: "left",
+        align: "start",
+      },
+    },
+    {
+      element: '[data-testid="pipeline-node-add_bond"]',
+      popover: {
+        title: "3. Active nodes light up",
+        description:
+          "Each node has a <strong>toggle switch</strong> in its header and a colored stripe down its left edge marking its category. Enabled nodes show in full color and contribute to the render; toggling one off greys it out (50% opacity) and skips its branch — handy for A/B comparing styles or muting a heavy step. A red or amber badge appears whenever a node has errors or warnings.",
+        side: "left",
+        align: "start",
+      },
+    },
+    {
+      element: '[data-testid="pipeline-node-viewport"]',
+      popover: {
+        title: "4. Everything ends in the Viewport",
+        description:
+          "The <strong>Viewport</strong> node is the terminus of every pipeline. Whatever you wire into its inputs — particles, bonds, trajectories, overlays — becomes what you see in the 3D viewport on the left. If nothing reaches it, nothing renders. Each pipeline keeps exactly one Viewport, so it is never deletable.",
         side: "left",
         align: "start",
       },
@@ -131,7 +178,7 @@ export function buildTourSteps(): DriveStep[] {
       popover: {
         title: "Templates",
         description:
-          "Pick a starter pipeline (molecule, solid, streaming) to see a working setup in one click.",
+          "Prefer to start from a working example? Pick a starter pipeline (molecule, solid, streaming) to populate the graph in one click — a fast way to see the load → connect → viewport flow in action.",
         side: "bottom",
         align: "end",
       },

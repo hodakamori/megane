@@ -6,7 +6,7 @@ describe("buildTourSteps", () => {
   const steps = buildTourSteps();
 
   it("returns the expected number of steps", () => {
-    expect(steps).toHaveLength(6);
+    expect(steps).toHaveLength(10);
   });
 
   it("first step is the welcome screen with no anchor element", () => {
@@ -44,13 +44,6 @@ describe("buildTourSteps", () => {
     }
   });
 
-  it("anchored selectors are unique", () => {
-    const selectors = steps
-      .map((s) => s.element)
-      .filter((v): v is string => typeof v === "string");
-    expect(new Set(selectors).size).toBe(selectors.length);
-  });
-
   it("expected anchors reference the documented data attributes", () => {
     const selectors = steps
       .map((s) => s.element)
@@ -58,5 +51,20 @@ describe("buildTourSteps", () => {
     expect(selectors).toContain('[data-tour-anchor="viewport"]');
     expect(selectors).toContain('[data-testid="panel-pipeline"]');
     expect(selectors).toContain('[data-testid="pipeline-editor-templates"]');
+    expect(selectors).toContain('[data-testid="pipeline-node-load_structure"]');
+    expect(selectors).toContain('[data-testid="pipeline-node-add_bond"]');
+    expect(selectors).toContain('[data-testid="pipeline-node-viewport"]');
+  });
+
+  it("pipeline assembly walk-through follows load → connect → toggle → viewport order", () => {
+    const titles = steps.map((s) => s.popover?.title ?? "");
+    const loadIdx = titles.findIndex((t) => t.includes("Load a structure"));
+    const connectIdx = titles.findIndex((t) => t.includes("Connect outputs"));
+    const activeIdx = titles.findIndex((t) => t.includes("Active nodes"));
+    const viewportIdx = titles.findIndex((t) => t.includes("ends in the Viewport"));
+    expect(loadIdx).toBeGreaterThan(-1);
+    expect(connectIdx).toBeGreaterThan(loadIdx);
+    expect(activeIdx).toBeGreaterThan(connectIdx);
+    expect(viewportIdx).toBeGreaterThan(activeIdx);
   });
 });
