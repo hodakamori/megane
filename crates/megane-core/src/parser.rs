@@ -13,6 +13,8 @@ pub struct Atom {
     pub y: f32,
     pub z: f32,
     pub element: u8,
+    pub chain_id: u8,
+    pub b_factor: f32,
 }
 
 /// Common result type for all structure format parsers.
@@ -26,6 +28,10 @@ pub struct ParsedStructure {
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
     pub atom_labels: Option<Vec<String>>,
+    /// Per-atom chain IDs encoded as u8 (0=no chain, 1='A', 2='B', ...).
+    pub chain_ids: Option<Vec<u8>>,
+    /// Per-atom B-factors (temperature factors) in Å².
+    pub b_factors: Option<Vec<f32>>,
     /// Embedded vector channels (e.g. GRO velocities).
     /// Empty for formats that carry no per-atom vector quantities.
     pub vector_channels: Vec<crate::trajectory::VectorChannel>,
@@ -76,7 +82,7 @@ fn parse_element(line: &str) -> u8 {
     0 // unknown
 }
 
-/// Parse an ATOM/HETATM line to extract coordinates and element.
+/// Parse an ATOM/HETATM line to extract coordinates, element, chain ID, and B-factor.
 fn parse_atom_line(line: &str) -> Option<(i32, Atom)> {
     if line.len() < 54 {
         return None;
@@ -88,7 +94,22 @@ fn parse_atom_line(line: &str) -> Option<(i32, Atom)> {
     let z: f32 = line[46..54].trim().parse().ok()?;
     let element = parse_element(line);
 
-    Some((serial, Atom { x, y, z, element }))
+    // Chain ID at column 21 (0-indexed)
+    let chain_id = if line.len() > 21 {
+        let ch = line.as_bytes()[21];
+        if ch.is_ascii_alphabetic() { ch - b'A' + 1 } else { 0 }
+    } else {
+        0
+    };
+
+    // B-factor at columns 60-66 (0-indexed)
+    let b_factor = if line.len() >= 66 {
+        line[60..66].trim().parse::<f32>().unwrap_or(0.0)
+    } else {
+        0.0
+    };
+
+    Some((serial, Atom { x, y, z, element, chain_id, b_factor }))
 }
 
 /// Parse CRYST1 record and convert cell parameters to a 3x3 matrix.
@@ -265,14 +286,18 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let first_model = &all_models[0];
     let n_atoms = first_model.len();
 
-    // Build positions and elements from first model
+    // Build positions, elements, chain IDs, and B-factors from first model
     let mut positions = Vec::with_capacity(n_atoms * 3);
     let mut elements = Vec::with_capacity(n_atoms);
+    let mut chain_ids_raw = Vec::with_capacity(n_atoms);
+    let mut b_factors_raw = Vec::with_capacity(n_atoms);
     for atom in first_model {
         positions.push(atom.x);
         positions.push(atom.y);
         positions.push(atom.z);
         elements.push(atom.element);
+        chain_ids_raw.push(atom.chain_id);
+        b_factors_raw.push(atom.b_factor);
     }
 
     // Deduplicate CONECT bonds
@@ -311,6 +336,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    // Only store chain IDs if at least one atom has a non-zero chain ID
+    let chain_ids = if chain_ids_raw.iter().any(|&c| c != 0) {
+        Some(chain_ids_raw)
+    } else {
+        None
+    };
+
+    // Only store B-factors if at least one atom has a non-zero B-factor
+    let b_factors = if b_factors_raw.iter().any(|&b| b != 0.0) {
+        Some(b_factors_raw)
+    } else {
+        None
+    };
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -321,6 +360,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions,
         atom_labels,
+        chain_ids,
+        b_factors,
         vector_channels: vec![],
     })
 }

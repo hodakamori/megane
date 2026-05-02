@@ -614,6 +614,16 @@ export class MoleculeRenderer {
     this.atomRenderer?.clearOverrides?.();
   }
 
+  /** Set per-atom color overrides (RGB flat array, length = nAtoms * 3). */
+  setAtomColorOverrides(colors: Float32Array): void {
+    this.atomRenderer?.setColorOverrides?.(colors);
+  }
+
+  /** Revert per-atom colors to element-based scheme. */
+  clearAtomColorOverrides(): void {
+    this.atomRenderer?.clearColorOverrides?.();
+  }
+
   /** Set bond radius scale multiplier. */
   setBondScale(scale: number): void {
     this.bondScale = scale;

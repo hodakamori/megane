@@ -195,6 +195,7 @@ function applyParticleOverrides(
   if (particles.length === 0) {
     if (prevParticles && prevParticles.length > 0) {
       renderer.clearAtomOverrides();
+      renderer.clearAtomColorOverrides();
       renderer.setAtomScale(1.0);
       renderer.setAtomOpacity(1.0);
     }
@@ -204,6 +205,7 @@ function applyParticleOverrides(
   // Merge overrides from all particle streams for the primary structure
   let mergedScale: Float32Array | null = null;
   let mergedOpacity: Float32Array | null = null;
+  let mergedColor: Float32Array | null = null;
 
   for (const p of particles) {
     if (p.scaleOverrides) {
@@ -227,6 +229,9 @@ function applyParticleOverrides(
           }
         }
       }
+    }
+    if (p.colorOverrides) {
+      mergedColor = p.colorOverrides;
     }
   }
 
@@ -244,6 +249,12 @@ function applyParticleOverrides(
   } else {
     renderer.setAtomOpacity(1.0);
   }
+
+  if (mergedColor) {
+    renderer.setAtomColorOverrides(mergedColor);
+  } else {
+    renderer.clearAtomColorOverrides();
+  }
 }
 
 /** Apply overrides to a StructureLayer. */
@@ -254,11 +265,14 @@ function applyLayerParticleOverrides(
     setAtomScaleOverrides: (o: Float32Array) => void;
     setAtomOpacityOverrides: (o: Float32Array) => void;
     clearAtomOverrides: () => void;
+    setAtomColorOverrides: (o: Float32Array) => void;
+    clearAtomColorOverrides: () => void;
   },
   particles: ParticleData[],
 ): void {
   let mergedScale: Float32Array | null = null;
   let mergedOpacity: Float32Array | null = null;
+  let mergedColor: Float32Array | null = null;
 
   for (const p of particles) {
     if (p.scaleOverrides) {
@@ -283,6 +297,9 @@ function applyLayerParticleOverrides(
         }
       }
     }
+    if (p.colorOverrides) {
+      mergedColor = p.colorOverrides;
+    }
   }
 
   if (mergedScale) {
@@ -298,6 +315,12 @@ function applyLayerParticleOverrides(
     layer.setAtomOpacityOverrides(mergedOpacity);
   } else {
     layer.setAtomOpacity(1.0);
+  }
+
+  if (mergedColor) {
+    layer.setAtomColorOverrides(mergedColor);
+  } else {
+    layer.clearAtomColorOverrides();
   }
 }
 

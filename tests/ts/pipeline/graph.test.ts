@@ -117,6 +117,7 @@ describe("collectInputs", () => {
     indices: null,
     scaleOverrides: null,
     opacityOverrides: null,
+    colorOverrides: null,
   };
 
   it("returns empty map when no edges match", () => {

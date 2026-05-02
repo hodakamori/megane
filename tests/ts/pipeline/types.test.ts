@@ -101,6 +101,7 @@ describe("defaultParams", () => {
       type: "modify",
       scale: 1.0,
       opacity: 1.0,
+      colorScheme: "element",
     });
   });
 

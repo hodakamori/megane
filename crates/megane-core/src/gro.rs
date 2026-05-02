@@ -145,6 +145,8 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         box_matrix,
         frame_positions: Vec::new(),
         atom_labels,
+        chain_ids: None,
+        b_factors: None,
         vector_channels,
     })
 }

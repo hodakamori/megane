@@ -213,7 +213,13 @@ class Filter(PipelineNode):
 
 
 class Modify(PipelineNode):
-    """Modify per-atom visual properties (scale, opacity).
+    """Modify per-atom visual properties (scale, opacity, color scheme).
+
+    Args:
+        scale: Atom radius scale multiplier (default 1.0).
+        opacity: Global atom opacity in 0–1 range (default 1.0).
+        color_scheme: One of ``"element"``, ``"residue"``, ``"chain"``,
+                      ``"bfactor"`` (default ``"element"``).
 
     Ports:
         inp.particle — atom data in
@@ -229,10 +235,12 @@ class Modify(PipelineNode):
         *,
         scale: float = 1.0,
         opacity: float = 1.0,
+        color_scheme: str = "element",
     ) -> None:
         super().__init__()
         self.scale = scale
         self.opacity = opacity
+        self.color_scheme = color_scheme
 
 
 class AddBonds(PipelineNode):
@@ -563,7 +571,11 @@ class Pipeline:
         elif ntype == "filter":
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
         elif ntype == "modify":
-            return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0))
+            return Modify(
+                scale=nd.get("scale", 1.0),
+                opacity=nd.get("opacity", 1.0),
+                color_scheme=nd.get("colorScheme", "element"),
+            )
         elif ntype == "add_bond":
             bond_source = nd.get("bondSource", "distance")
             if bond_source == "file":
@@ -717,6 +729,7 @@ class Pipeline:
         elif isinstance(node, Modify):
             base["scale"] = node.scale
             base["opacity"] = node.opacity
+            base["colorScheme"] = node.color_scheme
         elif isinstance(node, AddBonds):
             if node.top is not None:
                 base["bondSource"] = "file"

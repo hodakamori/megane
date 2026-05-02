@@ -33,6 +33,8 @@ export class ImpostorAtomMesh {
   private opacityOverrideBuf: Float32Array;
   private nAtoms = 0;
   private capacity: number;
+  // Cached elements for restoring element-based colors when clearing overrides
+  private lastElements: Uint8Array = new Uint8Array(0);
 
   constructor(maxAtoms: number = 1_000_000) {
     this.capacity = maxAtoms;
@@ -96,6 +98,9 @@ export class ImpostorAtomMesh {
     if (nAtoms > this.capacity) {
       this.grow(nAtoms);
     }
+
+    // Cache elements for later color restoration
+    this.lastElements = elements.slice(0, nAtoms);
 
     // Fill buffers directly (no object allocation)
     for (let i = 0; i < nAtoms; i++) {
@@ -177,6 +182,25 @@ export class ImpostorAtomMesh {
     this.scaleOverrideAttr.needsUpdate = true;
     this.opacityOverrideAttr.needsUpdate = true;
     this.material.uniforms.uUsePerAtomOverrides.value = 0;
+  }
+
+  /** Set per-atom color overrides (replaces element-based colors). Length = nAtoms * 3, RGB in 0-1 range. */
+  setColorOverrides(colors: Float32Array): void {
+    for (let i = 0; i < this.nAtoms * 3; i++) {
+      this.colorBuf[i] = colors[i];
+    }
+    this.colorAttr.needsUpdate = true;
+  }
+
+  /** Revert per-atom colors back to element-based colors. */
+  clearColorOverrides(): void {
+    for (let i = 0; i < this.nAtoms; i++) {
+      const [r, g, b] = getColor(this.lastElements[i] ?? 0);
+      this.colorBuf[i * 3] = r;
+      this.colorBuf[i * 3 + 1] = g;
+      this.colorBuf[i * 3 + 2] = b;
+    }
+    this.colorAttr.needsUpdate = true;
   }
 
   private grow(needed: number): void {

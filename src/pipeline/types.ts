@@ -37,6 +37,8 @@ export interface ParticleData {
   indices: Uint32Array | null; // null = all atoms
   scaleOverrides: Float32Array | null;
   opacityOverrides: Float32Array | null;
+  /** Per-atom color overrides (RGB flat, length = nAtoms * 3). Null = element colors. */
+  colorOverrides: Float32Array | null;
 }
 
 /** Bond data flowing through the pipeline. */
@@ -351,6 +353,7 @@ export interface ModifyParams {
   type: "modify";
   scale: number;
   opacity: number;
+  colorScheme: import("../constants").ColorScheme;
 }
 
 export interface LabelGeneratorParams {
@@ -411,7 +414,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "filter":
       return { type, query: "", bond_query: "" };
     case "modify":
-      return { type, scale: 1.0, opacity: 1.0 };
+      return { type, scale: 1.0, opacity: 1.0, colorScheme: "element" };
     case "label_generator":
       return { type, source: "element" };
     case "polyhedron_generator":

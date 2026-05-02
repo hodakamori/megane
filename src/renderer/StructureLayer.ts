@@ -126,6 +126,14 @@ export class StructureLayer {
     this.atomRenderer?.clearOverrides?.();
   }
 
+  setAtomColorOverrides(colors: Float32Array): void {
+    this.atomRenderer?.setColorOverrides?.(colors);
+  }
+
+  clearAtomColorOverrides(): void {
+    this.atomRenderer?.clearColorOverrides?.();
+  }
+
   setBondScale(scale: number): void {
     this.bondScale = scale;
     if (this.bondRenderer?.setScale && this.snapshot) {

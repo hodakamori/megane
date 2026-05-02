@@ -437,3 +437,173 @@ export function getElementSymbol(atomicNum: number): string {
 export function getAtomicMass(atomicNum: number): number {
   return ATOMIC_MASSES[atomicNum] ?? 0;
 }
+
+// ─── Color Schemes ────────────────────────────────────────────────────────────
+
+/** Available atom color schemes. */
+export type ColorScheme = "element" | "residue" | "chain" | "bfactor";
+
+export const COLOR_SCHEME_LABELS: Record<ColorScheme, string> = {
+  element: "Element (CPK/VESTA)",
+  residue: "Residue type",
+  chain: "Chain",
+  bfactor: "B-factor",
+};
+
+/**
+ * Shapely / RasMol-style residue colors.
+ * Keys are 3-letter residue codes in uppercase.
+ */
+export const RESIDUE_COLORS: Record<string, [number, number, number]> = {
+  ALA: [0.627, 0.627, 0.627],
+  ARG: [0.118, 0.118, 0.863],
+  ASN: [0.0, 0.863, 0.863],
+  ASP: [0.863, 0.118, 0.118],
+  CYS: [0.863, 0.863, 0.0],
+  GLN: [0.0, 0.863, 0.863],
+  GLU: [0.863, 0.118, 0.118],
+  GLY: [0.863, 0.863, 0.863],
+  HIS: [0.118, 0.588, 0.863],
+  ILE: [0.0, 0.588, 0.0],
+  LEU: [0.0, 0.588, 0.0],
+  LYS: [0.118, 0.118, 0.863],
+  MET: [0.863, 0.863, 0.0],
+  PHE: [0.2, 0.2, 0.706],
+  PRO: [0.863, 0.627, 0.0],
+  SER: [0.98, 0.588, 0.0],
+  THR: [0.98, 0.588, 0.0],
+  TRP: [0.706, 0.353, 0.706],
+  TYR: [0.196, 0.196, 0.706],
+  VAL: [0.0, 0.588, 0.0],
+  // Nucleotides
+  DA: [0.863, 0.0, 0.0],
+  DC: [0.0, 0.863, 0.0],
+  DG: [0.0, 0.0, 0.863],
+  DT: [0.863, 0.863, 0.0],
+  A: [0.863, 0.0, 0.0],
+  C: [0.0, 0.863, 0.0],
+  G: [0.0, 0.0, 0.863],
+  U: [0.863, 0.863, 0.0],
+  // Water / common heteroatoms
+  HOH: [0.196, 0.588, 0.863],
+  WAT: [0.196, 0.588, 0.863],
+};
+
+/** Default residue color for unknown residue types. */
+export const DEFAULT_RESIDUE_COLOR: [number, number, number] = [0.75, 0.75, 0.75];
+
+/**
+ * Categorical chain palette (up to 26 chains A–Z).
+ * Index 0 is unused (0 = no chain), index 1 = chain A, 2 = chain B, etc.
+ */
+export const CHAIN_COLORS: [number, number, number][] = [
+  [0.75, 0.75, 0.75], // 0 = no chain (gray)
+  [0.878, 0.235, 0.235], // 1 = A (red)
+  [0.235, 0.51, 0.878], // 2 = B (blue)
+  [0.235, 0.706, 0.353], // 3 = C (green)
+  [0.929, 0.686, 0.118], // 4 = D (amber)
+  [0.612, 0.235, 0.878], // 5 = E (purple)
+  [0.235, 0.776, 0.784], // 6 = F (teal)
+  [0.957, 0.451, 0.216], // 7 = G (orange)
+  [0.855, 0.235, 0.612], // 8 = H (pink)
+  [0.455, 0.722, 0.0], // 9 = I (lime)
+  [0.129, 0.588, 0.502], // 10 = J (emerald)
+  [0.612, 0.455, 0.235], // 11 = K (brown)
+];
+
+/** Default chain color when chain index exceeds the palette. */
+export const DEFAULT_CHAIN_COLOR: [number, number, number] = [0.75, 0.75, 0.75];
+
+/**
+ * Map a B-factor value to an RGB color using a blue→white→red gradient.
+ * bMin/bMax define the data range; the value is clamped.
+ */
+export function bfactorToColor(
+  value: number,
+  bMin: number,
+  bMax: number,
+): [number, number, number] {
+  const range = bMax - bMin;
+  const t = range > 0 ? Math.max(0, Math.min(1, (value - bMin) / range)) : 0.5;
+  // blue (cold) → white (mid) → red (hot)
+  if (t < 0.5) {
+    const u = t * 2; // 0 → 1
+    return [u, u, 1.0]; // blue → white
+  } else {
+    const u = (t - 0.5) * 2; // 0 → 1
+    return [1.0, 1.0 - u, 1.0 - u]; // white → red
+  }
+}
+
+/** Extract residue name (3-letter code) from an atom label like "ALA42" or "ALA". */
+function extractResname(label: string): string {
+  return label.replace(/\d+$/, "").toUpperCase().trim();
+}
+
+/**
+ * Compute per-atom colors as a flat Float32Array (length = nAtoms * 3)
+ * for the given color scheme, using available snapshot and auxiliary data.
+ */
+export function computeColorOverrides(
+  scheme: ColorScheme,
+  nAtoms: number,
+  elements: Uint8Array,
+  atomLabels: string[] | null,
+  chainIds: Uint8Array | null | undefined,
+  bFactors: Float32Array | null | undefined,
+): Float32Array | null {
+  if (scheme === "element") return null;
+
+  const colors = new Float32Array(nAtoms * 3);
+
+  if (scheme === "residue") {
+    for (let i = 0; i < nAtoms; i++) {
+      const label = atomLabels?.[i] ?? "";
+      const resname = extractResname(label);
+      const [r, g, b] = RESIDUE_COLORS[resname] ?? DEFAULT_RESIDUE_COLOR;
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    return colors;
+  }
+
+  if (scheme === "chain") {
+    for (let i = 0; i < nAtoms; i++) {
+      const chainIdx = chainIds?.[i] ?? 0;
+      const [r, g, b] = CHAIN_COLORS[chainIdx] ?? DEFAULT_CHAIN_COLOR;
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    return colors;
+  }
+
+  if (scheme === "bfactor") {
+    if (!bFactors || bFactors.length === 0) {
+      // No B-factors: use default color
+      for (let i = 0; i < nAtoms; i++) {
+        const [r, g, b] = DEFAULT_COLOR;
+        colors[i * 3] = r;
+        colors[i * 3 + 1] = g;
+        colors[i * 3 + 2] = b;
+      }
+      return colors;
+    }
+    let bMin = Infinity;
+    let bMax = -Infinity;
+    for (let i = 0; i < nAtoms; i++) {
+      if (bFactors[i] < bMin) bMin = bFactors[i];
+      if (bFactors[i] > bMax) bMax = bFactors[i];
+    }
+    for (let i = 0; i < nAtoms; i++) {
+      const [r, g, b] = bfactorToColor(bFactors[i], bMin, bMax);
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    return colors;
+  }
+
+  return null;
+}

@@ -1,5 +1,5 @@
 /**
- * Modify node — changes visual properties (scale, opacity) of incoming data.
+ * Modify node — changes visual properties (scale, opacity, color scheme) of incoming data.
  * Accepts particle or bond input.
  */
 
@@ -8,6 +8,7 @@ import type { PipelineNodeData } from "../../pipeline/execute";
 import type { ModifyParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
+import { COLOR_SCHEME_LABELS, type ColorScheme } from "../../constants";
 
 const sliderStyle: React.CSSProperties = {
   width: "100%",
@@ -32,6 +33,17 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
   color: "#64748b",
   marginBottom: 3,
+};
+
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  fontSize: 15,
+  padding: "3px 6px",
+  borderRadius: 4,
+  border: "1px solid #cbd5e1",
+  background: "#f8fafc",
+  color: "#1e293b",
+  cursor: "pointer",
 };
 
 export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
@@ -74,6 +86,22 @@ export function ModifyNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
             />
             <span style={valueStyle}>{`${Math.round(params.opacity * 100)}%`}</span>
           </div>
+        </div>
+        <div>
+          <div style={labelStyle}>Color scheme</div>
+          <select
+            data-testid="modify-node-color-scheme"
+            className="nodrag"
+            value={params.colorScheme ?? "element"}
+            onChange={(e) => updateNodeParams(id, { colorScheme: e.target.value as ColorScheme })}
+            style={selectStyle}
+          >
+            {(Object.keys(COLOR_SCHEME_LABELS) as ColorScheme[]).map((scheme) => (
+              <option key={scheme} value={scheme}>
+                {COLOR_SCHEME_LABELS[scheme]}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </NodeShell>
