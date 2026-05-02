@@ -77,6 +77,19 @@ try {
     });
     const page = await context.newPage();
 
+    // Suppress the first-time user tour so the screenshot doesn't capture
+    // the welcome modal overlay.
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem(
+          "megane-tour-prefs",
+          JSON.stringify({ dontShowAgain: true }),
+        );
+      } catch {
+        /* noop */
+      }
+    });
+
     // Load the full app — auto-loads caffeine_water with trajectory,
     // rendering the complete UI (3D viewport, pipeline editor, timeline).
     await page.goto(`http://127.0.0.1:${PORT}/`, {
