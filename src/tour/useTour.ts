@@ -24,8 +24,12 @@ export function useTour({ host, autoStartDelayMs = 600 }: UseTourOptions) {
 
   useEffect(() => {
     if (autoStartHandled) return;
+    // Suppress auto-start under E2E so the welcome modal doesn't capture
+    // the page while tests interact with JupyterLab tabs / the viewer.
+    const isTestMode =
+      (globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__ === true;
     const { dontShowAgain } = useTourStore.getState();
-    if (!shouldAutoStart(host, dontShowAgain)) {
+    if (isTestMode || !shouldAutoStart(host, dontShowAgain)) {
       markAutoStartHandled();
       return;
     }

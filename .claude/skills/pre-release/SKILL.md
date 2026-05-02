@@ -8,10 +8,11 @@ Run this skill before creating a release tag. Complete every phase in order.
 
 ## Phase 0: Prerequisites
 
-`make test-all` (Phase 1.4) launches Playwright projects that depend on the
-webapp build artifacts and the JupyterLab labextension. **Build first, test
-second** — running tests before the build guarantees timeouts and false
-failures.
+The pre-release sequence is **bump first, then build, then test**. The
+JupyterLab labextension embeds its own `package.json` version into the
+shipped JS bundle at build time, so building before bumping ships the wheel
+with a stale labextension version. The Python wheel and the E2E suites also
+depend on those build artifacts, so reordering is not optional.
 
 Confirm the dev environment is set up:
 ```bash
@@ -33,59 +34,21 @@ re-baseline), prefix the command with `PATH="$(pwd)/.venv/bin:$PATH"` or the
 `jupyterlab-doc` / `widget-jupyterlab` projects fail with `spawn jupyter
 ENOENT`.
 
-## Phase 1: Build & Tests
+## Phase 1: Version bump
 
-### 1.1 Full build
-```bash
-npm run build
-```
-Must complete without errors. This covers WASM → TypeScript → Vite app →
-widget → lib → JupyterLab labextension. Confirms
-`python/megane/static/app/index.html` and
-`wheel-share/data/share/jupyter/labextensions/megane-jupyterlab/` exist —
-both are required by the E2E suites in Phase 1.3.
-
-### 1.2 Python wheel build
-```bash
-maturin build --release
-```
-Must produce a wheel without errors.
-
-### 1.3 Run all tests
-```bash
-uv run make test-all
-```
-All of Python, TypeScript, Rust, E2E, notebook, and integration tests must
-pass.
-
-**E2E baseline drift.** Per `CLAUDE.md`, E2E is local-only and font /
-fontconfig differences across machines can cause baseline diffs. If E2E fails
-only with `full-page diff X.XX% > 2%` style errors (not timeouts or app
-errors), re-baseline the affected projects and commit the new PNGs:
-```bash
-PATH="$(pwd)/.venv/bin:$PATH" MEGANE_E2E_UPDATE=1 \
-  npx playwright test --project=<failing-project> [--project=<...>]
-```
-Then `git add tests/e2e/baselines/<project>/` and commit as a separate
-`test(e2e): re-baseline ...` commit *before* the release commit. If failures
-are timeouts or runtime errors, fix the underlying cause — do not paper over
-with a re-baseline.
-
-## Phase 2: Version Consistency
-
-### 2.1 Run bump-my-version
+### 1.1 Run bump-my-version
 Install if not already available:
 ```bash
 uv tool install bump-my-version
 ```
-Choose the appropriate bump level:
+Choose the appropriate level:
 ```bash
 uv tool run bump-my-version bump patch   # bug fixes
 uv tool run bump-my-version bump minor   # new features
 uv tool run bump-my-version bump major   # breaking changes
 ```
 
-### 2.2 Verify all 9 files are updated
+### 1.2 Verify all 11 files are updated
 The bumpversion config in `pyproject.toml` updates these files:
 - `pyproject.toml`
 - `package.json`, `package-lock.json`
@@ -94,6 +57,7 @@ The bumpversion config in `pyproject.toml` updates these files:
 - `crates/megane-wasm/Cargo.toml`
 - `python/megane/__init__.py`
 - `vscode-megane/package.json`, `vscode-megane/package-lock.json`
+- `jupyterlab-megane/package.json`, `jupyterlab-megane/package-lock.json`
 
 Sanity-check no stale references remain (replace `0.6.2` with the previous
 version — output should be empty):
@@ -103,20 +67,77 @@ grep -rn "0\.6\.2" pyproject.toml package.json package-lock.json \
   crates/megane-python/Cargo.toml \
   crates/megane-wasm/Cargo.toml \
   python/megane/__init__.py \
-  vscode-megane/package.json vscode-megane/package-lock.json
+  vscode-megane/package.json vscode-megane/package-lock.json \
+  jupyterlab-megane/package.json jupyterlab-megane/package-lock.json
 ```
 `docs/scripts/prepare-notebooks.py` reads the version dynamically from
 `pyproject.toml`, so no manual update is required.
 
-### 2.3 Update Cargo.lock
+### 1.3 Update Cargo.lock
 ```bash
 cargo check
 ```
 Ensures `Cargo.lock` is in sync with the bumped Cargo.toml versions.
 
-## Phase 3: CHANGELOG
+## Phase 2: Build
 
-### 3.0 Pre-condition check
+### 2.1 Full build (with the new version)
+```bash
+npm run build
+```
+Must complete without errors. This covers WASM → TypeScript → Vite app →
+widget → lib → JupyterLab labextension. The labextension webpack bundle is
+where the `jupyterlab-megane` version is embedded — confirm it picked up
+the bump:
+```bash
+grep -ohE 'megane-jupyterlab@[0-9.]+' \
+  wheel-share/data/share/jupyter/labextensions/megane-jupyterlab/static/*.js \
+  | head -1
+```
+The version in the output must match the new release version.
+
+### 2.2 Python wheel build
+```bash
+maturin build --release
+```
+Must produce a wheel without errors. The wheel includes `wheel-share/` so
+the labextension shipped with the wheel reflects whatever was on disk at
+this point.
+
+### 2.3 Editable install (only needed for Phase 3 E2E)
+The `jupyterlab-doc` and `widget-jupyterlab` projects spawn `jupyter lab`
+and require the labextension to be discoverable in the venv prefix. After
+Phase 2.1 the build artifacts are on disk; install them into the venv:
+```bash
+PATH="$(pwd)/.venv/bin:$PATH" uv run maturin develop --release
+PATH="$(pwd)/.venv/bin:$PATH" jupyter labextension list | grep megane
+```
+The listed `megane-jupyterlab` must show the new version.
+
+## Phase 3: Tests
+
+```bash
+uv run make test-all
+```
+All of Python, TypeScript, Rust, E2E, notebook, and integration tests must
+pass.
+
+**E2E baseline drift.** Per `CLAUDE.md`, E2E is local-only and font /
+fontconfig differences across machines can cause baseline diffs. If E2E
+fails only with `full-page diff X.XX% > 2%` style errors (not timeouts or
+app errors), re-baseline the affected projects and commit the new PNGs:
+```bash
+PATH="$(pwd)/.venv/bin:$PATH" MEGANE_E2E_UPDATE=1 \
+  npx playwright test --project=<failing-project> [--project=<...>]
+```
+Then `git add tests/e2e/baselines/<project>/` and commit as a separate
+`test(e2e): re-baseline ...` commit *before* the release commit. If
+failures are timeouts or runtime errors, fix the underlying cause — do not
+paper over with a re-baseline.
+
+## Phase 4: CHANGELOG
+
+### 4.1 Pre-condition check
 Confirm that `CHANGELOG.md` has an `[Unreleased]` section at the top:
 ```bash
 head -10 CHANGELOG.md
@@ -126,7 +147,7 @@ If `[Unreleased]` is missing or empty, populate it from
 `[Unreleased]` is a sign there are no user-facing changes to release —
 double-check before continuing.
 
-### 3.1 Verify CHANGELOG.md has a new entry
+### 4.2 Verify CHANGELOG.md has a new entry
 - The `[Unreleased]` section must be renamed to `[X.Y.Z] - YYYY-MM-DD` with today's date.
 - A fresh empty `[Unreleased]` section should remain at the top.
 - Format follows [Keep a Changelog](https://keepachangelog.com/).
@@ -142,37 +163,40 @@ Example:
 - ...
 ```
 
-## Phase 4: Documentation & Content
+## Phase 5: Documentation & Content
 
-### 4.1 README code examples
-Manually verify that install commands and code snippets in `README.md` reflect the current API.
+### 5.1 README code examples
+Manually verify that install commands and code snippets in `README.md`
+reflect the current API.
 Check at minimum:
 - Installation section (pip, npm, vscode)
 - Quick-start Python snippet (`megane.view()` / `megane.view_traj()` are 0.6.0+)
 - Quick-start React snippet (imports from `megane-viewer/lib`)
 - Supported file formats table
 
-### 4.2 Docs site builds
-Docs build is verified by the `release-dry-run.yml` workflow (the "Dry run: Docs" job).
-No manual step needed here — Phase 6 covers this.
+### 5.2 Docs site builds
+Docs build is verified by the `release-dry-run.yml` workflow (the "Dry run:
+Docs" job). No manual step needed here — Phase 7 covers this.
 
-### 4.3 Feature table alignment
-Confirm the README feature table ("Runs Everywhere" section) matches what is actually supported:
+### 5.3 Feature table alignment
+Confirm the README feature table ("Runs Everywhere" section) matches what
+is actually supported:
 - Supported environments (Jupyter, browser, React, VSCode)
 - Supported file formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, LAMMPS dump, ASE .traj)
 - Cross-host parity per `docs/docs/platform-support.md`
 
-## Phase 5: Visual Verification
+## Phase 6: Visual Verification
 
-### 5.1 Capture screenshots
+### 6.1 Capture screenshots
 ```bash
 node scripts/capture-screenshots.mjs
 ```
-Requires WASM to be built (covered by Phase 1.1 `npm run build`).
-The script opens the full app (3D viewport + pipeline editor + timeline) and saves
-`docs/public/screenshots/hero.png`. Review it visually for rendering regressions.
+Requires WASM to be built (covered by Phase 2.1 `npm run build`).
+The script opens the full app (3D viewport + pipeline editor + timeline)
+and saves `docs/public/screenshots/hero.png`. Review it visually for
+rendering regressions.
 
-### 5.2 Live demo (AWS S3 + CloudFront) — health check and visual verification
+### 6.2 Live demo (AWS S3 + CloudFront) — health check and visual verification
 
 The demo deploy workflow is `.github/workflows/deploy.yml` ("Deploy demo to
 AWS S3 + CloudFront"). It runs on every push to `main` and on workflow
@@ -188,7 +212,8 @@ git remote set-url origin "$ORIG_REMOTE"
 ```
 Note the CloudFront URL.
 
-**Step 2**: Take a screenshot of the live demo with Playwright and verify rendering:
+**Step 2**: Take a screenshot of the live demo with Playwright and verify
+rendering:
 ```bash
 node -e "
 const { createRequire } = require('module');
@@ -212,9 +237,9 @@ Replace `LIVE_DEMO_URL` with the URL from Step 1.
 - A molecule is rendered (atoms/bonds visible)
 - The UI controls (toolbar, sidebar) are present
 
-## Phase 6: Dry Run
+## Phase 7: Dry Run
 
-### 6.1 Trigger release-dry-run workflow
+### 7.1 Trigger release-dry-run workflow
 ```bash
 gh workflow run release-dry-run.yml
 ```
@@ -224,23 +249,24 @@ gh run list --workflow=release-dry-run.yml --limit 1
 ```
 All three publish jobs (PyPI, npm, VSCode) must pass in dry-run mode.
 
-## Phase 7: Release Commit
+## Phase 8: Release Commit
 
 Only proceed here after all phases above are green.
 
-### 7.1 Verify clean git state
+### 8.1 Verify clean git state
 ```bash
 git status
 ```
 Expected modifications: bump-my-version files (`pyproject.toml`,
 `package.json`, `package-lock.json`, the three `Cargo.toml`s,
-`python/megane/__init__.py`, both `vscode-megane/package*.json`),
-`Cargo.lock`, `CHANGELOG.md`. `python/megane/static/widget.js` may also
-appear because `npm run build` re-bundles it; include it in the release
-commit. Any other unrelated modifications should already have been split
-into separate commits (e.g. E2E baselines from Phase 1.3).
+`python/megane/__init__.py`, both `vscode-megane/package*.json`, both
+`jupyterlab-megane/package*.json`), `Cargo.lock`, `CHANGELOG.md`.
+`python/megane/static/widget.js` may also appear because `npm run build`
+re-bundles it; include it in the release commit. Any unrelated
+modifications should already have been split into separate commits (e.g.
+E2E baselines from Phase 3).
 
-### 7.2 Create release commit
+### 8.2 Create release commit
 ```bash
 git add pyproject.toml package.json package-lock.json \
   crates/megane-core/Cargo.toml \
@@ -250,6 +276,7 @@ git add pyproject.toml package.json package-lock.json \
   python/megane/__init__.py \
   python/megane/static/widget.js \
   vscode-megane/package.json vscode-megane/package-lock.json \
+  jupyterlab-megane/package.json jupyterlab-megane/package-lock.json \
   CHANGELOG.md
 git commit -m "chore: release vX.Y.Z"
 ```
@@ -260,8 +287,9 @@ Then push. The push target depends on workflow:
   branch (e.g. `claude/release-vX.Y.Z-...`), open a PR, merge after CI
   passes. The tag must point at the merge commit on `main`.
 
-### 7.3 Hand off to user
-After the release commit is on `main`, hand off to the user to create and push the tag manually:
+### 8.3 Hand off to user
+After the release commit is on `main`, hand off to the user to create and
+push the tag manually:
 
 ```
 # Run these commands yourself to trigger the publish workflows:
@@ -270,8 +298,10 @@ git push origin vX.Y.Z
 ```
 
 Pushing the tag triggers all publish workflows automatically:
-`publish-pypi.yml`, `publish-npm.yml`, `publish-vscode.yml`, `release.yml`, `docs.yml`.
+`publish-pypi.yml`, `publish-npm.yml`, `publish-vscode.yml`, `release.yml`,
+`docs.yml`.
 
 ## Next Step
 
-After the user pushes the tag, follow the **post-release** skill to verify the release landed correctly.
+After the user pushes the tag, follow the **post-release** skill to verify
+the release landed correctly.
