@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-02
+
+### Added
+
+- **Tripos MOL2 parser** — load `.mol2` files across all hosts (#355, #379)
+- **First-time user tour** — driver.js-powered onboarding with welcome step, viewport highlight, and a dedicated pipeline assembly walk-through, launchable from the toolbar Tutorial button
+- Cross-host platform-support gaps closed — every supported format now registers on webapp, JupyterLab DocWidget, JupyterLab widget, VSCode custom editor, and VSCode notebook widget (#377)
+- Auto-open extended to all megane primary structure formats
+- Pipeline toolbar split into Pipeline / I/O / Others rows for clearer categorization
+- AddBond node picks its default Source by file format on open
+- `usePipelineStore.openFile` becomes the single ingestion entry; webapp, JupyterLab, and VSCode webview all route through it
+- `setup-local.sh` one-shot installer for VSCode and JupyterLab extensions
+- LICENSE file shipped in the VSCode extension package
+
+### Changed
+
+- MeganeViewer is now driven entirely from the pipeline + playback stores; per-document store isolation in JupyterLab/VSCode prevents cross-tab contamination
+- Demo deployment migrated to Cloudflare Pages
+- Dropped the redundant LoadTrajectory node — multi-frame structure files load directly via the structure node
+- Removed legacy `AppearancePanel` and `WidgetViewerSimple` components
+
+### Fixed
+
+- Per-frame GPU leak on bonds — InstancedBufferAttributes are reused instead of recreated each frame
+- Plotly notebook dihedral plot and frame numbering
+- Blank multi-viewport in widgets — pipeline store is now per-instance and pipeline JSON applies atomically with per-node snapshots
+- AddBond Source default now applies in single-file viewers
+- Deserialized pipeline graphs are normalized and viewport guides are preserved
+- Timeline renders in all hosts via a playback-store fallback
+- VSCode supported-formats documentation drift
+
+### Performance
+
+- PBC `inferBondsVdwJS` precomputes per-cell shifts (hot-path rewrite with typed arrays)
+- JupyterLab tab state is cached and `MeganeViewer` is decoupled from `viewportState`
+
+### Documentation
+
+- Local-run instructions for the VSCode and JupyterLab extensions
+- Test coverage roadmap and E2E `COVERAGE_PLAN.md`
+- README and skills aligned with the current implementation
+
 ## [0.6.2] - 2026-03-25
 
 No user-facing changes in this version.
