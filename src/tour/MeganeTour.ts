@@ -46,9 +46,7 @@ function injectDontShowCheckbox(footer: HTMLElement): void {
  * `data-megane-tour-action="<name>"`.
  */
 function wireActionButtons(description: HTMLElement): void {
-  const buttons = description.querySelectorAll<HTMLElement>(
-    "[data-megane-tour-action]",
-  );
+  const buttons = description.querySelectorAll<HTMLElement>("[data-megane-tour-action]");
   buttons.forEach((btn) => {
     if (btn.dataset.meganeTourActionWired === "true") return;
     btn.dataset.meganeTourActionWired = "true";
