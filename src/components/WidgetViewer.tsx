@@ -171,7 +171,13 @@ export function WidgetViewer({
     const renderer = rendererRef.current;
     if (renderer) {
       const storeState = pipelineStore.getState();
-      applyViewportState(renderer, storeState.viewportState, null, undefined, storeState.atomLabels);
+      applyViewportState(
+        renderer,
+        storeState.viewportState,
+        null,
+        undefined,
+        storeState.atomLabels,
+      );
       prevViewportStateRef.current = storeState.viewportState;
     }
   }, [snapshot, nodeSnapshotsData, pipelineJson, setSnapshot, pipelineStore]);
@@ -181,7 +187,13 @@ export function WidgetViewer({
     const renderer = rendererRef.current;
     if (!renderer) return;
     const atomLabels = pipelineStore.getState().atomLabels;
-    applyViewportState(renderer, viewportState, prevViewportStateRef.current, undefined, atomLabels);
+    applyViewportState(
+      renderer,
+      viewportState,
+      prevViewportStateRef.current,
+      undefined,
+      atomLabels,
+    );
     prevViewportStateRef.current = viewportState;
   }, [viewportState, pipelineStore]);
 

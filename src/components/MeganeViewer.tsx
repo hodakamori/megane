@@ -118,7 +118,13 @@ export function MeganeViewer({
     const renderer = rendererRef.current;
     if (renderer) {
       const state = usePipelineStore.getState();
-      applyViewportState(renderer, state.viewportState, null, primaryNodeIdRef.current, state.atomLabels);
+      applyViewportState(
+        renderer,
+        state.viewportState,
+        null,
+        primaryNodeIdRef.current,
+        state.atomLabels,
+      );
       prevViewportStateRef.current = state.viewportState;
     }
   }, [snapshot]);
@@ -136,7 +142,13 @@ export function MeganeViewer({
       const renderer = rendererRef.current;
       if (renderer) {
         const atomLabels = usePipelineStore.getState().atomLabels;
-        applyViewportState(renderer, vs, prevViewportStateRef.current, primaryNodeIdRef.current, atomLabels);
+        applyViewportState(
+          renderer,
+          vs,
+          prevViewportStateRef.current,
+          primaryNodeIdRef.current,
+          atomLabels,
+        );
         prevViewportStateRef.current = vs;
       }
 

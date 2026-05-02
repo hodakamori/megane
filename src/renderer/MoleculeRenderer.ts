@@ -30,11 +30,7 @@ import { StructureLayer } from "./StructureLayer";
 import { PivotMarker } from "./PivotMarker";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
-import {
-  type ColorScheme,
-  type ColorContext,
-  computeBfactorRange,
-} from "../colorSchemes";
+import { type ColorScheme, type ColorContext, computeBfactorRange } from "../colorSchemes";
 import { pickAtPixel, projectToScreen } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
@@ -644,10 +640,7 @@ export class MoleculeRenderer {
       // Recolor bonds with current bond state (positions may have advanced)
       if (this.bondRenderer && this.snapshot.nBonds > 0) {
         const positions = this.currentPositions ?? this.snapshot.positions;
-        this.bondRenderer.loadSnapshot(
-          { ...this.snapshot, positions },
-          ctx,
-        );
+        this.bondRenderer.loadSnapshot({ ...this.snapshot, positions }, ctx);
         if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
           this.bondRenderer.setScale(this.bondScale, this.snapshot);
         }

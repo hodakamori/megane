@@ -409,7 +409,13 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "add_bond":
       return { type, bondSource: "distance" };
     case "viewport":
-      return { type, perspective: false, cellAxesVisible: true, pivotMarkerVisible: true, colorScheme: "byElement" };
+      return {
+        type,
+        perspective: false,
+        cellAxesVisible: true,
+        pivotMarkerVisible: true,
+        colorScheme: "byElement",
+      };
     case "filter":
       return { type, query: "", bond_query: "" };
     case "modify":

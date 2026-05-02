@@ -30,14 +30,14 @@ const RESIDUE_COLORS: Record<string, [number, number, number]> = {
   VAL: [0.58, 0.58, 0.58],
   ILE: [0.58, 0.58, 0.58],
   LEU: [0.58, 0.58, 0.58],
-  MET: [0.85, 0.80, 0.02],
+  MET: [0.85, 0.8, 0.02],
   PHE: [0.22, 0.22, 0.75],
   TRP: [0.22, 0.22, 0.75],
   PRO: [0.58, 0.58, 0.58],
   // Polar uncharged
-  SER: [0.95, 0.65, 0.30],
-  THR: [0.95, 0.65, 0.30],
-  CYS: [0.90, 0.90, 0.02],
+  SER: [0.95, 0.65, 0.3],
+  THR: [0.95, 0.65, 0.3],
+  CYS: [0.9, 0.9, 0.02],
   TYR: [0.22, 0.22, 0.75],
   ASN: [0.53, 0.78, 0.53],
   GLN: [0.53, 0.78, 0.53],
@@ -49,16 +49,16 @@ const RESIDUE_COLORS: Record<string, [number, number, number]> = {
   ASP: [0.85, 0.22, 0.22],
   GLU: [0.85, 0.22, 0.22],
   // Glycine
-  GLY: [1.00, 1.00, 1.00],
+  GLY: [1.0, 1.0, 1.0],
   // Nucleotides
   DA: [0.64, 0.16, 0.16],
-  DC: [0.24, 0.80, 0.24],
-  DG: [0.80, 0.80, 0.24],
-  DT: [0.24, 0.80, 0.80],
+  DC: [0.24, 0.8, 0.24],
+  DG: [0.8, 0.8, 0.24],
+  DT: [0.24, 0.8, 0.8],
   A: [0.64, 0.16, 0.16],
-  C: [0.24, 0.80, 0.24],
-  G: [0.80, 0.80, 0.24],
-  U: [0.80, 0.24, 0.80],
+  C: [0.24, 0.8, 0.24],
+  G: [0.8, 0.8, 0.24],
+  U: [0.8, 0.24, 0.8],
 };
 
 const DEFAULT_RESIDUE_COLOR: [number, number, number] = [0.65, 0.65, 0.65];
@@ -70,14 +70,14 @@ const CHAIN_COLORS: [number, number, number][] = [
   [0.85, 0.33, 0.22], // red
   [0.22, 0.73, 0.33], // green
   [0.85, 0.73, 0.12], // yellow
-  [0.60, 0.22, 0.85], // purple
+  [0.6, 0.22, 0.85], // purple
   [0.22, 0.78, 0.78], // cyan
-  [0.85, 0.50, 0.22], // orange
+  [0.85, 0.5, 0.22], // orange
   [0.85, 0.22, 0.65], // pink
   [0.45, 0.75, 0.22], // lime
   [0.75, 0.45, 0.22], // brown
-  [0.22, 0.45, 0.60], // teal
-  [0.60, 0.60, 0.22], // olive
+  [0.22, 0.45, 0.6], // teal
+  [0.6, 0.6, 0.22], // olive
 ];
 
 // ─── B-factor color scale (viridis-like: blue→cyan→green→yellow→red) ─────────
@@ -90,9 +90,9 @@ function bfactorToColor(value: number, minB: number, maxB: number): [number, num
   const stops: [number, number, number][] = [
     [0.07, 0.11, 0.58], // blue
     [0.07, 0.65, 0.85], // cyan
-    [0.22, 0.80, 0.33], // green
-    [0.97, 0.90, 0.12], // yellow
-    [0.85, 0.10, 0.10], // red
+    [0.22, 0.8, 0.33], // green
+    [0.97, 0.9, 0.12], // yellow
+    [0.85, 0.1, 0.1], // red
   ];
   const n = stops.length - 1;
   const seg = t * n;
