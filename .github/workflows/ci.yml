@@ -46,7 +46,7 @@ jobs:
           files: lcov.info
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_on_error: false
+          fail_ci_on_error: true
 
   test-ts:
     name: TypeScript tests
@@ -78,7 +78,7 @@ jobs:
           files: coverage/ts/lcov.info
           flags: typescript
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_on_error: false
+          fail_ci_on_error: true
 
   test-python:
     name: Python tests
@@ -114,7 +114,7 @@ jobs:
           files: coverage.xml
           flags: python
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_on_error: false
+          fail_ci_on_error: true
 
   test-notebooks:
     name: Notebook tests
