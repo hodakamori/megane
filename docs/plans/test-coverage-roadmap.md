@@ -1,5 +1,19 @@
 # Test Coverage Roadmap (Refactoring Re-plan)
 
+## Progress (updated)
+
+- ✅ Phase 0 — codecov flag/upload alignment (option A): commit `c17462a`
+- ✅ Phase 1 — `src/tour/` unit tests (3 files, 277 LOC): commit `b03bf04`
+- ✅ Phase 2 — `src/stream/` unit tests (2 files, 361 LOC): commit `61ada6e`
+- ✅ Phase 3 — `src/ai/` unit tests (4 files, 539 LOC) + `parseFrontmatter` export: commit `db0b679`
+- ⬜ Phase 4 — `src/renderer/` pure helpers (Selection, Picking, CameraManager, shaders)
+- ⬜ Phase 5 — `src/components/nodes/` UI tests (split: NodeShell + 4, then remaining 8)
+- ⬜ Phase 6 — `jupyterlab-megane/src/` (filetypes, wasmLoader, factory)
+- ⬜ Phase 7 — `vscode-megane/src/extension.ts` with vscode mock
+- ⬜ Phase 8 — codecov threshold tightening (`1% → 2%`) + `fail_ci_on_error: true`
+
+Total new tests added in Phases 0–3: **100** tests across 9 files (1,177 LOC test source).
+
 ## Context
 
 main を取り込んだ直後のリポジトリでは、すでに以下が main 側で完了しています:
@@ -23,7 +37,11 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **既存パターンに乗る**: `tests/ts/setup.ts` (`@testing-library/jest-dom/vitest`)、`tests/ts/stores/usePlaybackStore.test.ts`、`tests/ts/components/*.test.tsx` を参照テンプレに。
 - **vitest 設定はそのまま**: `vitest.config.ts:12` の `include: ["tests/ts/**/*.test.{ts,tsx}"]` に従い、新規テストは `tests/ts/<area>/` に追加。
 
-## Phase 0 — codecov 信号の整合性修正 (前提・ブロッキング)
+## Phase 0 — codecov 信号の整合性修正 (前提・ブロッキング) ✅ DONE (`c17462a`)
+
+**実施内容**: 推奨案 A (フラグ統合) を採用。`codecov.yml` から `vscode` / `jupyterlab` の status と `individual_flags` エントリを削除し、`typescript` フラグの paths に `vscode-megane/src/` と `jupyterlab-megane/src/` を追加。`.github/workflows/ci.yml:79` の `flags: typescript,vscode,jupyterlab` を `flags: typescript` に縮約。`fail_ci_on_error: true` への昇格は Phase 8 に持ち越し。
+
+
 
 このフェーズなしに以降のテストを足してもフラグ別ステータスが正しく光らない。
 
@@ -37,7 +55,15 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **対象ファイル**: `.github/workflows/ci.yml`, `codecov.yml`
 - **検証**: PR で codecov コメントを確認し、`typescript` (または `typescript` / `vscode` / `jupyterlab`) ステータスが PR チェックに分離して現れること。
 
-## Phase 1 — `src/tour/` (小さく・純粋・即効性高)
+## Phase 1 — `src/tour/` (小さく・純粋・即効性高) ✅ DONE (`b03bf04`)
+
+**実施内容**: 以下 3 ファイル / 35 テストを追加。`MeganeTour.ts` 本体は driver.js DOM 結合のため `useTour` 経由で間接的にカバー。
+
+- `tests/ts/tour/tourStore.test.ts` (131 LOC, 20 tests): `setHost` / `setActive` / `markAutoStartHandled` / `setDontShowAgain` (localStorage 永続化 + 不正 JSON 耐性 + 再 import パス) と `shouldAutoStart` の 4 ホスト × `dontShowAgain` 行列、`?guide=on/off/1/0/true/false` URL オーバーライド
+- `tests/ts/tour/tourSteps.test.ts` (62 LOC, 8 tests): ステップ数 / Welcome 構造 / `package.json` 由来バージョン / 全ステップタイトル非空 / アンカーセレクタ非空・重複なし
+- `tests/ts/tour/useTour.test.tsx` (84 LOC, 7 tests): `vi.mock("@/tour/MeganeTour")` で driver.js を回避、`renderHook` で host 同期 / 自動開始ゲート / unmount での `stopTour` / 手動 `startTour` 経路を検証
+
+
 
 `useTour.ts` (52), `tourStore.ts` (98), `tourSteps.ts` (179), `MeganeTour.ts` (80)。zustand ベース + 純データのみ。
 
@@ -49,7 +75,14 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **既存利用**: `@testing-library/react` は既に `tests/ts/components/*` で使用中
 - **規模**: S
 
-## Phase 2 — `src/stream/` (WebSocket / フレーム供給)
+## Phase 2 — `src/stream/` (WebSocket / フレーム供給) ✅ DONE (`61ada6e`)
+
+**実施内容**: 以下 2 ファイル / 23 テストを追加。`globalThis.WebSocket` を `MockWebSocket` クラスでスタブ化するパターンを `tests/ts/` に新規導入。
+
+- `tests/ts/stream/WebSocketClient.test.ts` (243 LOC, 15 tests): connect / 自動再接続の指数バックオフ (1s→2s→4s→8s→16s→30s 上限) / 成功 open でのバックオフリセット / disconnect での timer キャンセル / `send()` の readyState ガード / `connected` getter / `onerror` 非例外
+- `tests/ts/stream/StreamFrameProvider.test.ts` (118 LOC, 8 tests): cache miss → `request_frame` 送信 / `receiveFrame` の `onFrameReady` 発火 / `maxCacheSize` 越えでの LRU 退避 / 既存 frameId 再 receive での MRU 移動 / `clear()` / `setOnFrameReady` 上書き
+
+
 
 `WebSocketClient.ts` (93), `StreamFrameProvider.ts` (82)。
 
@@ -59,7 +92,16 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **既存契約参照**: `src/stores/usePlaybackStore.ts` の `setProvider` / `currentFrameData` 経路 (`MeganeViewer.tsx:122,140` で利用)
 - **規模**: S
 
-## Phase 3 — `src/ai/` (純粋ロジック先行、ネットワークは後回し)
+## Phase 3 — `src/ai/` (純粋ロジック先行、ネットワークは後回し) ✅ DONE (`db0b679`)
+
+**実施内容**: 以下 4 ファイル / 42 テストを追加。`fetch` を `vi.stubGlobal` でモックし、SSE は `ReadableStream` を Response 本体に渡す `makeSSEResponse` ヘルパで合成。`src/ai/skillLoader.ts` の `parseFrontmatter` を 1 行だけ `export` に昇格 (ロードマップが許容する「テスト + 必要最小の export 追加」枠)。
+
+- `tests/ts/ai/config.test.ts` (93 LOC, 8 tests): zustand store の localStorage 読み書き / `apiKey` を絶対に永続化しない不変条件 / 不正 JSON 耐性 / `setProvider` でのデフォルトモデル切替 / `PROVIDER_MODELS` 構造
+- `tests/ts/ai/prompt.test.ts` (45 LOC, 6 tests): 全ノードタイプ・スキーマ version 3 マーカー・JSON コードフェンス・`Connection Rules` 節の存在 / 決定性
+- `tests/ts/ai/skillLoader.test.ts` (121 LOC, 13 tests): `parseFrontmatter` のフロントマターあり/なし、コロンなし行、値中コロン、空ボディ / `buildToolDefinitions` の kebab→snake / `executeSkill` のマッチ・null / `loadSkills` (空ディレクトリ) / `getSkills` キャッシュ
+- `tests/ts/ai/client.test.ts` (280 LOC, 15 tests): `extractPipelineJSON` の fenced/raw/malformed/version 不一致/配列欠落分岐 / Anthropic SSE フローの text-only / tool_use → tool_result 往復 / ヘッダ・ボディ検証 / non-OK status 例外 / OpenAI SSE フローの delta / `[DONE]` / 不正 JSON 行スキップ / non-OK status 例外
+
+
 
 `config.ts` (80), `prompt.ts` (196), `skillLoader.ts` (128), `client.ts` (354)。
 
@@ -128,19 +170,19 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 ## 推奨実行順 / 並列性
 
 ```
-Phase 0 (codecov flag fix)        ← 必ず最初
+Phase 0 (codecov flag fix)        ✅ DONE (c17462a)
    │
-   ├─ Phase 1 (tour)              ← 小・即効性、並列可
-   ├─ Phase 2 (stream)            ← 並列可
-   └─ Phase 3 (ai)                ← 並列可
+   ├─ Phase 1 (tour)              ✅ DONE (b03bf04)
+   ├─ Phase 2 (stream)            ✅ DONE (61ada6e)
+   └─ Phase 3 (ai)                ✅ DONE (db0b679)
         │
-        ├─ Phase 4 (renderer pure helpers)
-        └─ Phase 5 (nodes UI)     ← 2 PR に分割
+        ├─ Phase 4 (renderer pure helpers)   ⬜ TODO
+        └─ Phase 5 (nodes UI)                 ⬜ TODO  ← 2 PR に分割
              │
-             ├─ Phase 6 (jupyterlab small files)
-             └─ Phase 7 (vscode extension)
+             ├─ Phase 6 (jupyterlab small files)  ⬜ TODO
+             └─ Phase 7 (vscode extension)        ⬜ TODO
                   │
-                  └─ Phase 8 (threshold tighten)
+                  └─ Phase 8 (threshold tighten)  ⬜ TODO
 ```
 
 各フェーズは独立 PR。1, 2, 3 は依存無しで並列着手可。

@@ -43,7 +43,7 @@ const skillModules: Record<string, { default: string }> = import.meta.glob("./sk
  * Parse YAML frontmatter from a markdown string.
  * Returns the frontmatter key-value pairs and the remaining content.
  */
-function parseFrontmatter(raw: string): {
+export function parseFrontmatter(raw: string): {
   attrs: Record<string, string>;
   content: string;
 } {
