@@ -47,6 +47,18 @@ export class ImpostorBondMesh {
   private opacityBuf: Float32Array; // per-visual-instance opacity override
   private logicalBondIdx: Float32Array; // CPU-only: maps visual instance → logical bond index
 
+  // Persistent InstancedBufferAttribute references. Recreated only when the
+  // backing typed arrays are reallocated by grow(); otherwise we just flip
+  // needsUpdate to re-upload, so the old GL buffer is reused (and not leaked).
+  private atomAAttr!: THREE.InstancedBufferAttribute;
+  private atomBAttr!: THREE.InstancedBufferAttribute;
+  private offsetXAttr!: THREE.InstancedBufferAttribute;
+  private offsetYAttr!: THREE.InstancedBufferAttribute;
+  private colorAttr!: THREE.InstancedBufferAttribute;
+  private radiusAttr!: THREE.InstancedBufferAttribute;
+  private dashedAttr!: THREE.InstancedBufferAttribute;
+  private opacityAttr!: THREE.InstancedBufferAttribute;
+
   // Position DataTexture (updated per frame)
   private positionTex: THREE.DataTexture;
   private positionTexData: Float32Array;
@@ -220,10 +232,12 @@ export class ImpostorBondMesh {
     // Reset per-bond override mode when loading a new snapshot
     this.bondMaterial.uniforms.uUsePerBondOverrides.value = 0;
 
-    // Recreate all InstancedBufferAttributes and re-register them.
-    // This forces Three.js to create new GPU buffers, ensuring data
-    // is uploaded even when loadSnapshot() is called repeatedly.
-    this.registerAttributes();
+    // Re-upload existing GL buffers in place. Recreating the
+    // InstancedBufferAttributes here would orphan the previous GL buffers
+    // (Three.js only frees them on the attribute's own dispose event), and
+    // when bondSource="distance" loadSnapshot runs every frame — that path
+    // exhausted GPU memory and triggered WebGL context loss.
+    this.markAttributesDirty();
     this.geo.instanceCount = idx;
   }
 
@@ -271,25 +285,71 @@ export class ImpostorBondMesh {
     }
   }
 
-  /** Recreate all instance attributes and re-register with geometry. */
+  /**
+   * (Re)allocate all instance attributes and register them with the
+   * geometry. Disposes any previously-held attributes first so their GL
+   * buffers are released — this is the only path that should churn GPU
+   * memory, and it only runs at construction and when grow() reallocates
+   * the typed arrays.
+   */
   private registerAttributes(): void {
-    const atomA = new THREE.InstancedBufferAttribute(this.atomABuf, 1);
-    const atomB = new THREE.InstancedBufferAttribute(this.atomBBuf, 1);
-    const offsetX = new THREE.InstancedBufferAttribute(this.offsetXBuf, 1);
-    const offsetY = new THREE.InstancedBufferAttribute(this.offsetYBuf, 1);
-    const color = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
-    const radius = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
-    const dashed = new THREE.InstancedBufferAttribute(this.dashedBuf, 1);
-    const opacity = new THREE.InstancedBufferAttribute(this.opacityBuf, 1);
+    this.disposeAttributes();
 
-    this.geo.setAttribute("instanceAtomA", atomA);
-    this.geo.setAttribute("instanceAtomB", atomB);
-    this.geo.setAttribute("instanceOffsetX", offsetX);
-    this.geo.setAttribute("instanceOffsetY", offsetY);
-    this.geo.setAttribute("instanceColor", color);
-    this.geo.setAttribute("instanceRadius", radius);
-    this.geo.setAttribute("instanceDashed", dashed);
-    this.geo.setAttribute("instanceBondOpacity", opacity);
+    this.atomAAttr = new THREE.InstancedBufferAttribute(this.atomABuf, 1);
+    this.atomBAttr = new THREE.InstancedBufferAttribute(this.atomBBuf, 1);
+    this.offsetXAttr = new THREE.InstancedBufferAttribute(this.offsetXBuf, 1);
+    this.offsetYAttr = new THREE.InstancedBufferAttribute(this.offsetYBuf, 1);
+    this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
+    this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
+    this.dashedAttr = new THREE.InstancedBufferAttribute(this.dashedBuf, 1);
+    this.opacityAttr = new THREE.InstancedBufferAttribute(this.opacityBuf, 1);
+
+    this.geo.setAttribute("instanceAtomA", this.atomAAttr);
+    this.geo.setAttribute("instanceAtomB", this.atomBAttr);
+    this.geo.setAttribute("instanceOffsetX", this.offsetXAttr);
+    this.geo.setAttribute("instanceOffsetY", this.offsetYAttr);
+    this.geo.setAttribute("instanceColor", this.colorAttr);
+    this.geo.setAttribute("instanceRadius", this.radiusAttr);
+    this.geo.setAttribute("instanceDashed", this.dashedAttr);
+    this.geo.setAttribute("instanceBondOpacity", this.opacityAttr);
+  }
+
+  private disposeAttributes(): void {
+    // Three.js' WebGLAttributes registers a `dispose` listener on each
+    // BufferAttribute and frees the GL buffer when the event fires.
+    // BufferAttribute extends EventDispatcher at runtime but @types/three
+    // 0.183 omits it, so we cast to a minimal disposable shape. Without
+    // this, swapping attributes via setAttribute leaks the previous GL
+    // buffers — fatal under per-frame VDW bond recalculation.
+    type Disposable = {
+      dispose?: () => void;
+      dispatchEvent?: (e: { type: string }) => void;
+    };
+    const dispose = (a: THREE.InstancedBufferAttribute | undefined) => {
+      if (!a) return;
+      const d = a as unknown as Disposable;
+      if (typeof d.dispose === "function") d.dispose();
+      else d.dispatchEvent?.({ type: "dispose" });
+    };
+    dispose(this.atomAAttr);
+    dispose(this.atomBAttr);
+    dispose(this.offsetXAttr);
+    dispose(this.offsetYAttr);
+    dispose(this.colorAttr);
+    dispose(this.radiusAttr);
+    dispose(this.dashedAttr);
+    dispose(this.opacityAttr);
+  }
+
+  private markAttributesDirty(): void {
+    this.atomAAttr.needsUpdate = true;
+    this.atomBAttr.needsUpdate = true;
+    this.offsetXAttr.needsUpdate = true;
+    this.offsetYAttr.needsUpdate = true;
+    this.colorAttr.needsUpdate = true;
+    this.radiusAttr.needsUpdate = true;
+    this.dashedAttr.needsUpdate = true;
+    this.opacityAttr.needsUpdate = true;
   }
 
   private grow(needed: number): void {
