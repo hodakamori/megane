@@ -43,21 +43,25 @@ function App() {
       if (message.type === "loadFile") {
         const { contentBytes, filename, wasmBytes } = message;
         setWasmUrlFromBytes(wasmBytes);
-        // Build a File from raw bytes so binary formats like .traj round-trip
-        // unmodified. The shared parser dispatches by extension to text() or
-        // arrayBuffer() and both work over a Uint8Array-backed File.
         const bytes = new Uint8Array(contentBytes);
         const file = new File([bytes], filename);
-        // useMeganeLocal.loadFile internally drives the pipeline (via
-        // applyResult: setNodeSnapshot + load_structure / load_trajectory
-        // fileName updates) so we no longer need a manual
-        // updateNodeParams patch here.
-        local
-          .loadFile(file)
+        const lower = filename.toLowerCase();
+        const isTrajectoryOnly =
+          lower.endsWith(".xtc") || lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
+        // Trajectory-only formats (XTC, LAMMPS dump) need a topology loaded
+        // first. Surface an actionable error rather than silently failing —
+        // the user can recover via the always-mounted pipeline editor by
+        // adding a Load Structure node and re-pointing the trajectory file.
+        const loadPromise = isTrajectoryOnly ? local.loadXtc(file) : local.loadFile(file);
+        loadPromise
           .then(() => setLoaded(true))
           .catch((err) => {
             console.error("Failed to load file:", err);
-            setError(`Failed to load file: ${err instanceof Error ? err.message : String(err)}`);
+            const base = err instanceof Error ? err.message : String(err);
+            const hint = isTrajectoryOnly
+              ? " Open a structure file (PDB, GRO, etc.) first, or use the pipeline editor to wire a Load Structure node."
+              : "";
+            setError(`Failed to load file: ${base}${hint}`);
           });
         return;
       }

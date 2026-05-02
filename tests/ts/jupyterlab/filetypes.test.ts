@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships exactly seven text structure filetypes", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(7);
+  it("ships eight text structure filetypes (incl. LAMMPS dump trajectory)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(8);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / CIF / LAMMPS-data names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / CIF / LAMMPS-data / LAMMPS-dump names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -49,6 +49,7 @@ describe("jupyterlab filetypes", () => {
         "megane-sdf",
         "megane-cif",
         "megane-lammps-data",
+        "megane-lammps-dump",
       ].sort(),
     );
   });
@@ -59,13 +60,23 @@ describe("jupyterlab filetypes", () => {
     expect(lammps?.extensions).toEqual([".data", ".lammps"]);
   });
 
-  it("ships a single ASE trajectory binary filetype", () => {
-    expect(STRUCTURE_FILETYPES_BINARY).toHaveLength(1);
-    const traj = STRUCTURE_FILETYPES_BINARY[0];
-    expect(traj.name).toBe("megane-ase-traj");
-    expect(traj.extensions).toEqual([".traj"]);
-    expect(traj.fileFormat).toBe("base64");
-    expect(traj.contentType).toBe("file");
+  it("registers both .lammpstrj and .dump for the LAMMPS-dump filetype", () => {
+    const dump = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-lammps-dump");
+    expect(dump).toBeDefined();
+    expect(dump?.extensions).toEqual([".lammpstrj", ".dump"]);
+    expect(dump?.fileFormat).toBe("text");
+  });
+
+  it("ships ASE-traj and XTC binary filetypes", () => {
+    expect(STRUCTURE_FILETYPES_BINARY).toHaveLength(2);
+    const names = STRUCTURE_FILETYPES_BINARY.map((f) => f.name).sort();
+    expect(names).toEqual(["megane-ase-traj", "megane-xtc"]);
+    for (const ft of STRUCTURE_FILETYPES_BINARY) {
+      expect(ft.fileFormat).toBe("base64");
+      expect(ft.contentType).toBe("file");
+    }
+    const xtc = STRUCTURE_FILETYPES_BINARY.find((f) => f.name === "megane-xtc");
+    expect(xtc?.extensions).toEqual([".xtc"]);
   });
 
   it("ensures every extension starts with '.' and every name is unique across all arrays", () => {
@@ -89,7 +100,7 @@ describe("jupyterlab filetypes", () => {
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
       STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
     );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(7);
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(1);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(8);
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(2);
   });
 });

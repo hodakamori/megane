@@ -30,6 +30,18 @@ def test_widget_instantiation():
     assert v._frame_data == b""
 
 
+def test_widget_pipeline_flag_default_false():
+    """`pipeline` kwarg defaults to False so the editor is opt-in."""
+    v = MolecularViewer()
+    assert v._pipeline_enabled is False
+
+
+def test_widget_pipeline_flag_opt_in():
+    """`pipeline=True` flips the synced traitlet that the frontend reads."""
+    v = MolecularViewer(pipeline=True)
+    assert v._pipeline_enabled is True
+
+
 def test_esm_is_valid_js():
     """_esm resolves to non-empty JS string containing the render export."""
     v = MolecularViewer()
