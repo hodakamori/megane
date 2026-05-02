@@ -9,8 +9,8 @@
 - ✅ Phase 4 — `src/renderer/` pure helpers (Selection, Picking, CameraManager, shaders) — 4 files, 788 LOC, 69 tests
 - ✅ Phase 5a — `NodeShell` + 4 node components (commit `a9a0540`)
 - ✅ Phase 5b — remaining 7 node components (LabelGenerator, LoadTrajectory, LoadVector, Modify, PolyhedronGenerator, Streaming, VectorOverlay) — 7 files, 56 tests
-- ⬜ Phase 6 — `jupyterlab-megane/src/` (filetypes, wasmLoader, factory)
-- ⬜ Phase 7 — `vscode-megane/src/extension.ts` with vscode mock
+- ✅ Phase 6 — `jupyterlab-megane/src/` (filetypes, wasmLoader, factory, skillLoaderStub) — commit `ff31c30`
+- ✅ Phase 7 — `vscode-megane/src/extension.ts` with vscode mock — 1 file, 22 tests, ~440 LOC test source. New `tests/ts/__stubs__/vscode.ts` + `vitest.config.ts` alias. `webview/main.tsx` is intentionally deferred (roadmap-noted: requires module split into pure handlers, separate task).
 - ⬜ Phase 8 — codecov threshold tightening (`1% → 2%`) + `fail_ci_on_error: true`
 
 Total new tests added in Phases 0–4: **169** tests across 13 files (1,965 LOC test source).
@@ -170,15 +170,17 @@ main を取り込んだ直後のリポジトリでは、すでに以下が main 
 - **DocWidget は対象外**: `MeganeDocWidget.tsx`, `MeganePipelineDocWidget.tsx` は JupyterLab DocumentWidget / Comm 直結なので E2E (`tests/e2e/jupyterlab-doc.spec.ts`) に任せる
 - **規模**: S
 
-## Phase 7 — `vscode-megane/src/` (vscode API モック必須)
+## Phase 7 — `vscode-megane/src/` (vscode API モック必須) ✅ DONE
 
-`extension.ts` (257), `webview/main.tsx` (206)。
+**実施内容**: `tests/ts/vscode/extension.test.ts` (22 tests, ~440 LOC) を追加。`tests/ts/__stubs__/vscode.ts` で `Uri` / `workspace.fs.readFile` / `window.registerCustomEditorProvider` の最小スタブを用意し、`vitest.config.ts` の `resolve.alias` に `vscode` → スタブを追加 (jupyterlab パッケージと同じパターン)。テスト側は `vi.hoisted` + `vi.mock("vscode", () => ({...}))` で `mockState.registered` / `mockState.readFile` を駆動し、`activate()` 経由で各 provider インスタンスを captura → 直接 `openCustomDocument` / `resolveCustomEditor` を呼んで挙動を検証。
 
-- **追加テスト**:
-  - `tests/ts/vscode/extension.test.ts`: `vitest` の `vi.mock("vscode", ...)` で vscode API をモックし、`activate()` のコマンド登録 / contentProvider / postMessage 経路を検証
-  - `webview/main.tsx` のメッセージハンドラ部分はモジュール分割して純粋関数化したうえでテスト (本格的な分割は別タスク)
-- **既存契約参照**: `vscode-megane/webview/main.tsx:43-50` の `event.data` ディスパッチ
-- **規模**: M (vscode モック作成のオーバーヘッドあり)
+- `tests/ts/vscode/extension.test.ts` (4 describe ブロック / 22 tests):
+  - `activate / deactivate` (4 tests): 2 provider 登録順序 (`structureViewer` → `pipelineViewer`)、`subscriptions` プッシュ、`retainContextWhenHidden: true` + `supportsMultipleEditorsPerDocument: false`、`deactivate()` no-op
+  - `MeganeEditorProvider` 単一構造ファイル (8 tests): `openCustomDocument` の uri 保持と dispose noop、`webview.options` に `enableScripts` + `localResourceRoots` が media フォルダ 1 件のみ、`onDidReceiveMessage("ready")` での `postMessage` ペイロード (`type: "loadFile"`, `contentBytes`, `filename`, `wasmBytes`)、非 ready メッセージ無視、readFile 失敗時 `{type: "error", message}`、非 Error throw の文字列化、HTML 内の CSP / `__MEGANE_CONTEXT__ = "vscode"` / nonce 32 文字、`MEGANE_E2E_MODE=1` 時の `window.__MEGANE_TEST__ = true;` 注入と通常時の非注入、4 回連続呼び出しでの nonce 重複なし
+  - `MeganePipelineEditorProvider` パイプライン (8 tests): `openCustomDocument` の uri 保持、`load_structure` + `load_trajectory` ノードの相対パスを使った companion ファイル並走読み込み + ペイロード組み立て、`version !== 3` のエラーペイロード (`"version 3 required"`, `"got 2"`)、JSON malformed のエラーペイロード、絶対パス (`/etc/passwd`) スキップ、ディレクトリ脱出 (`../../escape.pdb`) スキップ、companion 読み失敗の silent skip + 残ノード継続、`fileName` 未設定 / `null` ノードのスキップ、`load_structure` / `load_trajectory` 以外の type のスキップ
+- **`webview/main.tsx` (206 LOC) は対象外**: `acquireVsCodeApi()` 直結 + ReactDOM.render + `usePipelineStore.openFile` ネットワーク経路で、message handler の純粋分離が前提。ロードマップが許容する「テスト + 必要最小の export 追加」枠を超えるため、本フェーズでは E2E (`tests/e2e/vscode-*.spec.ts`) に任せ、純粋関数化は別タスク。
+- **追加スタブ / alias**: `tests/ts/__stubs__/vscode.ts`、`vitest.config.ts` の resolve.alias へ `vscode` 追加。
+- **規模**: M (実績)
 
 ## Phase 8 — codecov しきい値の段階引き締め (締め)
 
@@ -200,8 +202,8 @@ Phase 0 (codecov flag fix)        ✅ DONE (c17462a)
         ├─ Phase 4 (renderer pure helpers)   ✅ DONE
         └─ Phase 5 (nodes UI)                 ✅ DONE (2 PR: 5a + 5b)
              │
-             ├─ Phase 6 (jupyterlab small files)  ⬜ TODO
-             └─ Phase 7 (vscode extension)        ⬜ TODO
+             ├─ Phase 6 (jupyterlab small files)  ✅ DONE (ff31c30)
+             └─ Phase 7 (vscode extension)        ✅ DONE
                   │
                   └─ Phase 8 (threshold tighten)  ⬜ TODO
 ```
