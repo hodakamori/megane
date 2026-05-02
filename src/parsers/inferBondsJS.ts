@@ -208,15 +208,58 @@ export function inferBondsVdwJS(
     const b6 = b[6],
       b7 = b[7],
       b8 = b[8];
-    const bi0 = boxInv![0],
-      bi1 = boxInv![1],
-      bi2 = boxInv![2];
-    const bi3 = boxInv![3],
-      bi4 = boxInv![4],
-      bi5 = boxInv![5];
-    const bi6 = boxInv![6],
-      bi7 = boxInv![7],
-      bi8 = boxInv![8];
+
+    // Per-neighbor-cell shift: when the cell index wraps around the box,
+    // shift the neighbor atom by ±box vector(s) so the inner pair loop can
+    // do plain Cartesian distance. Avoids running the minimum-image
+    // transform (9 mults + 3 Math.round + 9 mults) for *every* candidate
+    // pair — instead it's amortized over all atoms in the neighbor cell.
+    //
+    // This optimization is only correct when each axis has ≥ 2 cells: with
+    // a single cell along an axis, atoms within the same cell can span the
+    // full box width, so cell-wrap-derived shifts no longer match the true
+    // minimum image. For such tiny boxes we fall back to the per-pair
+    // minimum-image transform (still correct, just less branch-friendly).
+    if (nx < 2 || ny < 2 || nz < 2) {
+      const bi0 = boxInv![0],
+        bi1 = boxInv![1],
+        bi2 = boxInv![2];
+      const bi3 = boxInv![3],
+        bi4 = boxInv![4],
+        bi5 = boxInv![5];
+      const bi6 = boxInv![6],
+        bi7 = boxInv![7],
+        bi8 = boxInv![8];
+      // Brute-force min-image: at most a few dozen atoms per cell × few cells.
+      for (let i = 0; i < nAtoms; i++) {
+        const ix3 = i * 3;
+        const pix = positions[ix3];
+        const piy = positions[ix3 + 1];
+        const piz = positions[ix3 + 2];
+        const ri = radii[i];
+        for (let j = i + 1; j < nAtoms; j++) {
+          const jx3 = j * 3;
+          let dx = positions[jx3] - pix;
+          let dy = positions[jx3 + 1] - piy;
+          let dz = positions[jx3 + 2] - piz;
+          let sx = bi0 * dx + bi3 * dy + bi6 * dz;
+          let sy = bi1 * dx + bi4 * dy + bi7 * dz;
+          let sz = bi2 * dx + bi5 * dy + bi8 * dz;
+          sx -= Math.round(sx);
+          sy -= Math.round(sy);
+          sz -= Math.round(sz);
+          dx = b0 * sx + b3 * sy + b6 * sz;
+          dy = b1 * sx + b4 * sy + b7 * sz;
+          dz = b2 * sx + b5 * sy + b8 * sz;
+          const distSq = dx * dx + dy * dy + dz * dz;
+          const th = (ri + radii[j]) * vdwScale;
+          if (distSq > minDistSq && distSq <= th * th) {
+            pushBond(i, j);
+          }
+        }
+      }
+      return outBuf.slice(0, outLen);
+    }
 
     for (let ix = 0; ix < nx; ix++) {
       for (let iy = 0; iy < ny; iy++) {
@@ -224,8 +267,9 @@ export function inferBondsVdwJS(
           const cellIdx = ix * nyz + iy * nz + iz;
           const aStart = cellStart[cellIdx];
           const aEnd = cellStart[cellIdx + 1];
+          if (aStart === aEnd) continue;
 
-          // Self-cell pairs.
+          // Self-cell pairs: same image, no shift.
           for (let a = aStart; a < aEnd; a++) {
             const i = cellAtoms[a];
             const ix3 = i * 3;
@@ -236,18 +280,9 @@ export function inferBondsVdwJS(
             for (let b2i = a + 1; b2i < aEnd; b2i++) {
               const j = cellAtoms[b2i];
               const jx3 = j * 3;
-              let dx = positions[jx3] - pix;
-              let dy = positions[jx3 + 1] - piy;
-              let dz = positions[jx3 + 2] - piz;
-              let sx = bi0 * dx + bi3 * dy + bi6 * dz;
-              let sy = bi1 * dx + bi4 * dy + bi7 * dz;
-              let sz = bi2 * dx + bi5 * dy + bi8 * dz;
-              sx -= Math.round(sx);
-              sy -= Math.round(sy);
-              sz -= Math.round(sz);
-              dx = b0 * sx + b3 * sy + b6 * sz;
-              dy = b1 * sx + b4 * sy + b7 * sz;
-              dz = b2 * sx + b5 * sy + b8 * sz;
+              const dx = positions[jx3] - pix;
+              const dy = positions[jx3 + 1] - piy;
+              const dz = positions[jx3 + 2] - piz;
               const distSq = dx * dx + dy * dy + dz * dz;
               const th = (ri + radii[j]) * vdwScale;
               if (distSq > minDistSq && distSq <= th * th) {
@@ -257,19 +292,54 @@ export function inferBondsVdwJS(
             }
           }
 
-          // Neighbor-cell pairs (half-shell).
+          // Neighbor-cell pairs (half-shell). For each visited neighbor,
+          // compute one shift vector and reuse it for all atoms in that cell.
           for (let o = 0; o < N_OFFSETS; o++) {
             const dxo = OFFSETS[o * 3];
             const dyo = OFFSETS[o * 3 + 1];
             const dzo = OFFSETS[o * 3 + 2];
-            const jx = (((ix + dxo) % nx) + nx) % nx;
-            const jy = (((iy + dyo) % ny) + ny) % ny;
-            const jz = (((iz + dzo) % nz) + nz) % nz;
+
+            // Detect per-axis wrap and accumulate the shift in fractional
+            // units (-1, 0, or +1 along each box vector).
+            let wx = 0;
+            let wy = 0;
+            let wz = 0;
+            let jx = ix + dxo;
+            let jy = iy + dyo;
+            let jz = iz + dzo;
+            if (jx < 0) {
+              jx += nx;
+              wx = -1;
+            } else if (jx >= nx) {
+              jx -= nx;
+              wx = 1;
+            }
+            if (jy < 0) {
+              jy += ny;
+              wy = -1;
+            } else if (jy >= ny) {
+              jy -= ny;
+              wy = 1;
+            }
+            if (jz < 0) {
+              jz += nz;
+              wz = -1;
+            } else if (jz >= nz) {
+              jz -= nz;
+              wz = 1;
+            }
             const nbrIdx = jx * nyz + jy * nz + jz;
             // In very small boxes, wrapped neighbor can map back to self — skip to avoid dup.
             if (nbrIdx === cellIdx) continue;
             const bStart = cellStart[nbrIdx];
             const bEnd = cellStart[nbrIdx + 1];
+            if (bStart === bEnd) continue;
+
+            // Cartesian shift to apply to neighbor atom positions.
+            const shiftX = wx * b0 + wy * b3 + wz * b6;
+            const shiftY = wx * b1 + wy * b4 + wz * b7;
+            const shiftZ = wx * b2 + wy * b5 + wz * b8;
+
             for (let a = aStart; a < aEnd; a++) {
               const i = cellAtoms[a];
               const ix3 = i * 3;
@@ -280,18 +350,9 @@ export function inferBondsVdwJS(
               for (let bb = bStart; bb < bEnd; bb++) {
                 const j = cellAtoms[bb];
                 const jx3 = j * 3;
-                let dx = positions[jx3] - pix;
-                let dy = positions[jx3 + 1] - piy;
-                let dz = positions[jx3 + 2] - piz;
-                let sx = bi0 * dx + bi3 * dy + bi6 * dz;
-                let sy = bi1 * dx + bi4 * dy + bi7 * dz;
-                let sz = bi2 * dx + bi5 * dy + bi8 * dz;
-                sx -= Math.round(sx);
-                sy -= Math.round(sy);
-                sz -= Math.round(sz);
-                dx = b0 * sx + b3 * sy + b6 * sz;
-                dy = b1 * sx + b4 * sy + b7 * sz;
-                dz = b2 * sx + b5 * sy + b8 * sz;
+                const dx = positions[jx3] + shiftX - pix;
+                const dy = positions[jx3 + 1] + shiftY - piy;
+                const dz = positions[jx3 + 2] + shiftZ - piz;
                 const distSq = dx * dx + dy * dy + dz * dz;
                 const th = (ri + radii[j]) * vdwScale;
                 if (distSq > minDistSq && distSq <= th * th) {
