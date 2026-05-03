@@ -29,7 +29,8 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Rust / WASM Parsers  (crates/megane-wasm/)                 │
-│  PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS, XTC, .traj, LAMMPS dump │
+│  PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data,            │
+│  XTC, ASE .traj, .lammpstrj/.dump                           │
 │  → Snapshot { positions, elements, bonds, box }             │
 └────────────────────────────┬────────────────────────────────┘
                              │  wasm-bindgen FFI
@@ -260,11 +261,25 @@ To add a new uniform:
 
 ### Adding a New File Format Parser
 
+The single source of truth for cross-host format coverage is
+`docs/docs/platform-support.md` — every parser change MUST update its tables in
+the same PR. The full per-host registration checklist lives in the
+`add-format` skill (`.claude/skills/add-format/SKILL.md`).
+
 1. Implement the parser in Rust in `crates/megane-core/src/`
 2. Expose via WASM in `crates/megane-wasm/src/lib.rs` with `#[wasm_bindgen]`
 3. Expose via PyO3 in `crates/megane-python/src/lib.rs` with `#[pyfunction]`
-4. Add the file extension dispatch in `src/parsers/structure.ts` (`parseStructureFile`)
-5. Update the file format support table in `docs/docs/platform-support.md`
+4. Add the file-extension dispatch in `src/parsers/structure.ts`
+   (`parseStructureFile`) and the standalone accept lists in
+   `src/components/nodes/LoadStructureNode.tsx` /
+   `LoadTrajectoryNode.tsx`
+5. Register the type on every host: `jupyterlab-megane/src/filetypes.ts`
+   (JupyterLab `IFileType`) and `vscode-megane/package.json`
+   (VSCode `customEditors`)
+6. Wire the Python `LoadStructure` / `LoadTrajectory` dispatch in
+   `python/megane/pipeline.py` (`_load_structure_file` / `_load_trajectory_data`)
+7. Update `docs/docs/platform-support.md`, `docs/docs/introduction.md`, and
+   `docs/docs/getting-started.md`
 
 ## Key File Index
 

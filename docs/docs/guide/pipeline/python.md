@@ -79,7 +79,17 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.data`, `.lammps`, `.traj` |
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.data`, `.lammps`, `.traj` (ASE binary). |
+
+> **Note — MOL2 and CIF in Python pipelines.** The Rust/PyO3 layer ships
+> `parse_mol2` and `parse_cif`, but the Python `LoadStructure` extension
+> dispatcher (`_load_structure_file()` in `python/megane/pipeline.py`) does not
+> route those two extensions yet, so `LoadStructure("foo.mol2")` /
+> `LoadStructure("foo.cif")` will raise an unsupported-format error. Until the
+> dispatcher is wired up, parse them directly with
+> `from megane import megane_parser; megane_parser.parse_mol2(text)` or open
+> the file in the standalone web app, JupyterLab, or VSCode where MOL2/CIF
+> are fully supported.
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -88,7 +98,12 @@ LoadStructure(path: str)
 Load an external trajectory file. Requires connection from a `LoadStructure` node.
 
 ```python
-LoadTrajectory(*, xtc: str | None = None, traj: str | None = None, xyz: str | None = None)
+LoadTrajectory(
+    *,
+    xtc: str | None = None,
+    traj: str | None = None,
+    xyz: str | None = None,
+)
 ```
 
 | Parameter | Type | Default | Description |
@@ -97,7 +112,7 @@ LoadTrajectory(*, xtc: str | None = None, traj: str | None = None, xyz: str | No
 | `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
 | `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
 
-**Ports:** `inp.particle`, `out.traj`
+Pass exactly one of the three. **Ports:** `inp.particle`, `out.traj`
 
 ### Streaming
 

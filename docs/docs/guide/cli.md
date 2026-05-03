@@ -56,18 +56,20 @@ megane serve protein.pdb
 megane serve [PDB_FILE] [OPTIONS]
 ```
 
+`serve` is currently the only subcommand.
+
 ## Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `PDB_FILE` | Path to a PDB file (optional; can upload from the browser) |
+| `PDB_FILE` | Path to a PDB file (optional; can upload from the browser). The CLI server only loads `.pdb` from this positional argument — to start with an ASE trajectory, use `--traj` instead. Once the browser is open, drag-and-drop in the standalone UI accepts every supported structure format (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, …). |
 
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--xtc PATH` | — | Path to an XTC trajectory file |
-| `--traj PATH` | — | Path to an ASE `.traj` trajectory file |
+| `--xtc PATH` | — | Path to an XTC trajectory file (paired with `PDB_FILE` for topology) |
+| `--traj PATH` | — | Path to an ASE `.traj` file. Loads both topology and frames from the trajectory; do not pass `PDB_FILE` when using this. |
 | `--port PORT` | `8765` | Server port |
 | `--no-browser` | `false` | Don't automatically open the browser |
 | `--dev` | `false` | Development mode (use Vite dev server for frontend) |
@@ -85,7 +87,11 @@ Opens `http://localhost:8765` in your browser with the structure loaded.
 ### View with trajectory
 
 ```bash
+# PDB topology + XTC frames
 megane serve protein.pdb --xtc trajectory.xtc
+
+# ASE .traj (topology + frames in one file)
+megane serve --traj simulation.traj
 ```
 
 The viewer will show trajectory controls (timeline, play/pause, FPS) for frame-by-frame playback.

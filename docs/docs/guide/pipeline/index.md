@@ -58,9 +58,9 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL/SDF, CIF, LAMMPS data, ASE .traj) | — | particle, trajectory, cell |
-| **Load Trajectory** | Load an external trajectory file (XTC, LAMMPS dump) | particle | trajectory |
-| **Streaming** | WebSocket-based real-time data delivery | — | particle, bond, trajectory, cell |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE `.traj`) | — | particle, trajectory, cell |
+| **Load Trajectory** | Load a separate trajectory file (XTC, LAMMPS `.lammpstrj` / `.dump`) | particle | trajectory |
+| **Streaming** | WebSocket-based real-time data delivery (only available on the standalone `megane serve` host) | — | particle, bond, trajectory, cell |
 | **Load Vector** | Load per-atom vector data from a file | — | vector |
 
 ### Processing
@@ -91,14 +91,13 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`, `.data`, `.lammps`, `.traj` |
+| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.data` / `.lammps`, `.traj` (ASE) |
 
 ### Load Trajectory
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| xtc | string | Path to XTC trajectory file |
-| traj | string | Path to ASE .traj trajectory file |
+| File path | string | Path to a trajectory file. Supported: `.xtc`, `.lammpstrj` / `.dump` |
 
 Requires a connection from a LoadStructure node. Frames are loaded lazily when `frame_index` changes.
 

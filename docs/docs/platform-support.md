@@ -33,7 +33,7 @@ Legend:
 | XYZ | `.xyz` | ✓ | API | ✓ | ✓ | ✓ |
 | MOL | `.mol` | ✓ | API | ✓ | ✓ | ✓ |
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ |
-| MOL2 | `.mol2` | API | API | API | API | ✓ |
+| MOL2 | `.mol2` | ✓ | API | ✓ | ✓ | ✓ |
 | CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
 
@@ -89,7 +89,7 @@ How data gets into the viewer on each platform:
 
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
-- **MOL2 (`.mol2`) has no UI opener on any platform.** The Rust parser and WASM/PyO3 bindings exist, but `LoadStructureNode.tsx`, `jupyterlab-megane/src/filetypes.ts`, and `vscode-megane/package.json` do not register `.mol2`. The format is reachable programmatically via the Python API (`parse_mol2`) or by calling `parseStructureText` directly from TypeScript, but cannot be opened through the file picker, drag-and-drop, or JupyterLab/VSCode file browser.
+- **Python `LoadStructure` does not yet dispatch MOL2 / CIF.** The Rust core and PyO3 bindings ship `parse_mol2` / `parse_cif`, but `_load_structure_file()` in `python/megane/pipeline.py` does not route those extensions. As a result `LoadStructure("foo.mol2")` and `LoadStructure("foo.cif")` raise an unsupported-format error from a `Pipeline`. The standalone web app, JupyterLab labextension, and VSCode extension all open both formats; from Python you can also call `megane.megane_parser.parse_mol2(text)` / `parse_cif(text)` directly.
 - **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.lammpstrj` / `.dump` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
