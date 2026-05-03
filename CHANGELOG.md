@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Atom coloring moved out of the Viewport node and into the Modify node.** The Viewport "Color scheme" dropdown is gone; coloring is now a pipeline-edge concern. The Modify node has a new `Color` toggle plus a mode selector (uniform hex, byElement, byResidue, byChain, byBFactor, byProperty), and the chosen palette applies **only** to the upstream selection — so "color residues on chain A only" is now expressible by chaining Filter → Modify. A Modify node wired without a Filter still colors the whole structure (the previous single-mode workflow). Legacy serialized pipelines carrying `viewport.colorScheme` are silently stripped on load; they render in CPK until a Modify color rule is added.
+
 ## [0.7.0] - 2026-05-02
 
 ### Added
