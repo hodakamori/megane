@@ -109,6 +109,7 @@ For multiple independent viewers per page (e.g. embedding in MDX docs), use
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj`, `.dump` | LAMMPS dump trajectory |
+| AMBER NetCDF | `.nc` | AMBER compressed trajectory (NetCDF format) |
 
 Not every host opens every extension from its native file picker — see
 [Platform Support](./platform-support) for the per-host matrix.

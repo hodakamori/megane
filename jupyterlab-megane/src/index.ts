@@ -5,8 +5,10 @@ import {
 } from "@jupyterlab/application";
 import { WidgetTracker } from "@jupyterlab/apputils";
 import type { IDocumentWidget } from "@jupyterlab/docregistry";
+import { IStatusBar } from "@jupyterlab/statusbar";
 import { exposeAppForTests } from "./testHook";
 import { MeganeDocFactory, MeganePipelineDocFactory } from "./factory";
+import { setupFrameStatusBar } from "./frameStatusBar";
 import type { MeganeReactView } from "./MeganeDocWidget";
 import type { MeganePipelineReactView } from "./MeganePipelineDocWidget";
 import {
@@ -31,7 +33,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
     "Open molecular structure files (PDB, GRO, XYZ, MOL, SDF, CIF, LAMMPS data, ASE traj) and trajectories (XTC, DCD, LAMMPS dump) and megane pipelines",
   autoStart: true,
   requires: [ILayoutRestorer],
-  activate: (app: JupyterFrontEnd, restorer: ILayoutRestorer) => {
+  optional: [IStatusBar],
+  activate: (app: JupyterFrontEnd, restorer: ILayoutRestorer, statusBar: IStatusBar | null) => {
     exposeAppForTests(app);
 
     for (const ft of [...STRUCTURE_FILETYPES_TEXT, ...STRUCTURE_FILETYPES_BINARY]) {
@@ -123,6 +126,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
       }),
       name: (widget) => widget.context.path,
     });
+
+    if (statusBar) {
+      setupFrameStatusBar(tracker, statusBar);
+    }
   },
 };
 
