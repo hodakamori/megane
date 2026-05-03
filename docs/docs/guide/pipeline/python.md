@@ -79,7 +79,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.data` (LAMMPS) |
+| `path` | `str` | File path. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.data`, `.lammps`, `.traj` |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -88,13 +88,14 @@ LoadStructure(path: str)
 Load an external trajectory file. Requires connection from a `LoadStructure` node.
 
 ```python
-LoadTrajectory(*, xtc: str | None = None, traj: str | None = None)
+LoadTrajectory(*, xtc: str | None = None, traj: str | None = None, xyz: str | None = None)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
-| `traj` | `str \| None` | `None` | Path to ASE .traj trajectory file |
+| `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
+| `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
 
 **Ports:** `inp.particle`, `out.traj`
 

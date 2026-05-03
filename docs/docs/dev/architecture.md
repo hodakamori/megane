@@ -29,7 +29,7 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Rust / WASM Parsers  (crates/megane-wasm/)                 │
-│  PDB, GRO, XYZ, MOL, CIF, LAMMPS, XTC, .traj              │
+│  PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS, XTC, .traj, LAMMPS dump │
 │  → Snapshot { positions, elements, bonds, box }             │
 └────────────────────────────┬────────────────────────────────┘
                              │  wasm-bindgen FFI
@@ -264,7 +264,7 @@ To add a new uniform:
 2. Expose via WASM in `crates/megane-wasm/src/lib.rs` with `#[wasm_bindgen]`
 3. Expose via PyO3 in `crates/megane-python/src/lib.rs` with `#[pyfunction]`
 4. Add the file extension dispatch in `src/parsers/structure.ts` (`parseStructureFile`)
-5. Update the file format support list in `README.md`
+5. Update the file format support table in `docs/docs/platform-support.md`
 
 ## Key File Index
 

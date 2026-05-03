@@ -29,7 +29,7 @@ The generator creates the appropriate LoadStructure, AddBond, Filter, Modify, an
 
 ## VSCode Extension Auto-Setup
 
-When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
+When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`, `.data`, `.lammps`, `.traj`, `.xtc`, `.lammpstrj`, `.dump`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
 
 ## Getting Started
 
@@ -58,8 +58,8 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL/SDF, CIF, LAMMPS data) | — | particle, trajectory, cell |
-| **Load Trajectory** | Load an XTC or ASE .traj trajectory file | particle | trajectory |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL/SDF, CIF, LAMMPS data, ASE .traj) | — | particle, trajectory, cell |
+| **Load Trajectory** | Load an external trajectory file (XTC, LAMMPS dump) | particle | trajectory |
 | **Streaming** | WebSocket-based real-time data delivery | — | particle, bond, trajectory, cell |
 | **Load Vector** | Load per-atom vector data from a file | — | vector |
 
@@ -91,7 +91,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`, `.data`, `.lammps` |
+| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`, `.data`, `.lammps`, `.traj` |
 
 ### Load Trajectory
 

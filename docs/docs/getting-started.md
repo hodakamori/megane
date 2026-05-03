@@ -89,6 +89,7 @@ function App() {
 | GRO | `.gro` | GROMACS structure file |
 | XYZ | `.xyz` | Simple cartesian coordinate format |
 | MOL | `.mol` | MDL Molfile (V2000) — small molecules with bond information |
+| SDF | `.sdf` | MDL SDfile — structure-data file, uses MOL V2000 parser |
 | XTC | `.xtc` | GROMACS compressed trajectory |
 | CIF | `.cif` | Crystallographic Information File |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
