@@ -91,4 +91,26 @@ describe("ViewportNode", () => {
     expect(screen.getByText("Viewport")).toBeInTheDocument();
     expect(screen.queryByTitle("Remove node")).toBeNull();
   });
+
+  it("renders a Representation dropdown defaulting to Atoms", () => {
+    const seeded = seedPipelineStore("viewport", { id: "v1" });
+    render(<ViewportNode {...nodeProps("v1", seeded.data.params as ViewportParams)} />);
+
+    const select = screen.getByTestId("viewport-representation-select") as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+    expect(select.value).toBe("atoms");
+  });
+
+  it("changing Representation dropdown calls updateNodeParams", () => {
+    const updateNodeParams = vi.fn();
+    const seeded = seedPipelineStore("viewport", { id: "v1" });
+    usePipelineStore.setState({ updateNodeParams });
+
+    render(<ViewportNode {...nodeProps("v1", seeded.data.params as ViewportParams)} />);
+    fireEvent.change(screen.getByTestId("viewport-representation-select"), {
+      target: { value: "cartoon" },
+    });
+
+    expect(updateNodeParams).toHaveBeenCalledWith("v1", { representationMode: "cartoon" });
+  });
 });

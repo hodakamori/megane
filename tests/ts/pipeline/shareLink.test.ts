@@ -288,7 +288,7 @@ describe("shareCurrentPipeline", () => {
     expect(outcome.tooLong).toBe(true);
     expect(outcome.copyFailed).toBe(false);
     expect(outcome.message).toBe("Pipeline too large for a share link — use Export instead");
-    expect(outcome.clearAfterMs).toBe(4000);
+    expect(outcome.clearAfterMs).toBe(5000);
     expect(writeText).not.toHaveBeenCalled();
     expect(replaceStateSpy).not.toHaveBeenCalled();
   });

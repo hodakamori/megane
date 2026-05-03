@@ -148,6 +148,10 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         chain_ids: None,
         bfactors: None,
         vector_channels,
+        ca_indices: vec![],
+        ca_chain_ids: vec![],
+        ca_res_nums: vec![],
+        ca_ss_type: vec![],
     })
 }
 

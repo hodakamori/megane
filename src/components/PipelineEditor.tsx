@@ -381,6 +381,36 @@ const shareBtnStyle: React.CSSProperties = {
   color: "#059669",
 };
 
+const shareFeedbackBase: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "4px 10px",
+  borderRadius: 4,
+  lineHeight: 1.2,
+};
+
+const SHARE_FEEDBACK_STYLES: Record<"success" | "warning" | "error", React.CSSProperties> = {
+  success: {
+    ...shareFeedbackBase,
+    background: "rgba(16, 185, 129, 0.12)",
+    border: "1px solid rgba(16, 185, 129, 0.35)",
+    color: "#047857",
+  },
+  warning: {
+    ...shareFeedbackBase,
+    background: "rgba(220, 38, 38, 0.12)",
+    border: "1px solid rgba(220, 38, 38, 0.35)",
+    color: "#b91c1c",
+  },
+  error: {
+    ...shareFeedbackBase,
+    background: "rgba(220, 38, 38, 0.12)",
+    border: "1px solid rgba(220, 38, 38, 0.35)",
+    color: "#b91c1c",
+  },
+};
+
 const guideBtnStyle: React.CSSProperties = {
   ...textBtnBase,
   background: "rgba(100, 116, 139, 0.08)",
@@ -521,7 +551,10 @@ function PipelineEditorInner({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [showRenderModal, setShowRenderModal] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<{
+    message: string;
+    tone: "success" | "warning" | "error";
+  } | null>(null);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
@@ -678,10 +711,21 @@ function PipelineEditorInner({
   );
 
   const handleShare = useCallback(async () => {
-    const serialized = usePipelineStore.getState().serialize();
-    const outcome = await shareCurrentPipeline(serialized);
-    setShareFeedback(outcome.message);
-    setTimeout(() => setShareFeedback(null), outcome.clearAfterMs);
+    try {
+      const serialized = usePipelineStore.getState().serialize();
+      const outcome = await shareCurrentPipeline(serialized);
+      const tone: "success" | "warning" | "error" = outcome.tooLong
+        ? "warning"
+        : outcome.copyFailed
+          ? "error"
+          : "success";
+      setShareFeedback({ message: outcome.message, tone });
+      setTimeout(() => setShareFeedback(null), outcome.clearAfterMs);
+    } catch (err) {
+      console.error("Share failed:", err);
+      setShareFeedback({ message: "Share failed — see console", tone: "error" });
+      setTimeout(() => setShareFeedback(null), 5000);
+    }
   }, []);
 
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
@@ -811,16 +855,16 @@ function PipelineEditorInner({
         </button>
       </div>
       {shareFeedback && (
-        <div
-          style={{
-            fontSize: 10,
-            color: shareFeedback.startsWith("Pipeline too") ? "#dc2626" : "#059669",
-            padding: "2px 0 0 68px",
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          {shareFeedback}
+        <div style={{ padding: "2px 0 0 68px" }}>
+          <span
+            data-testid="pipeline-editor-share-feedback"
+            data-tone={shareFeedback.tone}
+            style={SHARE_FEEDBACK_STYLES[shareFeedback.tone]}
+            role="status"
+            aria-live="polite"
+          >
+            {shareFeedback.message}
+          </span>
         </div>
       )}
 

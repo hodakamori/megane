@@ -335,11 +335,16 @@ export interface AddBondParams {
   bondFileData?: Uint32Array | null;
 }
 
+/** Visual representation mode selectable in the Viewport node. */
+export type RepresentationMode = "atoms" | "cartoon" | "both";
+
 export interface ViewportParams {
   type: "viewport";
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
+  /** Visual representation: "atoms" (default), "cartoon", or "both". */
+  representationMode: RepresentationMode;
   colorScheme?: ColorScheme;
 }
 
@@ -414,6 +419,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         perspective: false,
         cellAxesVisible: true,
         pivotMarkerVisible: true,
+        representationMode: "atoms" as RepresentationMode,
         colorScheme: "byElement",
       };
     case "filter":
@@ -494,6 +500,7 @@ export interface ViewportState {
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
+  representationMode: RepresentationMode;
   colorScheme: ColorScheme;
 }
 
@@ -508,6 +515,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   perspective: false,
   cellAxesVisible: true,
   pivotMarkerVisible: true,
+  representationMode: "atoms",
   colorScheme: "byElement",
 };
 
