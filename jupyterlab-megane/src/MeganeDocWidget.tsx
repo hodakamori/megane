@@ -14,6 +14,7 @@ import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
 import { TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
+import { createFrameSubscription } from "./frameSubscription";
 
 const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
@@ -31,6 +32,7 @@ type ActivationSubscribe = (cb: () => void) => () => void;
 interface DocBodyProps {
   context: DocumentRegistry.Context;
   subscribeActivation: ActivationSubscribe;
+  onFrameChange?: (frame: number) => void;
 }
 
 type LoadState = "loading" | "ready" | { error: string };
@@ -52,7 +54,7 @@ function ThemeSync() {
   return null;
 }
 
-function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
+function DocBody({ context, subscribeActivation, onFrameChange }: DocBodyProps): JSX.Element {
   const local = useMeganeLocal();
   const [state, setState] = useState<LoadState>("loading");
   useTour({ host: "jupyterlab" });
@@ -200,6 +202,7 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
         onVectorSourceChange={(s: string) => local.setVectorSource(s as "none" | "file" | "demo")}
         onLoadVectorFile={(f: File) => local.loadVectorFile(f)}
         onLoadDemoVectors={() => local.loadDemoVectors()}
+        onFrameChange={onFrameChange}
       />
     </div>
   );
@@ -207,6 +210,14 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
 
 export class MeganeReactView extends ReactWidget {
   private readonly listeners = new Set<() => void>();
+  private readonly _frameSub = createFrameSubscription();
+
+  /** Subscribe to trajectory frame-change events emitted by the viewer. */
+  readonly subscribeFrameChange = this._frameSub.subscribe.bind(this._frameSub);
+
+  private readonly _handleFrameChange = (frame: number): void => {
+    this._frameSub.emit(frame);
+  };
 
   constructor(private readonly context: DocumentRegistry.Context) {
     super();
@@ -233,6 +244,12 @@ export class MeganeReactView extends ReactWidget {
   };
 
   protected render(): JSX.Element {
-    return <DocBody context={this.context} subscribeActivation={this.subscribeActivation} />;
+    return (
+      <DocBody
+        context={this.context}
+        subscribeActivation={this.subscribeActivation}
+        onFrameChange={this._handleFrameChange}
+      />
+    );
   }
 }
