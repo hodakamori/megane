@@ -170,4 +170,4 @@ renderer.updateFrame(frame);
 renderer.dispose();
 ```
 
-Use this to embed megane in Vue, Svelte, or any other framework — or directly in a vanilla `<div>`. See the [Web / React Guide](/guide/web#framework-agnostic-usage) for detailed examples.
+Use this to embed megane in Vue, Svelte, or any other framework — or directly in a vanilla `<div>`. See the [Web / React Guide](/guide/web#core-renderer-framework-agnostic) for detailed examples.

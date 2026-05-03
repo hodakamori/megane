@@ -54,7 +54,7 @@ Both `view()` and `view_traj()` accept these keyword arguments:
 | `perspective` | `bool` | `False` | Perspective projection instead of orthographic |
 | `cell_axes_visible` | `bool` | `True` | Show unit cell axes |
 
-For full control over the visualization (filtering, multi-layer rendering, custom nodes), see [Visual Pipeline — Python API](./pipeline#python-pipeline-api).
+For full control over the visualization (filtering, multi-layer rendering, custom nodes), see [Visual Pipeline — Python API](./pipeline/python).
 
 ## Widget API
 
@@ -203,7 +203,7 @@ Event handling, Plotly integration, bidirectional sync, dihedral analysis, and c
 
 ## Pipeline API Reference
 
-For simple visualization, use `megane.view()` and `megane.view_traj()`. For advanced customization (filtering, multi-layer rendering, custom nodes), build a pipeline manually with the `Pipeline` class. See [Visual Pipeline — Python API](./pipeline#python-pipeline-api) for the complete list of node classes, port names, and parameters.
+For simple visualization, use `megane.view()` and `megane.view_traj()`. For advanced customization (filtering, multi-layer rendering, custom nodes), build a pipeline manually with the `Pipeline` class. See [Visual Pipeline — Python API](./pipeline/python) for the complete list of node classes, port names, and parameters.
 
 All classes and convenience functions are importable from `megane`:
 
@@ -264,7 +264,7 @@ The `measurement` dict contains: `type` (`"distance"`, `"angle"`, or `"dihedral"
 
 - **Re-running cells** — calling `viewer.set_pipeline(pipe)` again updates the displayed pipeline in-place without re-creating the widget.
 - **JupyterLab vs. classic Notebook** — megane is tested on JupyterLab 4+. In classic Notebook, enable the `anywidget` extension if the viewer appears blank.
-- **Large trajectories** — megane streams frames over a local WebSocket rather than loading them into memory. Even multi-GB XTC files scrub smoothly.
+- **Large trajectories** — the Jupyter widget loads the full trajectory into Python memory before scrubbing. If your XTC is too large, run `megane serve protein.pdb --xtc traj.xtc` from the CLI instead — only the standalone server streams frames over WebSocket on demand. See [Platform Support — UI features](../platform-support#ui-features).
 - **Sharing notebooks** — exported HTML (`File → Export → HTML`) captures the last-rendered frame as a static image.
 
 ## Troubleshooting
