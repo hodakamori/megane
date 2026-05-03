@@ -28,6 +28,7 @@ import { ArrowRenderer } from "./ArrowRenderer";
 import { PolyhedronRenderer } from "./PolyhedronRenderer";
 import { StructureLayer } from "./StructureLayer";
 import { PivotMarker } from "./PivotMarker";
+import { CartoonRenderer } from "./CartoonRenderer";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel, projectToScreen } from "./Picking";
@@ -97,7 +98,11 @@ export interface MeganeSubsystemVisibility {
   vectors: boolean;
   labels: boolean;
   polyhedra: boolean;
+  cartoon: boolean;
 }
+
+/** Representation mode for the viewer. */
+export type RepresentationType = "atoms" | "cartoon" | "both";
 
 export interface MeganeRendererMemory {
   geometries: number;
@@ -245,6 +250,10 @@ export class MoleculeRenderer {
 
   /** Structure layers for multi-structure overlay rendering. */
   private layers = new Map<string, StructureLayer>();
+
+  /** Cartoon backbone renderer (lazy, created on first use). */
+  private cartoonRenderer: CartoonRenderer | null = null;
+  private representationType: RepresentationType = "atoms";
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -400,6 +409,20 @@ export class MoleculeRenderer {
     }
     this.arrowRenderer.setAtomPositions(snapshot.positions, snapshot.nAtoms);
 
+    // Update cartoon renderer (lazy init, only if snapshot has Cα data)
+    if (snapshot.caIndices && snapshot.caIndices.length > 0) {
+      if (!this.cartoonRenderer) {
+        this.cartoonRenderer = new CartoonRenderer();
+        this.scene.add(this.cartoonRenderer.mesh);
+      }
+      this.cartoonRenderer.loadSnapshot(snapshot);
+      this.cartoonRenderer.setVisible(
+        this.representationType === "cartoon" || this.representationType === "both",
+      );
+    } else if (this.cartoonRenderer) {
+      this.cartoonRenderer.setVisible(false);
+    }
+
     // Update simulation cell
     if (snapshot.box) {
       const hasNonZero = snapshot.box.some((v) => v !== 0);
@@ -437,6 +460,7 @@ export class MoleculeRenderer {
     this.labelOverlay?.setPositions(frame.positions);
     this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
     this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
+    this.cartoonRenderer?.updatePositions(frame.positions);
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
     }
@@ -648,6 +672,27 @@ export class MoleculeRenderer {
   setAtomsVisible(visible: boolean): void {
     if (this.atomRenderer) {
       this.atomRenderer.mesh.visible = visible;
+    }
+  }
+
+  /**
+   * Switch between atom/bond and cartoon representation modes.
+   * "atoms"  – classic ball-and-stick (default)
+   * "cartoon" – Cα backbone only; atoms/bonds hidden
+   * "both"   – cartoon overlaid on atoms/bonds
+   */
+  setRepresentationType(type: RepresentationType): void {
+    this.representationType = type;
+    const showAtoms = type === "atoms" || type === "both";
+    const showCartoon = type === "cartoon" || type === "both";
+
+    if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
+    if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms;
+    if (this.cartoonRenderer) {
+      // Only show cartoon when it has backbone data
+      const hasBackbone =
+        this.snapshot?.caIndices != null && this.snapshot.caIndices.length > 0;
+      this.cartoonRenderer.setVisible(showCartoon && hasBackbone);
     }
   }
 
@@ -1413,6 +1458,7 @@ export class MoleculeRenderer {
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
+    if (this.cartoonRenderer) this.cartoonRenderer.dispose();
     if (this.pivotMarker) this.pivotMarker.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     // Dispose all structure layers
@@ -1530,6 +1576,7 @@ export class MoleculeRenderer {
       vectors: this.arrowRenderer?.mesh.visible ?? false,
       labels: this.labelOverlay != null && this.snapshot != null,
       polyhedra: this.polyhedronRenderer?.group.visible ?? false,
+      cartoon: this.cartoonRenderer?.mesh.visible ?? false,
     };
   }
 

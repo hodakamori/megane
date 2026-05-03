@@ -10,6 +10,11 @@ export interface Snapshot {
   bonds: Uint32Array; // length = nBonds * 2
   bondOrders: Uint8Array | null; // length = nBonds (1=single,2=double,3=triple,4=aromatic)
   box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
+  // Cα backbone data for cartoon rendering (undefined for non-PDB or structures without atom names)
+  caIndices?: Uint32Array; // indices of Cα atoms in positions array
+  caChainIds?: Uint8Array; // per-Cα chain ID as ASCII byte (e.g. 65 = 'A')
+  caResNums?: Uint32Array; // per-Cα residue sequence number
+  caSsType?: Uint8Array; // per-Cα secondary structure: 0=coil, 1=helix, 2=sheet
 }
 
 /** Data mode for the application. */

@@ -111,6 +111,7 @@ describe("defaultParams", () => {
       perspective: false,
       cellAxesVisible: true,
       pivotMarkerVisible: true,
+      representationMode: "atoms",
     });
   });
 

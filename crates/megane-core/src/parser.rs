@@ -29,6 +29,59 @@ pub struct ParsedStructure {
     /// Embedded vector channels (e.g. GRO velocities).
     /// Empty for formats that carry no per-atom vector quantities.
     pub vector_channels: Vec<crate::trajectory::VectorChannel>,
+    /// Indices of Cα (alpha-carbon) atoms in the positions array.
+    /// Empty for non-protein or formats that do not carry atom names.
+    pub ca_indices: Vec<u32>,
+    /// Per-Cα chain identifier (ASCII byte, e.g. b'A').
+    pub ca_chain_ids: Vec<u8>,
+    /// Per-Cα residue sequence number.
+    pub ca_res_nums: Vec<u32>,
+    /// Per-Cα secondary-structure type: 0 = coil, 1 = helix, 2 = sheet.
+    pub ca_ss_type: Vec<u8>,
+}
+
+/// Secondary-structure range from a PDB HELIX or SHEET record.
+struct SsRange {
+    chain_id: u8,
+    start: u32,
+    end: u32,
+    ss_type: u8, // 1 = helix, 2 = sheet
+}
+
+/// Parse a PDB HELIX record and return a secondary-structure range.
+fn parse_helix_range(line: &str) -> Option<SsRange> {
+    if line.len() < 37 {
+        return None;
+    }
+    let chain_id = line.as_bytes().get(19).copied().unwrap_or(b' ');
+    let start: u32 = line[21..25].trim().parse().ok()?;
+    let end: u32 = line[33..37].trim().parse().ok()?;
+    Some(SsRange { chain_id, start, end, ss_type: 1 })
+}
+
+/// Parse a PDB SHEET record and return a secondary-structure range.
+fn parse_sheet_range(line: &str) -> Option<SsRange> {
+    if line.len() < 37 {
+        return None;
+    }
+    let chain_id = line.as_bytes().get(21).copied().unwrap_or(b' ');
+    let start: u32 = line[22..26].trim().parse().ok()?;
+    let end: u32 = line[33..37].trim().parse().ok()?;
+    Some(SsRange { chain_id, start, end, ss_type: 2 })
+}
+
+/// If `line` is an ATOM record for a Cα atom, return (chain_id, res_num).
+fn parse_ca_info(line: &str) -> Option<(u8, u32)> {
+    if line.len() < 27 {
+        return None;
+    }
+    let atom_name = line[12..16].trim();
+    if atom_name != "CA" {
+        return None;
+    }
+    let chain_id = line.as_bytes().get(21).copied().unwrap_or(b' ');
+    let res_num: u32 = line[22..26].trim().parse().ok()?;
+    Some((chain_id, res_num))
 }
 
 /// Parse the element from a PDB ATOM/HETATM line.
@@ -200,6 +253,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut has_model_record = false;
     let mut model_count: usize = 0;
 
+    // Secondary-structure ranges from HELIX/SHEET records.
+    let mut ss_ranges: Vec<SsRange> = Vec::new();
+    // Backbone Cα data collected from the first model only.
+    let mut raw_ca: Vec<(usize, u8, u32)> = Vec::new(); // (atom_index, chain_id, res_num)
+
     for line in text.lines() {
         let record = if line.len() >= 6 {
             line[..6].trim_end()
@@ -208,6 +266,16 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         };
 
         match record {
+            "HELIX" => {
+                if let Some(r) = parse_helix_range(line) {
+                    ss_ranges.push(r);
+                }
+            }
+            "SHEET" => {
+                if let Some(r) = parse_sheet_range(line) {
+                    ss_ranges.push(r);
+                }
+            }
             "MODEL" => {
                 has_model_record = true;
                 current_model = Vec::new();
@@ -228,6 +296,12 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                     // Build serial→index map from first model only
                     if !has_model_record || model_count == 0 {
                         serial_to_index.insert(serial, current_model.len());
+                    }
+                    // Collect Cα info from first model
+                    if !has_model_record || model_count == 0 {
+                        if let Some((chain_id, res_num)) = parse_ca_info(line) {
+                            raw_ca.push((current_model.len(), chain_id, res_num));
+                        }
                     }
                     // Extract residue label: resName (cols 17-20) + resSeq (cols 22-26)
                     let res_name = if line.len() >= 20 {
@@ -311,6 +385,23 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    // Build Cα backbone arrays with SS type annotation.
+    let mut ca_indices = Vec::with_capacity(raw_ca.len());
+    let mut ca_chain_ids = Vec::with_capacity(raw_ca.len());
+    let mut ca_res_nums = Vec::with_capacity(raw_ca.len());
+    let mut ca_ss_type = Vec::with_capacity(raw_ca.len());
+    for (idx, chain_id, res_num) in raw_ca {
+        let ss = ss_ranges
+            .iter()
+            .find(|r| r.chain_id == chain_id && res_num >= r.start && res_num <= r.end)
+            .map(|r| r.ss_type)
+            .unwrap_or(0);
+        ca_indices.push(idx as u32);
+        ca_chain_ids.push(chain_id);
+        ca_res_nums.push(res_num);
+        ca_ss_type.push(ss);
+    }
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -322,6 +413,10 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         frame_positions,
         atom_labels,
         vector_channels: vec![],
+        ca_indices,
+        ca_chain_ids,
+        ca_res_nums,
+        ca_ss_type,
     })
 }
 
@@ -381,5 +476,94 @@ mod tests {
         assert!(result.elements.contains(&7)); // N
         assert!(result.elements.contains(&8)); // O
         assert!(result.elements.contains(&16)); // S
+    }
+
+    #[test]
+    fn test_parse_helix_range() {
+        // HELIX record: initChainID at col 19, initSeqNum at cols 21-25, endChainID at 31, endSeqNum at 33-37
+        let line = "HELIX    1   1 SER A    7  GLY A   18  1                                  12";
+        let r = parse_helix_range(line).expect("should parse");
+        assert_eq!(r.chain_id, b'A');
+        assert_eq!(r.start, 7);
+        assert_eq!(r.end, 18);
+        assert_eq!(r.ss_type, 1); // helix
+    }
+
+    #[test]
+    fn test_parse_sheet_range() {
+        // SHEET record: initChainID at col 21, initSeqNum at cols 22-26, endChainID at 32, endSeqNum at 33-37
+        let line = "SHEET    1   A 2 GLY A  20  TYR A  24  0";
+        let r = parse_sheet_range(line).expect("should parse");
+        assert_eq!(r.chain_id, b'A');
+        assert_eq!(r.start, 20);
+        assert_eq!(r.end, 24);
+        assert_eq!(r.ss_type, 2); // sheet
+    }
+
+    #[test]
+    fn test_parse_ca_info_detects_alpha_carbon() {
+        let line = "ATOM      2  CA  THR A   1      16.967  12.784   4.338  1.00 10.80           C  ";
+        let info = parse_ca_info(line).expect("should detect Cα");
+        assert_eq!(info.0, b'A'); // chain ID
+        assert_eq!(info.1, 1);   // residue number
+    }
+
+    #[test]
+    fn test_parse_ca_info_rejects_non_ca() {
+        let line = "ATOM      1  N   THR A   1      17.047  14.099   3.625  1.00 13.79           N  ";
+        assert!(parse_ca_info(line).is_none());
+    }
+
+    #[test]
+    fn test_pdb_with_helix_and_sheet() {
+        // Minimal PDB with HELIX/SHEET records and a few backbone atoms.
+        let pdb = "\
+HELIX    1   1 THR A    1  ALA A    2  1                                   2
+SHEET    1   A 1 GLY A   3  GLY A   4  0
+ATOM      1  N   THR A   1       1.000   0.000   0.000  1.00  0.00           N
+ATOM      2  CA  THR A   1       2.000   0.000   0.000  1.00  0.00           C
+ATOM      3  N   ALA A   2       3.000   0.000   0.000  1.00  0.00           N
+ATOM      4  CA  ALA A   2       4.000   0.000   0.000  1.00  0.00           C
+ATOM      5  N   GLY A   3       5.000   0.000   0.000  1.00  0.00           N
+ATOM      6  CA  GLY A   3       6.000   0.000   0.000  1.00  0.00           C
+ATOM      7  N   GLY A   4       7.000   0.000   0.000  1.00  0.00           N
+ATOM      8  CA  GLY A   4       8.000   0.000   0.000  1.00  0.00           C
+END
+";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.n_atoms, 8);
+        // Cα atoms: indices 1 (THR 1), 3 (ALA 2), 5 (GLY 3), 7 (GLY 4)
+        assert_eq!(result.ca_indices.len(), 4);
+        assert_eq!(result.ca_indices[0], 1); // THR A 1 → index 1
+        assert_eq!(result.ca_indices[1], 3); // ALA A 2 → index 3
+        assert_eq!(result.ca_indices[2], 5); // GLY A 3 → index 5
+        assert_eq!(result.ca_indices[3], 7); // GLY A 4 → index 7
+        // SS types: THR 1 → helix(1), ALA 2 → helix(1), GLY 3 → sheet(2), GLY 4 → sheet(2)
+        assert_eq!(result.ca_ss_type[0], 1); // helix
+        assert_eq!(result.ca_ss_type[1], 1); // helix
+        assert_eq!(result.ca_ss_type[2], 2); // sheet
+        assert_eq!(result.ca_ss_type[3], 2); // sheet
+        // All chain IDs should be b'A'
+        assert!(result.ca_chain_ids.iter().all(|&c| c == b'A'));
+    }
+
+    #[test]
+    fn test_pdb_no_helix_sheet_all_coil() {
+        // PDB with Cα but no HELIX/SHEET → all coil (0)
+        let pdb = "\
+ATOM      1  CA  ALA A   1       1.000   0.000   0.000  1.00  0.00           C
+ATOM      2  CA  GLY A   2       2.000   0.000   0.000  1.00  0.00           C
+END
+";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.ca_indices.len(), 2);
+        assert!(result.ca_ss_type.iter().all(|&t| t == 0)); // all coil
+    }
+
+    #[test]
+    fn test_parse_ca_info_cb_is_not_ca() {
+        // CB (beta carbon) should not be detected as Cα
+        let line = "ATOM      5  CB  THR A   1      16.000  12.000   4.000  1.00  0.00           C  ";
+        assert!(parse_ca_info(line).is_none());
     }
 }

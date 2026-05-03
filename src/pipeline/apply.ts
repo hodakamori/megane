@@ -152,6 +152,9 @@ export function applyViewportState(
   if (!previous || current.pivotMarkerVisible !== previous.pivotMarkerVisible) {
     renderer.setPivotMarkerVisible(current.pivotMarkerVisible);
   }
+  if (!previous || current.representationMode !== previous.representationMode) {
+    renderer.setRepresentationType(current.representationMode ?? "atoms");
+  }
 
   // ─── Labels (primary structure only for now) ───────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);

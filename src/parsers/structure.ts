@@ -31,6 +31,7 @@ interface WasmParseResult {
   atom_labels: string;
   vector_channel_count: number;
   vector_channel_meta: string;
+  ca_count: number;
   positions(): Float32Array;
   elements(): Uint8Array;
   bonds(): Uint32Array;
@@ -38,6 +39,10 @@ interface WasmParseResult {
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
   vector_channel_data(): Float32Array;
+  ca_indices(): Uint32Array;
+  ca_chain_ids(): Uint8Array;
+  ca_res_nums(): Uint32Array;
+  ca_ss_type(): Uint8Array;
   free(): void;
 }
 
@@ -160,6 +165,7 @@ export async function parseStructureFile(file: File): Promise<StructureParseResu
 function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
   const result = parseFn(text) as WasmParseResult;
 
+  const caCount = result.ca_count;
   const snapshot: Snapshot = {
     nAtoms: result.n_atoms,
     nBonds: result.n_bonds,
@@ -169,6 +175,12 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
     bonds: result.bonds(),
     bondOrders: result.bond_orders(),
     box: result.has_box ? result.box_matrix() : null,
+    ...(caCount > 0 && {
+      caIndices: result.ca_indices(),
+      caChainIds: result.ca_chain_ids(),
+      caResNums: result.ca_res_nums(),
+      caSsType: result.ca_ss_type(),
+    }),
   };
 
   const frames: Frame[] = [];

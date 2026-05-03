@@ -429,6 +429,10 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         frame_positions: Vec::new(),
         atom_labels,
         vector_channels: vec![],
+        ca_indices: vec![],
+        ca_chain_ids: vec![],
+        ca_res_nums: vec![],
+        ca_ss_type: vec![],
     })
 }
 
