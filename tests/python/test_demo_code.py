@@ -123,7 +123,7 @@ def test_event_callback_selection_change():
 
 
 def test_pipeline_load_structure():
-    """Pipeline API: LoadStructure + Viewport + set_pipeline() enables pipeline mode."""
+    """Pipeline API: LoadStructure + Viewport + set_pipeline() ships node data."""
     pipe = megane.Pipeline()
     s = pipe.add_node(megane.LoadStructure(str(FIXTURES / "1crn.pdb")))
     v = pipe.add_node(megane.Viewport())
@@ -132,7 +132,7 @@ def test_pipeline_load_structure():
     viewer = megane.MolecularViewer()
     viewer.set_pipeline(pipe)
 
-    assert viewer._pipeline_enabled is True
+    assert viewer._pipeline_json != ""
     assert len(viewer._node_snapshots_data) > 0
 
 
@@ -152,4 +152,4 @@ def test_pipeline_with_trajectory():
     viewer.set_pipeline(pipe)
 
     assert viewer.total_frames > 0
-    assert viewer._pipeline_enabled is True
+    assert viewer._pipeline_json != ""

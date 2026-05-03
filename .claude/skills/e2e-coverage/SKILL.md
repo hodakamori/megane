@@ -87,7 +87,7 @@ npm run test:e2e:format-loading      # PDB/GRO/XYZ/MOL/SDF/CIF/LAMMPS load on we
 npm run test:e2e:playback            # play/pause/scrub/fps on webapp
 npm run test:e2e:sidebar             # CollapsiblePanel (Pipeline panel) toggle on webapp
 npm run test:e2e:widget-api          # programmatic frame_index / selected_atoms in JupyterLab
-npm run test:e2e:pipeline-editor     # seeded node kinds + Render button mounts modal
+npm run test:e2e:pipeline-editor     # seeded node kinds + Render button mounts modal (webapp / labext / vscode only — widget hosts intentionally do not mount the editor)
 npm run test:e2e:pipeline-file       # drag-drop .megane.json on webapp
 npm run test:e2e:render-modal        # snapshot mode (GIF/MP4 gated by MEGANE_E2E_FFMPEG=1)
 ```

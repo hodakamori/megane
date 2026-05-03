@@ -57,6 +57,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-mol2",
+    displayName: "MOL2",
+    extensions: [".mol2"],
+    mimeTypes: ["chemical/x-mol2"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-cif",
     displayName: "CIF",
     extensions: [".cif"],

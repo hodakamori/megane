@@ -10,7 +10,8 @@
 3. **Always build WASM before running the dev server or full build.** The WASM pkg directory (`crates/megane-wasm/pkg/`) does not exist until `npm run build:wasm` is run.
 4. **Always create a PR after pushing changes.** Use `gh pr create` to open a pull request. PR titles and descriptions must be in English. See the `github-cli` skill for remote URL workaround. Before reporting completion, verify CI passes with `gh run list`.
 5. **In plan mode, strictly follow the approved plan.** Do not skip steps, reorder them, or add unplanned work. If the plan needs changes, explain the reason and get approval before deviating.
-6. **All file formats should behave consistently across hosts.** When you add a parser or feature to one platform (standalone webapp, Jupyter widget, JupyterLab labextension, VSCode extension), register it on every host unless there is a host-specific reason not to. The single source of truth is `docs/docs/platform-support.md`; update its tables in the same PR. Host registration points: `crates/megane-wasm/src/lib.rs` (browser parsers), `src/components/nodes/LoadStructureNode.tsx` / `LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts`, `vscode-megane/package.json` `customEditors`.
+6. **All file formats should behave consistently across hosts.** When you add a parser or feature to one platform (standalone webapp, Jupyter widget, JupyterLab labextension, VSCode extension), register it on every host unless there is a host-specific reason not to. The single source of truth is `docs/docs/platform-support.md`; update its tables in the same PR. Host registration points: `crates/megane-wasm/src/lib.rs` (browser parsers), `src/components/nodes/LoadStructureNode.tsx` / `LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts`, `vscode-megane/package.json` `customEditors`. Walk the full checklist in the `add-format` skill — drift between hosts is the #1 source of "format X works in the webapp but not in VSCode/JupyterLab" bugs.
+7. **The Jupyter widget (anywidget `MolecularViewer`) does not mount the visual pipeline editor.** Pipeline data still flows in via `MolecularViewer.set_pipeline()` (`_pipeline_json` + `_node_snapshots_data`), but the in-cell `PipelineEditor` UI is intentionally not rendered — the host cell chrome cannot reliably lay it out. Do not re-introduce a `pipeline=True` opt-in or a `_pipeline_enabled` traitlet. Visual editing lives in the standalone webapp, JupyterLab labextension, and VSCode extension only.
 
 ## Dev Environment Setup
 
@@ -101,8 +102,9 @@ A SessionStart hook (`.claude/hooks/session-start.sh`) injects a reminder pointi
 | `preview` | Screenshot/video capture for visual review |
 | `pre-release` | Pre-release checklist (tests, version bump, dry-run, tag) |
 | `post-release` | Post-release verification (publish workflows, package availability, docs) |
+| `add-format` | Per-host registration checklist for new file formats (enforces CRITICAL RULE #6) |
 
-Total: 9 skills.
+Total: 10 skills.
 
 ## Architecture
 
