@@ -106,6 +106,7 @@ For multiple independent viewers per page (e.g. embedding in MDX docs), use
 | CIF | `.cif` | Crystallographic Information File |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | XTC | `.xtc` | GROMACS compressed trajectory |
+| DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj`, `.dump` | LAMMPS dump trajectory |
 

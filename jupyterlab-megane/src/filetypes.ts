@@ -107,6 +107,22 @@ export const STRUCTURE_FILETYPES_BINARY: DocumentRegistry.IFileType[] = [
     fileFormat: "base64",
     contentType: "file",
   },
+  {
+    name: "megane-dcd",
+    displayName: "DCD trajectory",
+    extensions: [".dcd"],
+    mimeTypes: ["chemical/x-dcd"],
+    fileFormat: "base64",
+    contentType: "file",
+  },
+  {
+    name: "megane-netcdf",
+    displayName: "AMBER NetCDF trajectory",
+    extensions: [".nc"],
+    mimeTypes: ["application/x-netcdf"],
+    fileFormat: "base64",
+    contentType: "file",
+  },
 ];
 
 export const STRUCTURE_FILETYPE_NAMES_TEXT = STRUCTURE_FILETYPES_TEXT.map((f) => f.name);

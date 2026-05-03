@@ -240,6 +240,9 @@ export class MoleculeRenderer {
   /** True until the first frame has been rendered after mount; used for perf hook. */
   private firstFramePending = true;
 
+  /** Called when the user finishes a camera interaction (drag end). */
+  private _cameraChangeCallback: (() => void) | null = null;
+
   /** Structure layers for multi-structure overlay rendering. */
   private layers = new Map<string, StructureLayer>();
 
@@ -317,6 +320,9 @@ export class MoleculeRenderer {
     this.attachPivotCancelListener();
     this.attachWheelZoomListener();
     this.attachCustomPanListener();
+    this.controls.addEventListener("end", () => {
+      this._cameraChangeCallback?.();
+    });
 
     // Lighting - hemisphere + 3-point
     const hemi = new THREE.HemisphereLight(0xddeeff, 0x997744, 0.4);
@@ -1448,6 +1454,7 @@ export class MoleculeRenderer {
   /** Switch projection mode by name (wraps setPerspective for symmetry). */
   setCameraMode(mode: MeganeCameraMode): void {
     this.setPerspective(mode === "perspective");
+    this._cameraChangeCallback?.();
   }
 
   /** Re-fit the camera to the current snapshot's bounding box. */
@@ -1464,6 +1471,43 @@ export class MoleculeRenderer {
         this.lastExtent,
       );
     }
+    this._frustumPanX = 0;
+    this._frustumPanY = 0;
+    this._cameraChangeCallback?.();
+  }
+
+  /** Register a callback invoked after each user camera interaction ends. */
+  setCameraChangeCallback(cb: (() => void) | null): void {
+    this._cameraChangeCallback = cb;
+  }
+
+  /** Read current camera state. Returns null before mount. */
+  getCameraState(): MeganeCameraState | null {
+    if (!this.camera || !this.controls) return null;
+    const pos = this.camera.position;
+    const tgt = this.controls.target;
+    return {
+      mode: this.perspectiveMode ? "perspective" : "orthographic",
+      position: [pos.x, pos.y, pos.z],
+      target: [tgt.x, tgt.y, tgt.z],
+      zoom: this.camera.zoom,
+    };
+  }
+
+  /** Restore camera to a previously saved state. */
+  applyCameraState(state: MeganeCameraState): void {
+    if (!this.camera || !this.controls) return;
+    if ((state.mode === "perspective") !== this.perspectiveMode) {
+      this.setPerspective(state.mode === "perspective");
+    }
+    this.camera.position.set(...state.position);
+    this.controls.target.set(...state.target);
+    this.camera.zoom = state.zoom;
+    this.camera.updateProjectionMatrix();
+    const wasDamping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = wasDamping;
     this._frustumPanX = 0;
     this._frustumPanY = 0;
   }

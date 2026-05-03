@@ -67,6 +67,11 @@ class MolecularViewer(anywidget.AnyWidget):
     # Measurement result (JS → Python)
     _measurement_json = traitlets.Unicode("").tag(sync=True)
 
+    # Camera state (JS ↔ Python). Persisted by anywidget kernel-side storage.
+    # Schema: {"mode": "orthographic"|"perspective", "position": [x,y,z],
+    #           "target": [x,y,z], "zoom": float}
+    camera_state = traitlets.Dict({}).tag(sync=True)
+
     # Pipeline data delivery (the visual pipeline editor is intentionally
     # not surfaced in the widget — it lives in the standalone webapp,
     # JupyterLab labextension and VSCode extension only).

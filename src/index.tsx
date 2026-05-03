@@ -15,6 +15,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
+import { restorePipelineFromHash } from "./pipeline/shareLink";
 import { useTour } from "./tour/useTour";
 import { parseXTCFile } from "./parsers/xtc";
 import { MemoryFrameProvider } from "./pipeline/types";
@@ -57,11 +58,15 @@ function App() {
   const setFps = usePlaybackStore((s) => s.setFps);
   const seekFrame = usePlaybackStore((s) => s.seekFrame);
 
-  // Load bundled demo PDB + XTC on first mount
+  // Restore pipeline from URL hash (#pipeline=...) when present; otherwise
+  // load the bundled demo so first-time visitors see something immediately.
   useEffect(() => {
     (async () => {
+      const restored = await restorePipelineFromHash((p) =>
+        usePipelineStore.getState().deserialize(p),
+      );
+      if (restored) return;
       await ds.local.loadText(defaultPDB);
-      // Load demo trajectory
       const resp = await fetch(defaultXtcUrl);
       const blob = await resp.blob();
       const xtcFile = new File([blob], "caffeine_water_vibration.xtc");

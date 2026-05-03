@@ -18,7 +18,7 @@ const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
 );
 
-const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".lammpstrj", ".dump"]);
+const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".lammpstrj", ".dump", ".nc"]);
 
 /**
  * Subscription channel used by `DocBody` to re-load when the host

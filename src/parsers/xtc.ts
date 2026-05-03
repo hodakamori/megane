@@ -17,6 +17,8 @@ export interface XTCParseResult {
 let initPromise: Promise<void> | null = null;
 let wasmParseXtc: ((data: Uint8Array) => WasmXtcResult) | null = null;
 let wasmParseLammpstrj: ((text: string) => WasmXtcResult) | null = null;
+let wasmParseDcd: ((data: Uint8Array) => WasmXtcResult) | null = null;
+let wasmParseNetcdf: ((data: Uint8Array) => WasmXtcResult) | null = null;
 
 interface WasmXtcResult {
   n_atoms: number;
@@ -42,6 +44,8 @@ async function ensureInit(): Promise<void> {
       await wasm.default(wasmUrl);
       wasmParseXtc = wasm.parse_xtc_file;
       wasmParseLammpstrj = wasm.parse_lammpstrj_file;
+      wasmParseDcd = wasm.parse_dcd_file;
+      wasmParseNetcdf = wasm.parse_netcdf_file;
     })();
   }
   await initPromise;
@@ -100,6 +104,20 @@ export async function parseXTCFile(file: File, expectedNAtoms: number): Promise<
 }
 
 /**
+ * Parse a DCD trajectory file (CHARMM/NAMD/X-PLOR binary format).
+ * Returns Frame[] (all frames) and TrajectoryMeta.
+ */
+export async function parseDCDFile(file: File, expectedNAtoms: number): Promise<XTCParseResult> {
+  await ensureInit();
+
+  const buffer = await file.arrayBuffer();
+  const data = new Uint8Array(buffer);
+  const result = wasmParseDcd!(data) as WasmXtcResult;
+
+  return extractFrames(result, expectedNAtoms, "DCD");
+}
+
+/**
  * Parse a LAMMPS dump trajectory file (.lammpstrj / .dump).
  * Returns Frame[] (all frames) and TrajectoryMeta.
  */
@@ -113,4 +131,18 @@ export async function parseLammpstrjFile(
   const result = wasmParseLammpstrj!(text) as WasmXtcResult;
 
   return extractFrames(result, expectedNAtoms, "LAMMPS dump");
+}
+
+/**
+ * Parse an AMBER NetCDF trajectory file (.nc).
+ * Returns Frame[] (all frames) and TrajectoryMeta.
+ */
+export async function parseNetCDFFile(file: File, expectedNAtoms: number): Promise<XTCParseResult> {
+  await ensureInit();
+
+  const buffer = await file.arrayBuffer();
+  const data = new Uint8Array(buffer);
+  const result = wasmParseNetcdf!(data) as WasmXtcResult;
+
+  return extractFrames(result, expectedNAtoms, "AMBER NetCDF");
 }

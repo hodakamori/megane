@@ -14,7 +14,7 @@ import { Viewport } from "./Viewport";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
-import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
+import { MoleculeRenderer, type MeganeCameraState } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -36,6 +36,10 @@ interface WidgetViewerProps {
   pipelineJson?: string;
   nodeSnapshotsData?: Record<string, DataView>;
   onPipelineChange?: (json: string) => void;
+  /** Initial camera state to restore on first snapshot load. */
+  initialCameraState?: MeganeCameraState | null;
+  /** Called when camera state changes (after user interaction ends). */
+  onCameraStateChange?: (state: MeganeCameraState) => void;
   // Optional pipeline store override. Each Jupyter widget mount creates its
   // own private store so multiple MolecularViewers in the same notebook do
   // not share state. Tests pass their own store to inspect internal state.
@@ -64,6 +68,8 @@ export function WidgetViewer({
   onMeasurementChange,
   pipelineJson,
   nodeSnapshotsData,
+  initialCameraState,
+  onCameraStateChange,
   pipelineStore: pipelineStoreProp,
 }: WidgetViewerProps) {
   // Each WidgetViewer instance owns a private pipeline store. The webapp
@@ -81,6 +87,10 @@ export function WidgetViewer({
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [bondCount, setBondCount] = useState<number>(0);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+  const hasRestoredCameraRef = useRef(false);
+  const onCameraStateChangeRef = useRef(onCameraStateChange);
+  onCameraStateChangeRef.current = onCameraStateChange;
+  const initialCameraStateRef = useRef(initialCameraState);
 
   const {
     selection,
@@ -157,6 +167,15 @@ export function WidgetViewer({
       const vs = pipelineStore.getState().viewportState;
       applyViewportState(renderer, vs, null);
       prevViewportStateRef.current = vs;
+
+      // Restore persisted camera on first load (Viewport's loadSnapshot/fitToView
+      // runs before this effect because child effects execute first).
+      const effectiveSnap = pipelineStore.getState().snapshot ?? snapshot;
+      if (effectiveSnap && !hasRestoredCameraRef.current) {
+        hasRestoredCameraRef.current = true;
+        const saved = initialCameraStateRef.current;
+        if (saved) renderer.applyCameraState(saved);
+      }
     }
   }, [snapshot, nodeSnapshotsData, pipelineJson, setSnapshot, pipelineStore]);
 
@@ -229,6 +248,11 @@ export function WidgetViewer({
       prevViewportStateRef.current = pipelineStore.getState().viewportState;
       // Apply initial selectedAtoms that may have arrived before the renderer was ready
       setExternalSelection(selectedAtomsRef.current ?? []);
+      // Register camera change callback for host-side persistence
+      renderer.setCameraChangeCallback(() => {
+        const state = renderer.getCameraState();
+        if (state) onCameraStateChangeRef.current?.(state);
+      });
     },
     [setExternalSelection, pipelineStore],
   );

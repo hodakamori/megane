@@ -1,11 +1,13 @@
 pub mod atomic;
 pub mod bonds;
 pub mod cif;
+pub mod dcd;
 pub mod gro;
 pub mod lammps_data;
 pub mod lammpstrj;
 pub mod mol;
 pub mod mol2;
+pub mod netcdf;
 pub mod parser;
 pub mod top;
 pub mod traj;
