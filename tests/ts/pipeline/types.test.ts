@@ -101,6 +101,9 @@ describe("defaultParams", () => {
       type: "modify",
       scale: 1.0,
       opacity: 1.0,
+      colorEnabled: false,
+      colorMode: "uniform",
+      uniformColor: "#ff8800",
     });
   });
 
@@ -111,7 +114,6 @@ describe("defaultParams", () => {
       perspective: false,
       cellAxesVisible: true,
       pivotMarkerVisible: true,
-      colorScheme: "byElement",
     });
   });
 

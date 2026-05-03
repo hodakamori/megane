@@ -19,7 +19,6 @@ import type {
 } from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { getVectorsForFrame } from "../logic/vectorSourceLogic";
-import type { ColorScheme } from "../colorSchemes";
 
 /**
  * Apply the current ViewportState to the renderer.
@@ -31,7 +30,7 @@ export function applyViewportState(
   current: ViewportState,
   previous: ViewportState | null,
   primaryNodeId?: string | null,
-  atomLabels?: string[] | null,
+  _atomLabels?: string[] | null,
 ): void {
   // ─── Determine which node IDs are primary vs layer ─────────
   const currentNodeIds = collectSourceNodeIds(current);
@@ -154,10 +153,6 @@ export function applyViewportState(
   }
   if (!previous || current.pivotMarkerVisible !== previous.pivotMarkerVisible) {
     renderer.setPivotMarkerVisible(current.pivotMarkerVisible);
-  }
-  const prevScheme: ColorScheme = previous?.colorScheme ?? "byElement";
-  if (!previous || current.colorScheme !== prevScheme) {
-    renderer.setColorScheme(current.colorScheme ?? "byElement", atomLabels ?? null);
   }
 
   // ─── Labels (primary structure only for now) ───────────────

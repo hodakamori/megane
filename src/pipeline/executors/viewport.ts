@@ -42,7 +42,6 @@ export function executeViewport(
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
     pivotMarkerVisible: params.pivotMarkerVisible ?? true,
-    colorScheme: params.colorScheme ?? "byElement",
   };
 }
 

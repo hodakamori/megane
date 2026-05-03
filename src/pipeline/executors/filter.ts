@@ -37,6 +37,7 @@ export function executeFilter(
           indices: finalIndices,
           scaleOverrides: particle.scaleOverrides,
           opacityOverrides: particle.opacityOverrides,
+          colorOverrides: particle.colorOverrides,
         };
         outputs.set("out", filtered);
       }
