@@ -182,6 +182,36 @@ export class ImpostorAtomMesh {
     this.material.uniforms.uUsePerAtomOverrides.value = 0;
   }
 
+  /**
+   * Overlay per-atom RGB overrides onto the existing color buffer.
+   * `overrides` length must be `nAtoms*3`. Atoms whose r-channel is NaN keep
+   * the current (base) color; other atoms are rewritten. The caller is
+   * responsible for re-running `loadSnapshot` first when the previous
+   * overrides need to be cleared, since this method only writes — it never
+   * reverts to base.
+   */
+  applyColorOverrides(overrides: Float32Array): void {
+    const limit = Math.min(this.nAtoms, Math.floor(overrides.length / 3));
+    for (let i = 0; i < limit; i++) {
+      const i3 = i * 3;
+      const r = overrides[i3];
+      if (Number.isNaN(r)) continue;
+      this.colorBuf[i3] = r;
+      this.colorBuf[i3 + 1] = overrides[i3 + 1];
+      this.colorBuf[i3 + 2] = overrides[i3 + 2];
+    }
+    this.colorAttr.needsUpdate = true;
+  }
+
+  /**
+   * Read-only handle on the per-atom RGB buffer (length `nAtoms*3`).
+   * Used by the bond mesh to derive per-bond colors after overrides are
+   * applied; do not mutate the returned subarray.
+   */
+  getColorBuffer(): Float32Array {
+    return this.colorBuf.subarray(0, this.nAtoms * 3);
+  }
+
   private grow(needed: number): void {
     this.capacity = Math.max(needed, this.capacity * 2);
 

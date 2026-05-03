@@ -30,7 +30,6 @@ import { StructureLayer } from "./StructureLayer";
 import { PivotMarker } from "./PivotMarker";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
-import { type ColorScheme, type ColorContext, computeBfactorRange } from "../colorSchemes";
 import { pickAtPixel, projectToScreen } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
@@ -201,8 +200,12 @@ export class MoleculeRenderer {
   private atomOpacity = 1.0;
   private bondScale = 1.0;
   private bondOpacity = 1.0;
-  private colorScheme: ColorScheme = "byElement";
-  private colorAtomLabels: string[] | null = null;
+  /**
+   * Current per-atom RGB overrides applied to the primary structure
+   * (length === nAtoms*3, NaN sentinel for "fall through to base"). Null
+   * means atoms render with the default CPK palette.
+   */
+  private currentColorOverrides: Float32Array | null = null;
   private viewInsetLeft = 0;
   private viewInsetRight = 0;
   private dprMediaQuery: MediaQueryList | null = null;
@@ -380,7 +383,10 @@ export class MoleculeRenderer {
       this.swapRenderers(true);
     }
 
-    this.atomRenderer!.loadSnapshot(snapshot, this.buildColorContext(snapshot));
+    this.atomRenderer!.loadSnapshot(snapshot);
+    if (this.currentColorOverrides) {
+      (this.atomRenderer as ImpostorAtomMesh).applyColorOverrides(this.currentColorOverrides);
+    }
     // Bond loading is handled exclusively by the pipeline via updateBondsExt/updateBonds
     // (called from applyViewportState). This avoids race conditions between
     // Viewport's loadSnapshot and MeganeViewer's applyViewportState effects.
@@ -465,11 +471,11 @@ export class MoleculeRenderer {
       bondOrders,
     };
     this.snapshot = updated;
-    const colorCtx = this.buildColorContext(updated);
-    this.bondRenderer.loadSnapshot({ ...updated, positions }, colorCtx);
+    this.bondRenderer.loadSnapshot({ ...updated, positions });
     if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
       this.bondRenderer.setScale(this.bondScale, updated);
     }
+    this.syncBondColorsToAtoms();
   }
 
   /**
@@ -497,10 +503,11 @@ export class MoleculeRenderer {
       positions: pos,
       elements: elems,
     };
-    this.bondRenderer.loadSnapshot(extSnap, this.buildColorContext(this.snapshot));
+    this.bondRenderer.loadSnapshot(extSnap);
     if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
       this.bondRenderer.setScale(this.bondScale, this.snapshot);
     }
+    this.syncBondColorsToAtoms(extSnap);
   }
 
   /** Set per-atom labels for overlay display. */
@@ -636,39 +643,39 @@ export class MoleculeRenderer {
     this.bondRenderer?.setOpacity?.(opacity);
   }
 
-  /** Update the active color scheme and immediately recolor if a snapshot is loaded. */
-  setColorScheme(scheme: ColorScheme, atomLabels: string[] | null): void {
-    this.colorScheme = scheme;
-    this.colorAtomLabels = atomLabels;
-    if (this.snapshot && this.atomRenderer) {
-      const ctx = this.buildColorContext(this.snapshot);
-      this.atomRenderer.loadSnapshot(this.snapshot, ctx);
-      // Recolor bonds with current bond state (positions may have advanced)
-      if (this.bondRenderer && this.snapshot.nBonds > 0) {
-        const positions = this.currentPositions ?? this.snapshot.positions;
-        this.bondRenderer.loadSnapshot({ ...this.snapshot, positions }, ctx);
-        if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
-          this.bondRenderer.setScale(this.bondScale, this.snapshot);
-        }
-      }
+  /**
+   * Apply per-atom RGB overrides for the primary structure. Null reverts to
+   * the default CPK palette for every atom. Identity comparison short-circuits
+   * the GPU upload when the same buffer reference is supplied repeatedly.
+   */
+  applyAtomColorOverrides(overrides: Float32Array | null): void {
+    if (overrides === this.currentColorOverrides) return;
+    this.currentColorOverrides = overrides;
+    if (!this.snapshot || !this.atomRenderer) return;
+
+    // Reset to base CPK by re-loading the snapshot with no color context.
+    this.atomRenderer.loadSnapshot(this.snapshot);
+    if (this.atomScale !== 1.0 && this.atomRenderer.setScale) {
+      this.atomRenderer.setScale(this.atomScale, this.snapshot);
     }
-    // Also recolor any structure layers
-    for (const layer of this.layers.values()) {
-      if (layer.snapshot) {
-        const ctx = this.buildColorContext(layer.snapshot);
-        layer.loadSnapshotWithColor(ctx);
-      }
+    if (overrides) {
+      (this.atomRenderer as ImpostorAtomMesh).applyColorOverrides(overrides);
     }
+    this.syncBondColorsToAtoms();
   }
 
-  /** Build a ColorContext for the given snapshot using current scheme and labels. */
-  private buildColorContext(snapshot: Snapshot): ColorContext | undefined {
-    if (this.colorScheme === "byElement") return undefined;
-    return {
-      scheme: this.colorScheme,
-      atomLabels: this.colorAtomLabels,
-      bfactorRange: computeBfactorRange(snapshot),
-    };
+  /**
+   * Re-derive per-bond colors from the current atom mesh color buffer. Called
+   * after atom colors change (override application) or after the bond mesh
+   * reloads (`updateBonds*`) so the two stay in sync.
+   */
+  private syncBondColorsToAtoms(snapshotOverride?: Snapshot): void {
+    const snap = snapshotOverride ?? this.snapshot;
+    if (!snap || !this.atomRenderer || !this.bondRenderer) return;
+    if (snap.nBonds === 0) return;
+    const atom = this.atomRenderer as ImpostorAtomMesh;
+    const bond = this.bondRenderer as ImpostorBondMesh;
+    bond.recomputeColorsFromAtomBuffer(atom.getColorBuffer(), snap);
   }
 
   /** Apply per-bond opacity overrides (one value per logical bond). */
