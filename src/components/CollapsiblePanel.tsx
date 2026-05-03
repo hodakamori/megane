@@ -12,12 +12,12 @@ export const panelContainerStyle: CSSProperties = {
   right: 12,
   bottom: 60,
   zIndex: 10,
-  background: "rgba(255, 255, 255, 0.92)",
+  background: "var(--megane-surface)",
   backdropFilter: "blur(16px)",
   WebkitBackdropFilter: "blur(16px)",
   borderRadius: 12,
-  boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
-  border: "1px solid rgba(226,232,240,0.6)",
+  boxShadow: "0 1px 8px var(--megane-shadow)",
+  border: "1px solid var(--megane-border)",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -29,14 +29,14 @@ export const panelHeaderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  borderBottom: "1px solid rgba(226,232,240,0.6)",
+  borderBottom: "1px solid var(--megane-border)",
   flexShrink: 0,
 };
 
 /** Panel title text style. */
 export const panelTitleStyle: CSSProperties = {
   fontWeight: 600,
-  color: "#1e293b",
+  color: "var(--megane-text)",
   fontSize: 13,
   letterSpacing: "-0.02em",
 };
@@ -47,26 +47,26 @@ export const collapseButtonStyle: CSSProperties = {
   border: "none",
   cursor: "pointer",
   fontSize: 13,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   padding: "2px 4px",
 };
 
 /** Style for the collapsed toggle button. */
 const collapsedButtonStyle: CSSProperties = {
-  background: "rgba(255, 255, 255, 0.88)",
+  background: "var(--megane-surface)",
   backdropFilter: "blur(16px)",
   WebkitBackdropFilter: "blur(16px)",
-  border: "1px solid rgba(226,232,240,0.6)",
+  border: "1px solid var(--megane-border)",
   borderRadius: 10,
   padding: "8px 12px",
   cursor: "pointer",
-  boxShadow: "0 1px 8px rgba(0,0,0,0.06)",
+  boxShadow: "0 1px 8px var(--megane-shadow)",
   display: "flex",
   alignItems: "center",
   gap: 8,
   fontSize: 13,
   fontWeight: 600,
-  color: "#1e293b",
+  color: "var(--megane-text)",
   letterSpacing: "-0.02em",
 };
 
@@ -119,7 +119,9 @@ export function CollapsiblePanel({
           aria-label={`Open ${title.toLowerCase()}`}
           aria-expanded="false"
         >
-          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>&#9664;</span>
+          <span style={{ fontSize: 11, color: "var(--megane-text-muted)", fontWeight: 400 }}>
+            &#9664;
+          </span>
           {title}
         </button>
       </div>
@@ -153,7 +155,7 @@ export function CollapsiblePanel({
             alignItems: "center",
             gap: 4,
             padding: "5px 8px",
-            borderBottom: "1px solid rgba(226,232,240,0.6)",
+            borderBottom: "1px solid var(--megane-border)",
             flexShrink: 0,
             flexWrap: "wrap",
             rowGap: 4,

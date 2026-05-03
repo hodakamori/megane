@@ -22,9 +22,28 @@ import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3_3x3x3.xyz?raw";
 import "./styles/megane.css";
+import { useThemeStore } from "./stores/useThemeStore";
 
 import type { DataMode } from "./types";
 export type { DataMode };
+
+/** Applies data-theme attribute to <html> and listens for OS preference changes. */
+function ThemeSync() {
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const syncSystem = useThemeStore((s) => s._syncSystemTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", syncSystem);
+    return () => mq.removeEventListener("change", syncSystem);
+  }, [syncSystem]);
+
+  return null;
+}
 
 function App() {
   const [mode] = useState<DataMode>("local");
@@ -147,6 +166,7 @@ function App() {
 
   return (
     <div style={{ width: "100%", height: "100%" }} onDragOver={handleDragOver} onDrop={handleDrop}>
+      <ThemeSync />
       <MeganeViewer
         playing={playing}
         fps={fps}

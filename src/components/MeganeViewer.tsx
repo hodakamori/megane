@@ -24,6 +24,7 @@ import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
 import type { HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
+import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
 interface MeganeViewerProps {
   playing?: boolean;
@@ -240,17 +241,29 @@ export function MeganeViewer({
     }
   }, [currentFrame]);
 
-  const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
-    rendererRef.current = renderer;
-    renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
-    applyViewportState(
-      renderer,
-      usePipelineStore.getState().viewportState,
-      null,
-      primaryNodeIdRef.current,
-    );
-    prevViewportStateRef.current = usePipelineStore.getState().viewportState;
-  }, []);
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+
+  // Update Three.js background color when theme changes
+  useEffect(() => {
+    rendererRef.current?.setBackgroundColor(themeToHex(resolvedTheme));
+  }, [resolvedTheme]);
+
+  const handleRendererReady = useCallback(
+    (renderer: MoleculeRenderer) => {
+      rendererRef.current = renderer;
+      renderer.setBackgroundColor(themeToHex(useThemeStore.getState().resolvedTheme));
+      renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
+      applyViewportState(
+        renderer,
+        usePipelineStore.getState().viewportState,
+        null,
+        primaryNodeIdRef.current,
+      );
+      prevViewportStateRef.current = usePipelineStore.getState().viewportState;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const handleTogglePipeline = useCallback(() => {
     setPipelineCollapsed((prev) => !prev);

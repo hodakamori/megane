@@ -19,6 +19,7 @@ import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
 import type { SerializedPipeline } from "../../src/pipeline/types";
 import { useTour } from "../../src/tour/useTour";
+import { useThemeStore } from "../../src/stores/useThemeStore";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -28,6 +29,23 @@ function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
   if (!wasmBytes) return;
   const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
   (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ = URL.createObjectURL(wasmBlob);
+}
+
+function ThemeSync() {
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const syncSystem = useThemeStore((s) => s._syncSystemTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", syncSystem);
+    return () => mq.removeEventListener("change", syncSystem);
+  }, [syncSystem]);
+
+  return null;
 }
 
 function App() {
@@ -141,47 +159,55 @@ function App() {
 
   if (error) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-          color: "#ef4444",
-          fontSize: "14px",
-          padding: "20px",
-          textAlign: "center",
-          gap: "8px",
-        }}
-      >
-        <div style={{ fontWeight: "bold" }}>Error</div>
-        <div style={{ color: "#64748b", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
-      </div>
+      <>
+        <ThemeSync />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            color: "#ef4444",
+            fontSize: "14px",
+            padding: "20px",
+            textAlign: "center",
+            gap: "8px",
+          }}
+        >
+          <div style={{ fontWeight: "bold" }}>Error</div>
+          <div style={{ color: "var(--megane-text-secondary)", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
+        </div>
+      </>
     );
   }
 
   if (!loaded) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-          color: "#64748b",
-          fontSize: "14px",
-        }}
-      >
-        Loading structure...
-      </div>
+      <>
+        <ThemeSync />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            color: "var(--megane-text-secondary)",
+            fontSize: "14px",
+          }}
+        >
+          Loading structure...
+        </div>
+      </>
     );
   }
 
   return (
-    <MeganeViewer
+    <>
+      <ThemeSync />
+      <MeganeViewer
       testContext="vscode"
       onUploadStructure={handleUploadStructure}
       onBondSourceChange={(s) =>
@@ -193,6 +219,7 @@ function App() {
       onLoadVectorFile={(f) => local.loadVectorFile(f)}
       onLoadDemoVectors={() => local.loadDemoVectors()}
     />
+    </>
   );
 }
 
