@@ -63,7 +63,10 @@ function App() {
         const file = new File([bytes], filename);
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
-          lower.endsWith(".xtc") || lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
+          lower.endsWith(".xtc") ||
+          lower.endsWith(".lammpstrj") ||
+          lower.endsWith(".dump") ||
+          lower.endsWith(".nc");
         // Trajectory-only formats (XTC, LAMMPS dump) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by
