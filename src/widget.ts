@@ -19,6 +19,7 @@ import {
   MSG_FRAME,
 } from "./protocol/protocol";
 import type { Snapshot, Frame, Measurement } from "./types";
+import type { MeganeCameraState } from "./renderer/MoleculeRenderer";
 
 interface AnyWidgetModel {
   get(key: string): unknown;
@@ -92,6 +93,25 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     model.save_changes();
   }
 
+  function handleCameraStateChange(state: MeganeCameraState) {
+    model.set("camera_state", state);
+    model.save_changes();
+  }
+
+  function getInitialCameraState(): MeganeCameraState | null {
+    const saved = model.get("camera_state") as Record<string, unknown> | null;
+    if (
+      saved &&
+      typeof saved.mode === "string" &&
+      Array.isArray(saved.position) &&
+      Array.isArray(saved.target) &&
+      typeof saved.zoom === "number"
+    ) {
+      return saved as unknown as MeganeCameraState;
+    }
+    return null;
+  }
+
   function renderApp() {
     if (!root || disposed) return;
     const frameIndex = (model.get("frame_index") as number) || 0;
@@ -112,6 +132,8 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         pipelineJson: pipelineJson,
         nodeSnapshotsData: nodeSnapshotsData,
         onPipelineChange: handlePipelineChange,
+        initialCameraState: getInitialCameraState(),
+        onCameraStateChange: handleCameraStateChange,
       }),
     );
   }
