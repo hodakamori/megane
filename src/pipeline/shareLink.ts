@@ -13,6 +13,13 @@ const HASH_PARAM = "pipeline";
 /** Warn the user when the hash fragment would exceed this many characters. */
 const MAX_HASH_LENGTH = 8000;
 
+const TOO_LONG_MESSAGE = "Pipeline too large for a share link — use Export instead";
+const COPIED_MESSAGE = "Link copied to clipboard!";
+const COPY_FAILED_MESSAGE = "Copy failed — see console for the link";
+
+const COPIED_TOAST_MS = 3000;
+const TOO_LONG_TOAST_MS = 4000;
+
 // ── byte ↔ base64url ────────────────────────────────────────────────────────
 
 function bytesToBase64url(bytes: Uint8Array<ArrayBuffer>): string {
@@ -129,5 +136,82 @@ export async function readPipelineFromHash(): Promise<SerializedPipeline | null>
     return parsed as SerializedPipeline;
   } catch {
     return null;
+  }
+}
+
+// ── share-button outcome helper ─────────────────────────────────────────────
+
+export type ShareOutcome = {
+  /** Toast message to surface to the user. */
+  message: string;
+  /** Milliseconds the toast should remain visible before auto-clearing. */
+  clearAfterMs: number;
+  /** The share URL (always set, even when copy failed). */
+  url: string;
+  /** True when the pipeline was too large to fit a shareable hash. */
+  tooLong: boolean;
+  /** True when navigator.clipboard.writeText threw. */
+  copyFailed: boolean;
+};
+
+/**
+ * Build a share URL for the given pipeline, copy it to the clipboard, and
+ * mirror the resulting hash into the address bar. Returns a presentation-ready
+ * outcome that the caller can render as a toast.
+ *
+ * Pure side effects (clipboard write, history.replaceState, console.info on
+ * failure) are kept out of the React component so the flow is testable.
+ */
+export async function shareCurrentPipeline(pipeline: SerializedPipeline): Promise<ShareOutcome> {
+  const { url, tooLong } = await buildShareUrl(pipeline);
+  if (tooLong) {
+    return {
+      message: TOO_LONG_MESSAGE,
+      clearAfterMs: TOO_LONG_TOAST_MS,
+      url,
+      tooLong: true,
+      copyFailed: false,
+    };
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    history.replaceState(null, "", new URL(url).hash);
+    return {
+      message: COPIED_MESSAGE,
+      clearAfterMs: COPIED_TOAST_MS,
+      url,
+      tooLong: false,
+      copyFailed: false,
+    };
+  } catch {
+    console.info("Share URL:", url);
+    return {
+      message: COPY_FAILED_MESSAGE,
+      clearAfterMs: COPIED_TOAST_MS,
+      url,
+      tooLong: false,
+      copyFailed: true,
+    };
+  }
+}
+
+// ── hash-restore helper ─────────────────────────────────────────────────────
+
+/**
+ * Read a pipeline from the URL hash (if present) and apply it via the supplied
+ * deserializer. Returns true on a successful restore so the caller can skip
+ * loading default content. Any failure (no hash, malformed payload, throwing
+ * deserializer) is swallowed and reported as `false`.
+ */
+export async function restorePipelineFromHash(
+  deserialize: (pipeline: SerializedPipeline) => void,
+): Promise<boolean> {
+  const hashPipeline = await readPipelineFromHash();
+  if (!hashPipeline) return false;
+  try {
+    deserialize(hashPipeline);
+    return true;
+  } catch {
+    return false;
   }
 }

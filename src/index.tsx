@@ -15,7 +15,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
-import { readPipelineFromHash } from "./pipeline/shareLink";
+import { restorePipelineFromHash } from "./pipeline/shareLink";
 import { useTour } from "./tour/useTour";
 import { parseXTCFile } from "./parsers/xtc";
 import { MemoryFrameProvider } from "./pipeline/types";
@@ -43,15 +43,10 @@ function App() {
   // load the bundled demo so first-time visitors see something immediately.
   useEffect(() => {
     (async () => {
-      const hashPipeline = await readPipelineFromHash();
-      if (hashPipeline) {
-        try {
-          usePipelineStore.getState().deserialize(hashPipeline);
-          return;
-        } catch {
-          // Fall through to demo on malformed hash
-        }
-      }
+      const restored = await restorePipelineFromHash((p) =>
+        usePipelineStore.getState().deserialize(p),
+      );
+      if (restored) return;
       await ds.local.loadText(defaultPDB);
       const resp = await fetch(defaultXtcUrl);
       const blob = await resp.blob();

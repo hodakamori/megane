@@ -17,7 +17,7 @@ import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
 import { downloadBlob } from "../renderer/RenderCapture";
-import { buildShareUrl } from "../pipeline/shareLink";
+import { shareCurrentPipeline } from "../pipeline/shareLink";
 import type { PipelineNodeType } from "../pipeline/types";
 import {
   NODE_TYPE_LABELS,
@@ -634,22 +634,9 @@ function PipelineEditorInner({
 
   const handleShare = useCallback(async () => {
     const serialized = usePipelineStore.getState().serialize();
-    const { url, tooLong } = await buildShareUrl(serialized);
-    if (tooLong) {
-      setShareFeedback("Pipeline too large for a share link — use Export instead");
-      setTimeout(() => setShareFeedback(null), 4000);
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-      // Also update the browser URL so the current tab reflects the shared state
-      history.replaceState(null, "", new URL(url).hash);
-      setShareFeedback("Link copied to clipboard!");
-    } catch {
-      setShareFeedback("Copy failed — see console for the link");
-      console.info("Share URL:", url);
-    }
-    setTimeout(() => setShareFeedback(null), 3000);
+    const outcome = await shareCurrentPipeline(serialized);
+    setShareFeedback(outcome.message);
+    setTimeout(() => setShareFeedback(null), outcome.clearAfterMs);
   }, []);
 
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);

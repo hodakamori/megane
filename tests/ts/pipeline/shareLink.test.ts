@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { buildShareUrl, readPipelineFromHash } from "@/pipeline/shareLink";
+import {
+  buildShareUrl,
+  readPipelineFromHash,
+  restorePipelineFromHash,
+  shareCurrentPipeline,
+} from "@/pipeline/shareLink";
 import type { SerializedPipeline } from "@/pipeline/types";
 
 const samplePipeline: SerializedPipeline = {
@@ -219,5 +224,129 @@ describe("buildShareUrl ↔ readPipelineFromHash compatibility", () => {
     expect(spy).toHaveBeenCalled();
     expect(tooLong).toBe(false);
     expect(url).toContain("#pipeline=");
+  });
+});
+
+describe("shareCurrentPipeline", () => {
+  let writeText: ReturnType<typeof vi.fn>;
+  let originalClipboard: PropertyDescriptor | undefined;
+  let replaceStateSpy: ReturnType<typeof vi.spyOn>;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    writeText = vi.fn().mockResolvedValue(undefined);
+    originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    replaceStateSpy = vi.spyOn(history, "replaceState").mockImplementation(() => {});
+    infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    window.location.hash = "";
+  });
+
+  afterEach(() => {
+    if (originalClipboard) {
+      Object.defineProperty(navigator, "clipboard", originalClipboard);
+    } else {
+      // @ts-expect-error - remove the test-installed property
+      delete navigator.clipboard;
+    }
+    replaceStateSpy.mockRestore();
+    infoSpy.mockRestore();
+  });
+
+  it("ok path: writes to clipboard, mirrors hash, returns success outcome", async () => {
+    const outcome = await shareCurrentPipeline(samplePipeline);
+    expect(outcome.tooLong).toBe(false);
+    expect(outcome.copyFailed).toBe(false);
+    expect(outcome.message).toBe("Link copied to clipboard!");
+    expect(outcome.clearAfterMs).toBe(3000);
+    expect(outcome.url).toContain("#pipeline=");
+    expect(writeText).toHaveBeenCalledWith(outcome.url);
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    // Second arg of replaceState is the URL fragment (e.g. "#pipeline=...")
+    const replaceArgs = replaceStateSpy.mock.calls[0];
+    expect(String(replaceArgs[2])).toMatch(/^#pipeline=/);
+  });
+
+  it("tooLong path: skips clipboard, returns 4-second toast", async () => {
+    const big: SerializedPipeline = {
+      version: 3,
+      nodes: Array.from({ length: 800 }, (_, i) => ({
+        id: `n-${i}`,
+        type: "load_structure",
+        position: { x: i, y: i },
+        enabled: true,
+        fileName: `${i}-${Math.random().toString(36).repeat(5)}-${"x".repeat(30)}`,
+        hasTrajectory: false,
+        hasCell: false,
+      })) as SerializedPipeline["nodes"],
+      edges: [],
+    };
+    const outcome = await shareCurrentPipeline(big);
+    expect(outcome.tooLong).toBe(true);
+    expect(outcome.copyFailed).toBe(false);
+    expect(outcome.message).toBe("Pipeline too large for a share link — use Export instead");
+    expect(outcome.clearAfterMs).toBe(4000);
+    expect(writeText).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+
+  it("copyFailed path: clipboard rejection logs URL and returns failure outcome", async () => {
+    writeText.mockRejectedValueOnce(new Error("denied"));
+    const outcome = await shareCurrentPipeline(samplePipeline);
+    expect(outcome.tooLong).toBe(false);
+    expect(outcome.copyFailed).toBe(true);
+    expect(outcome.message).toBe("Copy failed — see console for the link");
+    expect(outcome.clearAfterMs).toBe(3000);
+    expect(infoSpy).toHaveBeenCalledWith("Share URL:", outcome.url);
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("restorePipelineFromHash", () => {
+  beforeEach(() => {
+    window.location.hash = "";
+  });
+
+  it("returns false and skips deserialize when no hash is present", async () => {
+    const deserialize = vi.fn();
+    const restored = await restorePipelineFromHash(deserialize);
+    expect(restored).toBe(false);
+    expect(deserialize).not.toHaveBeenCalled();
+  });
+
+  it("returns false when hash payload is malformed", async () => {
+    window.location.hash = "pipeline=!!!not-base64!!!";
+    const deserialize = vi.fn();
+    const restored = await restorePipelineFromHash(deserialize);
+    expect(restored).toBe(false);
+    expect(deserialize).not.toHaveBeenCalled();
+  });
+
+  it("returns true and calls deserialize on a valid hash", async () => {
+    const { url } = await buildShareUrl(samplePipeline);
+    window.location.hash = url.slice(url.indexOf("#") + 1);
+
+    const deserialize = vi.fn();
+    const restored = await restorePipelineFromHash(deserialize);
+    expect(restored).toBe(true);
+    expect(deserialize).toHaveBeenCalledTimes(1);
+    const arg = deserialize.mock.calls[0][0];
+    expect(arg.version).toBe(3);
+    expect(arg.nodes).toHaveLength(2);
+  });
+
+  it("returns false when the deserializer throws", async () => {
+    const { url } = await buildShareUrl(samplePipeline);
+    window.location.hash = url.slice(url.indexOf("#") + 1);
+
+    const deserialize = vi.fn(() => {
+      throw new Error("bad pipeline");
+    });
+    const restored = await restorePipelineFromHash(deserialize);
+    expect(restored).toBe(false);
+    expect(deserialize).toHaveBeenCalledTimes(1);
   });
 });
