@@ -1,7 +1,7 @@
 {
   "name": "vscode-megane",
   "displayName": "megane - Molecular Viewer",
-  "description": "View molecular structure files (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE traj, XTC, LAMMPS dump) with megane",
+  "description": "View molecular structure files (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE traj, XTC, LAMMPS dump, AMBER NetCDF) with megane",
   "version": "0.7.0",
   "publisher": "hodakamori",
   "license": "MIT",
@@ -61,6 +61,9 @@
           },
           {
             "filenamePattern": "*.dump"
+          },
+          {
+            "filenamePattern": "*.nc"
           }
         ],
         "priority": "default"
