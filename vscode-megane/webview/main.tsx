@@ -18,7 +18,9 @@ import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
 import type { SerializedPipeline } from "../../src/pipeline/types";
+import type { MeganeCameraState } from "../../src/renderer/MoleculeRenderer";
 import { useTour } from "../../src/tour/useTour";
+import { useThemeStore } from "../../src/stores/useThemeStore";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -30,11 +32,43 @@ function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
   (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ = URL.createObjectURL(wasmBlob);
 }
 
+function ThemeSync() {
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const syncSystem = useThemeStore((s) => s._syncSystemTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", syncSystem);
+    return () => mq.removeEventListener("change", syncSystem);
+  }, [syncSystem]);
+
+  return null;
+}
+
+interface VsCodeState {
+  camera?: MeganeCameraState;
+}
+
 function App() {
   const local = useMeganeLocal();
   useTour({ host: "vscode" });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Per-document camera persistence using VS Code's webview state API.
+  const [initialCameraState] = useState<MeganeCameraState | null>(() => {
+    const saved = vscode.getState() as VsCodeState | undefined;
+    return saved?.camera ?? null;
+  });
+
+  const handleCameraStateChange = useCallback((state: MeganeCameraState) => {
+    const current = (vscode.getState() as VsCodeState | undefined) ?? {};
+    vscode.setState({ ...current, camera: state });
+  }, []);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -47,7 +81,10 @@ function App() {
         const file = new File([bytes], filename);
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
-          lower.endsWith(".xtc") || lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
+          lower.endsWith(".xtc") ||
+          lower.endsWith(".lammpstrj") ||
+          lower.endsWith(".dump") ||
+          lower.endsWith(".nc");
         // Trajectory-only formats (XTC, LAMMPS dump) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by
@@ -141,47 +178,55 @@ function App() {
 
   if (error) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-          color: "#ef4444",
-          fontSize: "14px",
-          padding: "20px",
-          textAlign: "center",
-          gap: "8px",
-        }}
-      >
-        <div style={{ fontWeight: "bold" }}>Error</div>
-        <div style={{ color: "#64748b", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
-      </div>
+      <>
+        <ThemeSync />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            color: "#ef4444",
+            fontSize: "14px",
+            padding: "20px",
+            textAlign: "center",
+            gap: "8px",
+          }}
+        >
+          <div style={{ fontWeight: "bold" }}>Error</div>
+          <div style={{ color: "var(--megane-text-secondary)", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
+        </div>
+      </>
     );
   }
 
   if (!loaded) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-          color: "#64748b",
-          fontSize: "14px",
-        }}
-      >
-        Loading structure...
-      </div>
+      <>
+        <ThemeSync />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            color: "var(--megane-text-secondary)",
+            fontSize: "14px",
+          }}
+        >
+          Loading structure...
+        </div>
+      </>
     );
   }
 
   return (
-    <MeganeViewer
+    <>
+      <ThemeSync />
+      <MeganeViewer
       testContext="vscode"
       onUploadStructure={handleUploadStructure}
       onBondSourceChange={(s) =>
@@ -192,7 +237,10 @@ function App() {
       onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
       onLoadVectorFile={(f) => local.loadVectorFile(f)}
       onLoadDemoVectors={() => local.loadDemoVectors()}
+      initialCameraState={initialCameraState}
+      onCameraStateChange={handleCameraStateChange}
     />
+    </>
   );
 }
 

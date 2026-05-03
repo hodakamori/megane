@@ -67,8 +67,14 @@ class MolecularViewer(anywidget.AnyWidget):
     # Measurement result (JS → Python)
     _measurement_json = traitlets.Unicode("").tag(sync=True)
 
-    # Pipeline
-    _pipeline_enabled = traitlets.Bool(False).tag(sync=True)
+    # Camera state (JS ↔ Python). Persisted by anywidget kernel-side storage.
+    # Schema: {"mode": "orthographic"|"perspective", "position": [x,y,z],
+    #           "target": [x,y,z], "zoom": float}
+    camera_state = traitlets.Dict({}).tag(sync=True)
+
+    # Pipeline data delivery (the visual pipeline editor is intentionally
+    # not surfaced in the widget — it lives in the standalone webapp,
+    # JupyterLab labextension and VSCode extension only).
     _pipeline_json = traitlets.Unicode("").tag(sync=True)
     _node_snapshots_data = traitlets.Dict(
         value_trait=traitlets.Bytes(),
@@ -78,20 +84,17 @@ class MolecularViewer(anywidget.AnyWidget):
     _structure = None
     _trajectory = None
 
-    def __init__(self, *args, pipeline: bool = False, **kwargs):
+    def __init__(self, *args, **kwargs):
         """Create a molecular viewer widget.
 
-        Args:
-            pipeline: When True, render the visual pipeline editor inside the
-                widget. Defaults to False (data must be supplied via
-                :meth:`load` or :meth:`set_pipeline`). Note that opting two
-                viewers in the same notebook into ``pipeline=True`` causes
-                them to share editor state.
+        Data is supplied via :meth:`load` (deprecated) or :meth:`set_pipeline`.
+        The visual pipeline editor is not available in the widget; use the
+        standalone web app, JupyterLab extension, or VSCode extension to
+        edit pipelines visually.
         """
         super().__init__(*args, **kwargs)
         self._event_handlers: dict[str, list[Callable]] = defaultdict(list)
         self._pipeline_ref: Pipeline | None = None
-        self._pipeline_enabled = bool(pipeline)
 
     def load(
         self,
@@ -302,7 +305,6 @@ class MolecularViewer(anywidget.AnyWidget):
                 or ``None`` to clear the pipeline.
         """
         if pipeline is None:
-            self._pipeline_enabled = False
             self._pipeline_json = ""
             self._node_snapshots_data = {}
             self._pipeline_ref = None
@@ -313,7 +315,6 @@ class MolecularViewer(anywidget.AnyWidget):
 
         # Send pipeline config JSON
         self._pipeline_json = json.dumps(pipeline.to_dict())
-        self._pipeline_enabled = True
 
         # Store trajectory refs for lazy loading
         self._pipeline_ref = pipeline

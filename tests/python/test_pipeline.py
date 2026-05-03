@@ -446,6 +446,20 @@ class TestPipelineDataLoading:
         assert s2._id in pipe._node_data
         assert s1._id != s2._id
 
+    def test_load_structure_mol2_populates_node_data(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "methanol.mol2")))
+        assert s._id in pipe._node_data
+        assert len(pipe._node_data[s._id]) > 0
+        assert pipe._node_data[s._id][:4] == b"MEGN"
+
+    def test_load_structure_cif_populates_node_data(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "nacl.cif")))
+        assert s._id in pipe._node_data
+        assert len(pipe._node_data[s._id]) > 0
+        assert pipe._node_data[s._id][:4] == b"MEGN"
+
     def test_unsupported_format_raises(self, tmp_path):
         # Create a dummy file with unsupported extension
         dummy = tmp_path / "test.unknown"
@@ -766,10 +780,6 @@ class TestViewWrapper:
         assert vp_cfg["perspective"] is True
         assert vp_cfg["cellAxesVisible"] is False
 
-    def test_pipeline_enabled(self):
-        viewer = view(str(FIXTURES / "1crn.pdb"))
-        assert viewer._pipeline_enabled is True
-
     def test_has_node_data(self):
         viewer = view(str(FIXTURES / "1crn.pdb"))
         pipe = viewer._pipeline_ref
@@ -949,7 +959,8 @@ class TestBuildPipeline:
         pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
         viewer = MolecularViewer()
         viewer.set_pipeline(pipe)
-        assert viewer._pipeline_enabled is True
+        assert viewer._pipeline_json != ""
+        assert len(viewer._node_snapshots_data) > 0
 
     def test_with_top_topology(self):
         pipe = build_pipeline(

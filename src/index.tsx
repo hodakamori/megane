@@ -15,6 +15,7 @@ import { MeganeViewer } from "./components/MeganeViewer";
 import { useDataSource } from "./hooks/useDataSource";
 import { usePipelineStore } from "./pipeline/store";
 import { usePlaybackStore } from "./stores/usePlaybackStore";
+import { restorePipelineFromHash } from "./pipeline/shareLink";
 import { useTour } from "./tour/useTour";
 import { parseXTCFile } from "./parsers/xtc";
 import { MemoryFrameProvider } from "./pipeline/types";
@@ -22,9 +23,28 @@ import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3_3x3x3.xyz?raw";
 import "./styles/megane.css";
+import { useThemeStore } from "./stores/useThemeStore";
 
 import type { DataMode } from "./types";
 export type { DataMode };
+
+/** Applies data-theme attribute to <html> and listens for OS preference changes. */
+function ThemeSync() {
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const syncSystem = useThemeStore((s) => s._syncSystemTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", syncSystem);
+    return () => mq.removeEventListener("change", syncSystem);
+  }, [syncSystem]);
+
+  return null;
+}
 
 function App() {
   const [mode] = useState<DataMode>("local");
@@ -38,11 +58,15 @@ function App() {
   const setFps = usePlaybackStore((s) => s.setFps);
   const seekFrame = usePlaybackStore((s) => s.seekFrame);
 
-  // Load bundled demo PDB + XTC on first mount
+  // Restore pipeline from URL hash (#pipeline=...) when present; otherwise
+  // load the bundled demo so first-time visitors see something immediately.
   useEffect(() => {
     (async () => {
+      const restored = await restorePipelineFromHash((p) =>
+        usePipelineStore.getState().deserialize(p),
+      );
+      if (restored) return;
       await ds.local.loadText(defaultPDB);
-      // Load demo trajectory
       const resp = await fetch(defaultXtcUrl);
       const blob = await resp.blob();
       const xtcFile = new File([blob], "caffeine_water_vibration.xtc");
@@ -147,6 +171,7 @@ function App() {
 
   return (
     <div style={{ width: "100%", height: "100%" }} onDragOver={handleDragOver} onDrop={handleDrop}>
+      <ThemeSync />
       <MeganeViewer
         playing={playing}
         fps={fps}

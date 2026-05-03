@@ -51,6 +51,18 @@ describe("useTour", () => {
     expect(useTourStore.getState().autoStartHandled).toBe(true);
   });
 
+  it("does not auto-start when __MEGANE_TEST__ is set", () => {
+    (globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__ = true;
+    try {
+      renderHook(() => useTour({ host: "webapp", autoStartDelayMs: 100 }));
+      vi.advanceTimersByTime(1000);
+      expect(mockStartTour).not.toHaveBeenCalled();
+      expect(useTourStore.getState().autoStartHandled).toBe(true);
+    } finally {
+      delete (globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__;
+    }
+  });
+
   it("does not auto-start when dontShowAgain is true", () => {
     useTourStore.setState({ dontShowAgain: true });
     renderHook(() => useTour({ host: "webapp", autoStartDelayMs: 100 }));

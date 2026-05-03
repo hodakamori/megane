@@ -9,6 +9,7 @@ import {
   type PipelineStoreSnapshot,
 } from "@megane/pipeline/storeSnapshot";
 import { useTour } from "@megane/tour/useTour";
+import { useThemeStore } from "@megane/stores/useThemeStore";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
@@ -17,7 +18,7 @@ const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
 );
 
-const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".lammpstrj", ".dump"]);
+const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".lammpstrj", ".dump", ".nc"]);
 
 /**
  * Subscription channel used by `DocBody` to re-load when the host
@@ -34,6 +35,23 @@ interface DocBodyProps {
 }
 
 type LoadState = "loading" | "ready" | { error: string };
+
+function ThemeSync() {
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const syncSystem = useThemeStore((s) => s._syncSystemTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", syncSystem);
+    return () => mq.removeEventListener("change", syncSystem);
+  }, [syncSystem]);
+
+  return null;
+}
 
 function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
   const local = useMeganeLocal();
@@ -169,6 +187,7 @@ function DocBody({ context, subscribeActivation }: DocBodyProps): JSX.Element {
       data-state="ready"
       style={{ width: "100%", height: "100%" }}
     >
+      <ThemeSync />
       <MeganeViewer
         testContext="jupyterlab-doc"
         onUploadStructure={handleUploadStructure}

@@ -19,11 +19,13 @@ import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
+import { useViewStateStore } from "../stores/useViewStateStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
 import type { HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
+import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
 interface MeganeViewerProps {
   playing?: boolean;
@@ -50,6 +52,18 @@ interface MeganeViewerProps {
   height?: string | number;
   /** Host context tag for E2E tests: "webapp" | "jupyterlab-doc" | "vscode". Defaults to "webapp". */
   testContext?: string;
+  /**
+   * Override the initial camera state to restore on first snapshot load.
+   * When provided, takes precedence over localStorage. Used by hosts (VSCode,
+   * JupyterLab) that manage their own persistent storage.
+   */
+  initialCameraState?: import("../renderer/MoleculeRenderer").MeganeCameraState | null;
+  /**
+   * Called whenever the camera state changes (after user interaction ends).
+   * Allows hosts to persist camera state in their own storage backends.
+   * When omitted, the built-in localStorage store is used.
+   */
+  onCameraStateChange?: (state: import("../renderer/MoleculeRenderer").MeganeCameraState) => void;
 }
 
 export function MeganeViewer({
@@ -70,6 +84,8 @@ export function MeganeViewer({
   width = "100%",
   height = "100%",
   testContext = "webapp",
+  initialCameraState,
+  onCameraStateChange,
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
@@ -79,6 +95,7 @@ export function MeganeViewer({
   const pipelineCollapsedRef = useRef(isNarrow);
   const pipelineWidthRef = useRef(480);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
+  const hasRestoredCameraRef = useRef(false);
 
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
@@ -112,7 +129,8 @@ export function MeganeViewer({
 
   // When the snapshot identity changes, the Viewport's child loadSnapshot
   // effect resets per-atom overrides, so we re-apply the pipeline viewport
-  // state immediately afterwards.
+  // state immediately afterwards. Viewport's effect (child) runs before this
+  // parent effect, so fitToView has already been called by the time we run.
   useEffect(() => {
     setBondCount(snapshot?.nBonds ?? 0);
     const renderer = rendererRef.current;
@@ -126,8 +144,22 @@ export function MeganeViewer({
         state.atomLabels,
       );
       prevViewportStateRef.current = state.viewportState;
+
+      // On first snapshot load after mount, restore persisted camera state
+      // (overrides fitToView). Hosts supply initialCameraState for their own
+      // storage; otherwise falls back to the localStorage-backed store.
+      if (snapshot && !hasRestoredCameraRef.current) {
+        hasRestoredCameraRef.current = true;
+        const saved =
+          initialCameraState !== undefined
+            ? initialCameraState
+            : useViewStateStore.getState().camera;
+        if (saved) {
+          renderer.applyCameraState(saved);
+        }
+      }
     }
-  }, [snapshot]);
+  }, [snapshot, initialCameraState]);
 
   // Apply viewportState changes to the renderer + drive playback / bond-count
   // updates without triggering a React re-render of MeganeViewer. Subscribing
@@ -253,8 +285,19 @@ export function MeganeViewer({
     }
   }, [currentFrame]);
 
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+
+  // Update Three.js background color when theme changes
+  useEffect(() => {
+    rendererRef.current?.setBackgroundColor(themeToHex(resolvedTheme));
+  }, [resolvedTheme]);
+
+  const onCameraStateChangeRef = useRef(onCameraStateChange);
+  onCameraStateChangeRef.current = onCameraStateChange;
+
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
+    renderer.setBackgroundColor(themeToHex(useThemeStore.getState().resolvedTheme));
     renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
     const storeState = usePipelineStore.getState();
     applyViewportState(
@@ -265,6 +308,17 @@ export function MeganeViewer({
       storeState.atomLabels,
     );
     prevViewportStateRef.current = storeState.viewportState;
+
+    // Register camera change callback for persistence
+    renderer.setCameraChangeCallback(() => {
+      const state = renderer.getCameraState();
+      if (!state) return;
+      if (onCameraStateChangeRef.current) {
+        onCameraStateChangeRef.current(state);
+      } else {
+        useViewStateStore.getState().updateCamera(state);
+      }
+    });
   }, []);
 
   const handleTogglePipeline = useCallback(() => {
@@ -298,6 +352,13 @@ export function MeganeViewer({
     rendererRef.current?.setViewInsets(0, pipelineCollapsed ? 0 : pipelineWidthRef.current + 12);
     updateTourAnchor();
   }, [pipelineCollapsed, updateTourAnchor]);
+
+  const handleResetView = useCallback(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.resetCamera();
+    useViewStateStore.getState().clearViewState();
+  }, []);
 
   return (
     <div
@@ -333,6 +394,29 @@ export function MeganeViewer({
           opacity: 0,
         }}
       />
+      <button
+        data-testid="reset-view-btn"
+        title="Reset view (fit to structure)"
+        onClick={handleResetView}
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          padding: "4px 8px",
+          fontSize: 11,
+          lineHeight: 1,
+          background: "rgba(255,255,255,0.85)",
+          border: "1px solid rgba(0,0,0,0.15)",
+          borderRadius: 4,
+          cursor: "pointer",
+          color: "#374151",
+          backdropFilter: "blur(4px)",
+          zIndex: 10,
+          userSelect: "none",
+        }}
+      >
+        Reset View
+      </button>
       <PipelineEditor
         collapsed={pipelineCollapsed}
         onToggleCollapse={handleTogglePipeline}

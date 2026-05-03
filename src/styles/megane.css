@@ -1,5 +1,32 @@
 /* megane - Molecular viewer styles */
 
+/* ── Theme tokens ─────────────────────────────────────────────────────── */
+:root {
+  --megane-bg: #ffffff;
+  --megane-surface: rgba(255, 255, 255, 0.92);
+  --megane-surface-solid: #f8f9fb;
+  --megane-text: #1e293b;
+  --megane-text-muted: #94a3b8;
+  --megane-text-secondary: #64748b;
+  --megane-border: rgba(226, 232, 240, 0.6);
+  --megane-border-solid: #e2e8f0;
+  --megane-primary: #3b82f6;
+  --megane-shadow: rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme="dark"] {
+  --megane-bg: #0f172a;
+  --megane-surface: rgba(15, 23, 42, 0.92);
+  --megane-surface-solid: #1e293b;
+  --megane-text: #e2e8f0;
+  --megane-text-muted: #475569;
+  --megane-text-secondary: #94a3b8;
+  --megane-border: rgba(51, 65, 85, 0.6);
+  --megane-border-solid: #334155;
+  --megane-primary: #60a5fa;
+  --megane-shadow: rgba(0, 0, 0, 0.3);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -19,8 +46,8 @@ body,
     -apple-system,
     "Segoe UI",
     sans-serif;
-  background: #ffffff;
-  color: #1e293b;
+  background: var(--megane-bg);
+  color: var(--megane-text);
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -33,10 +60,11 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(248, 249, 251, 0.9);
+  background: var(--megane-surface-solid);
+  opacity: 0.9;
   z-index: 20;
   font-size: 14px;
-  color: #94a3b8;
+  color: var(--megane-text-muted);
 }
 
 /* Connection status */

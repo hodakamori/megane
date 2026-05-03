@@ -10,7 +10,9 @@
 3. **Always build WASM before running the dev server or full build.** The WASM pkg directory (`crates/megane-wasm/pkg/`) does not exist until `npm run build:wasm` is run.
 4. **Always create a PR after pushing changes.** Use `gh pr create` to open a pull request. PR titles and descriptions must be in English. See the `github-cli` skill for remote URL workaround. Before reporting completion, verify CI passes with `gh run list`.
 5. **In plan mode, strictly follow the approved plan.** Do not skip steps, reorder them, or add unplanned work. If the plan needs changes, explain the reason and get approval before deviating.
-6. **All file formats should behave consistently across hosts.** When you add a parser or feature to one platform (standalone webapp, Jupyter widget, JupyterLab labextension, VSCode extension), register it on every host unless there is a host-specific reason not to. The single source of truth is `docs/docs/platform-support.md`; update its tables in the same PR. Host registration points: `crates/megane-wasm/src/lib.rs` (browser parsers), `src/components/nodes/LoadStructureNode.tsx` / `LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts`, `vscode-megane/package.json` `customEditors`.
+6. **All file formats should behave consistently across hosts.** When you add a parser or feature to one platform (standalone webapp, Jupyter widget, JupyterLab labextension, VSCode extension), register it on every host unless there is a host-specific reason not to. The single source of truth is `docs/docs/platform-support.md`; update its tables in the same PR. Host registration points: `crates/megane-wasm/src/lib.rs` (browser parsers), `src/components/nodes/LoadStructureNode.tsx` / `LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts`, `vscode-megane/package.json` `customEditors`. Walk the full checklist in the `add-format` skill — drift between hosts is the #1 source of "format X works in the webapp but not in VSCode/JupyterLab" bugs.
+7. **The Jupyter widget (anywidget `MolecularViewer`) does not mount the visual pipeline editor.** Pipeline data still flows in via `MolecularViewer.set_pipeline()` (`_pipeline_json` + `_node_snapshots_data`), but the in-cell `PipelineEditor` UI is intentionally not rendered — the host cell chrome cannot reliably lay it out. Do not re-introduce a `pipeline=True` opt-in or a `_pipeline_enabled` traitlet. Visual editing lives in the standalone webapp, JupyterLab labextension, and VSCode extension only.
+8. **Codecov is a hard merge gate — write tests for every new line you add.** The `test-rust`, `test-ts`, and `test-python` jobs in `.github/workflows/ci.yml` upload coverage to Codecov with `fail_ci_on_error: true`, and `codecov.yml` requires **patch coverage ≥ 70 %** on every PR (project coverage is off, only the diff is gated). New parsers, pipeline nodes, React components, Python API, and Rust modules MUST ship with unit tests in the same PR — relying on E2E does not count because E2E is local-only and unmeasured. Reproduce the gate locally before pushing: `npm test -- --coverage` (TS → `coverage/ts/lcov.info`), `cargo llvm-cov --package megane-core --lcov --output-path lcov.info` (Rust), `python -m pytest --cov-report=xml:coverage.xml` (Python). The `make coverage-all` target (or `make coverage-ts` / `coverage` / `coverage-rust`) wraps these. If you genuinely cannot cover a line (e.g. unreachable defensive branch) document why in the PR description rather than disabling the check. See the `testing` skill for details.
 
 ## Dev Environment Setup
 
@@ -55,8 +57,12 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 | Command | What it does |
 |---|---|
 | `npm test` | TypeScript unit tests (vitest) |
+| `npm test -- --coverage` | vitest with V8 coverage → `coverage/ts/lcov.info` (matches Codecov upload) |
 | `cargo test -p megane-core` | Rust parser tests |
-| `python -m pytest` | Python tests (needs maturin develop first) |
+| `cargo llvm-cov --package megane-core --lcov --output-path lcov.info` | Rust coverage in the exact form CI uploads |
+| `python -m pytest` | Python tests (needs maturin develop first); pytest config already enables `--cov` |
+| `python -m pytest --cov-report=xml:coverage.xml` | Python coverage in the exact form CI uploads |
+| `make coverage-all` | Run all three coverage targets locally before pushing |
 | `npm run test:all` | vitest + full Playwright suite |
 | `make test-all` | Python + TypeScript + Rust + active Playwright projects + notebooks + integration |
 
@@ -72,6 +78,8 @@ E2E is **local-only by policy** — CI does not run any E2E project (port-bind r
 | Single-feature projects | `:format-loading`, `:playback`, `:sidebar`, `:widget-api`, `:widget-examples`, `:pipeline-editor`, `:pipeline-file`, `:render-modal`, `:phase2` | Webapp host unless the project name encodes another |
 | Legacy mjs runner | `:vscode:legacy`, `:vscode:legacy:update` | `tests/e2e/vscode_full_screen.test.mjs` |
 | Re-baseline flag | `MEGANE_E2E_UPDATE=1 npm run test:e2e:<project>` | Unlinks the existing baseline before capture |
+
+When invoking Playwright directly (`npx playwright test ...`), prefix with `PATH="$(pwd)/.venv/bin:$PATH"` so the `jupyterlab-doc` / `widget-jupyterlab` projects can spawn the venv `jupyter`. `uv run make test-all` already does this implicitly. Re-baseline only when the failure is a pixel diff; treat timeouts and runtime errors as real regressions and fix the root cause instead.
 
 ### Lint / Format / Preview
 
@@ -99,8 +107,9 @@ A SessionStart hook (`.claude/hooks/session-start.sh`) injects a reminder pointi
 | `preview` | Screenshot/video capture for visual review |
 | `pre-release` | Pre-release checklist (tests, version bump, dry-run, tag) |
 | `post-release` | Post-release verification (publish workflows, package availability, docs) |
+| `add-format` | Per-host registration checklist for new file formats (enforces CRITICAL RULE #6) |
 
-Total: 9 skills.
+Total: 10 skills.
 
 ## Architecture
 

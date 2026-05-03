@@ -110,6 +110,27 @@ describe("LoadTrajectoryNode", () => {
     expect(handler).toHaveBeenCalledWith(file);
   });
 
+  it("file input change with .dcd is accepted", () => {
+    const updateNodeParams = vi.fn();
+    const handler = vi.fn();
+    const seeded = seedPipelineStore("load_trajectory", { id: "lt1" });
+    usePipelineStore.setState({ updateNodeParams });
+    setTrajectoryLoadHandler(handler);
+
+    render(
+      <LoadTrajectoryNode {...nodeProps("lt1", seeded.data.params as LoadTrajectoryParams)} />,
+    );
+
+    const file = new File(["dummy"], "trajectory.dcd", { type: "application/octet-stream" });
+    const input = screen
+      .getByText("Load trajectory...")
+      .parentElement!.querySelector('input[type="file"]') as HTMLInputElement;
+    fireFileInputChange(input, [file]);
+
+    expect(updateNodeParams).toHaveBeenCalledWith("lt1", { fileName: "trajectory.dcd" });
+    expect(handler).toHaveBeenCalledWith(file);
+  });
+
   it("file input change with an unsupported extension is a no-op", () => {
     const updateNodeParams = vi.fn();
     const handler = vi.fn();

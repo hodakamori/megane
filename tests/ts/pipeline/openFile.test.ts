@@ -9,16 +9,25 @@ vi.mock("@/parsers/structure", () => ({
 vi.mock("@/parsers/xtc", () => ({
   parseXTCFile: vi.fn(),
   parseLammpstrjFile: vi.fn(),
+  parseDCDFile: vi.fn(),
+  parseNetCDFFile: vi.fn(),
 }));
 
 import { parseStructureFile } from "@/parsers/structure";
-import { parseXTCFile, parseLammpstrjFile } from "@/parsers/xtc";
+import {
+  parseXTCFile,
+  parseLammpstrjFile,
+  parseDCDFile,
+  parseNetCDFFile,
+} from "@/parsers/xtc";
 import { usePipelineStore } from "@/pipeline/store";
 import type { Snapshot, Frame, TrajectoryMeta } from "@/types";
 
 const mockParseStructureFile = vi.mocked(parseStructureFile);
 const mockParseXTCFile = vi.mocked(parseXTCFile);
 const mockParseLammpstrjFile = vi.mocked(parseLammpstrjFile);
+const mockParseDCDFile = vi.mocked(parseDCDFile);
+const mockParseNetCDFFile = vi.mocked(parseNetCDFFile);
 
 function makeSnapshot(nAtoms = 3, withBox = false): Snapshot {
   return {
@@ -54,6 +63,8 @@ beforeEach(() => {
   mockParseStructureFile.mockReset();
   mockParseXTCFile.mockReset();
   mockParseLammpstrjFile.mockReset();
+  mockParseDCDFile.mockReset();
+  mockParseNetCDFFile.mockReset();
 });
 
 describe("usePipelineStore.openFile — single structure file", () => {
@@ -270,6 +281,65 @@ describe("usePipelineStore.openFile — trajectory files", () => {
 
     expect(mockParseLammpstrjFile).toHaveBeenCalled();
     expect(mockParseXTCFile).not.toHaveBeenCalled();
+  });
+
+  it("uses the DCD parser for .dcd", async () => {
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(3),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<pdb>"], "water.pdb"), {
+      mode: "replace",
+    });
+
+    mockParseDCDFile.mockResolvedValueOnce({
+      frames: [makeFrame(1, 3), makeFrame(2, 3)],
+      meta: makeMeta(2, 3),
+      vectorChannels: null,
+    });
+
+    const dcd = new File([new Uint8Array([0x54, 0x00, 0x00, 0x00])], "trajectory.dcd");
+    await usePipelineStore.getState().openFile(dcd);
+
+    expect(mockParseDCDFile).toHaveBeenCalled();
+    expect(mockParseXTCFile).not.toHaveBeenCalled();
+    expect(mockParseLammpstrjFile).not.toHaveBeenCalled();
+    expect(mockParseNetCDFFile).not.toHaveBeenCalled();
+
+    const state = usePipelineStore.getState();
+    const traj = state.nodes.find((n) => n.type === "load_trajectory")!;
+    expect((traj.data.params as { fileName: string }).fileName).toBe("trajectory.dcd");
+    expect(state.fileFrames?.length).toBe(2);
+  });
+
+  it("uses the NetCDF parser for .nc", async () => {
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(3),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<pdb>"], "water.pdb"), {
+      mode: "replace",
+    });
+
+    mockParseNetCDFFile.mockResolvedValueOnce({
+      frames: [makeFrame(1, 3)],
+      meta: makeMeta(1, 3),
+      vectorChannels: null,
+    });
+
+    const nc = new File([new Uint8Array([0x43, 0x44, 0x46, 0x01])], "trajectory.nc");
+    await usePipelineStore.getState().openFile(nc);
+
+    expect(mockParseNetCDFFile).toHaveBeenCalled();
+    expect(mockParseDCDFile).not.toHaveBeenCalled();
+    expect(mockParseXTCFile).not.toHaveBeenCalled();
+    expect(mockParseLammpstrjFile).not.toHaveBeenCalled();
   });
 });
 

@@ -11,6 +11,7 @@ import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { WidgetViewer } from "./components/WidgetViewer";
 import { perfMark, perfMeasure } from "./perf";
+import { useThemeStore } from "./stores/useThemeStore";
 import {
   decodeSnapshot,
   decodeFrame,
@@ -19,6 +20,7 @@ import {
   MSG_FRAME,
 } from "./protocol/protocol";
 import type { Snapshot, Frame, Measurement } from "./types";
+import type { MeganeCameraState } from "./renderer/MoleculeRenderer";
 
 interface AnyWidgetModel {
   get(key: string): unknown;
@@ -34,10 +36,19 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   container.style.width = "100%";
   container.style.height = "500px";
   container.style.position = "relative";
-  container.style.background = "#ffffff";
+  container.style.background = "var(--megane-bg, #ffffff)";
   container.style.borderRadius = "8px";
   container.style.overflow = "hidden";
   el.appendChild(container);
+
+  // Apply initial theme to document root (system preference detection)
+  const { resolvedTheme, _syncSystemTheme } = useThemeStore.getState();
+  document.documentElement.setAttribute("data-theme", resolvedTheme);
+  const mq =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-color-scheme: dark)")
+      : null;
+  mq?.addEventListener("change", _syncSystemTheme);
 
   let root: Root | null = null;
   let currentSnapshot: Snapshot | null = null;
@@ -92,6 +103,25 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     model.save_changes();
   }
 
+  function handleCameraStateChange(state: MeganeCameraState) {
+    model.set("camera_state", state);
+    model.save_changes();
+  }
+
+  function getInitialCameraState(): MeganeCameraState | null {
+    const saved = model.get("camera_state") as Record<string, unknown> | null;
+    if (
+      saved &&
+      typeof saved.mode === "string" &&
+      Array.isArray(saved.position) &&
+      Array.isArray(saved.target) &&
+      typeof saved.zoom === "number"
+    ) {
+      return saved as unknown as MeganeCameraState;
+    }
+    return null;
+  }
+
   function renderApp() {
     if (!root || disposed) return;
     const frameIndex = (model.get("frame_index") as number) || 0;
@@ -99,7 +129,6 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
     const pipelineJson = (model.get("_pipeline_json") as string) || "";
     const nodeSnapshotsData = (model.get("_node_snapshots_data") as Record<string, DataView>) || {};
-    const pipelineEnabled = (model.get("_pipeline_enabled") as boolean) || false;
 
     root.render(
       createElement(WidgetViewer, {
@@ -113,7 +142,8 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         pipelineJson: pipelineJson,
         nodeSnapshotsData: nodeSnapshotsData,
         onPipelineChange: handlePipelineChange,
-        pipelineEnabled: pipelineEnabled,
+        initialCameraState: getInitialCameraState(),
+        onCameraStateChange: handleCameraStateChange,
       }),
     );
   }
@@ -170,14 +200,11 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     renderApp();
   });
 
-  model.on("change:_pipeline_enabled", () => {
-    renderApp();
-  });
-
   // Cleanup
   return () => {
     disposed = true;
     ro.disconnect();
+    mq?.removeEventListener("change", _syncSystemTheme);
     root?.unmount();
     root = null;
   };

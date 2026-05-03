@@ -5,6 +5,7 @@ import {
 } from "@jupyterlab/application";
 import { WidgetTracker } from "@jupyterlab/apputils";
 import type { IDocumentWidget } from "@jupyterlab/docregistry";
+import { exposeAppForTests } from "./testHook";
 import { MeganeDocFactory, MeganePipelineDocFactory } from "./factory";
 import type { MeganeReactView } from "./MeganeDocWidget";
 import type { MeganePipelineReactView } from "./MeganePipelineDocWidget";
@@ -27,10 +28,12 @@ const PIPELINE_TRACKER_NAMESPACE = "megane-pipeline";
 const plugin: JupyterFrontEndPlugin<void> = {
   id: PLUGIN_ID,
   description:
-    "Open molecular structure files (PDB, GRO, XYZ, MOL, SDF, CIF, LAMMPS data, ASE traj) and trajectories (XTC, LAMMPS dump) and megane pipelines",
+    "Open molecular structure files (PDB, GRO, XYZ, MOL, SDF, CIF, LAMMPS data, ASE traj) and trajectories (XTC, DCD, LAMMPS dump) and megane pipelines",
   autoStart: true,
   requires: [ILayoutRestorer],
   activate: (app: JupyterFrontEnd, restorer: ILayoutRestorer) => {
+    exposeAppForTests(app);
+
     for (const ft of [...STRUCTURE_FILETYPES_TEXT, ...STRUCTURE_FILETYPES_BINARY]) {
       app.docRegistry.addFileType(ft);
     }
