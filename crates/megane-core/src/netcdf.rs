@@ -179,7 +179,13 @@ fn parse_var_list(r: &mut Reader) -> Result<Vec<VarDesc>, String> {
         let nc_type = r.read_u32()?;
         let vsize = r.read_u32()?;
         let begin = r.read_begin()?;
-        vars.push(VarDesc { name, dimids, nc_type, vsize, begin });
+        vars.push(VarDesc {
+            name,
+            dimids,
+            nc_type,
+            vsize,
+            begin,
+        });
     }
     Ok(vars)
 }
@@ -214,10 +220,7 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
     let vars = parse_var_list(&mut r)?;
 
     // unlimited dimension id (the "frame" dimension)
-    let unlimited_id: Option<u32> = dims
-        .iter()
-        .position(|(_, sz)| *sz == 0)
-        .map(|i| i as u32);
+    let unlimited_id: Option<u32> = dims.iter().position(|(_, sz)| *sz == 0).map(|i| i as u32);
 
     // required "atom" dimension
     let n_atoms = dims
@@ -290,7 +293,9 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
             .checked_add(i.checked_mul(recsize).ok_or("frame offset overflow")?)
             .ok_or("frame offset overflow")?;
         if base + expected_vsize > data.len() {
-            return Err(format!("frame {i} coordinates out of bounds (offset {base})"));
+            return Err(format!(
+                "frame {i} coordinates out of bounds (offset {base})"
+            ));
         }
         let mut positions = Vec::with_capacity(n_coords);
         for j in 0..n_coords {
@@ -424,13 +429,7 @@ mod tests {
 
         // We'll fill begin placeholders after computing header size.
         // Build the var section with placeholder begins (we will fix after).
-        fn build_var(
-            name: &str,
-            dimids: &[u32],
-            nc_type: u32,
-            vsize: u32,
-            begin: u32,
-        ) -> Vec<u8> {
+        fn build_var(name: &str, dimids: &[u32], nc_type: u32, vsize: u32, begin: u32) -> Vec<u8> {
             fn u32be(v: u32) -> [u8; 4] {
                 v.to_be_bytes()
             }
@@ -463,7 +462,13 @@ mod tests {
         var_bytes.extend_from_slice(&u32be(TAG_VAR));
         var_bytes.extend_from_slice(&u32be(n_vars));
         // coordinates(frame=0, atom=1, spatial=2)
-        var_bytes.extend(build_var("coordinates", &[0, 1, 2], NC_FLOAT, coord_vsize, 0));
+        var_bytes.extend(build_var(
+            "coordinates",
+            &[0, 1, 2],
+            NC_FLOAT,
+            coord_vsize,
+            0,
+        ));
         // time(frame=0)
         var_bytes.extend(build_var("time", &[0], NC_FLOAT, time_vsize, 0));
         if has_cell {

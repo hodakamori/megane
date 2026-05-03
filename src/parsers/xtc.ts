@@ -121,10 +121,7 @@ export async function parseLammpstrjFile(
  * Parse an AMBER NetCDF trajectory file (.nc).
  * Returns Frame[] (all frames) and TrajectoryMeta.
  */
-export async function parseNetCDFFile(
-  file: File,
-  expectedNAtoms: number,
-): Promise<XTCParseResult> {
+export async function parseNetCDFFile(file: File, expectedNAtoms: number): Promise<XTCParseResult> {
   await ensureInit();
 
   const buffer = await file.arrayBuffer();
