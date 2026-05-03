@@ -26,6 +26,7 @@ function makeRendererStub() {
     setPerspective: vi.fn(),
     setCellAxesVisible: vi.fn(),
     setPivotMarkerVisible: vi.fn(),
+    setRepresentationType: vi.fn(),
     setLabels: vi.fn(),
     loadPolyhedra: vi.fn(),
     clearPolyhedra: vi.fn(),

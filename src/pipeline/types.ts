@@ -340,11 +340,16 @@ export interface AddBondParams {
   bondFileData?: Uint32Array | null;
 }
 
+/** Visual representation mode selectable in the Viewport node. */
+export type RepresentationMode = "atoms" | "cartoon" | "both";
+
 export interface ViewportParams {
   type: "viewport";
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
+  /** Visual representation: "atoms" (default), "cartoon", or "both". */
+  representationMode: RepresentationMode;
 }
 
 export interface FilterParams {
@@ -434,6 +439,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         perspective: false,
         cellAxesVisible: true,
         pivotMarkerVisible: true,
+        representationMode: "atoms" as RepresentationMode,
       };
     case "filter":
       return { type, query: "", bond_query: "" };
@@ -520,6 +526,7 @@ export interface ViewportState {
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
+  representationMode: RepresentationMode;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -533,6 +540,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   perspective: false,
   cellAxesVisible: true,
   pivotMarkerVisible: true,
+  representationMode: "atoms",
 };
 
 // ─── Node Errors ──────────────────────────────────────────────────────

@@ -413,6 +413,10 @@ pub fn parse_traj(data: &[u8]) -> Result<ParsedStructure, String> {
         chain_ids: None,
         bfactors: None,
         vector_channels: vec![],
+        ca_indices: vec![],
+        ca_chain_ids: vec![],
+        ca_res_nums: vec![],
+        ca_ss_type: vec![],
     })
 }
 
