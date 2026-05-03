@@ -13,6 +13,7 @@ sidebar_position: 1
 - **Stream XTC trajectories from the `megane serve` CLI** over WebSocket — scrub multi-GB files without loading every frame into memory (browser/Jupyter without the CLI load full trajectories)
 - **Build visual pipelines** with a drag-and-drop node editor, or write them as Python/TypeScript code
 - **Integrate with Plotly**, MDX/Next.js, ipywidgets, and any framework via the framework-agnostic renderer
+- **Light, dark, and auto themes** — cycle through Light / Dark / Auto (follows OS preference) via the Theme button in the Pipeline panel; persisted across sessions
 
 ## Choose your environment
 

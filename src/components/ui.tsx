@@ -7,7 +7,7 @@ import { useCallback, useRef } from "react";
 export const sectionLabelStyle: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
   marginBottom: 6,
@@ -15,13 +15,13 @@ export const sectionLabelStyle: React.CSSProperties = {
 
 export const smallBtnStyle: React.CSSProperties = {
   background: "none",
-  border: "1px solid #e2e8f0",
+  border: "1px solid var(--megane-border-solid)",
   borderRadius: 8,
   padding: "3px 17px",
   cursor: "pointer",
   fontSize: 19,
   fontWeight: 500,
-  color: "#64748b",
+  color: "var(--megane-text-secondary)",
   transition: "all 0.15s",
 };
 
@@ -29,25 +29,25 @@ export const activeBtnStyle: React.CSSProperties = {
   ...smallBtnStyle,
   background: "rgba(59, 130, 246, 0.08)",
   borderColor: "rgba(59, 130, 246, 0.25)",
-  color: "#3b82f6",
+  color: "var(--megane-primary)",
 };
 
 export const fileNameStyle: React.CSSProperties = {
   fontSize: 22,
   fontWeight: 600,
-  color: "#1e293b",
+  color: "var(--megane-text)",
   wordBreak: "break-all",
 };
 
 export const statsStyle: React.CSSProperties = {
   fontSize: 11,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   marginTop: 2,
 };
 
 export const placeholderStyle: React.CSSProperties = {
   fontSize: 12,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   fontStyle: "italic",
 };
 
@@ -145,7 +145,7 @@ export function TabSelector<T extends string>({
         display: "flex",
         borderRadius: 10,
         overflow: "hidden",
-        border: "1px solid #e2e8f0",
+        border: "1px solid var(--megane-border-solid)",
         marginBottom: 10,
       }}
     >
@@ -160,12 +160,17 @@ export function TabSelector<T extends string>({
               flex: 1,
               background: isActive ? "rgba(59,130,246,0.08)" : "none",
               border: "none",
-              borderRight: idx < options.length - 1 ? "1px solid #e2e8f0" : "none",
+              borderRight:
+                idx < options.length - 1 ? "1px solid var(--megane-border-solid)" : "none",
               padding: "7px 0",
               cursor: isActive || isDisabled ? "default" : "pointer",
               fontSize: 19,
               fontWeight: 500,
-              color: isDisabled ? "#cbd5e1" : isActive ? "#3b82f6" : "#94a3b8",
+              color: isDisabled
+                ? "var(--megane-text-muted)"
+                : isActive
+                  ? "var(--megane-primary)"
+                  : "var(--megane-text-muted)",
               transition: "all 0.15s",
             }}
             disabled={isDisabled}

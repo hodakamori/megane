@@ -1149,6 +1149,12 @@ export class MoleculeRenderer {
     };
   }
 
+  /** Update the Three.js scene and canvas background color (e.g. when theme changes). */
+  setBackgroundColor(hexColor: number): void {
+    if (this.renderer) this.renderer.setClearColor(hexColor, 1);
+    if (this.scene) this.scene.background = new THREE.Color(hexColor);
+  }
+
   /** Get a copy of current atom positions (public, for external use). */
   getCurrentPositionsCopy(): Float32Array | null {
     if (!this.snapshot) return null;

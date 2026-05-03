@@ -25,6 +25,7 @@ import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
 import type { HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
+import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
 interface MeganeViewerProps {
   playing?: boolean;
@@ -271,11 +272,19 @@ export function MeganeViewer({
     }
   }, [currentFrame]);
 
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+
+  // Update Three.js background color when theme changes
+  useEffect(() => {
+    rendererRef.current?.setBackgroundColor(themeToHex(resolvedTheme));
+  }, [resolvedTheme]);
+
   const onCameraStateChangeRef = useRef(onCameraStateChange);
   onCameraStateChangeRef.current = onCameraStateChange;
 
   const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
     rendererRef.current = renderer;
+    renderer.setBackgroundColor(themeToHex(useThemeStore.getState().resolvedTheme));
     renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
     applyViewportState(
       renderer,
