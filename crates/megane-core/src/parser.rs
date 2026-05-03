@@ -97,7 +97,11 @@ fn parse_atom_line(line: &str) -> Option<(i32, Atom)> {
     // Chain ID at column 21 (0-indexed)
     let chain_id = if line.len() > 21 {
         let ch = line.as_bytes()[21];
-        if ch.is_ascii_alphabetic() { ch - b'A' + 1 } else { 0 }
+        if ch.is_ascii_alphabetic() {
+            ch - b'A' + 1
+        } else {
+            0
+        }
     } else {
         0
     };
@@ -109,7 +113,17 @@ fn parse_atom_line(line: &str) -> Option<(i32, Atom)> {
         0.0
     };
 
-    Some((serial, Atom { x, y, z, element, chain_id, b_factor }))
+    Some((
+        serial,
+        Atom {
+            x,
+            y,
+            z,
+            element,
+            chain_id,
+            b_factor,
+        },
+    ))
 }
 
 /// Parse CRYST1 record and convert cell parameters to a 3x3 matrix.
