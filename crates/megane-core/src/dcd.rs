@@ -403,4 +403,247 @@ mod tests {
     fn test_empty_returns_error() {
         assert!(parse_dcd(&[]).is_err());
     }
+
+    // ── synthetic DCD builders for endian / variant / error-path coverage ────
+
+    /// Build a CHARMM 84-byte header content block.
+    fn build_header(le: bool, charmm_version: i32, has_cell: bool, n_set: i32) -> [u8; 84] {
+        let mut h = [0u8; 84];
+        h[0..4].copy_from_slice(b"CORD");
+        let i32_bytes = |v: i32| -> [u8; 4] {
+            if le {
+                v.to_le_bytes()
+            } else {
+                v.to_be_bytes()
+            }
+        };
+        let f32_bytes = |v: f32| -> [u8; 4] {
+            if le {
+                v.to_le_bytes()
+            } else {
+                v.to_be_bytes()
+            }
+        };
+        let f64_bytes = |v: f64| -> [u8; 8] {
+            if le {
+                v.to_le_bytes()
+            } else {
+                v.to_be_bytes()
+            }
+        };
+        h[4..8].copy_from_slice(&i32_bytes(n_set));
+        h[12..16].copy_from_slice(&i32_bytes(1)); // NSAVC
+        if charmm_version != 0 {
+            // CHARMM: float32 DELTA at 40, HAS_CELL at 44
+            h[40..44].copy_from_slice(&f32_bytes(0.5));
+            h[44..48].copy_from_slice(&i32_bytes(if has_cell { 1 } else { 0 }));
+        } else {
+            // X-PLOR: float64 DELTA at 40
+            h[40..48].copy_from_slice(&f64_bytes(0.5));
+        }
+        h[80..84].copy_from_slice(&i32_bytes(charmm_version));
+        h
+    }
+
+    /// Wrap a payload in a Fortran unformatted record (size + data + size).
+    fn write_record(out: &mut Vec<u8>, payload: &[u8], le: bool) {
+        let size = payload.len() as u32;
+        out.extend_from_slice(&if le {
+            size.to_le_bytes()
+        } else {
+            size.to_be_bytes()
+        });
+        out.extend_from_slice(payload);
+        out.extend_from_slice(&if le {
+            size.to_le_bytes()
+        } else {
+            size.to_be_bytes()
+        });
+    }
+
+    fn write_natom(out: &mut Vec<u8>, n_atoms: i32, le: bool) {
+        let bytes = if le {
+            n_atoms.to_le_bytes()
+        } else {
+            n_atoms.to_be_bytes()
+        };
+        write_record(out, &bytes, le);
+    }
+
+    fn write_coord(out: &mut Vec<u8>, coords: &[f32], le: bool) {
+        let mut buf = Vec::with_capacity(coords.len() * 4);
+        for c in coords {
+            buf.extend_from_slice(&if le { c.to_le_bytes() } else { c.to_be_bytes() });
+        }
+        write_record(out, &buf, le);
+    }
+
+    fn write_cell(out: &mut Vec<u8>, a: f64, b: f64, c: f64, le: bool) {
+        let mut buf = Vec::with_capacity(48);
+        for v in &[a, 90.0_f64, b, 90.0_f64, 90.0_f64, c] {
+            buf.extend_from_slice(&if le { v.to_le_bytes() } else { v.to_be_bytes() });
+        }
+        write_record(out, &buf, le);
+    }
+
+    /// Produce a single-frame DCD blob.
+    fn build_single_frame(le: bool, charmm_version: i32, has_cell: bool) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_record(&mut out, &build_header(le, charmm_version, has_cell, 1), le);
+        // Title block: title count + 80-byte string
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&if le {
+            1i32.to_le_bytes()
+        } else {
+            1i32.to_be_bytes()
+        });
+        write_record(&mut out, &title, le);
+        write_natom(&mut out, 2, le);
+        if has_cell {
+            write_cell(&mut out, 12.0, 13.0, 14.0, le);
+        }
+        write_coord(&mut out, &[0.0, 1.0], le); // X for 2 atoms
+        write_coord(&mut out, &[2.0, 3.0], le); // Y
+        write_coord(&mut out, &[4.0, 5.0], le); // Z
+        out
+    }
+
+    #[test]
+    fn test_parse_big_endian_charmm_with_cell() {
+        let blob = build_single_frame(false, 24, true);
+        let r = parse_dcd(&blob).expect("BE CHARMM with cell");
+        assert_eq!(r.n_atoms, 2);
+        assert_eq!(r.n_frames, 1);
+        let bx = r.box_matrix.expect("cell present");
+        assert!((bx[0] - 12.0).abs() < 1e-3);
+        assert!((bx[4] - 13.0).abs() < 1e-3);
+        assert!((bx[8] - 14.0).abs() < 1e-3);
+        // First atom should be (0, 2, 4) — interleaved [x0, y0, z0]
+        let f0 = &r.frame_positions[0];
+        assert!((f0[0] - 0.0).abs() < 1e-5);
+        assert!((f0[1] - 2.0).abs() < 1e-5);
+        assert!((f0[2] - 4.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_parse_charmm_without_cell() {
+        let blob = build_single_frame(true, 24, false);
+        let r = parse_dcd(&blob).expect("CHARMM no cell");
+        assert_eq!(r.n_atoms, 2);
+        assert_eq!(r.n_frames, 1);
+        assert!(r.box_matrix.is_none());
+    }
+
+    #[test]
+    fn test_parse_xplor_variant() {
+        // charmm_version == 0 → X-PLOR header (float64 DELTA, no HAS_CELL)
+        let blob = build_single_frame(true, 0, false);
+        let r = parse_dcd(&blob).expect("X-PLOR DCD");
+        assert_eq!(r.n_atoms, 2);
+        assert_eq!(r.n_frames, 1);
+        // delta=0.5 AKMA × NSAVC=1 ≈ 0.0102275 ps
+        assert!(r.timestep_ps > 0.0);
+    }
+
+    #[test]
+    fn test_parse_big_endian_xplor() {
+        let blob = build_single_frame(false, 0, false);
+        let r = parse_dcd(&blob).expect("BE X-PLOR");
+        assert_eq!(r.n_atoms, 2);
+        assert_eq!(r.n_frames, 1);
+    }
+
+    #[test]
+    fn test_header_size_not_84_returns_error() {
+        // Construct a Fortran record claiming size 80 (not 84) at offset 0.
+        let mut blob = Vec::new();
+        let payload = vec![0u8; 80];
+        // Force first u32 to be 84 so endianness detection passes — but the
+        // record must agree with that, so we deliberately build a malformed
+        // file where the first record claims 84 bytes but the data is short.
+        write_record(&mut blob, &payload, true);
+        // First 4 bytes are now 80 (LE), 80 (BE), neither matches 84 → bad magic.
+        assert!(parse_dcd(&blob).is_err());
+    }
+
+    #[test]
+    fn test_zero_natoms_returns_error() {
+        let mut out = Vec::new();
+        write_record(&mut out, &build_header(true, 24, false, 1), true);
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&1i32.to_le_bytes());
+        write_record(&mut out, &title, true);
+        write_natom(&mut out, 0, true);
+        let err = parse_dcd(&out).err().expect("expected error");
+        assert!(err.contains("zero atoms"), "got: {err}");
+    }
+
+    #[test]
+    fn test_natom_block_wrong_size_returns_error() {
+        let mut out = Vec::new();
+        write_record(&mut out, &build_header(true, 24, false, 1), true);
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&1i32.to_le_bytes());
+        write_record(&mut out, &title, true);
+        // NATOM record with 8 bytes instead of 4.
+        write_record(&mut out, &[0u8; 8], true);
+        let err = parse_dcd(&out).err().expect("expected error");
+        assert!(err.contains("NATOM"), "got: {err}");
+    }
+
+    #[test]
+    fn test_invalid_magic_letters_returns_error() {
+        // Header record with valid 84-byte size but magic != "CORD"/"VELD".
+        let mut hdr = build_header(true, 24, false, 1);
+        hdr[0..4].copy_from_slice(b"XXXX");
+        let mut out = Vec::new();
+        write_record(&mut out, &hdr, true);
+        // Pad past the 96-byte size guard so the magic check is actually reached.
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&1i32.to_le_bytes());
+        write_record(&mut out, &title, true);
+        let err = parse_dcd(&out).err().expect("expected error");
+        assert!(err.contains("magic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_x_record_wrong_size_first_frame_errors() {
+        // Build header + title + natom=2, then write only 4 bytes of X (instead of 8).
+        let mut out = Vec::new();
+        write_record(&mut out, &build_header(true, 24, false, 1), true);
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&1i32.to_le_bytes());
+        write_record(&mut out, &title, true);
+        write_natom(&mut out, 2, true);
+        // Wrong-sized X coord record.
+        write_record(&mut out, &[0u8; 4], true);
+        let err = parse_dcd(&out).err().expect("expected error");
+        assert!(err.contains("X-coord"), "got: {err}");
+    }
+
+    #[test]
+    fn test_nset_caps_frame_count() {
+        // Build a 1-frame body but request NSET=1 — exercises the early break.
+        let blob = build_single_frame(true, 24, true);
+        let r = parse_dcd(&blob).expect("nset cap");
+        assert_eq!(r.n_frames, 1);
+    }
+
+    #[test]
+    fn test_velocity_magic_accepted() {
+        let mut hdr = build_header(true, 24, false, 1);
+        hdr[0..4].copy_from_slice(b"VELD");
+        let mut out = Vec::new();
+        write_record(&mut out, &hdr, true);
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&1i32.to_le_bytes());
+        write_record(&mut out, &title, true);
+        write_natom(&mut out, 2, true);
+        write_coord(&mut out, &[0.0, 1.0], true);
+        write_coord(&mut out, &[2.0, 3.0], true);
+        write_coord(&mut out, &[4.0, 5.0], true);
+        let r = parse_dcd(&out).expect("VELD magic");
+        assert_eq!(r.n_atoms, 2);
+        assert_eq!(r.n_frames, 1);
+    }
 }
