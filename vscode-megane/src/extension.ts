@@ -128,6 +128,12 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
   }
 }
 
+export function createFrameStatusBarItem(): vscode.StatusBarItem {
+  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  item.tooltip = "Current trajectory frame";
+  return item;
+}
+
 class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
   private static readonly viewType = "megane.structureViewer";
 
@@ -184,10 +190,22 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
     }
 
+    const frameStatusBar = createFrameStatusBarItem();
+
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
         webview.postMessage(payload);
+        return;
       }
+      if (message.type === "frameChange") {
+        const frame = message.frame as number;
+        frameStatusBar.text = `$(megane-frame) Frame ${frame}`;
+        frameStatusBar.show();
+      }
+    });
+
+    webviewPanel.onDidDispose(() => {
+      frameStatusBar.dispose();
     });
 
     webview.html = getHtmlForWebview(webview, mediaDir);

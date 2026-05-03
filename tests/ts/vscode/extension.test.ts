@@ -39,14 +39,23 @@ interface FakeWebview {
   asWebviewUri: (uri: FakeUri) => string;
 }
 
+interface FakeStatusBarItem {
+  tooltip: string;
+  text: string;
+  show: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+}
+
 interface FakeWebviewPanel {
   webview: FakeWebview;
+  onDidDispose: ReturnType<typeof vi.fn>;
 }
 
 const { mockState } = vi.hoisted(() => ({
   mockState: {
     registered: [] as RegisteredProvider[],
     readFile: vi.fn<(uri: FakeUri) => Promise<Uint8Array>>(),
+    statusBarItems: [] as FakeStatusBarItem[],
   },
 }));
 
@@ -85,12 +94,27 @@ vi.mock("vscode", () => {
           return { dispose: vi.fn() };
         },
       ),
+      createStatusBarItem: vi.fn((_alignment: unknown, _priority: unknown) => {
+        const item: FakeStatusBarItem = {
+          tooltip: "",
+          text: "",
+          show: vi.fn(),
+          dispose: vi.fn(),
+        };
+        mockState.statusBarItems.push(item);
+        return item;
+      }),
     },
+    StatusBarAlignment: { Left: 1, Right: 2 },
   };
 });
 
 import * as vscode from "vscode";
-import { activate, deactivate } from "../../../vscode-megane/src/extension";
+import {
+  activate,
+  deactivate,
+  createFrameStatusBarItem,
+} from "../../../vscode-megane/src/extension";
 
 const VscodeUri = (vscode as unknown as { Uri: { file: (p: string) => FakeUri } }).Uri;
 
@@ -107,8 +131,10 @@ function makeContext(extensionPath = "/ext"): {
 function makeWebviewPanel(): {
   panel: FakeWebviewPanel;
   fireMessage: (msg: unknown) => void;
+  fireDispose: () => void;
 } {
   let onMessage: ((m: unknown) => void) | undefined;
+  let onDispose: (() => void) | undefined;
   const webview: FakeWebview = {
     options: undefined,
     html: "",
@@ -120,11 +146,22 @@ function makeWebviewPanel(): {
     postMessage: vi.fn(),
     asWebviewUri: (uri: FakeUri) => `webview:${uri.toString()}`,
   };
+  const panel: FakeWebviewPanel = {
+    webview,
+    onDidDispose: vi.fn((handler: () => void) => {
+      onDispose = handler;
+      return { dispose: vi.fn() };
+    }),
+  };
   return {
-    panel: { webview },
+    panel,
     fireMessage: (msg) => {
       if (!onMessage) throw new Error("onDidReceiveMessage not registered");
       onMessage(msg);
+    },
+    fireDispose: () => {
+      if (!onDispose) throw new Error("onDidDispose not registered");
+      onDispose();
     },
   };
 }
@@ -137,6 +174,7 @@ function getProvider(viewType: string): FakeProvider {
 
 beforeEach(() => {
   mockState.registered.length = 0;
+  mockState.statusBarItems.length = 0;
   mockState.readFile.mockReset();
   vi.mocked(vscode.window.registerCustomEditorProvider).mockClear();
   delete process.env.MEGANE_E2E_MODE;
@@ -325,6 +363,90 @@ describe("MeganeEditorProvider — structureViewer", () => {
     }
     // Random — collisions across 4 picks of 32-char strings should be effectively impossible.
     expect(seen.size).toBe(4);
+  });
+});
+
+describe("createFrameStatusBarItem", () => {
+  it("returns a status bar item with a trajectory tooltip", () => {
+    const item = createFrameStatusBarItem();
+    expect(item).toBeDefined();
+    expect(mockState.statusBarItems).toHaveLength(1);
+    expect(mockState.statusBarItems[0].tooltip).toBe("Current trajectory frame");
+  });
+});
+
+describe("MeganeEditorProvider — frameChange message handling", () => {
+  beforeEach(() => {
+    activate(makeContext("/ext") as unknown as Parameters<typeof activate>[0]);
+  });
+
+  it("creates a status bar item when resolveCustomEditor is called", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    expect(mockState.statusBarItems).toHaveLength(1);
+  });
+
+  it("updates the status bar text when a frameChange message arrives", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireMessage({ type: "frameChange", frame: 5 });
+
+    const item = mockState.statusBarItems[0];
+    expect(item.text).toContain("5");
+    expect(item.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows successive frame indices as the frame progresses", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireMessage({ type: "frameChange", frame: 0 });
+    fireMessage({ type: "frameChange", frame: 42 });
+
+    const item = mockState.statusBarItems[0];
+    expect(item.text).toContain("42");
+    expect(item.show).toHaveBeenCalledTimes(2);
+  });
+
+  it("disposes the status bar item when the panel is disposed", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireDispose } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    const item = mockState.statusBarItems[0];
+    expect(item.dispose).not.toHaveBeenCalled();
+
+    fireDispose();
+    expect(item.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call postMessage for frameChange messages", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireMessage({ type: "frameChange", frame: 10 });
+    expect(panel.webview.postMessage).not.toHaveBeenCalled();
   });
 });
 

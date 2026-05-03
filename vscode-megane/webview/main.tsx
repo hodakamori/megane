@@ -82,6 +82,7 @@ function App() {
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
           lower.endsWith(".xtc") ||
+          lower.endsWith(".dcd") ||
           lower.endsWith(".lammpstrj") ||
           lower.endsWith(".dump") ||
           lower.endsWith(".nc");
@@ -176,6 +177,10 @@ function App() {
     [local.loadFile],
   );
 
+  const handleFrameChange = useCallback((frame: number) => {
+    vscode.postMessage({ type: "frameChange", frame });
+  }, []);
+
   if (error) {
     return (
       <>
@@ -239,6 +244,7 @@ function App() {
       onLoadDemoVectors={() => local.loadDemoVectors()}
       initialCameraState={initialCameraState}
       onCameraStateChange={handleCameraStateChange}
+      onFrameChange={handleFrameChange}
     />
     </>
   );
