@@ -43,11 +43,12 @@ Legend:
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓ |
+| AMBER NetCDF | `.nc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 
 ¹ Trajectory-only formats need a topology already loaded. Opening a `.xtc` /
-`.dcd` / `.lammpstrj` / `.dump` directly surfaces an actionable error; recover by
+`.dcd` / `.nc` / `.lammpstrj` / `.dump` directly surfaces an actionable error; recover by
 opening a structure file (PDB, GRO, …) first or by wiring a Load Structure
 node in the always-mounted pipeline editor.
 

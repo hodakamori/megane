@@ -296,8 +296,8 @@ export function Sidebar({
           />
           {trajectory.source === "file" && (
             <DropZone
-              accept=".xtc,.lammpstrj,.dump"
-              exts={[".xtc", ".lammpstrj", ".dump"]}
+              accept=".xtc,.lammpstrj,.dump,.dcd,.nc"
+              exts={[".xtc", ".lammpstrj", ".dump", ".dcd", ".nc"]}
               onFile={trajectory.onUploadXtc}
               label="Load trajectory..."
               testId="trajectory-upload"
