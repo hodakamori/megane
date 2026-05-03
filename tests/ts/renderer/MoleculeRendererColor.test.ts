@@ -93,4 +93,75 @@ describe("MoleculeRenderer.applyAtomColorOverrides", () => {
     expect(loadSpy).toHaveBeenCalledWith(snapshot);
     expect(atom.getColorBuffer()[0]).toBeCloseTo(baseR, 6);
   });
+
+  it("skips bond sync when the snapshot has no bonds", () => {
+    const renderer = new MoleculeRenderer();
+    const snapshot = {
+      nAtoms: 2,
+      nBonds: 0,
+      positions: new Float32Array([0, 0, 0, 1, 0, 0]),
+      elements: new Uint8Array([6, 8]),
+      bonds: new Uint32Array(),
+      bondOrders: null,
+    } as Snapshot;
+    const atom = new ImpostorAtomMesh(8);
+    atom.loadSnapshot(snapshot);
+    const bond = new ImpostorBondMesh(16);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internals = renderer as any;
+    internals.snapshot = snapshot;
+    internals.atomRenderer = atom;
+    internals.bondRenderer = bond;
+
+    const recomputeSpy = vi.spyOn(bond, "recomputeColorsFromAtomBuffer");
+    const overrides = new Float32Array(6);
+    overrides.fill(NaN);
+    overrides[0] = 1;
+    overrides[1] = 0;
+    overrides[2] = 0;
+
+    renderer.applyAtomColorOverrides(overrides);
+    expect(recomputeSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-syncs bond colors when updateBondsExt rewrites the bond mesh under active overrides", () => {
+    const { renderer, atom, bond, snapshot } = makeRendererWithMeshes();
+    const overrides = new Float32Array(6);
+    overrides.fill(NaN);
+    overrides[0] = 1;
+    overrides[1] = 0;
+    overrides[2] = 0;
+    overrides[3] = 0;
+    overrides[4] = 0;
+    overrides[5] = 1;
+    renderer.applyAtomColorOverrides(overrides);
+
+    const recomputeSpy = vi.spyOn(bond, "recomputeColorsFromAtomBuffer");
+    renderer.updateBondsExt(snapshot.bonds, null, null, null, snapshot.nAtoms);
+    expect(recomputeSpy).toHaveBeenCalledTimes(1);
+    // After the bond rewrite, atom 0's override is still red — bond mesh should
+    // see the updated atom color buffer.
+    expect(atom.getColorBuffer()[0]).toBeCloseTo(1, 6);
+  });
+
+  it("re-syncs bond colors when updateBonds rewrites topology under active overrides", () => {
+    const { renderer, bond, snapshot } = makeRendererWithMeshes();
+    const overrides = new Float32Array(6);
+    overrides.fill(NaN);
+    overrides[0] = 0;
+    overrides[1] = 1;
+    overrides[2] = 0;
+    renderer.applyAtomColorOverrides(overrides);
+
+    const recomputeSpy = vi.spyOn(bond, "recomputeColorsFromAtomBuffer");
+    renderer.updateBonds(snapshot.bonds, null);
+    expect(recomputeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("applyAtomColorOverrides on a renderer without snapshot is a safe no-op", () => {
+    const renderer = new MoleculeRenderer();
+    const overrides = new Float32Array(3);
+    overrides.fill(NaN);
+    expect(() => renderer.applyAtomColorOverrides(overrides)).not.toThrow();
+  });
 });
