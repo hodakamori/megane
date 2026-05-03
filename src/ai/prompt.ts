@@ -74,10 +74,11 @@ Filters atoms by a selection query.
 - Outputs: \`out\` (same type as input)
 
 ### modify
-Modifies visual properties (scale, opacity).
-- Parameters: \`{ type: "modify", scale: number, opacity: number }\`
+Modifies visual properties (scale, opacity, color scheme).
+- Parameters: \`{ type: "modify", scale: number, opacity: number, colorScheme: string }\`
   - scale: atom size multiplier (default 1.0)
   - opacity: transparency 0-1 (default 1.0)
+  - colorScheme: one of "element", "residue", "chain", "bfactor" (default "element")
 - Inputs: \`in\` (accepts particle or bond data type)
 - Outputs: \`out\` (same type as input)
 
