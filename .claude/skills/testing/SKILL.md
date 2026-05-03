@@ -40,6 +40,66 @@ python -m pytest
 Requires `maturin develop --release` to have been run first.
 Tests: `tests/python/`. Config: `pyproject.toml` under `[tool.pytest.ini_options]`.
 
+## Coverage & Codecov (merge gate)
+
+**Codecov is a hard merge gate — see CRITICAL RULE #8 in `CLAUDE.md`.** The
+three CI jobs that upload coverage all use `fail_ci_on_error: true`, and
+`codecov.yml` requires **patch coverage ≥ 70 %** on every PR (project
+coverage status is `off`, so only the diff matters — but the diff matters a
+lot).
+
+What this means in practice:
+- Every new function / branch / pipeline node / React component / parser
+  needs a unit test in the same PR. E2E does not count toward Codecov
+  because E2E is local-only and unmeasured.
+- A PR that adds 100 lines of TS but no `tests/ts/` updates will fail the
+  TS Codecov patch check, which fails CI, which blocks merge.
+- Adding a Rust parser without `#[test]` cases under that crate's `tests/`
+  module will fail the Rust patch check.
+
+### Local commands that match what CI uploads
+
+| Stack | Command | Output | CI job that consumes it |
+|---|---|---|---|
+| TypeScript | `npm test -- --coverage` | `coverage/ts/lcov.info` | `test-ts` |
+| Rust | `cargo llvm-cov --package megane-core --lcov --output-path lcov.info` | `lcov.info` | `test-rust` |
+| Python | `python -m pytest --cov-report=xml:coverage.xml` | `coverage.xml` | `test-python` |
+
+`cargo llvm-cov` requires `cargo install cargo-llvm-cov` once; the pytest
+`--cov` flag is already wired via `pyproject.toml` `addopts`.
+
+The convenience wrappers in the `Makefile` produce HTML reports under
+`coverage/{python,ts,rust}/index.html` for browsing, but they don't emit
+the lcov / xml files that match the CI uploads — use the table above when
+you want to predict the Codecov result:
+
+```sh
+make coverage-ts      # → coverage/ts/index.html
+make coverage         # → coverage/python/index.html
+make coverage-rust    # → coverage/rust/tarpaulin-report.html (needs cargo-tarpaulin)
+make coverage-all     # all three
+```
+
+### Patch coverage rules (`codecov.yml`)
+
+- Three flags are tracked separately: `python`, `typescript`, `rust`.
+  Each is filtered by path (`python/megane/`, `src/` + `vscode-megane/src/`
+  + `jupyterlab-megane/src/`, `crates/`).
+- `tests/`, `docs/`, `python/megane/static/**`, and `*.d.ts` are ignored.
+- The patch target is **70 % with 0 % threshold**, so a single uncovered
+  branch in a small diff can drop you below the line. When you change only
+  one file, run the matching coverage command and inspect the per-file
+  report before pushing.
+
+### Legitimate exceptions
+
+If a line genuinely cannot be covered (e.g. a defensive branch that's
+unreachable from public APIs, or platform-gated code that only runs in a
+specific host), document the gap in the PR description and prefer
+`#[cfg(...)]` / `/* c8 ignore next */` / `# pragma: no cover` over
+disabling the gate. Never set `fail_ci_on_error: false` or relax
+`codecov.yml` to make a PR pass.
+
 ## E2E Tests (cross-platform 3-layer suite)
 
 ### Playwright Test runner (current)
