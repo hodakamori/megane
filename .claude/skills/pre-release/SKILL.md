@@ -122,6 +122,14 @@ uv run make test-all
 All of Python, TypeScript, Rust, E2E, notebook, and integration tests must
 pass.
 
+The release commit will run through CI on the way to `main`, and CI uploads
+to Codecov with `fail_ci_on_error: true` (`codecov.yml` patch target 70 %).
+The release diff is mostly version bumps + CHANGELOG, which Codecov ignores
+(`pyproject.toml`, `Cargo.toml`, `*.md`), so the gate normally passes
+trivially. If the release branch happens to also include source-code
+changes, run `make coverage-all` locally first — see CRITICAL RULE #8 in
+`CLAUDE.md` and the `testing` skill's "Coverage & Codecov" section.
+
 **E2E baseline drift.** Per `CLAUDE.md`, E2E is local-only and font /
 fontconfig differences across machines can cause baseline diffs. If E2E
 fails only with `full-page diff X.XX% > 2%` style errors (not timeouts or
