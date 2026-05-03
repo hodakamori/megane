@@ -219,6 +219,19 @@ describe("decodeSnapshot", () => {
     const snap = decodeSnapshot(buf);
     expect(snap.bondOrders).toBeNull();
   });
+
+  it("returns null atomChainIds and atomBFactors (wire format does not yet carry them)", () => {
+    const buf = makeSnapshotBuffer({
+      nAtoms: 2,
+      nBonds: 1,
+      positions: [0, 0, 0, 1, 0, 0],
+      elements: [6, 6],
+      bonds: [0, 1],
+    });
+    const snap = decodeSnapshot(buf);
+    expect(snap.atomChainIds).toBeNull();
+    expect(snap.atomBFactors).toBeNull();
+  });
 });
 
 describe("decodeFrame", () => {

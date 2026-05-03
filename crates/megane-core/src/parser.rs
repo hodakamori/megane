@@ -26,6 +26,12 @@ pub struct ParsedStructure {
     pub box_matrix: Option<[f32; 9]>,
     pub frame_positions: Vec<Vec<f32>>,
     pub atom_labels: Option<Vec<String>>,
+    /// Per-atom chain IDs encoded as raw ASCII bytes (e.g. b'A'=65, b'B'=66).
+    /// None when the format does not carry chain information.
+    pub chain_ids: Option<Vec<u8>>,
+    /// Per-atom B-factors (temperature factors) in Å².
+    /// None when the format does not carry B-factor information.
+    pub bfactors: Option<Vec<f32>>,
     /// Embedded vector channels (e.g. GRO velocities).
     /// Empty for formats that carry no per-atom vector quantities.
     pub vector_channels: Vec<crate::trajectory::VectorChannel>,
@@ -196,7 +202,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut all_models: Vec<Vec<Atom>> = Vec::new();
     let mut current_model: Vec<Atom> = Vec::new();
     let mut current_labels: Vec<String> = Vec::new();
+    let mut current_chain_ids: Vec<u8> = Vec::new();
+    let mut current_bfactors: Vec<f32> = Vec::new();
     let mut first_model_labels: Vec<String> = Vec::new();
+    let mut first_model_chain_ids: Vec<u8> = Vec::new();
+    let mut first_model_bfactors: Vec<f32> = Vec::new();
     let mut has_model_record = false;
     let mut model_count: usize = 0;
 
@@ -212,10 +222,14 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 has_model_record = true;
                 current_model = Vec::new();
                 current_labels = Vec::new();
+                current_chain_ids = Vec::new();
+                current_bfactors = Vec::new();
             }
             "ENDMDL" => {
                 if model_count == 0 {
                     first_model_labels = std::mem::take(&mut current_labels);
+                    first_model_chain_ids = std::mem::take(&mut current_chain_ids);
+                    first_model_bfactors = std::mem::take(&mut current_bfactors);
                 }
                 all_models.push(std::mem::take(&mut current_model));
                 model_count += 1;
@@ -241,6 +255,15 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         ""
                     };
                     current_labels.push(format!("{}{}", res_name, res_seq));
+                    // parse_atom_line guarantees line.len() >= 54, so col 21 is always safe
+                    current_chain_ids.push(line.as_bytes()[21]);
+                    // Extract B-factor (cols 60-66, 0-indexed); absent in truncated lines
+                    let bfactor = if line.len() >= 66 {
+                        line[60..66].trim().parse::<f32>().unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
+                    current_bfactors.push(bfactor);
                     current_model.push(atom);
                 }
             }
@@ -255,6 +278,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     // If no MODEL/ENDMDL, treat all atoms as a single model
     if !has_model_record && !current_model.is_empty() {
         first_model_labels = current_labels;
+        first_model_chain_ids = current_chain_ids;
+        first_model_bfactors = current_bfactors;
         all_models.push(current_model);
     }
 
@@ -311,6 +336,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    // Only expose chain IDs when at least one is non-space (multi-chain PDB)
+    let chain_ids = if first_model_chain_ids.iter().any(|&c| c != b' ' && c != 0) {
+        Some(first_model_chain_ids)
+    } else {
+        None
+    };
+
+    // Only expose B-factors when at least one is non-zero
+    let bfactors = if first_model_bfactors.iter().any(|&b| b != 0.0) {
+        Some(first_model_bfactors)
+    } else {
+        None
+    };
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -321,6 +360,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         box_matrix,
         frame_positions,
         atom_labels,
+        chain_ids,
+        bfactors,
         vector_channels: vec![],
     })
 }
@@ -381,5 +422,27 @@ mod tests {
         assert!(result.elements.contains(&7)); // N
         assert!(result.elements.contains(&8)); // O
         assert!(result.elements.contains(&16)); // S
+    }
+
+    #[test]
+    fn test_parse_pdb_chain_id_and_bfactor() {
+        // Standard 80-col line: chain B, B-factor 42.50
+        let pdb = "ATOM      1  CA  ALA B   1      17.047  14.099   3.625  1.00 42.50           C  \nEND\n";
+        let result = parse(pdb).expect("parse failed");
+        let chain_ids = result.chain_ids.expect("chain_ids should be Some");
+        assert_eq!(chain_ids[0], b'B');
+        let bfactors = result.bfactors.expect("bfactors should be Some");
+        assert!((bfactors[0] - 42.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_pdb_truncated_no_bfactor() {
+        // 54-char line: valid coordinates but no occupancy/B-factor columns
+        // (exactly at the minimum length accepted by parse_atom_line)
+        let pdb = "ATOM      1  CA  ALA A   1      17.047  14.099   3.625\nEND\n";
+        let result = parse(pdb).expect("parse failed");
+        assert_eq!(result.n_atoms, 1);
+        // No non-zero B-factor => bfactors should be None
+        assert!(result.bfactors.is_none());
     }
 }

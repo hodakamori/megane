@@ -13,6 +13,7 @@
 
 import * as THREE from "three";
 import type { Snapshot } from "../types";
+import { type ColorContext, getAtomColorForScheme } from "../colorSchemes";
 import {
   getColor,
   BOND_RADIUS,
@@ -128,7 +129,7 @@ export class ImpostorBondMesh {
     this.mesh.frustumCulled = false;
   }
 
-  loadSnapshot(snapshot: Snapshot): void {
+  loadSnapshot(snapshot: Snapshot, colorCtx?: ColorContext): void {
     const { nAtoms, nBonds, positions, elements, bonds, bondOrders } = snapshot;
     this.nAtoms = nAtoms;
 
@@ -174,9 +175,13 @@ export class ImpostorBondMesh {
       const bi = bonds[i * 2 + 1];
       const order = bondOrders ? bondOrders[i] : BOND_SINGLE;
 
-      // Colors
-      const [r1, g1, b1] = getColor(elements[ai]);
-      const [r2, g2, b2] = getColor(elements[bi]);
+      // Colors: average the two endpoint colors for the bond
+      const [r1, g1, b1] = colorCtx
+        ? getAtomColorForScheme(ai, snapshot, colorCtx)
+        : getColor(elements[ai]);
+      const [r2, g2, b2] = colorCtx
+        ? getAtomColorForScheme(bi, snapshot, colorCtx)
+        : getColor(elements[bi]);
       const cr = (r1 + r2) * 0.5;
       const cg = (g1 + g2) * 0.5;
       const cb = (b1 + b2) * 0.5;
