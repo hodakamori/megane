@@ -155,6 +155,9 @@ export function applyViewportState(
   if (!previous || current.pivotMarkerVisible !== previous.pivotMarkerVisible) {
     renderer.setPivotMarkerVisible(current.pivotMarkerVisible);
   }
+  if (!previous || current.representationMode !== previous.representationMode) {
+    renderer.setRepresentationType(current.representationMode ?? "atoms");
+  }
   const prevScheme: ColorScheme = previous?.colorScheme ?? "byElement";
   if (!previous || current.colorScheme !== prevScheme) {
     renderer.setColorScheme(current.colorScheme ?? "byElement", atomLabels ?? null);

@@ -61,6 +61,11 @@ pub struct ParseResult {
     vector_channel_count: u32,
     vector_channel_meta: String,
     vector_channel_data: Vec<f32>,
+    // Cα backbone data for cartoon rendering
+    ca_indices: Vec<u32>,
+    ca_chain_ids: Vec<u8>,
+    ca_res_nums: Vec<u32>,
+    ca_ss_type: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -170,6 +175,32 @@ impl ParseResult {
     pub fn vector_channel_data(&self) -> Float32Array {
         Float32Array::from(&self.vector_channel_data[..])
     }
+
+    /// Number of Cα atoms in the backbone (0 when not a protein or format has no atom names).
+    #[wasm_bindgen(getter)]
+    pub fn ca_count(&self) -> u32 {
+        self.ca_indices.len() as u32
+    }
+
+    /// Indices of Cα atoms into the positions array.
+    pub fn ca_indices(&self) -> Uint32Array {
+        Uint32Array::from(&self.ca_indices[..])
+    }
+
+    /// Per-Cα chain identifier as ASCII byte (e.g. 65 = b'A').
+    pub fn ca_chain_ids(&self) -> Uint8Array {
+        Uint8Array::from(&self.ca_chain_ids[..])
+    }
+
+    /// Per-Cα residue sequence number.
+    pub fn ca_res_nums(&self) -> Uint32Array {
+        Uint32Array::from(&self.ca_res_nums[..])
+    }
+
+    /// Per-Cα secondary-structure type: 0 = coil, 1 = helix, 2 = sheet.
+    pub fn ca_ss_type(&self) -> Uint8Array {
+        Uint8Array::from(&self.ca_ss_type[..])
+    }
 }
 
 impl ParseResult {
@@ -223,6 +254,10 @@ impl ParseResult {
             vector_channel_count,
             vector_channel_meta,
             vector_channel_data,
+            ca_indices: data.ca_indices,
+            ca_chain_ids: data.ca_chain_ids,
+            ca_res_nums: data.ca_res_nums,
+            ca_ss_type: data.ca_ss_type,
         }
     }
 }
