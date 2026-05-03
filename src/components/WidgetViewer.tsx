@@ -2,11 +2,9 @@
  * Simplified megane viewer for Jupyter widget embedding.
  * Minimal UI: Viewport + Timeline + Tooltip + MeasurementPanel.
  *
- * Always drives rendering through the pipeline store. When the host has
- * not called `set_pipeline()` (legacy `.load()` path), the component
- * falls back to the global `snapshot` prop and renders it directly via
- * Viewport's `loadSnapshot` while the pipeline store stays at its
- * default (empty) viewport state.
+ * The visual pipeline editor is intentionally not mounted here — it is
+ * webapp / JupyterLab / VSCode only. Pipeline data still flows in via
+ * `pipelineJson` + `nodeSnapshotsData` from `MolecularViewer.set_pipeline()`.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,12 +14,11 @@ import { Viewport } from "./Viewport";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
-import { PipelineEditor } from "./PipelineEditor";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
-import { createPipelineStore, type PipelineStore, usePipelineStore } from "../pipeline/store";
+import { createPipelineStore, type PipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
@@ -38,14 +35,6 @@ interface WidgetViewerProps {
   pipelineJson?: string;
   nodeSnapshotsData?: Record<string, DataView>;
   onPipelineChange?: (json: string) => void;
-  // When true, render the visual pipeline editor inside the widget. Mounting
-  // the editor forces the widget onto the global pipeline store so the
-  // editor's reactive subscriptions (which use the global hook) and the
-  // widget's data-loading effects share one source of truth. The cost: two
-  // MolecularViewer instances both opted in to `pipeline=True` in the same
-  // notebook will share editor state. The default (`pipelineEnabled=false`)
-  // keeps the historical per-mount private store.
-  pipelineEnabled?: boolean;
   // Optional pipeline store override. Each Jupyter widget mount creates its
   // own private store so multiple MolecularViewers in the same notebook do
   // not share state. Tests pass their own store to inspect internal state.
@@ -74,7 +63,6 @@ export function WidgetViewer({
   onMeasurementChange,
   pipelineJson,
   nodeSnapshotsData,
-  pipelineEnabled = false,
   pipelineStore: pipelineStoreProp,
 }: WidgetViewerProps) {
   // Each WidgetViewer instance owns a private pipeline store. The webapp
@@ -82,13 +70,8 @@ export function WidgetViewer({
   // multiple MolecularViewers in one notebook do not share state — without
   // this, the second viewer's loadPipeline() overwrites the first viewer's
   // pipeline, leaving it blank.
-  //
-  // Exception: when the user opts into the visual pipeline editor with
-  // `pipeline=True`, fall back to the global store. PipelineEditor uses
-  // `usePipelineStore` directly, so the editor and the widget's effects must
-  // both target the same store or the editor's edits silently do nothing.
   const [defaultStore] = useState(() => createPipelineStore());
-  const pipelineStore = pipelineStoreProp ?? (pipelineEnabled ? usePipelineStore : defaultStore);
+  const pipelineStore = pipelineStoreProp ?? defaultStore;
 
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -312,17 +295,6 @@ export function WidgetViewer({
         onAtomRightClick={handleAtomRightClick}
         onFrameUpdated={handleFrameUpdated}
       />
-
-      {pipelineEnabled && (
-        <PipelineEditor
-          collapsed={false}
-          onToggleCollapse={() => {}}
-          rendererRef={rendererRef}
-          totalFrames={totalFrames}
-          currentFrame={currentFrame}
-          onSeek={handleSeek}
-        />
-      )}
 
       {totalFrames > 1 && (
         <Timeline
