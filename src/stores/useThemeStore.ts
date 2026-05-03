@@ -26,6 +26,7 @@ function saveTheme(theme: Theme) {
 export function resolveTheme(theme: Theme): ResolvedTheme {
   if (theme === "system") {
     return typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light";

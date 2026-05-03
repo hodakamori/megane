@@ -90,9 +90,8 @@ describe("LabelGeneratorNode", () => {
 
     const active = screen.getByRole("button", { name: "Resname" });
     const inactive = screen.getByRole("button", { name: "Element" });
-    // Active tab uses the project's blue (#3b82f6 → rgb(59, 130, 246))
-    expect(active.style.color).toBe("rgb(59, 130, 246)");
-    // Inactive tab uses slate-400 (#94a3b8 → rgb(148, 163, 184))
-    expect(inactive.style.color).toBe("rgb(148, 163, 184)");
+    // Active tab uses the primary CSS variable; inactive uses the muted variable
+    expect(active.style.color).toBe("var(--megane-primary)");
+    expect(inactive.style.color).toBe("var(--megane-text-muted)");
   });
 });
