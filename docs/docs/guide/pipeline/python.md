@@ -79,7 +79,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.data` (LAMMPS) |
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (parsed as MOL), `.data` / `.lammps`, and binary `.traj` (ASE). MOL2 and CIF parsers exist in the Rust core but are not yet wired into the Python `LoadStructure` dispatch — open an issue if you need them. |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -88,15 +88,21 @@ LoadStructure(path: str)
 Load an external trajectory file. Requires connection from a `LoadStructure` node.
 
 ```python
-LoadTrajectory(*, xtc: str | None = None, traj: str | None = None)
+LoadTrajectory(
+    *,
+    xtc: str | None = None,
+    traj: str | None = None,
+    xyz: str | None = None,
+)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
-| `traj` | `str \| None` | `None` | Path to ASE .traj trajectory file |
+| `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
+| `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ file |
 
-**Ports:** `inp.particle`, `out.traj`
+Pass exactly one of the three. **Ports:** `inp.particle`, `out.traj`
 
 ### Streaming
 

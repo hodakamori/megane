@@ -419,54 +419,73 @@ if (hit) {
 
 ## MDX Usage (Next.js)
 
-megane works in MDX-based documentation frameworks like Next.js. Here's how to embed the viewer in an `.mdx` file:
+megane works in MDX-based documentation frameworks like Next.js. For a static
+embed of a known structure, use [`PipelineViewer`](#pipelineviewer-docs--mdx-embed)
+— it has no global-store dependency, so multiple instances on the same page
+work independently and you don't need any file-upload plumbing:
 
 ```mdx
 ---
 title: Protein Visualization
 ---
 
-import { useState, useEffect } from "react";
-import { MeganeViewer, parseStructureFile } from "megane-viewer/lib";
+import { PipelineViewer } from "megane-viewer/lib";
 
-export function ProteinDemo() {
-  const [snapshot, setSnapshot] = useState(null);
+# Caffeine in Water
 
-  useEffect(() => {
-    fetch("/data/protein.pdb")
-      .then((r) => r.text())
-      .then(async (text) => {
-        const { parseStructureText } = await import("megane-viewer/lib");
-        const result = await parseStructureText(text);
-        setSnapshot(result.snapshot);
-      });
+A caffeine molecule solvated by water — 3024 atoms rendered in real time.
+
+<PipelineViewer
+  height={500}
+  pipeline={{
+    version: 3,
+    nodes: [
+      { id: "s1", type: "load_structure", fileName: "caffeine_water.pdb",
+        fileUrl: "/data/protein.pdb",
+        hasTrajectory: false, hasCell: false, position: { x: 0, y: 0 } },
+      { id: "b1", type: "add_bond", bondSource: "distance",
+        position: { x: 200, y: 0 } },
+      { id: "v1", type: "viewport", perspective: false, cellAxesVisible: false,
+        pivotMarkerVisible: true, position: { x: 400, y: 0 } },
+    ],
+    edges: [
+      { source: "s1", target: "b1", sourceHandle: "particle", targetHandle: "particle" },
+      { source: "s1", target: "v1", sourceHandle: "particle", targetHandle: "particle" },
+      { source: "b1", target: "v1", sourceHandle: "bond",     targetHandle: "bond" },
+    ],
+  }}
+/>
+
+The viewer above uses WASM-powered parsing and billboard impostor rendering
+to display all 3024 atoms with bonds inferred from van der Waals radii.
+```
+
+If you specifically need the full sidebar / appearance / pipeline-editor UI in
+an MDX page, use `MeganeViewer` and pipe uploads through `usePipelineStore`:
+
+```mdx
+import { useCallback } from "react";
+import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
+
+export function FullViewer() {
+  const handleUpload = useCallback((file) => {
+    usePipelineStore.getState().openFile(file);
   }, []);
-
   return (
     <MeganeViewer
-      snapshot={snapshot}
-      mode="local"
-      onToggleMode={() => {}}
-      onUploadStructure={() => {}}
-      pdbFileName="protein.pdb"
-      bonds={{ source: "structure", onSourceChange: () => {}, onUploadFile: () => {}, fileName: null, count: snapshot?.nBonds ?? 0 }}
-      trajectory={{ source: "structure", onSourceChange: () => {}, hasStructureFrames: false, hasFileFrames: false, fileName: null, totalFrames: 0, timestepPs: 0, onUploadXtc: () => {} }}
-      labels={{ source: "none", onSourceChange: () => {}, onUploadFile: () => {}, fileName: null, hasStructureLabels: false }}
+      onUploadStructure={handleUpload}
       width="100%"
       height="500px"
     />
   );
 }
 
-# Caffeine in Water
-
-A caffeine molecule solvated by water — 3024 atoms rendered in real time.
-
-<ProteinDemo />
-
-The viewer above uses WASM-powered parsing and billboard impostor rendering
-to display all 3024 atoms with bonds inferred from van der Waals radii.
+<FullViewer />
 ```
+
+Note that `MeganeViewer` is backed by a global Zustand store, so only one
+instance per page renders correctly — for multiple independent viewers, use
+`PipelineViewer` as shown above.
 
 ### Viewport-Only in MDX
 
