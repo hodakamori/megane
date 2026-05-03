@@ -446,6 +446,20 @@ class TestPipelineDataLoading:
         assert s2._id in pipe._node_data
         assert s1._id != s2._id
 
+    def test_load_structure_mol2_populates_node_data(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "methanol.mol2")))
+        assert s._id in pipe._node_data
+        assert len(pipe._node_data[s._id]) > 0
+        assert pipe._node_data[s._id][:4] == b"MEGN"
+
+    def test_load_structure_cif_populates_node_data(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "nacl.cif")))
+        assert s._id in pipe._node_data
+        assert len(pipe._node_data[s._id]) > 0
+        assert pipe._node_data[s._id][:4] == b"MEGN"
+
     def test_unsupported_format_raises(self, tmp_path):
         # Create a dummy file with unsupported extension
         dummy = tmp_path / "test.unknown"
