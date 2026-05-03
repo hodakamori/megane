@@ -17,6 +17,7 @@ import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
 import { downloadBlob } from "../renderer/RenderCapture";
+import { buildShareUrl } from "../pipeline/shareLink";
 import type { PipelineNodeType } from "../pipeline/types";
 import {
   NODE_TYPE_LABELS,
@@ -132,6 +133,16 @@ const IconPlus = (
   <svg {...iconProps} strokeWidth="2.5">
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+const IconShare = (
+  <svg {...iconProps}>
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
   </svg>
 );
 
@@ -333,6 +344,13 @@ const importBtnStyle: React.CSSProperties = {
   color: "#6366f1",
 };
 
+const shareBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(16, 185, 129, 0.08)",
+  border: "1px solid rgba(16, 185, 129, 0.25)",
+  color: "#059669",
+};
+
 const guideBtnStyle: React.CSSProperties = {
   ...textBtnBase,
   background: "rgba(100, 116, 139, 0.08)",
@@ -466,6 +484,7 @@ function PipelineEditorInner({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [showRenderModal, setShowRenderModal] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
@@ -613,6 +632,26 @@ function PipelineEditorInner({
     [deserialize, fitView],
   );
 
+  const handleShare = useCallback(async () => {
+    const serialized = usePipelineStore.getState().serialize();
+    const { url, tooLong } = await buildShareUrl(serialized);
+    if (tooLong) {
+      setShareFeedback("Pipeline too large for a share link — use Export instead");
+      setTimeout(() => setShareFeedback(null), 4000);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      // Also update the browser URL so the current tab reflects the shared state
+      history.replaceState(null, "", new URL(url).hash);
+      setShareFeedback("Link copied to clipboard!");
+    } catch {
+      setShareFeedback("Copy failed — see console for the link");
+      console.info("Share URL:", url);
+    }
+    setTimeout(() => setShareFeedback(null), 3000);
+  }, []);
+
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
   const headerExtra = (
@@ -722,6 +761,15 @@ function PipelineEditorInner({
           {IconImport} Import
         </button>
         <button
+          data-testid="pipeline-editor-share"
+          onClick={() => void handleShare()}
+          style={shareBtnStyle}
+          title="Copy shareable link"
+          aria-label="Copy shareable link"
+        >
+          {IconShare} Share
+        </button>
+        <button
           data-testid="pipeline-editor-render"
           onClick={() => setShowRenderModal(true)}
           style={renderBtnStyle}
@@ -730,6 +778,19 @@ function PipelineEditorInner({
           {IconRender} Render
         </button>
       </div>
+      {shareFeedback && (
+        <div
+          style={{
+            fontSize: 10,
+            color: shareFeedback.startsWith("Pipeline too") ? "#dc2626" : "#059669",
+            padding: "2px 0 0 68px",
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          {shareFeedback}
+        </div>
+      )}
 
       {/* Row 3 — Others: help */}
       <div style={toolbarRowStyle}>
