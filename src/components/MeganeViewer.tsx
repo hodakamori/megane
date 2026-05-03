@@ -143,7 +143,10 @@ export function MeganeViewer({
       // storage; otherwise falls back to the localStorage-backed store.
       if (snapshot && !hasRestoredCameraRef.current) {
         hasRestoredCameraRef.current = true;
-        const saved = initialCameraState !== undefined ? initialCameraState : useViewStateStore.getState().camera;
+        const saved =
+          initialCameraState !== undefined
+            ? initialCameraState
+            : useViewStateStore.getState().camera;
         if (saved) {
           renderer.applyCameraState(saved);
         }
