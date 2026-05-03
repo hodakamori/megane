@@ -79,7 +79,17 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (parsed as MOL), `.data` / `.lammps`, and binary `.traj` (ASE). MOL2 and CIF parsers exist in the Rust core but are not yet wired into the Python `LoadStructure` dispatch — open an issue if you need them. |
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.data`, `.lammps`, `.traj` (ASE binary). |
+
+> **Note — MOL2 and CIF in Python pipelines.** The Rust/PyO3 layer ships
+> `parse_mol2` and `parse_cif`, but the Python `LoadStructure` extension
+> dispatcher (`_load_structure_file()` in `python/megane/pipeline.py`) does not
+> route those two extensions yet, so `LoadStructure("foo.mol2")` /
+> `LoadStructure("foo.cif")` will raise an unsupported-format error. Until the
+> dispatcher is wired up, parse them directly with
+> `from megane import megane_parser; megane_parser.parse_mol2(text)` or open
+> the file in the standalone web app, JupyterLab, or VSCode where MOL2/CIF
+> are fully supported.
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -100,7 +110,7 @@ LoadTrajectory(
 |-----------|------|---------|-------------|
 | `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
 | `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
-| `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ file |
+| `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
 
 Pass exactly one of the three. **Ports:** `inp.particle`, `out.traj`
 

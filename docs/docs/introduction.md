@@ -33,7 +33,7 @@ For a side-by-side comparison of which formats and UI features each environment 
 | GROMACS structure | `.gro` |
 | XYZ | `.xyz` |
 | MDL Molfile (V2000) | `.mol` |
-| Structure-Data File (V2000 Molfile) | `.sdf` |
+| MDL SDfile (parsed via the V2000 Molfile reader) | `.sdf` |
 | Tripos MOL2 | `.mol2` |
 | Crystallographic Information File | `.cif` |
 | LAMMPS data | `.data`, `.lammps` |

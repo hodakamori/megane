@@ -101,7 +101,7 @@ For multiple independent viewers per page (e.g. embedding in MDX docs), use
 | GRO | `.gro` | GROMACS structure file |
 | XYZ | `.xyz` | Simple cartesian coordinate format (single- or multi-frame) |
 | MOL | `.mol` | MDL Molfile (V2000) — small molecules with bond information |
-| SDF | `.sdf` | Structure-Data File (parsed via the V2000 Molfile reader) |
+| SDF | `.sdf` | MDL SDfile — uses the MOL V2000 parser |
 | MOL2 | `.mol2` | Tripos MOL2 |
 | CIF | `.cif` | Crystallographic Information File |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
