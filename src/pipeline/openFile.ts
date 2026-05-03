@@ -24,7 +24,7 @@
 import type { StoreApi } from "zustand";
 import type { Node, Edge } from "@xyflow/react";
 import { parseStructureFile } from "../parsers/structure";
-import { parseXTCFile, parseLammpstrjFile, parseDCDFile } from "../parsers/xtc";
+import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "../parsers/xtc";
 import { createMinimalStructurePipeline } from "./defaults";
 import { getLayoutedElements } from "./layout";
 import type { PipelineNodeData } from "./execute";
@@ -64,7 +64,7 @@ const STRUCTURE_EXTS = [
   ".traj",
 ];
 
-const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump", ".dcd"];
+const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump", ".dcd", ".nc"];
 
 const PIPELINE_SUFFIX = ".megane.json";
 
@@ -227,7 +227,14 @@ async function openTrajectory(
   const lower = file.name.toLowerCase();
   const isLammps = lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
   const isDcd = lower.endsWith(".dcd");
-  const parseFn = isLammps ? parseLammpstrjFile : isDcd ? parseDCDFile : parseXTCFile;
+  const isNetcdf = lower.endsWith(".nc");
+  const parseFn = isLammps
+    ? parseLammpstrjFile
+    : isDcd
+      ? parseDCDFile
+      : isNetcdf
+        ? parseNetCDFFile
+        : parseXTCFile;
   const { frames, meta } = await parseFn(file, loaderSnapshot.nAtoms);
 
   state.setFileFrames(frames, meta ?? null);
@@ -296,7 +303,14 @@ async function openPipeline(
     const lower = name.toLowerCase();
     const isLammps = lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
     const isDcd = lower.endsWith(".dcd");
-    const parseFn = isLammps ? parseLammpstrjFile : isDcd ? parseDCDFile : parseXTCFile;
+    const isNetcdf = lower.endsWith(".nc");
+    const parseFn = isLammps
+      ? parseLammpstrjFile
+      : isDcd
+        ? parseDCDFile
+        : isNetcdf
+          ? parseNetCDFFile
+          : parseXTCFile;
     const { frames, meta } = await parseFn(f, firstSnapshot.nAtoms);
     const state = api.getState();
     state.setFileFrames(frames, meta ?? null);

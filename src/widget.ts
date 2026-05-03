@@ -19,6 +19,7 @@ import {
   MSG_FRAME,
 } from "./protocol/protocol";
 import type { Snapshot, Frame, Measurement } from "./types";
+import type { MeganeCameraState } from "./renderer/MoleculeRenderer";
 
 interface AnyWidgetModel {
   get(key: string): unknown;
@@ -92,6 +93,25 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     model.save_changes();
   }
 
+  function handleCameraStateChange(state: MeganeCameraState) {
+    model.set("camera_state", state);
+    model.save_changes();
+  }
+
+  function getInitialCameraState(): MeganeCameraState | null {
+    const saved = model.get("camera_state") as Record<string, unknown> | null;
+    if (
+      saved &&
+      typeof saved.mode === "string" &&
+      Array.isArray(saved.position) &&
+      Array.isArray(saved.target) &&
+      typeof saved.zoom === "number"
+    ) {
+      return saved as unknown as MeganeCameraState;
+    }
+    return null;
+  }
+
   function renderApp() {
     if (!root || disposed) return;
     const frameIndex = (model.get("frame_index") as number) || 0;
@@ -99,7 +119,6 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
     const pipelineJson = (model.get("_pipeline_json") as string) || "";
     const nodeSnapshotsData = (model.get("_node_snapshots_data") as Record<string, DataView>) || {};
-    const pipelineEnabled = (model.get("_pipeline_enabled") as boolean) || false;
 
     root.render(
       createElement(WidgetViewer, {
@@ -113,7 +132,8 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         pipelineJson: pipelineJson,
         nodeSnapshotsData: nodeSnapshotsData,
         onPipelineChange: handlePipelineChange,
-        pipelineEnabled: pipelineEnabled,
+        initialCameraState: getInitialCameraState(),
+        onCameraStateChange: handleCameraStateChange,
       }),
     );
   }
@@ -167,10 +187,6 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   });
 
   model.on("change:_pipeline_json", () => {
-    renderApp();
-  });
-
-  model.on("change:_pipeline_enabled", () => {
     renderApp();
   });
 

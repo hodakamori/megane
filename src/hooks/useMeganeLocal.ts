@@ -8,7 +8,7 @@
 import { useState, useRef, useCallback } from "react";
 import { parseStructureFile, parseStructureText } from "../parsers/structure";
 import type { StructureParseResult } from "../parsers/structure";
-import { parseXTCFile, parseLammpstrjFile, parseDCDFile } from "../parsers/xtc";
+import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "../parsers/xtc";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
@@ -283,7 +283,14 @@ export function useMeganeLocal(): MeganeLocalState {
       const ext = xtc.name.toLowerCase();
       const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
       const isDcd = ext.endsWith(".dcd");
-      const parseFn = isLammpstrj ? parseLammpstrjFile : isDcd ? parseDCDFile : parseXTCFile;
+      const isNetcdf = ext.endsWith(".nc");
+      const parseFn = isLammpstrj
+        ? parseLammpstrjFile
+        : isDcd
+          ? parseDCDFile
+          : isNetcdf
+            ? parseNetCDFFile
+            : parseXTCFile;
       const {
         frames,
         meta: xtcMeta,

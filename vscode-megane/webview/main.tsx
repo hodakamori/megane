@@ -18,6 +18,7 @@ import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
 import type { SerializedPipeline } from "../../src/pipeline/types";
+import type { MeganeCameraState } from "../../src/renderer/MoleculeRenderer";
 import { useTour } from "../../src/tour/useTour";
 import "../../src/styles/megane.css";
 
@@ -30,11 +31,26 @@ function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
   (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ = URL.createObjectURL(wasmBlob);
 }
 
+interface VsCodeState {
+  camera?: MeganeCameraState;
+}
+
 function App() {
   const local = useMeganeLocal();
   useTour({ host: "vscode" });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Per-document camera persistence using VS Code's webview state API.
+  const [initialCameraState] = useState<MeganeCameraState | null>(() => {
+    const saved = vscode.getState() as VsCodeState | undefined;
+    return saved?.camera ?? null;
+  });
+
+  const handleCameraStateChange = useCallback((state: MeganeCameraState) => {
+    const current = (vscode.getState() as VsCodeState | undefined) ?? {};
+    vscode.setState({ ...current, camera: state });
+  }, []);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -47,7 +63,10 @@ function App() {
         const file = new File([bytes], filename);
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
-          lower.endsWith(".xtc") || lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
+          lower.endsWith(".xtc") ||
+          lower.endsWith(".lammpstrj") ||
+          lower.endsWith(".dump") ||
+          lower.endsWith(".nc");
         // Trajectory-only formats (XTC, LAMMPS dump) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by
@@ -192,6 +211,8 @@ function App() {
       onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
       onLoadVectorFile={(f) => local.loadVectorFile(f)}
       onLoadDemoVectors={() => local.loadDemoVectors()}
+      initialCameraState={initialCameraState}
+      onCameraStateChange={handleCameraStateChange}
     />
   );
 }

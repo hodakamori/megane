@@ -43,7 +43,7 @@ Legend:
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓ |
-| ASE trajectory | `.traj` | ✓ | API | — | ✓ | ✓ |
+| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 
 ¹ Trajectory-only formats need a topology already loaded. Opening a `.xtc` /
@@ -59,7 +59,7 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 |---|:---:|:---:|:---:|:---:|:---:|
 | Drag-and-drop into viewer | ✓ | — | — | — | n/a |
 | Built-in file picker | ✓ | — | host | host | n/a |
-| Visual pipeline editor | ✓ | opt-in | ✓ | ✓ (`.megane.json`) | n/a |
+| Visual pipeline editor | ✓ | — | ✓ | ✓ (`.megane.json`) | n/a |
 | Trajectory timeline / scrubbing | ✓ | ✓ | ✓ | ✓ | n/a |
 | WebSocket trajectory streaming | ✓ | — | — | — | n/a |
 | Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
@@ -70,7 +70,7 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 Notes:
 
 - **host** means the parent app provides the file picker (the JupyterLab file browser, the VS Code explorer); megane itself does not render one.
-- **opt-in** for the widget pipeline editor means it is shown only when the widget is instantiated with `pipeline=True` (see `python/megane/widget.py` `MolecularViewer.__init__` and `src/components/WidgetViewer.tsx`). Two viewers in the same notebook with `pipeline=True` share editor state.
+- The Jupyter widget intentionally does not mount the visual pipeline editor — pipelines are built in Python (`megane.Pipeline`) and pushed via `MolecularViewer.set_pipeline()`. Use the standalone app, JupyterLab labextension, or VSCode extension to edit pipelines visually.
 - The standalone app is the only platform with `megane serve` WebSocket streaming; other platforms load full trajectories into memory.
 - The standalone React `MeganeViewer` exposes an `onFrameChange?: (frame: number) => void` prop that fires on every trajectory frame transition — useful for keeping a host Plotly figure in sync.
 
@@ -92,5 +92,5 @@ These are formats or features that the parser layer supports but a given platfor
 
 - **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
-- **Jupyter widget pipeline editor is off by default.** It is rendered only when the widget is created with `pipeline=True`. Two viewers in the same notebook both opted in share editor state.
+- **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
 - **`selection_change` / `measurement` events are widget-only.** Other platforms do not emit these to a host. The standalone React component does expose `onFrameChange` (see UI features table).

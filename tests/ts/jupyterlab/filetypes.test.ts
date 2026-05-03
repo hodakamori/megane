@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships eight text structure filetypes (incl. LAMMPS dump trajectory)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(8);
+  it("ships nine text structure filetypes (incl. LAMMPS dump trajectory)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(9);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / CIF / LAMMPS-data / LAMMPS-dump names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / LAMMPS-data / LAMMPS-dump names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -47,6 +47,7 @@ describe("jupyterlab filetypes", () => {
         "megane-xyz",
         "megane-mol",
         "megane-sdf",
+        "megane-mol2",
         "megane-cif",
         "megane-lammps-data",
         "megane-lammps-dump",
@@ -67,10 +68,10 @@ describe("jupyterlab filetypes", () => {
     expect(dump?.fileFormat).toBe("text");
   });
 
-  it("ships ASE-traj, XTC, and DCD binary filetypes", () => {
-    expect(STRUCTURE_FILETYPES_BINARY).toHaveLength(3);
+  it("ships ASE-traj, XTC, DCD, and AMBER NetCDF binary filetypes", () => {
+    expect(STRUCTURE_FILETYPES_BINARY).toHaveLength(4);
     const names = STRUCTURE_FILETYPES_BINARY.map((f) => f.name).sort();
-    expect(names).toEqual(["megane-ase-traj", "megane-dcd", "megane-xtc"]);
+    expect(names).toEqual(["megane-ase-traj", "megane-dcd", "megane-netcdf", "megane-xtc"]);
     for (const ft of STRUCTURE_FILETYPES_BINARY) {
       expect(ft.fileFormat).toBe("base64");
       expect(ft.contentType).toBe("file");
@@ -79,6 +80,8 @@ describe("jupyterlab filetypes", () => {
     expect(xtc?.extensions).toEqual([".xtc"]);
     const dcd = STRUCTURE_FILETYPES_BINARY.find((f) => f.name === "megane-dcd");
     expect(dcd?.extensions).toEqual([".dcd"]);
+    const nc = STRUCTURE_FILETYPES_BINARY.find((f) => f.name === "megane-netcdf");
+    expect(nc?.extensions).toEqual([".nc"]);
   });
 
   it("ensures every extension starts with '.' and every name is unique across all arrays", () => {
@@ -102,7 +105,7 @@ describe("jupyterlab filetypes", () => {
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
       STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
     );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(8);
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(3);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(9);
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

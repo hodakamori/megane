@@ -9,8 +9,8 @@ sidebar_position: 1
 ## What can megane do?
 
 - **Render 1M+ atoms at 60 fps** in the browser using billboard impostor rendering
-- **Load 10 file formats**: PDB, GRO, XYZ, MOL, XTC, DCD, CIF, LAMMPS data, ASE `.traj`, LAMMPS dump
-- **Stream trajectories** over WebSocket — scrub through XTC files without loading everything into memory
+- **Load 12 file formats**: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, XTC, DCD, ASE `.traj`, LAMMPS dump
+- **Stream XTC trajectories from the `megane serve` CLI** over WebSocket — scrub multi-GB files without loading every frame into memory (browser/Jupyter without the CLI load full trajectories)
 - **Build visual pipelines** with a drag-and-drop node editor, or write them as Python/TypeScript code
 - **Integrate with Plotly**, MDX/Next.js, ipywidgets, and any framework via the framework-agnostic renderer
 
@@ -20,7 +20,7 @@ sidebar_position: 1
 |-------------|---------|------------|
 | **Jupyter / Python** | `pip install megane` | [Jupyter Guide](./guide/jupyter) |
 | **Web / React** | `npm install megane-viewer` | [Web Guide](./guide/web) |
-| **CLI (Docker)** | `docker pull hodakamori/megane` | [CLI Guide](./guide/cli) |
+| **CLI (Docker)** | `docker build -t megane .` | [CLI Guide](./guide/cli) |
 | **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline/index) |
 
 For a side-by-side comparison of which formats and UI features each environment supports — including known gaps — see [Platform Support](./platform-support).
@@ -33,11 +33,15 @@ For a side-by-side comparison of which formats and UI features each environment 
 | GROMACS structure | `.gro` |
 | XYZ | `.xyz` |
 | MDL Molfile (V2000) | `.mol` |
-| GROMACS trajectory | `.xtc` |
+| MDL SDfile (parsed via the V2000 Molfile reader) | `.sdf` |
+| Tripos MOL2 | `.mol2` |
 | Crystallographic Information File | `.cif` |
 | LAMMPS data | `.data`, `.lammps` |
+| GROMACS trajectory | `.xtc` |
 | ASE trajectory | `.traj` |
-| LAMMPS dump | `.lammpstrj` |
+| LAMMPS dump | `.lammpstrj`, `.dump` |
+
+Per-host coverage (which formats each platform's UI can open vs. parser-only access) is enumerated in [Platform Support](./platform-support).
 
 ## Architecture at a glance
 

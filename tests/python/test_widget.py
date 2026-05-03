@@ -30,18 +30,6 @@ def test_widget_instantiation():
     assert v._frame_data == b""
 
 
-def test_widget_pipeline_flag_default_false():
-    """`pipeline` kwarg defaults to False so the editor is opt-in."""
-    v = MolecularViewer()
-    assert v._pipeline_enabled is False
-
-
-def test_widget_pipeline_flag_opt_in():
-    """`pipeline=True` flips the synced traitlet that the frontend reads."""
-    v = MolecularViewer(pipeline=True)
-    assert v._pipeline_enabled is True
-
-
 def test_esm_is_valid_js():
     """_esm resolves to non-empty JS string containing the render export."""
     v = MolecularViewer()
@@ -66,7 +54,6 @@ def test_set_pipeline_populates_snapshot():
     pipe = _make_pdb_pipeline(str(FIXTURES / "1crn.pdb"))
     v.set_pipeline(pipe)
 
-    assert v._pipeline_enabled is True
     assert v._pipeline_json != ""
     assert len(v._node_snapshots_data) > 0
 
@@ -112,10 +99,9 @@ def test_set_pipeline_and_clear():
     v = MolecularViewer()
     pipe = _make_pdb_pipeline(str(FIXTURES / "1crn.pdb"))
     v.set_pipeline(pipe)
-    assert v._pipeline_enabled is True
+    assert v._pipeline_json != ""
 
     v.set_pipeline(None)
-    assert v._pipeline_enabled is False
     assert v._pipeline_json == ""
     assert v._node_snapshots_data == {}
 
