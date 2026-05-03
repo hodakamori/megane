@@ -29,7 +29,7 @@ The generator creates the appropriate LoadStructure, AddBond, Filter, Modify, an
 
 ## VSCode Extension Auto-Setup
 
-When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.cif`, `.data`, `.lammps`, `.traj`, `.xtc`, `.lammpstrj`, `.dump`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
+When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.data`, `.lammps`, `.traj`, `.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
 
 ## Getting Started
 
@@ -59,7 +59,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
 | **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE `.traj`) | — | particle, trajectory, cell |
-| **Load Trajectory** | Load a separate trajectory file (XTC, LAMMPS `.lammpstrj` / `.dump`) | particle | trajectory |
+| **Load Trajectory** | Load a separate trajectory file (XTC, DCD, LAMMPS `.lammpstrj` / `.dump`, AMBER NetCDF `.nc`) | particle | trajectory |
 | **Streaming** | WebSocket-based real-time data delivery (only available on the standalone `megane serve` host) | — | particle, bond, trajectory, cell |
 | **Load Vector** | Load per-atom vector data from a file | — | vector |
 
@@ -97,7 +97,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| File path | string | Path to a trajectory file. Supported: `.xtc`, `.lammpstrj` / `.dump` |
+| File path | string | Path to a trajectory file. Supported: `.xtc`, `.dcd`, `.lammpstrj` / `.dump`, `.nc` |
 
 Requires a connection from a LoadStructure node. Frames are loaded lazily when `frame_index` changes.
 
