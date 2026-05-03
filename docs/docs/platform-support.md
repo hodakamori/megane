@@ -64,7 +64,7 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | Trajectory timeline / scrubbing | ✓ | ✓ | ✓ | ✓ | n/a |
 | WebSocket trajectory streaming | ✓ | — | — | — | n/a |
 | Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
-| `frame_change` callback | ✓ (React prop) | ✓ (Python event) | — | ✓ (status bar) | n/a |
+| `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | — | ✓ | — | — | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | — | — | n/a |
 
@@ -95,4 +95,4 @@ These are formats or features that the parser layer supports but a given platfor
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
 - **`selection_change` / `measurement` events are widget-only.** Other platforms do not emit these to a host. The standalone React component does expose `onFrameChange` (see UI features table).
-- **`frame_change` callback is not yet wired for JupyterLab.** The JupyterLab DocWidget has no Python kernel connection, so there is no callback surface to fire. The VSCode extension surfaces it as a status-bar frame counter.
+- **`frame_change` callback for JupyterLab is surfaced as a status-bar frame counter.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Instead, when `IStatusBar` is available, the current frame index is shown in the JupyterLab status bar (right side). The `subscribeFrameChange` method on `MeganeReactView` can also be used by other JupyterLab extensions to react to frame changes.
