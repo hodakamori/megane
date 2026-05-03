@@ -24,6 +24,7 @@ describe("vscode-megane package.json", () => {
       [
         "*.cif",
         "*.data",
+        "*.dcd",
         "*.dump",
         "*.gro",
         "*.lammps",

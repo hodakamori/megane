@@ -32,7 +32,7 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, CIF, XTC, DCD, LAMMPS, and ASE .traj parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
 - **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 11 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
@@ -56,7 +56,7 @@ One codebase, every environment.
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
-The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: PDB, GRO, XYZ, MOL, CIF, XTC, DCD, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
 
@@ -166,6 +166,7 @@ function App() {
 | Format | Extension | Description |
 |--------|-----------|-------------|
 | XTC | `.xtc` | GROMACS compressed trajectory |
+| DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj` | LAMMPS dump trajectory |
 

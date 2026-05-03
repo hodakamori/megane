@@ -9,7 +9,7 @@ sidebar_position: 1
 ## What can megane do?
 
 - **Render 1M+ atoms at 60 fps** in the browser using billboard impostor rendering
-- **Load 11 file formats**: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, XTC, ASE `.traj`, LAMMPS dump
+- **Load 12 file formats**: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, XTC, DCD, ASE `.traj`, LAMMPS dump
 - **Stream XTC trajectories from the `megane serve` CLI** over WebSocket — scrub multi-GB files without loading every frame into memory (browser/Jupyter without the CLI load full trajectories)
 - **Build visual pipelines** with a drag-and-drop node editor, or write them as Python/TypeScript code
 - **Integrate with Plotly**, MDX/Next.js, ipywidgets, and any framework via the framework-agnostic renderer

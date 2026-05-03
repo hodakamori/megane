@@ -215,6 +215,40 @@ struct PyTrajectoryData {
     frame_positions: Py<PyArray2<f32>>,
 }
 
+/// Parse a DCD trajectory binary (CHARMM/NAMD/X-PLOR) and return frame data.
+#[pyfunction]
+fn parse_dcd(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
+    let traj = megane_core::dcd::parse_dcd(data).map_err(PyValueError::new_err)?;
+
+    let box_vec = match traj.box_matrix {
+        Some(m) => m.to_vec(),
+        None => vec![0.0f32; 9],
+    };
+    let box_array = Array2::from_shape_vec((3, 3), box_vec).map_err(|e| {
+        PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
+    })?;
+
+    let stride = traj.n_atoms * 3;
+    let mut flat: Vec<f32> = Vec::with_capacity(traj.n_frames * stride);
+    for frame in &traj.frame_positions {
+        flat.extend_from_slice(frame);
+    }
+    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), flat).map_err(|e| {
+        PyValueError::new_err(format!(
+            "failed to reshape frame_positions into ({}, {}): {e}",
+            traj.n_frames, stride
+        ))
+    })?;
+
+    Ok(PyTrajectoryData {
+        n_atoms: traj.n_atoms,
+        n_frames: traj.n_frames,
+        timestep_ps: traj.timestep_ps,
+        box_matrix: box_array.into_pyarray(py).into(),
+        frame_positions: frame_array.into_pyarray(py).into(),
+    })
+}
+
 /// Parse a LAMMPS dump trajectory text and return frame data.
 #[pyfunction]
 fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
@@ -333,6 +367,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cif, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xtc, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_dcd, m)?)?;
     m.add_function(wrap_pyfunction!(parse_traj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammpstrj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_netcdf, m)?)?;
