@@ -19,16 +19,19 @@ import type {
 } from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { getVectorsForFrame } from "../logic/vectorSourceLogic";
+import type { ColorScheme } from "../colorSchemes";
 
 /**
  * Apply the current ViewportState to the renderer.
  * If previous is null, all properties are applied (initial).
+ * atomLabels is required for residue/chain color schemes.
  */
 export function applyViewportState(
   renderer: MoleculeRenderer,
   current: ViewportState,
   previous: ViewportState | null,
   primaryNodeId?: string | null,
+  atomLabels?: string[] | null,
 ): void {
   // ─── Determine which node IDs are primary vs layer ─────────
   const currentNodeIds = collectSourceNodeIds(current);
@@ -154,6 +157,10 @@ export function applyViewportState(
   }
   if (!previous || current.representationMode !== previous.representationMode) {
     renderer.setRepresentationType(current.representationMode ?? "atoms");
+  }
+  const prevScheme: ColorScheme = previous?.colorScheme ?? "byElement";
+  if (!previous || current.colorScheme !== prevScheme) {
+    renderer.setColorScheme(current.colorScheme ?? "byElement", atomLabels ?? null);
   }
 
   // ─── Labels (primary structure only for now) ───────────────

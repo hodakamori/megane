@@ -6,7 +6,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--megane-bg, #ffffff);
 }
 
 .megane-jupyter-doc > div {
@@ -21,7 +21,7 @@
   width: 100%;
   height: 100%;
   font-size: 14px;
-  color: #64748b;
+  color: var(--megane-text-secondary, #64748b);
   padding: 20px;
   text-align: center;
 }

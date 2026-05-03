@@ -14,6 +14,7 @@ import * as THREE from "three";
 import type { Snapshot } from "../types";
 import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { atomVertexShader, atomFragmentShader } from "./shaders";
+import { type ColorContext, getAtomColorForScheme } from "../colorSchemes";
 
 export class ImpostorAtomMesh {
   readonly mesh: THREE.Mesh;
@@ -88,7 +89,7 @@ export class ImpostorAtomMesh {
     this.mesh.frustumCulled = false;
   }
 
-  loadSnapshot(snapshot: Snapshot): void {
+  loadSnapshot(snapshot: Snapshot, colorCtx?: ColorContext): void {
     const { nAtoms, positions, elements } = snapshot;
     this.nAtoms = nAtoms;
 
@@ -106,7 +107,9 @@ export class ImpostorAtomMesh {
 
       this.radiusBuf[i] = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
 
-      const [r, g, b] = getColor(elements[i]);
+      const [r, g, b] = colorCtx
+        ? getAtomColorForScheme(i, snapshot, colorCtx)
+        : getColor(elements[i]);
       this.colorBuf[i3] = r;
       this.colorBuf[i3 + 1] = g;
       this.colorBuf[i3 + 2] = b;

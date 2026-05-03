@@ -13,6 +13,8 @@ import {
   BackgroundVariant,
   useReactFlow,
 } from "@xyflow/react";
+import { useThemeStore } from "../stores/useThemeStore";
+import type { Theme } from "../stores/useThemeStore";
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
@@ -160,6 +162,34 @@ const IconTutorial = (
     <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
   </svg>
 );
+
+const THEME_ICONS: Record<Theme, React.ReactNode> = {
+  light: (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  ),
+  dark: (
+    <svg {...iconProps}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  ),
+  system: (
+    <svg {...iconProps}>
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  ),
+};
 
 /* Category icons for Add Node dropdown */
 const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
@@ -351,6 +381,36 @@ const shareBtnStyle: React.CSSProperties = {
   color: "#059669",
 };
 
+const shareFeedbackBase: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "4px 10px",
+  borderRadius: 4,
+  lineHeight: 1.2,
+};
+
+const SHARE_FEEDBACK_STYLES: Record<"success" | "warning" | "error", React.CSSProperties> = {
+  success: {
+    ...shareFeedbackBase,
+    background: "rgba(16, 185, 129, 0.12)",
+    border: "1px solid rgba(16, 185, 129, 0.35)",
+    color: "#047857",
+  },
+  warning: {
+    ...shareFeedbackBase,
+    background: "rgba(220, 38, 38, 0.12)",
+    border: "1px solid rgba(220, 38, 38, 0.35)",
+    color: "#b91c1c",
+  },
+  error: {
+    ...shareFeedbackBase,
+    background: "rgba(220, 38, 38, 0.12)",
+    border: "1px solid rgba(220, 38, 38, 0.35)",
+    color: "#b91c1c",
+  },
+};
+
 const guideBtnStyle: React.CSSProperties = {
   ...textBtnBase,
   background: "rgba(100, 116, 139, 0.08)",
@@ -365,15 +425,22 @@ const tutorialBtnStyle: React.CSSProperties = {
   color: "#1d4ed8",
 };
 
+const themeBtnStyle: React.CSSProperties = {
+  ...textBtnBase,
+  background: "rgba(148, 163, 184, 0.08)",
+  border: "1px solid rgba(148, 163, 184, 0.3)",
+  color: "var(--megane-text-secondary)",
+};
+
 const dropdownStyle: React.CSSProperties = {
   position: "absolute",
   top: "100%",
   right: 0,
   marginTop: 4,
-  background: "white",
-  border: "1px solid #e2e8f0",
+  background: "var(--megane-surface-solid)",
+  border: "1px solid var(--megane-border-solid)",
   borderRadius: 8,
-  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+  boxShadow: "0 4px 12px var(--megane-shadow)",
   zIndex: 100,
   minWidth: 180,
   padding: "4px 0",
@@ -387,14 +454,14 @@ const dropdownItemStyle: React.CSSProperties = {
   padding: "6px 14px 6px 20px",
   cursor: "pointer",
   fontSize: 12,
-  color: "#334155",
+  color: "var(--megane-text)",
   textAlign: "left",
 };
 
 const groupHeaderStyle: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
   padding: "6px 14px 2px",
@@ -405,7 +472,7 @@ const groupHeaderStyle: React.CSSProperties = {
 
 const templateItemDescStyle: React.CSSProperties = {
   fontSize: 10,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   marginTop: 1,
 };
 
@@ -421,7 +488,7 @@ const toolbarRowStyle: React.CSSProperties = {
 const toolbarCategoryLabelStyle: React.CSSProperties = {
   fontSize: 9,
   fontWeight: 700,
-  color: "#94a3b8",
+  color: "var(--megane-text-muted)",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
   marginRight: 2,
@@ -484,11 +551,22 @@ function PipelineEditorInner({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [showRenderModal, setShowRenderModal] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<{
+    message: string;
+    tone: "success" | "warning" | "error";
+  } | null>(null);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { theme, setTheme } = useThemeStore();
+  const THEME_CYCLE: Theme[] = ["light", "dark", "system"];
+  const THEME_LABELS: Record<Theme, string> = { light: "Light", dark: "Dark", system: "Auto" };
+  const handleCycleTheme = useCallback(() => {
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length];
+    setTheme(next);
+  }, [theme, setTheme]);
 
   // Resize drag handling
   const handleResizeMouseDown = useCallback(
@@ -633,10 +711,21 @@ function PipelineEditorInner({
   );
 
   const handleShare = useCallback(async () => {
-    const serialized = usePipelineStore.getState().serialize();
-    const outcome = await shareCurrentPipeline(serialized);
-    setShareFeedback(outcome.message);
-    setTimeout(() => setShareFeedback(null), outcome.clearAfterMs);
+    try {
+      const serialized = usePipelineStore.getState().serialize();
+      const outcome = await shareCurrentPipeline(serialized);
+      const tone: "success" | "warning" | "error" = outcome.tooLong
+        ? "warning"
+        : outcome.copyFailed
+          ? "error"
+          : "success";
+      setShareFeedback({ message: outcome.message, tone });
+      setTimeout(() => setShareFeedback(null), outcome.clearAfterMs);
+    } catch (err) {
+      console.error("Share failed:", err);
+      setShareFeedback({ message: "Share failed — see console", tone: "error" });
+      setTimeout(() => setShareFeedback(null), 5000);
+    }
   }, []);
 
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
@@ -766,20 +855,20 @@ function PipelineEditorInner({
         </button>
       </div>
       {shareFeedback && (
-        <div
-          style={{
-            fontSize: 10,
-            color: shareFeedback.startsWith("Pipeline too") ? "#dc2626" : "#059669",
-            padding: "2px 0 0 68px",
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          {shareFeedback}
+        <div style={{ padding: "2px 0 0 68px" }}>
+          <span
+            data-testid="pipeline-editor-share-feedback"
+            data-tone={shareFeedback.tone}
+            style={SHARE_FEEDBACK_STYLES[shareFeedback.tone]}
+            role="status"
+            aria-live="polite"
+          >
+            {shareFeedback.message}
+          </span>
         </div>
       )}
 
-      {/* Row 3 — Others: help */}
+      {/* Row 3 — Others: help & appearance */}
       <div style={toolbarRowStyle}>
         <span style={toolbarCategoryLabelStyle}>Others</span>
         <button
@@ -799,6 +888,15 @@ function PipelineEditorInner({
           aria-label="Open pipeline tutorial"
         >
           {IconTutorial} Tutorial
+        </button>
+        <button
+          data-testid="pipeline-editor-theme"
+          onClick={handleCycleTheme}
+          style={themeBtnStyle}
+          title={`Theme: ${THEME_LABELS[theme]} (click to cycle)`}
+          aria-label={`Switch theme, current: ${THEME_LABELS[theme]}`}
+        >
+          {THEME_ICONS[theme]} {THEME_LABELS[theme]}
         </button>
       </div>
     </>
@@ -846,22 +944,27 @@ function PipelineEditorInner({
           }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e2e8f0" />
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={16}
+            size={1}
+            color="var(--megane-border-solid)"
+          />
           <MiniMap
             style={{
-              background: "rgba(255,255,255,0.8)",
-              border: "1px solid #e2e8f0",
+              background: "var(--megane-surface-solid)",
+              border: "1px solid var(--megane-border-solid)",
               borderRadius: 6,
               width: 100,
               height: 70,
             }}
-            nodeColor="#3b82f6"
+            nodeColor="var(--megane-primary)"
             maskColor="rgba(59,130,246,0.05)"
           />
           <Controls
             showInteractive={false}
             style={{
-              border: "1px solid #e2e8f0",
+              border: "1px solid var(--megane-border-solid)",
               borderRadius: 6,
               boxShadow: "none",
             }}

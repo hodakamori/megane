@@ -5,6 +5,7 @@
  */
 
 import type { Snapshot, Frame, TrajectoryMeta, BondSource, VectorFrame } from "../types";
+import type { ColorScheme } from "../colorSchemes";
 
 // ─── Pipeline Data Types ──────────────────────────────────────────────
 
@@ -344,6 +345,7 @@ export interface ViewportParams {
   pivotMarkerVisible: boolean;
   /** Visual representation: "atoms" (default), "cartoon", or "both". */
   representationMode: RepresentationMode;
+  colorScheme?: ColorScheme;
 }
 
 export interface FilterParams {
@@ -418,6 +420,7 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         cellAxesVisible: true,
         pivotMarkerVisible: true,
         representationMode: "atoms" as RepresentationMode,
+        colorScheme: "byElement",
       };
     case "filter":
       return { type, query: "", bond_query: "" };
@@ -498,6 +501,7 @@ export interface ViewportState {
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
   representationMode: RepresentationMode;
+  colorScheme: ColorScheme;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -512,6 +516,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   cellAxesVisible: true,
   pivotMarkerVisible: true,
   representationMode: "atoms",
+  colorScheme: "byElement",
 };
 
 // ─── Node Errors ──────────────────────────────────────────────────────

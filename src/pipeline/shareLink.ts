@@ -18,7 +18,7 @@ const COPIED_MESSAGE = "Link copied to clipboard!";
 const COPY_FAILED_MESSAGE = "Copy failed — see console for the link";
 
 const COPIED_TOAST_MS = 3000;
-const TOO_LONG_TOAST_MS = 4000;
+const TOO_LONG_TOAST_MS = 5000;
 
 // ── byte ↔ base64url ────────────────────────────────────────────────────────
 

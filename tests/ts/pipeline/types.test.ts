@@ -112,6 +112,7 @@ describe("defaultParams", () => {
       cellAxesVisible: true,
       pivotMarkerVisible: true,
       representationMode: "atoms",
+      colorScheme: "byElement",
     });
   });
 

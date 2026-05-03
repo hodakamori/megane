@@ -31,6 +31,7 @@ import { PivotMarker } from "./PivotMarker";
 import { CartoonRenderer } from "./CartoonRenderer";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
+import { type ColorScheme, type ColorContext, computeBfactorRange } from "../colorSchemes";
 import { pickAtPixel, projectToScreen } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
@@ -206,6 +207,8 @@ export class MoleculeRenderer {
   private atomOpacity = 1.0;
   private bondScale = 1.0;
   private bondOpacity = 1.0;
+  private colorScheme: ColorScheme = "byElement";
+  private colorAtomLabels: string[] | null = null;
   private viewInsetLeft = 0;
   private viewInsetRight = 0;
   private dprMediaQuery: MediaQueryList | null = null;
@@ -387,7 +390,7 @@ export class MoleculeRenderer {
       this.swapRenderers(true);
     }
 
-    this.atomRenderer!.loadSnapshot(snapshot);
+    this.atomRenderer!.loadSnapshot(snapshot, this.buildColorContext(snapshot));
     // Bond loading is handled exclusively by the pipeline via updateBondsExt/updateBonds
     // (called from applyViewportState). This avoids race conditions between
     // Viewport's loadSnapshot and MeganeViewer's applyViewportState effects.
@@ -487,10 +490,8 @@ export class MoleculeRenderer {
       bondOrders,
     };
     this.snapshot = updated;
-    this.bondRenderer.loadSnapshot({
-      ...updated,
-      positions,
-    });
+    const colorCtx = this.buildColorContext(updated);
+    this.bondRenderer.loadSnapshot({ ...updated, positions }, colorCtx);
     if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
       this.bondRenderer.setScale(this.bondScale, updated);
     }
@@ -512,7 +513,7 @@ export class MoleculeRenderer {
     const pos = positions ?? this.currentPositions ?? this.snapshot.positions;
     const elems = elements ?? this.snapshot.elements;
     const atomCount = nAtoms || this.snapshot.nAtoms;
-    this.bondRenderer.loadSnapshot({
+    const extSnap = {
       ...this.snapshot,
       nAtoms: atomCount,
       nBonds: bonds.length / 2,
@@ -520,7 +521,8 @@ export class MoleculeRenderer {
       bondOrders,
       positions: pos,
       elements: elems,
-    });
+    };
+    this.bondRenderer.loadSnapshot(extSnap, this.buildColorContext(this.snapshot));
     if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
       this.bondRenderer.setScale(this.bondScale, this.snapshot);
     }
@@ -657,6 +659,41 @@ export class MoleculeRenderer {
   setBondOpacity(opacity: number): void {
     this.bondOpacity = opacity;
     this.bondRenderer?.setOpacity?.(opacity);
+  }
+
+  /** Update the active color scheme and immediately recolor if a snapshot is loaded. */
+  setColorScheme(scheme: ColorScheme, atomLabels: string[] | null): void {
+    this.colorScheme = scheme;
+    this.colorAtomLabels = atomLabels;
+    if (this.snapshot && this.atomRenderer) {
+      const ctx = this.buildColorContext(this.snapshot);
+      this.atomRenderer.loadSnapshot(this.snapshot, ctx);
+      // Recolor bonds with current bond state (positions may have advanced)
+      if (this.bondRenderer && this.snapshot.nBonds > 0) {
+        const positions = this.currentPositions ?? this.snapshot.positions;
+        this.bondRenderer.loadSnapshot({ ...this.snapshot, positions }, ctx);
+        if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
+          this.bondRenderer.setScale(this.bondScale, this.snapshot);
+        }
+      }
+    }
+    // Also recolor any structure layers
+    for (const layer of this.layers.values()) {
+      if (layer.snapshot) {
+        const ctx = this.buildColorContext(layer.snapshot);
+        layer.loadSnapshotWithColor(ctx);
+      }
+    }
+  }
+
+  /** Build a ColorContext for the given snapshot using current scheme and labels. */
+  private buildColorContext(snapshot: Snapshot): ColorContext | undefined {
+    if (this.colorScheme === "byElement") return undefined;
+    return {
+      scheme: this.colorScheme,
+      atomLabels: this.colorAtomLabels,
+      bfactorRange: computeBfactorRange(snapshot),
+    };
   }
 
   /** Apply per-bond opacity overrides (one value per logical bond). */
@@ -1192,6 +1229,12 @@ export class MoleculeRenderer {
       this.lastDpr = savedDpr;
       this.onResize();
     };
+  }
+
+  /** Update the Three.js scene and canvas background color (e.g. when theme changes). */
+  setBackgroundColor(hexColor: number): void {
+    if (this.renderer) this.renderer.setClearColor(hexColor, 1);
+    if (this.scene) this.scene.background = new THREE.Color(hexColor);
   }
 
   /** Get a copy of current atom positions (public, for external use). */

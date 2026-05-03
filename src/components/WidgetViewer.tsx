@@ -23,6 +23,7 @@ import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 import type { Snapshot, Frame, Measurement, HoverInfo } from "../types";
+import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
 interface WidgetViewerProps {
   snapshot: Snapshot | null;
@@ -163,13 +164,19 @@ export function WidgetViewer({
 
     const renderer = rendererRef.current;
     if (renderer) {
-      const vs = pipelineStore.getState().viewportState;
-      applyViewportState(renderer, vs, null);
-      prevViewportStateRef.current = vs;
+      const storeState = pipelineStore.getState();
+      applyViewportState(
+        renderer,
+        storeState.viewportState,
+        null,
+        undefined,
+        storeState.atomLabels,
+      );
+      prevViewportStateRef.current = storeState.viewportState;
 
       // Restore persisted camera on first load (Viewport's loadSnapshot/fitToView
       // runs before this effect because child effects execute first).
-      const effectiveSnap = pipelineStore.getState().snapshot ?? snapshot;
+      const effectiveSnap = storeState.snapshot ?? snapshot;
       if (effectiveSnap && !hasRestoredCameraRef.current) {
         hasRestoredCameraRef.current = true;
         const saved = initialCameraStateRef.current;
@@ -182,9 +189,16 @@ export function WidgetViewer({
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
-    applyViewportState(renderer, viewportState, prevViewportStateRef.current);
+    const atomLabels = pipelineStore.getState().atomLabels;
+    applyViewportState(
+      renderer,
+      viewportState,
+      prevViewportStateRef.current,
+      undefined,
+      atomLabels,
+    );
     prevViewportStateRef.current = viewportState;
-  }, [viewportState]);
+  }, [viewportState, pipelineStore]);
 
   // Per-frame bond recalculation for distance mode
   useEffect(() => {
@@ -234,9 +248,15 @@ export function WidgetViewer({
     setBondCount(total);
   }, [viewportState.bonds]);
 
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  useEffect(() => {
+    rendererRef.current?.setBackgroundColor(themeToHex(resolvedTheme));
+  }, [resolvedTheme]);
+
   const handleRendererReady = useCallback(
     (renderer: MoleculeRenderer) => {
       rendererRef.current = renderer;
+      renderer.setBackgroundColor(themeToHex(useThemeStore.getState().resolvedTheme));
       applyViewportState(renderer, pipelineStore.getState().viewportState, null);
       prevViewportStateRef.current = pipelineStore.getState().viewportState;
       // Apply initial selectedAtoms that may have arrived before the renderer was ready

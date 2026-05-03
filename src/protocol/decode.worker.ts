@@ -60,6 +60,8 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
             bonds: snapshot.bonds,
             bondOrders: snapshot.bondOrders,
             box: snapshot.box,
+            atomChainIds: null,
+            atomBFactors: null,
           },
         } satisfies WorkerResponse,
         transfers,

@@ -32,6 +32,8 @@ wheel-share/data/share/jupyter/labextensions/megane-jupyterlab/
 jupyterlab-megane/lib/
 jupyterlab-megane/node_modules/
 jupyterlab-megane/tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo
+dist-node/
 .ipynb_checkpoints/
 docs/node_modules
 docs/.docusaurus/
