@@ -76,7 +76,7 @@ const paths = [
   {
     icon: "🐳",
     title: "Docker",
-    install: "docker run hodakamori/megane",
+    install: "docker build -t megane .",
     isCommand: true,
     description: "Serve local structure files and view them instantly in the browser. No code needed.",
     href: "/guide/cli",
@@ -126,12 +126,12 @@ function Features() {
     {
       title: "🚀 1M+ Atoms at 60fps",
       description:
-        "Billboard impostor rendering scales from small molecules to massive protein complexes in real time. Stream XTC trajectories over WebSocket — scrub thousands of frames without loading everything into memory.",
+        "Billboard impostor rendering scales from small molecules to massive protein complexes in real time. Run `megane serve` to stream XTC trajectories from disk over WebSocket — scrub thousands of frames without loading everything into memory.",
     },
     {
       title: "🌍 Runs Everywhere",
       description:
-        "Jupyter widget, CLI server, React component, VSCode extension. Rust parsers (PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, .traj) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
+        "Jupyter widget, CLI server, React component, VSCode extension, JupyterLab labextension. Rust parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj, LAMMPS dump) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
     },
     {
       title: "🧩 Visual Pipeline Editor",
@@ -165,15 +165,17 @@ function PillarSection() {
       <section className="pillar-section">
         <h2>Scale</h2>
         <p>
-          megane renders over <strong>1 million atoms at 60fps</strong> in the browser.
-          Small systems get high-quality InstancedMesh spheres and cylinders; large systems
-          automatically switch to GPU-accelerated billboard impostors. No desktop app,
-          no plugin — just a browser tab.
+          megane renders over <strong>1 million atoms at 60fps</strong> in the browser
+          using GPU-accelerated billboard impostor rendering — atoms are drawn as
+          screen-aligned quads with a ray-sphere shader, so a single instanced draw
+          call covers the whole structure. No desktop app, no plugin — just a browser
+          tab.
         </p>
         <p>
-          Trajectory streaming works over WebSocket via a binary protocol. Load an XTC
-          file and scrub through thousands of frames in real time, without reading
-          everything into memory.
+          With the <code>megane serve</code> CLI, multi-GB XTC trajectories stream over a
+          local WebSocket via a binary protocol — scrub through thousands of frames
+          without reading the whole file into memory. (Other hosts load trajectories
+          fully into memory; see <a href="/platform-support#ui-features">Platform Support</a>.)
         </p>
       </section>
 
@@ -214,9 +216,10 @@ function PillarSection() {
               </tbody>
             </table>
             <p>
-              The secret: PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, and ASE .traj parsers
-              are written in <strong>Rust</strong> and compiled to both <strong>PyO3</strong>{" "}
-              (Python) and <strong>WASM</strong> (browser). Parse once, run anywhere.
+              The secret: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC,
+              ASE .traj, and LAMMPS dump parsers are written in <strong>Rust</strong> and
+              compiled to both <strong>PyO3</strong> (Python) and <strong>WASM</strong>{" "}
+              (browser). Parse once, run anywhere.
             </p>
           </div>
           <div className="pillar-images single-col">
