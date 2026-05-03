@@ -13,12 +13,11 @@ import { useThemeStore } from "@megane/stores/useThemeStore";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
+import { TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
 
 const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
 );
-
-const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".lammpstrj", ".dump", ".nc"]);
 
 /**
  * Subscription channel used by `DocBody` to re-load when the host
