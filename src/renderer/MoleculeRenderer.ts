@@ -691,8 +691,7 @@ export class MoleculeRenderer {
     if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms;
     if (this.cartoonRenderer) {
       // Only show cartoon when it has backbone data
-      const hasBackbone =
-        this.snapshot?.caIndices != null && this.snapshot.caIndices.length > 0;
+      const hasBackbone = this.snapshot?.caIndices != null && this.snapshot.caIndices.length > 0;
       this.cartoonRenderer.setVisible(showCartoon && hasBackbone);
     }
   }

@@ -134,9 +134,15 @@ function makeCurve(pts: THREE.Vector3[]): THREE.CatmullRomCurve3 | null {
   // Pad the curve with a reflected ghost point at each end so the first/last
   // segment isn't shortened by the catmull-rom tangent computation.
   const padded = [
-    pts[0].clone().multiplyScalar(2).sub(pts[1] ?? pts[0]),
+    pts[0]
+      .clone()
+      .multiplyScalar(2)
+      .sub(pts[1] ?? pts[0]),
     ...pts,
-    pts[pts.length - 1].clone().multiplyScalar(2).sub(pts[pts.length - 2] ?? pts[pts.length - 1]),
+    pts[pts.length - 1]
+      .clone()
+      .multiplyScalar(2)
+      .sub(pts[pts.length - 2] ?? pts[pts.length - 1]),
   ];
   return new THREE.CatmullRomCurve3(padded, false, "catmullrom", 0.5);
 }
@@ -169,7 +175,8 @@ function buildHelixMesh(pts: THREE.Vector3[]): THREE.Mesh | null {
     const t = i / numSamples;
     const pos = curve.getPoint(t);
     const N = frenetFrames.normals[i] ?? frenetFrames.normals[frenetFrames.normals.length - 1];
-    const B = frenetFrames.binormals[i] ?? frenetFrames.binormals[frenetFrames.binormals.length - 1];
+    const B =
+      frenetFrames.binormals[i] ?? frenetFrames.binormals[frenetFrames.binormals.length - 1];
 
     // 4 corners of the rectangle cross-section: (±w, ±t)
     for (const sW of [-1, 1]) {
