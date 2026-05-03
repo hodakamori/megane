@@ -402,6 +402,8 @@ def _load_structure_file(path: str):
         ".xyz": megane_parser.parse_xyz,
         ".mol": megane_parser.parse_mol,
         ".sdf": megane_parser.parse_mol,
+        ".mol2": megane_parser.parse_mol2,
+        ".cif": megane_parser.parse_cif,
         ".data": megane_parser.parse_lammps_data,
         ".lammps": megane_parser.parse_lammps_data,
     }
