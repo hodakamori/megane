@@ -766,10 +766,6 @@ class TestViewWrapper:
         assert vp_cfg["perspective"] is True
         assert vp_cfg["cellAxesVisible"] is False
 
-    def test_pipeline_enabled(self):
-        viewer = view(str(FIXTURES / "1crn.pdb"))
-        assert viewer._pipeline_enabled is True
-
     def test_has_node_data(self):
         viewer = view(str(FIXTURES / "1crn.pdb"))
         pipe = viewer._pipeline_ref
@@ -949,7 +945,8 @@ class TestBuildPipeline:
         pipe = build_pipeline(str(FIXTURES / "1crn.pdb"))
         viewer = MolecularViewer()
         viewer.set_pipeline(pipe)
-        assert viewer._pipeline_enabled is True
+        assert viewer._pipeline_json != ""
+        assert len(viewer._node_snapshots_data) > 0
 
     def test_with_top_topology(self):
         pipe = build_pipeline(
