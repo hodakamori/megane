@@ -15,13 +15,13 @@ const MAX_HASH_LENGTH = 8000;
 
 // ── byte ↔ base64url ────────────────────────────────────────────────────────
 
-function bytesToBase64url(bytes: Uint8Array): string {
+function bytesToBase64url(bytes: Uint8Array<ArrayBuffer>): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-function base64urlToBytes(str: string): Uint8Array {
+function base64urlToBytes(str: string): Uint8Array<ArrayBuffer> {
   const padded = str.replace(/-/g, "+").replace(/_/g, "/");
   const padding = (4 - (padded.length % 4)) % 4;
   const binary = atob(padded + "=".repeat(padding));
@@ -32,7 +32,7 @@ function base64urlToBytes(str: string): Uint8Array {
 
 // ── deflate-raw helpers (async, CompressionStream) ──────────────────────────
 
-async function deflate(data: Uint8Array): Promise<Uint8Array> {
+async function deflate(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const cs = new CompressionStream("deflate-raw");
   const writer = cs.writable.getWriter();
   await writer.write(data);
@@ -40,7 +40,7 @@ async function deflate(data: Uint8Array): Promise<Uint8Array> {
   return collectStream(cs.readable);
 }
 
-async function inflate(data: Uint8Array): Promise<Uint8Array> {
+async function inflate(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const ds = new DecompressionStream("deflate-raw");
   const writer = ds.writable.getWriter();
   await writer.write(data);
@@ -48,7 +48,9 @@ async function inflate(data: Uint8Array): Promise<Uint8Array> {
   return collectStream(ds.readable);
 }
 
-async function collectStream(readable: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+async function collectStream(
+  readable: ReadableStream<Uint8Array>,
+): Promise<Uint8Array<ArrayBuffer>> {
   const chunks: Uint8Array[] = [];
   const reader = readable.getReader();
   for (;;) {
@@ -69,8 +71,8 @@ async function collectStream(readable: ReadableStream<Uint8Array>): Promise<Uint
 // ── public API ───────────────────────────────────────────────────────────────
 
 /**
- * Encode a pipeline to the hash fragment value.
- * Returns the encoded string and whether the resulting URL would be too long.
+ * Encode a pipeline to a shareable URL.
+ * Returns the URL and whether the resulting hash would be too long to share.
  */
 export async function buildShareUrl(
   pipeline: SerializedPipeline,
