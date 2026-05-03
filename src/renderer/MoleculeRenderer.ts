@@ -144,6 +144,7 @@ function _setActiveRenderer(r: MoleculeRenderer | null): void {
               vectors: false,
               labels: false,
               polyhedra: false,
+              cartoon: false,
             },
       setCameraMode: (mode) => _activeRenderer?.setCameraMode(mode),
       resetCamera: () => _activeRenderer?.resetCamera(),

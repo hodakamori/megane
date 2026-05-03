@@ -56,7 +56,12 @@ fn parse_helix_range(line: &str) -> Option<SsRange> {
     let chain_id = line.as_bytes().get(19).copied().unwrap_or(b' ');
     let start: u32 = line[21..25].trim().parse().ok()?;
     let end: u32 = line[33..37].trim().parse().ok()?;
-    Some(SsRange { chain_id, start, end, ss_type: 1 })
+    Some(SsRange {
+        chain_id,
+        start,
+        end,
+        ss_type: 1,
+    })
 }
 
 /// Parse a PDB SHEET record and return a secondary-structure range.
@@ -67,7 +72,12 @@ fn parse_sheet_range(line: &str) -> Option<SsRange> {
     let chain_id = line.as_bytes().get(21).copied().unwrap_or(b' ');
     let start: u32 = line[22..26].trim().parse().ok()?;
     let end: u32 = line[33..37].trim().parse().ok()?;
-    Some(SsRange { chain_id, start, end, ss_type: 2 })
+    Some(SsRange {
+        chain_id,
+        start,
+        end,
+        ss_type: 2,
+    })
 }
 
 /// If `line` is an ATOM record for a Cα atom, return (chain_id, res_num).
@@ -502,15 +512,17 @@ mod tests {
 
     #[test]
     fn test_parse_ca_info_detects_alpha_carbon() {
-        let line = "ATOM      2  CA  THR A   1      16.967  12.784   4.338  1.00 10.80           C  ";
+        let line =
+            "ATOM      2  CA  THR A   1      16.967  12.784   4.338  1.00 10.80           C  ";
         let info = parse_ca_info(line).expect("should detect Cα");
         assert_eq!(info.0, b'A'); // chain ID
-        assert_eq!(info.1, 1);   // residue number
+        assert_eq!(info.1, 1); // residue number
     }
 
     #[test]
     fn test_parse_ca_info_rejects_non_ca() {
-        let line = "ATOM      1  N   THR A   1      17.047  14.099   3.625  1.00 13.79           N  ";
+        let line =
+            "ATOM      1  N   THR A   1      17.047  14.099   3.625  1.00 13.79           N  ";
         assert!(parse_ca_info(line).is_none());
     }
 
@@ -538,12 +550,12 @@ END
         assert_eq!(result.ca_indices[1], 3); // ALA A 2 → index 3
         assert_eq!(result.ca_indices[2], 5); // GLY A 3 → index 5
         assert_eq!(result.ca_indices[3], 7); // GLY A 4 → index 7
-        // SS types: THR 1 → helix(1), ALA 2 → helix(1), GLY 3 → sheet(2), GLY 4 → sheet(2)
+                                             // SS types: THR 1 → helix(1), ALA 2 → helix(1), GLY 3 → sheet(2), GLY 4 → sheet(2)
         assert_eq!(result.ca_ss_type[0], 1); // helix
         assert_eq!(result.ca_ss_type[1], 1); // helix
         assert_eq!(result.ca_ss_type[2], 2); // sheet
         assert_eq!(result.ca_ss_type[3], 2); // sheet
-        // All chain IDs should be b'A'
+                                             // All chain IDs should be b'A'
         assert!(result.ca_chain_ids.iter().all(|&c| c == b'A'));
     }
 
@@ -563,7 +575,8 @@ END
     #[test]
     fn test_parse_ca_info_cb_is_not_ca() {
         // CB (beta carbon) should not be detected as Cα
-        let line = "ATOM      5  CB  THR A   1      16.000  12.000   4.000  1.00  0.00           C  ";
+        let line =
+            "ATOM      5  CB  THR A   1      16.000  12.000   4.000  1.00  0.00           C  ";
         assert!(parse_ca_info(line).is_none());
     }
 }
