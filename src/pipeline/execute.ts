@@ -192,7 +192,7 @@ export function executePipeline(
         break;
       }
       case "modify": {
-        const outputs = executeModify(data.params as ModifyParams, inputs);
+        const outputs = executeModify(data.params as ModifyParams, inputs, ctx.atomLabels ?? null);
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });

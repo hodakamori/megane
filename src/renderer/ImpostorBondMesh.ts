@@ -251,6 +251,45 @@ export class ImpostorBondMesh {
     this.positionTex.needsUpdate = true;
   }
 
+  /**
+   * Recompute per-instance bond colors from a caller-supplied per-atom RGB
+   * buffer (length === `snapshot.nAtoms * 3`). The fan-out for double / triple
+   * / aromatic bonds is reproduced exactly as `loadSnapshot` did, so a single
+   * call replaces the GPU color buffer in place.
+   *
+   * Used after `ImpostorAtomMesh.applyColorOverrides` has updated atom colors
+   * — this propagates the updated palette to bonds without re-uploading the
+   * topology buffers.
+   */
+  recomputeColorsFromAtomBuffer(atomColors: Float32Array, snapshot: Snapshot): void {
+    const { nBonds, bonds, bondOrders } = snapshot;
+    let idx = 0;
+    for (let i = 0; i < nBonds; i++) {
+      const ai = bonds[i * 2];
+      const bi = bonds[i * 2 + 1];
+      const order = bondOrders ? bondOrders[i] : BOND_SINGLE;
+
+      const ai3 = ai * 3;
+      const bi3 = bi * 3;
+      const cr = (atomColors[ai3] + atomColors[bi3]) * 0.5;
+      const cg = (atomColors[ai3 + 1] + atomColors[bi3 + 1]) * 0.5;
+      const cb = (atomColors[ai3 + 2] + atomColors[bi3 + 2]) * 0.5;
+
+      let perBond = 1;
+      if (order === BOND_DOUBLE || order === BOND_AROMATIC) perBond = 2;
+      else if (order === BOND_TRIPLE) perBond = 3;
+
+      for (let k = 0; k < perBond; k++) {
+        const j3 = idx * 3;
+        this.colorBuf[j3] = cr;
+        this.colorBuf[j3 + 1] = cg;
+        this.colorBuf[j3 + 2] = cb;
+        idx++;
+      }
+    }
+    this.colorAttr.needsUpdate = true;
+  }
+
   private setTopology(
     idx: number,
     ai: number,

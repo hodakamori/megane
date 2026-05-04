@@ -9,7 +9,6 @@ import type { PipelineNodeData } from "../../pipeline/execute";
 import type { ViewportParams, RepresentationMode } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
-import { COLOR_SCHEME_LABELS, type ColorScheme } from "../../colorSchemes";
 
 const toggleRowStyle: React.CSSProperties = {
   display: "flex",
@@ -66,22 +65,6 @@ export function ViewportNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
             ))}
           </select>
         </div>
-        <label style={toggleRowStyle}>
-          Color scheme
-          <select
-            value={params.colorScheme ?? "byElement"}
-            onChange={(e) => updateNodeParams(id, { colorScheme: e.target.value as ColorScheme })}
-            style={selectStyle}
-          >
-            {(Object.entries(COLOR_SCHEME_LABELS) as [ColorScheme, string][]).map(
-              ([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ),
-            )}
-          </select>
-        </label>
         <label style={toggleRowStyle}>
           Perspective
           <input

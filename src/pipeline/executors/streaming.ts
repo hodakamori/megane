@@ -36,6 +36,7 @@ export function executeStreaming(
     indices: null,
     scaleOverrides: null,
     opacityOverrides: null,
+    colorOverrides: null,
   };
   outputs.set("particle", particle);
 

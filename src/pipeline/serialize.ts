@@ -78,6 +78,13 @@ export function deserializePipeline(json: SerializedPipeline): {
     const nodeType = serialized.type as PipelineNodeType;
     const defaults = defaultParams(nodeType);
     const { id, position, enabled, ...paramFields } = serialized;
+    // Drop legacy fields that no longer exist on the current params shape.
+    // Viewport.colorScheme moved to Modify.colorMode; any value carried by
+    // older saved pipelines is silently discarded (legacy graphs render with
+    // the default CPK / byElement base colors until a Modify node is added).
+    if (nodeType === "viewport" && "colorScheme" in paramFields) {
+      delete (paramFields as { colorScheme?: unknown }).colorScheme;
+    }
     const params = { ...defaults, ...paramFields, type: nodeType } as typeof defaults;
 
     return {
