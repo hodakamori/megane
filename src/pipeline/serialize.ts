@@ -17,6 +17,8 @@ const VALID_NODE_TYPES: Set<string> = new Set([
   "viewport",
   "filter",
   "modify",
+  "color",
+  "representation",
   "label_generator",
   "polyhedron_generator",
   "vector_overlay",
@@ -84,6 +86,26 @@ export function deserializePipeline(json: SerializedPipeline): {
     // the default CPK / byElement base colors until a Modify node is added).
     if (nodeType === "viewport" && "colorScheme" in paramFields) {
       delete (paramFields as { colorScheme?: unknown }).colorScheme;
+    }
+    // Viewport.representationMode moved to the dedicated Representation node;
+    // legacy graphs render with the default "atoms" representation until a
+    // Representation node is added.
+    if (nodeType === "viewport" && "representationMode" in paramFields) {
+      delete (paramFields as { representationMode?: unknown }).representationMode;
+    }
+    // Modify color section split into the dedicated Color node; legacy graphs
+    // with these fields fall through to the default base colors.
+    if (nodeType === "modify") {
+      const legacy = paramFields as {
+        colorEnabled?: unknown;
+        colorMode?: unknown;
+        uniformColor?: unknown;
+        colorRange?: unknown;
+      };
+      delete legacy.colorEnabled;
+      delete legacy.colorMode;
+      delete legacy.uniformColor;
+      delete legacy.colorRange;
     }
     const params = { ...defaults, ...paramFields, type: nodeType } as typeof defaults;
 
@@ -267,7 +289,13 @@ function findReachableViewport(
       }
       const tgt = nodes.find((n) => n.id === e.target);
       if (!tgt) continue;
-      if (tgt.type !== "filter" && tgt.type !== "modify") continue;
+      if (
+        tgt.type !== "filter" &&
+        tgt.type !== "modify" &&
+        tgt.type !== "color" &&
+        tgt.type !== "representation"
+      )
+        continue;
       if (!visited.has(tgt.id)) {
         visited.add(tgt.id);
         stack.push(tgt.id);

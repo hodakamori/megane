@@ -26,6 +26,7 @@ export function executeLoadStructure(
     scaleOverrides: null,
     opacityOverrides: null,
     colorOverrides: null,
+    representationOverride: null,
   };
   outputs.set("particle", particle);
 

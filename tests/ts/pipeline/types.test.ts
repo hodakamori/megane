@@ -101,9 +101,23 @@ describe("defaultParams", () => {
       type: "modify",
       scale: 1.0,
       opacity: 1.0,
-      colorEnabled: false,
-      colorMode: "uniform",
+    });
+  });
+
+  it("returns correct defaults for color", () => {
+    const params = defaultParams("color");
+    expect(params).toEqual({
+      type: "color",
+      mode: "uniform",
       uniformColor: "#ff8800",
+    });
+  });
+
+  it("returns correct defaults for representation", () => {
+    const params = defaultParams("representation");
+    expect(params).toEqual({
+      type: "representation",
+      mode: "atoms",
     });
   });
 
@@ -114,7 +128,6 @@ describe("defaultParams", () => {
       perspective: false,
       cellAxesVisible: true,
       pivotMarkerVisible: true,
-      representationMode: "atoms",
     });
   });
 
@@ -186,7 +199,7 @@ describe("defaultParams", () => {
 describe("NODE_PORTS", () => {
   const allNodeTypes: PipelineNodeType[] = [
     "load_structure", "load_trajectory", "load_vector", "streaming",
-    "add_bond", "viewport", "filter", "modify",
+    "add_bond", "viewport", "filter", "modify", "color", "representation",
     "label_generator", "polyhedron_generator", "vector_overlay",
   ];
 
@@ -217,7 +230,7 @@ describe("NODE_TYPE_LABELS", () => {
   it("has labels for all node types", () => {
     const allTypes: PipelineNodeType[] = [
       "load_structure", "load_trajectory", "load_vector",
-      "add_bond", "viewport", "filter", "modify",
+      "add_bond", "viewport", "filter", "modify", "color", "representation",
       "label_generator", "polyhedron_generator", "vector_overlay",
     ];
     for (const t of allTypes) {

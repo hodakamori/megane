@@ -240,6 +240,10 @@ export class Filter extends PipelineNode {
 /**
  * Override per-atom visual properties (scale, opacity).
  *
+ * Color and representation now live on dedicated `Color` and `Representation`
+ * nodes so each modifier owns a single visual property (Ovito-style modifier
+ * stack).
+ *
  * Ports:
  *   inp.particle — atom data in
  *   out.particle — modified atom data
@@ -260,6 +264,82 @@ export class Modify extends PipelineNode {
 
   _toSerializedParams() {
     return { type: this.nodeType, scale: this.scale, opacity: this.opacity };
+  }
+}
+
+/**
+ * Per-stream coloring (Ovito-style). The Viewport reads color overrides
+ * directly off the particle stream, so multiple Color nodes can stack.
+ *
+ * Ports:
+ *   inp.particle — atom data in
+ *   out.particle — recolored atom data
+ */
+export type ColorMode =
+  | "uniform"
+  | "byElement"
+  | "byResidue"
+  | "byChain"
+  | "byBFactor"
+  | "byProperty";
+
+export class Color extends PipelineNode {
+  readonly nodeType = "color";
+  protected readonly _outPorts = { particle: "out" };
+  protected readonly _inpPorts = { particle: "in" };
+
+  public mode: ColorMode;
+  public uniformColor: string;
+  public range?: [number, number];
+
+  constructor({
+    mode = "uniform",
+    uniformColor = "#ff8800",
+    range,
+  }: { mode?: ColorMode; uniformColor?: string; range?: [number, number] } = {}) {
+    super();
+    this.mode = mode;
+    this.uniformColor = uniformColor;
+    this.range = range;
+  }
+
+  _toSerializedParams() {
+    const base: Record<string, unknown> = {
+      type: this.nodeType,
+      mode: this.mode,
+      uniformColor: this.uniformColor,
+    };
+    if (this.range !== undefined) base.range = this.range;
+    return base;
+  }
+}
+
+/**
+ * Tag the particle stream with the visual representation the Viewport should
+ * display. Stacks Ovito-style: the Viewport reads the override from the first
+ * particle stream that carries one. When no chain has an override, the
+ * Viewport falls back to `"atoms"`.
+ *
+ * Ports:
+ *   inp.particle — atom data in
+ *   out.particle — atom data tagged with the representation override
+ */
+export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface";
+
+export class Representation extends PipelineNode {
+  readonly nodeType = "representation";
+  protected readonly _outPorts = { particle: "out" };
+  protected readonly _inpPorts = { particle: "in" };
+
+  public mode: RepresentationMode;
+
+  constructor({ mode = "atoms" }: { mode?: RepresentationMode } = {}) {
+    super();
+    this.mode = mode;
+  }
+
+  _toSerializedParams() {
+    return { type: this.nodeType, mode: this.mode };
   }
 }
 

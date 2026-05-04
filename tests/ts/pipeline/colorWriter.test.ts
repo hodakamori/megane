@@ -30,6 +30,7 @@ function makeParticle(overrides: Float32Array | null = null): ParticleData {
     scaleOverrides: null,
     opacityOverrides: null,
     colorOverrides: overrides,
+    representationOverride: null,
   };
 }
 

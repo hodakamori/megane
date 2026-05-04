@@ -50,6 +50,8 @@ export {
   LoadVector,
   Filter,
   Modify,
+  Color,
+  Representation,
   AddBonds,
   AddLabels,
   AddPolyhedra,

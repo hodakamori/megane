@@ -43,6 +43,12 @@ export interface ParticleData {
    * null = this stream carries no color overrides at all.
    */
   colorOverrides: Float32Array | null;
+  /**
+   * Per-stream representation override set by an upstream `representation`
+   * node. The viewport picks the first non-null override across its primary
+   * particle inputs (in stream order); null means "no opinion, use default".
+   */
+  representationOverride: RepresentationMode | null;
 }
 
 /** Bond data flowing through the pipeline. */
@@ -182,6 +188,8 @@ export type PipelineNodeType =
   | "viewport"
   | "filter"
   | "modify"
+  | "color"
+  | "representation"
   | "label_generator"
   | "polyhedron_generator"
   | "vector_overlay";
@@ -196,6 +204,8 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   viewport: "Viewport",
   filter: "Filter",
   modify: "Modify",
+  color: "Color",
+  representation: "Representation",
   label_generator: "Labels",
   polyhedron_generator: "Polyhedra",
   vector_overlay: "Vectors",
@@ -214,6 +224,8 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   add_bond: "bond",
   filter: "filter",
   modify: "modify",
+  color: "modify",
+  representation: "modify",
   label_generator: "overlay",
   polyhedron_generator: "overlay",
   vector_overlay: "overlay",
@@ -287,6 +299,14 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
     outputs: [{ name: "out", dataType: "particle", label: "Out" }],
   },
+  color: {
+    inputs: [{ name: "in", dataType: "particle", label: "In" }],
+    outputs: [{ name: "out", dataType: "particle", label: "Out" }],
+  },
+  representation: {
+    inputs: [{ name: "in", dataType: "particle", label: "In" }],
+    outputs: [{ name: "out", dataType: "particle", label: "Out" }],
+  },
   label_generator: {
     inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
     outputs: [{ name: "label", dataType: "label", label: "Label" }],
@@ -308,6 +328,8 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
 export const GENERIC_NODE_ACCEPTS: Record<string, PipelineDataType[]> = {
   filter: ["particle", "bond"],
   modify: ["particle", "bond"],
+  color: ["particle"],
+  representation: ["particle"],
 };
 
 // ─── Node Parameters ──────────────────────────────────────────────────
@@ -340,7 +362,10 @@ export interface AddBondParams {
   bondFileData?: Uint32Array | null;
 }
 
-/** Visual representation mode selectable in the Viewport node. */
+/**
+ * Visual representation mode applied per-stream by the Representation node and
+ * read by the Viewport when collecting incoming particle data.
+ */
 export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface";
 
 export interface ViewportParams {
@@ -348,8 +373,6 @@ export interface ViewportParams {
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
-  /** Visual representation: "atoms" (default), "cartoon", or "both". */
-  representationMode: RepresentationMode;
 }
 
 export interface FilterParams {
@@ -358,7 +381,7 @@ export interface FilterParams {
   bond_query?: string; // bond selection query (empty/undefined = no filtering)
 }
 
-/** Per-atom palette modes for the Modify node's color section. */
+/** Per-atom palette modes used by the Color node. */
 export type ColorMode =
   | "uniform"
   | "byElement"
@@ -371,13 +394,20 @@ export interface ModifyParams {
   type: "modify";
   scale: number;
   opacity: number;
-  /** When true, recolor the upstream selection using colorMode. */
-  colorEnabled: boolean;
-  colorMode: ColorMode;
-  /** Hex color string used when colorMode === "uniform" (e.g. "#ff8800"). */
+}
+
+export interface ColorParams {
+  type: "color";
+  mode: ColorMode;
+  /** Hex color string used when mode === "uniform" (e.g. "#ff8800"). */
   uniformColor: string;
   /** Optional explicit range for byBFactor / byProperty. Undefined = auto. */
-  colorRange?: [number, number];
+  range?: [number, number];
+}
+
+export interface RepresentationParams {
+  type: "representation";
+  mode: RepresentationMode;
 }
 
 export interface LabelGeneratorParams {
@@ -416,6 +446,8 @@ export type PipelineNodeParams =
   | ViewportParams
   | FilterParams
   | ModifyParams
+  | ColorParams
+  | RepresentationParams
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
   | VectorOverlayParams;
@@ -439,7 +471,6 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         perspective: false,
         cellAxesVisible: true,
         pivotMarkerVisible: true,
-        representationMode: "atoms" as RepresentationMode,
       };
     case "filter":
       return { type, query: "", bond_query: "" };
@@ -448,9 +479,17 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         type,
         scale: 1.0,
         opacity: 1.0,
-        colorEnabled: false,
-        colorMode: "uniform",
+      };
+    case "color":
+      return {
+        type,
+        mode: "uniform",
         uniformColor: "#ff8800",
+      };
+    case "representation":
+      return {
+        type,
+        mode: "atoms",
       };
     case "label_generator":
       return { type, source: "element" };
@@ -514,6 +553,11 @@ export function resolveGenericPortType(sourceDataType: PipelineDataType): Pipeli
 
 /**
  * The collected data for rendering, produced by ViewportNode.
+ *
+ * `representationMode` is computed from incoming particle streams: the first
+ * non-null `representationOverride` (in stream order) wins; otherwise it
+ * defaults to `"atoms"`. The Viewport node itself no longer owns this setting
+ * — it lives on the dedicated Representation node.
  */
 export interface ViewportState {
   particles: ParticleData[];

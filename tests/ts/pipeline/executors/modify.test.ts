@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { executeModify } from "@/pipeline/executors/modify";
-import type { ModifyParams, ParticleData, PipelineData } from "@/pipeline/types";
-import { NO_OVERRIDE } from "@/pipeline/colorWriter";
+import type { ModifyParams, ParticleData, BondData, PipelineData } from "@/pipeline/types";
 import type { Snapshot } from "@/types";
 
 function makeSnapshot(): Snapshot {
@@ -26,6 +25,26 @@ function makeParticle(opts: Partial<ParticleData> = {}): ParticleData {
     scaleOverrides: null,
     opacityOverrides: null,
     colorOverrides: null,
+    representationOverride: null,
+    ...opts,
+  };
+}
+
+function makeBond(opts: Partial<BondData> = {}): BondData {
+  return {
+    type: "bond",
+    sourceNodeId: "src",
+    bondIndices: new Uint32Array([0, 1, 2, 3]),
+    bondOrders: null,
+    nBonds: 2,
+    scale: 1.0,
+    opacity: 1.0,
+    positions: null,
+    elements: null,
+    nAtoms: 0,
+    atomElements: null,
+    selectedBondIndices: null,
+    bondOpacityOverrides: null,
     ...opts,
   };
 }
@@ -35,130 +54,75 @@ function baseParams(extra: Partial<ModifyParams> = {}): ModifyParams {
     type: "modify",
     scale: 1.0,
     opacity: 1.0,
-    colorEnabled: false,
-    colorMode: "uniform",
-    uniformColor: "#ff8800",
     ...extra,
   };
 }
 
-function inputs(particle: ParticleData): Map<string, PipelineData[]> {
-  return new Map([["in", [particle as PipelineData]]]);
+function inputs(data: PipelineData): Map<string, PipelineData[]> {
+  return new Map([["in", [data]]]);
 }
 
-describe("executeModify — color branch", () => {
-  it("emits null colorOverrides when colorEnabled is false", () => {
+describe("executeModify — particle scale & opacity", () => {
+  it("returns no output when there is no input", () => {
+    const out = executeModify(baseParams(), new Map());
+    expect(out.size).toBe(0);
+  });
+
+  it("paints the scale across all atoms when indices is null and scale != 1.0", () => {
+    const out = executeModify(baseParams({ scale: 1.5 }), inputs(makeParticle()));
+    const result = out.get("out") as ParticleData;
+    expect(result.scaleOverrides).not.toBeNull();
+    expect(Array.from(result.scaleOverrides!)).toEqual([1.5, 1.5, 1.5, 1.5]);
+  });
+
+  it("does not allocate a scale buffer when scale === 1.0 and indices is null", () => {
     const out = executeModify(baseParams(), inputs(makeParticle()));
     const result = out.get("out") as ParticleData;
-    expect(result.colorOverrides).toBeNull();
+    expect(result.scaleOverrides).toBeNull();
   });
 
-  it("paints every atom in uniform mode when indices is null", () => {
-    const out = executeModify(
-      baseParams({ colorEnabled: true, colorMode: "uniform", uniformColor: "#ff0000" }),
-      inputs(makeParticle()),
-    );
+  it("paints scale only on the selected indices when indices is non-null", () => {
+    const particle = makeParticle({ indices: new Uint32Array([1, 3]) });
+    const out = executeModify(baseParams({ scale: 0.5 }), inputs(particle));
     const result = out.get("out") as ParticleData;
-    const buf = result.colorOverrides!;
-    expect(buf.length).toBe(12);
-    for (let i = 0; i < 4; i++) {
-      const i3 = i * 3;
-      expect(buf[i3]).toBe(1);
-      expect(buf[i3 + 1]).toBe(0);
-      expect(buf[i3 + 2]).toBe(0);
-    }
+    expect(result.scaleOverrides).not.toBeNull();
+    expect(Array.from(result.scaleOverrides!)).toEqual([1.0, 0.5, 1.0, 0.5]);
   });
 
-  it("paints only the selected indices when indices is non-null", () => {
+  it("paints opacity only on the selected indices when indices is non-null", () => {
     const particle = makeParticle({ indices: new Uint32Array([0, 2]) });
-    const out = executeModify(
-      baseParams({ colorEnabled: true, colorMode: "uniform", uniformColor: "#00ff00" }),
-      inputs(particle),
-    );
+    const out = executeModify(baseParams({ opacity: 0.3 }), inputs(particle));
     const result = out.get("out") as ParticleData;
-    const buf = result.colorOverrides!;
-    // atoms 0 and 2 painted green
-    expect(buf[0]).toBe(0);
-    expect(buf[1]).toBe(1);
-    expect(buf[2]).toBe(0);
-    expect(buf[6]).toBe(0);
-    expect(buf[7]).toBe(1);
-    expect(buf[8]).toBe(0);
-    // atoms 1 and 3 untouched (NaN sentinel)
-    expect(Number.isNaN(buf[3])).toBe(true);
-    expect(Number.isNaN(buf[9])).toBe(true);
+    expect(result.opacityOverrides).not.toBeNull();
+    const arr = Array.from(result.opacityOverrides!);
+    expect(arr[0]).toBeCloseTo(0.3, 6);
+    expect(arr[1]).toBeCloseTo(1.0, 6);
+    expect(arr[2]).toBeCloseTo(0.3, 6);
+    expect(arr[3]).toBeCloseTo(1.0, 6);
   });
 
-  it("preserves upstream colorOverrides for unselected atoms", () => {
-    const upstream = new Float32Array(12);
-    upstream.fill(NO_OVERRIDE);
-    upstream[3] = 0.5;
-    upstream[4] = 0.5;
-    upstream[5] = 0.5;
-
-    const particle = makeParticle({
-      indices: new Uint32Array([0]),
-      colorOverrides: upstream,
-    });
-    const out = executeModify(
-      baseParams({ colorEnabled: true, colorMode: "uniform", uniformColor: "#ff0000" }),
-      inputs(particle),
-    );
+  it("preserves the upstream representationOverride", () => {
+    const particle = makeParticle({ representationOverride: "cartoon" });
+    const out = executeModify(baseParams({ scale: 1.5 }), inputs(particle));
     const result = out.get("out") as ParticleData;
-    const buf = result.colorOverrides!;
-    // Atom 0: newly painted red.
-    expect(buf[0]).toBe(1);
-    // Atom 1: upstream gray preserved (writer never visited it).
-    expect(buf[3]).toBe(0.5);
-    expect(buf[4]).toBe(0.5);
-    expect(buf[5]).toBe(0.5);
+    expect(result.representationOverride).toBe("cartoon");
+  });
+});
+
+describe("executeModify — bond scale & opacity", () => {
+  it("applies scale and opacity to a global bond stream", () => {
+    const out = executeModify(baseParams({ scale: 2.0, opacity: 0.5 }), inputs(makeBond()));
+    const result = out.get("out") as BondData;
+    expect(result.scale).toBe(2.0);
+    expect(result.opacity).toBe(0.5);
+    expect(result.bondOpacityOverrides).toBeNull();
   });
 
-  it("does not mutate the upstream colorOverrides buffer", () => {
-    const upstream = new Float32Array(12);
-    upstream.fill(NO_OVERRIDE);
-
-    const particle = makeParticle({ colorOverrides: upstream });
-    executeModify(
-      baseParams({ colorEnabled: true, colorMode: "uniform", uniformColor: "#ff0000" }),
-      inputs(particle),
-    );
-    // Upstream still all-NaN — executor must clone.
-    for (let i = 0; i < upstream.length; i++) {
-      expect(Number.isNaN(upstream[i])).toBe(true);
-    }
-  });
-
-  it("byResidue uses the supplied atomLabels to choose a palette entry", () => {
-    const labels = ["ALA1", "ALA1", "GLY2", "GLY2"];
-    const out = executeModify(
-      baseParams({ colorEnabled: true, colorMode: "byResidue" }),
-      inputs(makeParticle()),
-      labels,
-    );
-    const result = out.get("out") as ParticleData;
-    const buf = result.colorOverrides!;
-    // atom 0 (ALA) palette = [0.78,0.78,0.78]; atom 2 (GLY) palette = [1,1,1]
-    expect(buf[0]).toBeCloseTo(0.78, 5);
-    expect(buf[6]).toBeCloseTo(1, 5);
-  });
-
-  it("still propagates scale and opacity overrides alongside the color branch", () => {
-    const particle = makeParticle({ indices: new Uint32Array([1]) });
-    const out = executeModify(
-      baseParams({
-        scale: 1.5,
-        opacity: 0.3,
-        colorEnabled: true,
-        colorMode: "uniform",
-        uniformColor: "#0000ff",
-      }),
-      inputs(particle),
-    );
-    const result = out.get("out") as ParticleData;
-    expect(result.scaleOverrides![1]).toBeCloseTo(1.5, 6);
-    expect(result.opacityOverrides![1]).toBeCloseTo(0.3, 6);
-    expect(result.colorOverrides![3]).toBe(0);
-    expect(result.colorOverrides![5]).toBe(1);
+  it("paints per-bond opacity when selectedBondIndices is set", () => {
+    const bond = makeBond({ selectedBondIndices: new Uint32Array([1]) });
+    const out = executeModify(baseParams({ scale: 1.0, opacity: 0.25 }), inputs(bond));
+    const result = out.get("out") as BondData;
+    expect(result.bondOpacityOverrides).not.toBeNull();
+    expect(Array.from(result.bondOpacityOverrides!)).toEqual([1.0, 0.25]);
   });
 });
