@@ -59,8 +59,12 @@ export function buildAlphaSdf(
   }
 
   // Compute bounding box expanded by alphaRadius.
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
 
   for (let a = 0; a < nAtoms; a++) {
     const x = positions[a * 3];
