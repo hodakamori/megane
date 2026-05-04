@@ -530,6 +530,34 @@ describe("executePipeline", () => {
     });
   });
 
+  describe("SurfaceMesh node", () => {
+    it("produces a mesh output when connected to a particle source", () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("sm", "surface_mesh", { alphaRadius: 3.0, color: "#4488ff", opacity: 0.5 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "sm", "particle"),
+        makeEdge("sm", "mesh", "vp", "mesh"),
+      ];
+
+      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: waterSnapshot });
+      expect(result.meshes).toHaveLength(1);
+    });
+
+    it("adds a warning error when no particle is connected", () => {
+      const nodes = [
+        makeNode("sm", "surface_mesh", { alphaRadius: 3.0, color: "#4488ff", opacity: 0.5 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [makeEdge("sm", "mesh", "vp", "mesh")];
+
+      const { nodeErrors } = executePipeline(nodes, edges, {});
+      expect(nodeErrors.get("sm")).toBeDefined();
+    });
+  });
+
   describe("bond filtering by particles", () => {
     it("filters bonds when particle stream has filtered indices", () => {
       // Snapshot with bonds 0-1 and 0-2
