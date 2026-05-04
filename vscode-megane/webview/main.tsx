@@ -17,6 +17,7 @@ import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "../../src/components/MeganeViewer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
+import { usePlaybackStore } from "../../src/stores/usePlaybackStore";
 import type { SerializedPipeline } from "../../src/pipeline/types";
 import type { MeganeCameraState } from "../../src/renderer/MoleculeRenderer";
 import { useTour } from "../../src/tour/useTour";
@@ -101,6 +102,11 @@ function App() {
               : "";
             setError(`Failed to load file: ${base}${hint}`);
           });
+        return;
+      }
+
+      if (message.type === "seekFrame") {
+        usePlaybackStore.getState().seekFrame(message.frame as number);
         return;
       }
 

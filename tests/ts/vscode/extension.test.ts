@@ -49,11 +49,19 @@ interface FakeStatusBarItem {
 interface FakeWebviewPanel {
   webview: FakeWebview;
   onDidDispose: ReturnType<typeof vi.fn>;
+  onDidChangeViewState: ReturnType<typeof vi.fn>;
+  active: boolean;
+}
+
+interface RegisteredCommand {
+  command: string;
+  handler: (...args: unknown[]) => unknown;
 }
 
 const { mockState } = vi.hoisted(() => ({
   mockState: {
     registered: [] as RegisteredProvider[],
+    registeredCommands: [] as RegisteredCommand[],
     readFile: vi.fn<(uri: FakeUri) => Promise<Uint8Array>>(),
     statusBarItems: [] as FakeStatusBarItem[],
   },
@@ -106,6 +114,12 @@ vi.mock("vscode", () => {
       }),
     },
     StatusBarAlignment: { Left: 1, Right: 2 },
+    commands: {
+      registerCommand: vi.fn((command: string, handler: (...args: unknown[]) => unknown) => {
+        mockState.registeredCommands.push({ command, handler });
+        return { dispose: vi.fn() };
+      }),
+    },
   };
 });
 
@@ -114,6 +128,7 @@ import {
   activate,
   deactivate,
   createFrameStatusBarItem,
+  MeganeEditorProvider,
 } from "../../../vscode-megane/src/extension";
 
 const VscodeUri = (vscode as unknown as { Uri: { file: (p: string) => FakeUri } }).Uri;
@@ -132,9 +147,11 @@ function makeWebviewPanel(): {
   panel: FakeWebviewPanel;
   fireMessage: (msg: unknown) => void;
   fireDispose: () => void;
+  fireViewStateChange: (active: boolean) => void;
 } {
   let onMessage: ((m: unknown) => void) | undefined;
   let onDispose: (() => void) | undefined;
+  let onViewStateChange: ((e: { webviewPanel: FakeWebviewPanel }) => void) | undefined;
   const webview: FakeWebview = {
     options: undefined,
     html: "",
@@ -148,10 +165,17 @@ function makeWebviewPanel(): {
   };
   const panel: FakeWebviewPanel = {
     webview,
+    active: true,
     onDidDispose: vi.fn((handler: () => void) => {
       onDispose = handler;
       return { dispose: vi.fn() };
     }),
+    onDidChangeViewState: vi.fn(
+      (handler: (e: { webviewPanel: FakeWebviewPanel }) => void) => {
+        onViewStateChange = handler;
+        return { dispose: vi.fn() };
+      },
+    ),
   };
   return {
     panel,
@@ -162,6 +186,11 @@ function makeWebviewPanel(): {
     fireDispose: () => {
       if (!onDispose) throw new Error("onDidDispose not registered");
       onDispose();
+    },
+    fireViewStateChange: (active: boolean) => {
+      if (!onViewStateChange) throw new Error("onDidChangeViewState not registered");
+      panel.active = active;
+      onViewStateChange({ webviewPanel: panel });
     },
   };
 }
@@ -174,6 +203,7 @@ function getProvider(viewType: string): FakeProvider {
 
 beforeEach(() => {
   mockState.registered.length = 0;
+  mockState.registeredCommands.length = 0;
   mockState.statusBarItems.length = 0;
   mockState.readFile.mockReset();
   vi.mocked(vscode.window.registerCustomEditorProvider).mockClear();
@@ -195,14 +225,20 @@ describe("activate / deactivate", () => {
     ]);
   });
 
-  it("pushes both registration disposables onto context.subscriptions", () => {
+  it("pushes two provider disposables and the seekFrame command onto context.subscriptions", () => {
     const ctx = makeContext();
     activate(ctx as unknown as Parameters<typeof activate>[0]);
 
-    expect(ctx.subscriptions).toHaveLength(2);
+    expect(ctx.subscriptions).toHaveLength(3);
     for (const sub of ctx.subscriptions) {
       expect(typeof sub.dispose).toBe("function");
     }
+  });
+
+  it("registers the megane.seekFrame command", () => {
+    activate(makeContext() as unknown as Parameters<typeof activate>[0]);
+    const commandNames = mockState.registeredCommands.map((c) => c.command);
+    expect(commandNames).toContain("megane.seekFrame");
   });
 
   it("configures retainContextWhenHidden and disables multi-editor for both providers", () => {
@@ -680,5 +716,90 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     };
     expect(payload.structureFiles).toEqual([]);
     expect(payload.trajectoryFiles).toEqual([]);
+  });
+});
+
+describe("MeganeEditorProvider.seekFrame", () => {
+  it("returns false and does not post when no panel has been opened", () => {
+    const ctx = makeContext();
+    const provider = new MeganeEditorProvider(
+      ctx as unknown as Parameters<typeof MeganeEditorProvider>[0],
+    );
+    expect(provider.seekFrame(5)).toBe(false);
+  });
+
+  it("returns true and posts seekFrame message to the active panel", async () => {
+    const ctx = makeContext();
+    const provider = new MeganeEditorProvider(
+      ctx as unknown as Parameters<typeof MeganeEditorProvider>[0],
+    );
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    // Clear postMessage calls from the initial load
+    panel.webview.postMessage.mockClear();
+
+    const result = provider.seekFrame(42);
+    expect(result).toBe(true);
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({ type: "seekFrame", frame: 42 });
+  });
+
+  it("returns false after the panel is disposed", async () => {
+    const ctx = makeContext();
+    const provider = new MeganeEditorProvider(
+      ctx as unknown as Parameters<typeof MeganeEditorProvider>[0],
+    );
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireDispose } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireDispose();
+    expect(provider.seekFrame(10)).toBe(false);
+  });
+
+  it("updates the active panel when a different panel becomes active via onDidChangeViewState", async () => {
+    const ctx = makeContext();
+    const provider = new MeganeEditorProvider(
+      ctx as unknown as Parameters<typeof MeganeEditorProvider>[0],
+    );
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc1 = { uri: VscodeUri.file("/work/a.pdb"), dispose: vi.fn() };
+    const { panel: panel1, fireViewStateChange: fireVsc1 } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc1, panel1, {});
+
+    const doc2 = { uri: VscodeUri.file("/work/b.pdb"), dispose: vi.fn() };
+    const { panel: panel2, fireViewStateChange: fireVsc2 } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc2, panel2, {});
+
+    // panel2 was opened last and should be active
+    panel1.webview.postMessage.mockClear();
+    panel2.webview.postMessage.mockClear();
+
+    // panel1 becomes focused
+    fireVsc1(true);
+    provider.seekFrame(7);
+    expect(panel1.webview.postMessage).toHaveBeenCalledWith({ type: "seekFrame", frame: 7 });
+    expect(panel2.webview.postMessage).not.toHaveBeenCalled();
+
+    // panel2 becomes focused again
+    panel1.webview.postMessage.mockClear();
+    fireVsc2(true);
+    provider.seekFrame(8);
+    expect(panel2.webview.postMessage).toHaveBeenCalledWith({ type: "seekFrame", frame: 8 });
+    expect(panel1.webview.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("megane.seekFrame command is wired to the editor provider", () => {
+    const ctx = makeContext();
+    activate(ctx as unknown as Parameters<typeof activate>[0]);
+
+    const cmd = mockState.registeredCommands.find((c) => c.command === "megane.seekFrame");
+    expect(cmd).toBeDefined();
+    // Command handler should not throw when no panel is open
+    expect(() => cmd!.handler(0)).not.toThrow();
   });
 });

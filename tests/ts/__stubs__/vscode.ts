@@ -50,7 +50,22 @@ export const window = {
     _provider: unknown,
     _options?: unknown,
   ): { dispose: () => void } => ({ dispose: () => {} }),
+  createStatusBarItem: (_alignment?: unknown, _priority?: unknown): unknown => ({
+    tooltip: "",
+    text: "",
+    show: () => {},
+    dispose: () => {},
+  }),
 };
+
+export const commands = {
+  registerCommand: (
+    _command: string,
+    _handler: (...args: unknown[]) => unknown,
+  ): { dispose: () => void } => ({ dispose: () => {} }),
+};
+
+export const StatusBarAlignment = { Left: 1, Right: 2 };
 
 export interface Disposable {
   dispose(): void;
