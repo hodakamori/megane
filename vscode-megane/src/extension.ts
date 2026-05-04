@@ -134,6 +134,12 @@ export function createFrameStatusBarItem(): vscode.StatusBarItem {
   return item;
 }
 
+export function createSelectionStatusBarItem(): vscode.StatusBarItem {
+  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  item.tooltip = "Current atom selection or measurement";
+  return item;
+}
+
 class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
   private static readonly viewType = "megane.structureViewer";
 
@@ -192,6 +198,8 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
     const frameStatusBar = createFrameStatusBarItem();
 
+    const selectionStatusBar = createSelectionStatusBarItem();
+
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
         webview.postMessage(payload);
@@ -201,11 +209,36 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
         const frame = message.frame as number;
         frameStatusBar.text = `$(megane-frame) Frame ${frame}`;
         frameStatusBar.show();
+        return;
+      }
+      if (message.type === "selectionChange") {
+        const atoms = (message.selection as { atoms: number[] }).atoms;
+        if (atoms.length === 0) {
+          selectionStatusBar.hide();
+        } else {
+          selectionStatusBar.text = `$(megane-atom) ${atoms.length} atom${atoms.length === 1 ? "" : "s"} selected`;
+          selectionStatusBar.show();
+        }
+        return;
+      }
+      if (message.type === "measurementChange") {
+        const measurement = message.measurement as {
+          type: string;
+          value: number;
+          label: string;
+        } | null;
+        if (!measurement) {
+          selectionStatusBar.hide();
+        } else {
+          selectionStatusBar.text = `$(megane-atom) ${measurement.label}`;
+          selectionStatusBar.show();
+        }
       }
     });
 
     webviewPanel.onDidDispose(() => {
       frameStatusBar.dispose();
+      selectionStatusBar.dispose();
     });
 
     webview.html = getHtmlForWebview(webview, mediaDir);

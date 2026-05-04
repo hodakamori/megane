@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { createFrameSubscription } from "../../../jupyterlab-megane/src/frameSubscription";
+import {
+  createFrameSubscription,
+  createSubscription,
+} from "../../../jupyterlab-megane/src/frameSubscription";
 
 describe("createFrameSubscription", () => {
   it("calls listener when emit is called", () => {
@@ -83,5 +86,53 @@ describe("createFrameSubscription", () => {
     const sub = createFrameSubscription();
     const unsub = sub.subscribe(vi.fn());
     expect(typeof unsub).toBe("function");
+  });
+});
+
+describe("createSubscription (generic)", () => {
+  it("works with object payloads", () => {
+    const sub = createSubscription<{ atoms: number[] }>();
+    const received: { atoms: number[] }[] = [];
+    sub.subscribe((v) => received.push(v));
+    sub.emit({ atoms: [1, 2, 3] });
+    expect(received).toEqual([{ atoms: [1, 2, 3] }]);
+  });
+
+  it("works with nullable payloads", () => {
+    const sub = createSubscription<string | null>();
+    const received: (string | null)[] = [];
+    sub.subscribe((v) => received.push(v));
+    sub.emit("hello");
+    sub.emit(null);
+    expect(received).toEqual(["hello", null]);
+  });
+
+  it("unsubscribes correctly", () => {
+    const sub = createSubscription<number>();
+    const received: number[] = [];
+    const unsub = sub.subscribe((v) => received.push(v));
+    sub.emit(1);
+    unsub();
+    sub.emit(2);
+    expect(received).toEqual([1]);
+  });
+
+  it("swallows listener errors", () => {
+    const sub = createSubscription<number>();
+    const received: number[] = [];
+    sub.subscribe(() => {
+      throw new Error("boom");
+    });
+    sub.subscribe((v) => received.push(v));
+    expect(() => sub.emit(5)).not.toThrow();
+    expect(received).toEqual([5]);
+  });
+
+  it("createFrameSubscription delegates to createSubscription", () => {
+    const sub = createFrameSubscription();
+    const received: number[] = [];
+    sub.subscribe((f) => received.push(f));
+    sub.emit(7);
+    expect(received).toEqual([7]);
   });
 });

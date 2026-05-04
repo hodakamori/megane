@@ -19,6 +19,7 @@ import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
 import type { SerializedPipeline } from "../../src/pipeline/types";
 import type { MeganeCameraState } from "../../src/renderer/MoleculeRenderer";
+import type { SelectionState, Measurement } from "../../src/types";
 import { useTour } from "../../src/tour/useTour";
 import { useThemeStore } from "../../src/stores/useThemeStore";
 import "../../src/styles/megane.css";
@@ -181,6 +182,14 @@ function App() {
     vscode.postMessage({ type: "frameChange", frame });
   }, []);
 
+  const handleSelectionChange = useCallback((selection: SelectionState) => {
+    vscode.postMessage({ type: "selectionChange", selection });
+  }, []);
+
+  const handleMeasurementChange = useCallback((measurement: Measurement | null) => {
+    vscode.postMessage({ type: "measurementChange", measurement });
+  }, []);
+
   if (error) {
     return (
       <>
@@ -245,6 +254,8 @@ function App() {
       initialCameraState={initialCameraState}
       onCameraStateChange={handleCameraStateChange}
       onFrameChange={handleFrameChange}
+      onSelectionChange={handleSelectionChange}
+      onMeasurementChange={handleMeasurementChange}
     />
     </>
   );
