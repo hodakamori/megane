@@ -341,7 +341,7 @@ export interface AddBondParams {
 }
 
 /** Visual representation mode selectable in the Viewport node. */
-export type RepresentationMode = "atoms" | "cartoon" | "both";
+export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface";
 
 export interface ViewportParams {
   type: "viewport";

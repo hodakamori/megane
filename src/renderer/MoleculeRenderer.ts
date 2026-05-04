@@ -29,6 +29,7 @@ import { PolyhedronRenderer } from "./PolyhedronRenderer";
 import { StructureLayer } from "./StructureLayer";
 import { PivotMarker } from "./PivotMarker";
 import { CartoonRenderer } from "./CartoonRenderer";
+import { SurfaceRenderer } from "./SurfaceRenderer";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel, projectToScreen } from "./Picking";
@@ -99,10 +100,11 @@ export interface MeganeSubsystemVisibility {
   labels: boolean;
   polyhedra: boolean;
   cartoon: boolean;
+  surface: boolean;
 }
 
 /** Representation mode for the viewer. */
-export type RepresentationType = "atoms" | "cartoon" | "both";
+export type RepresentationType = "atoms" | "cartoon" | "both" | "surface";
 
 export interface MeganeRendererMemory {
   geometries: number;
@@ -145,6 +147,7 @@ function _setActiveRenderer(r: MoleculeRenderer | null): void {
               labels: false,
               polyhedra: false,
               cartoon: false,
+              surface: false,
             },
       setCameraMode: (mode) => _activeRenderer?.setCameraMode(mode),
       resetCamera: () => _activeRenderer?.resetCamera(),
@@ -260,6 +263,8 @@ export class MoleculeRenderer {
 
   /** Cartoon backbone renderer (lazy, created on first use). */
   private cartoonRenderer: CartoonRenderer | null = null;
+  /** Solvent-accessible surface renderer (lazy, created on first use). */
+  private surfaceRenderer: SurfaceRenderer | null = null;
   private representationType: RepresentationType = "atoms";
 
   // (screen-space picking replaces Three.js raycasting)
@@ -433,6 +438,18 @@ export class MoleculeRenderer {
       this.cartoonRenderer.setVisible(false);
     }
 
+    // Update surface renderer (lazy init, always available for surface mode)
+    if (!this.surfaceRenderer) {
+      this.surfaceRenderer = new SurfaceRenderer();
+      this.scene.add(this.surfaceRenderer.mesh);
+    }
+    if (this.representationType === "surface") {
+      this.surfaceRenderer.loadSnapshot(snapshot);
+      this.surfaceRenderer.setVisible(true);
+    } else {
+      this.surfaceRenderer.setVisible(false);
+    }
+
     // Update simulation cell
     if (snapshot.box) {
       const hasNonZero = snapshot.box.some((v) => v !== 0);
@@ -471,6 +488,9 @@ export class MoleculeRenderer {
     this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
     this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
     this.cartoonRenderer?.updatePositions(frame.positions);
+    if (this.surfaceRenderer?.mesh.visible) {
+      this.surfaceRenderer.updatePositions(frame.positions);
+    }
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
     }
@@ -730,6 +750,7 @@ export class MoleculeRenderer {
     this.representationType = type;
     const showAtoms = type === "atoms" || type === "both";
     const showCartoon = type === "cartoon" || type === "both";
+    const showSurface = type === "surface";
 
     if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
     if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms;
@@ -737,6 +758,12 @@ export class MoleculeRenderer {
       // Only show cartoon when it has backbone data
       const hasBackbone = this.snapshot?.caIndices != null && this.snapshot.caIndices.length > 0;
       this.cartoonRenderer.setVisible(showCartoon && hasBackbone);
+    }
+    if (this.surfaceRenderer) {
+      if (showSurface && this.snapshot) {
+        this.surfaceRenderer.loadSnapshot(this.snapshot);
+      }
+      this.surfaceRenderer.setVisible(showSurface);
     }
   }
 
@@ -1509,6 +1536,7 @@ export class MoleculeRenderer {
     if (this.arrowRenderer) this.arrowRenderer.dispose();
     if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
     if (this.cartoonRenderer) this.cartoonRenderer.dispose();
+    if (this.surfaceRenderer) this.surfaceRenderer.dispose();
     if (this.pivotMarker) this.pivotMarker.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     // Dispose all structure layers
@@ -1627,6 +1655,7 @@ export class MoleculeRenderer {
       labels: this.labelOverlay != null && this.snapshot != null,
       polyhedra: this.polyhedronRenderer?.group.visible ?? false,
       cartoon: this.cartoonRenderer?.mesh.visible ?? false,
+      surface: this.surfaceRenderer?.mesh.visible ?? false,
     };
   }
 

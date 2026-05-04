@@ -64,6 +64,7 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | Trajectory timeline / scrubbing | ✓ | ✓ | ✓ | ✓ | n/a |
 | WebSocket trajectory streaming | ✓ | — | — | — | n/a |
 | Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
+| Solvent-accessible surface (SAS) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | — | ✓ | — | — | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | — | — | n/a |

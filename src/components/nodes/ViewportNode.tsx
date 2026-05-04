@@ -38,6 +38,7 @@ const REPRESENTATION_OPTIONS: { value: RepresentationMode; label: string }[] = [
   { value: "atoms", label: "Atoms" },
   { value: "cartoon", label: "Cartoon" },
   { value: "both", label: "Both" },
+  { value: "surface", label: "Surface" },
 ];
 
 export function ViewportNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
