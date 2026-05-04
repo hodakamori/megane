@@ -312,6 +312,177 @@ function createStreamingTemplate(): {
   };
 }
 
+/**
+ * Protein template: ubiquitin (1UBQ) as a ribbon with semi-transparent
+ * all-atom water.
+ *
+ *   LoadStructure ─┬─ Filter(resname != "HOH") → Modify(opacity 0)   → Representation(both) ─┐
+ *                  ├─ Filter(resname == "HOH") → Modify(opacity 0.5) ───────────────────────┤
+ *                  └────────────────────────── cell ─────────────────────────────────────────┴─→ Viewport
+ *
+ * Protein atoms are hidden (opacity 0) so only the cartoon ribbon shows;
+ * water atoms render as translucent spheres because they have no Cα and
+ * therefore inherit no ribbon. Representation "both" makes the global
+ * viewport mode draw atoms + cartoon, which is what each branch needs.
+ */
+function createProteinTemplate(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "loader-1",
+        type: "load_structure",
+        position: { x: 425, y: 0 },
+        data: {
+          params: {
+            type: "load_structure",
+            fileName: "1ubq.pdb",
+            hasTrajectory: false,
+            hasCell: true,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "protein-filter",
+        type: "filter",
+        position: { x: 170, y: 200 },
+        data: {
+          params: {
+            type: "filter",
+            query: 'resname != "HOH"',
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "protein-modify",
+        type: "modify",
+        position: { x: 170, y: 360 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 1,
+            opacity: 0,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "protein-rep",
+        type: "representation",
+        position: { x: 170, y: 520 },
+        data: {
+          params: {
+            type: "representation",
+            mode: "both",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "water-filter",
+        type: "filter",
+        position: { x: 680, y: 200 },
+        data: {
+          params: {
+            type: "filter",
+            query: 'resname == "HOH"',
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "water-modify",
+        type: "modify",
+        position: { x: 680, y: 360 },
+        data: {
+          params: {
+            type: "modify",
+            scale: 1,
+            opacity: 0.5,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 425, y: 700 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+            pivotMarkerVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "protein-filter",
+        sourceHandle: "particle",
+        targetHandle: "in",
+      },
+      {
+        id: "e2",
+        source: "protein-filter",
+        target: "protein-modify",
+        sourceHandle: "out",
+        targetHandle: "in",
+      },
+      {
+        id: "e3",
+        source: "protein-modify",
+        target: "protein-rep",
+        sourceHandle: "out",
+        targetHandle: "in",
+      },
+      {
+        id: "e4",
+        source: "protein-rep",
+        target: "viewport-1",
+        sourceHandle: "out",
+        targetHandle: "particle",
+      },
+      {
+        id: "e5",
+        source: "loader-1",
+        target: "water-filter",
+        sourceHandle: "particle",
+        targetHandle: "in",
+      },
+      {
+        id: "e6",
+        source: "water-filter",
+        target: "water-modify",
+        sourceHandle: "out",
+        targetHandle: "in",
+      },
+      {
+        id: "e7",
+        source: "water-modify",
+        target: "viewport-1",
+        sourceHandle: "out",
+        targetHandle: "particle",
+      },
+      {
+        id: "e8",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+    ],
+  };
+}
+
 export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
   {
     id: "molecule",
@@ -324,6 +495,12 @@ export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
     label: "Solid",
     description: "Perovskite with coordination polyhedra",
     create: createSolidTemplate,
+  },
+  {
+    id: "protein",
+    label: "Protein",
+    description: "Ubiquitin ribbon with semi-transparent water",
+    create: createProteinTemplate,
   },
   {
     id: "streaming",
