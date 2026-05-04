@@ -1,10 +1,20 @@
 /**
  * Cartoon / ribbon representation renderer for proteins.
  *
- * Renders the Cα backbone as secondary-structure-aware geometry:
- *  - Coil (ss=0): thin TubeGeometry
- *  - Helix (ss=1): wide flat ribbon BufferGeometry
- *  - Sheet (ss=2): medium tube + ConeGeometry arrowhead at the C-terminal end
+ * Renders the entire backbone of each chain as a single continuous ribbon
+ * whose cross-section morphs smoothly between secondary-structure types:
+ *  - Coil  (ss=0): thin circular tube
+ *  - Helix (ss=1): wide rounded ribbon
+ *  - Sheet (ss=2): wide flat ribbon, ending in a tapered arrowhead
+ *
+ * Goals: match the visual quality of Mol* / PyMOL cartoons:
+ *  - High sub-resolution sampling (10 samples per residue) for smooth curvature
+ *  - Rounded rectangular cross-sections (16 points around the perimeter)
+ *  - Smooth taper of width/thickness/color at SS boundaries via per-residue
+ *    parameter interpolation along the spline
+ *  - Sheet arrowheads with widened base + zero-width knife-edge tip
+ *  - Vertex colors so SS color transitions are interpolated, not stepped
+ *  - MeshStandardMaterial for physically-plausible shading
  *
  * Data flows in via loadSnapshot() (first frame) and updatePositions() (trajectory).
  * The renderer owns a THREE.Group that is added to the scene by MoleculeRenderer.
@@ -18,16 +28,20 @@ export const SS_COIL = 0;
 export const SS_HELIX = 1;
 export const SS_SHEET = 2;
 
-/** Colors used for each secondary structure type. */
-const SS_COLORS: Record<number, number> = {
+/** RGB colors used for each secondary structure type (vertex-color targets). */
+const SS_COLORS_HEX: Record<number, number> = {
   [SS_COIL]: 0x9ca3af, // gray
   [SS_HELIX]: 0xef4444, // red
   [SS_SHEET]: 0x3b82f6, // blue
 };
+const SS_COLOR_VECS: Record<number, THREE.Color> = {
+  [SS_COIL]: new THREE.Color(SS_COLORS_HEX[SS_COIL]),
+  [SS_HELIX]: new THREE.Color(SS_COLORS_HEX[SS_HELIX]),
+  [SS_SHEET]: new THREE.Color(SS_COLORS_HEX[SS_SHEET]),
+};
 
 /** A contiguous run of Cα atoms sharing the same secondary structure type. */
 export interface BackboneSegment {
-  /** Indices into the caIndices array (not into the atom positions array). */
   caSliceStart: number;
   caSliceEnd: number; // exclusive
   ssType: number;
@@ -36,26 +50,19 @@ export interface BackboneSegment {
 /** Per-chain ordered Cα backbone data extracted from a Snapshot. */
 export interface ChainBackbone {
   chainId: number; // ASCII byte of the chain letter
-  /** Sorted Cα atom indices (into the full positions array). */
   atomIndices: Uint32Array;
-  /** Per-Cα secondary structure type. */
   ssTypes: Uint8Array;
 }
 
-// ─── Pure geometry helpers (exported for unit testing) ───────────────────────
+// ─── Backbone extraction (unchanged from prior API) ───────────────────────────
 
-/**
- * Extract per-chain backbone data from a Snapshot, sorted by residue number.
- * Returns an empty array when the snapshot has no Cα data.
- */
 export function extractChainBackbones(snapshot: Snapshot): ChainBackbone[] {
   const { caIndices, caChainIds, caResNums, caSsType } = snapshot;
   if (!caIndices || !caChainIds || !caResNums || !caSsType || caIndices.length === 0) {
     return [];
   }
 
-  // Group Cα atoms by chain ID.
-  const chainMap = new Map<number, number[]>(); // chain → array of ca positions
+  const chainMap = new Map<number, number[]>();
   for (let i = 0; i < caIndices.length; i++) {
     const chain = caChainIds[i];
     let list = chainMap.get(chain);
@@ -68,9 +75,7 @@ export function extractChainBackbones(snapshot: Snapshot): ChainBackbone[] {
 
   const chains: ChainBackbone[] = [];
   for (const [chainId, caPositions] of chainMap) {
-    // Sort by residue number within the chain.
     caPositions.sort((a, b) => caResNums[a] - caResNums[b]);
-
     const atomIndices = new Uint32Array(caPositions.length);
     const ssTypes = new Uint8Array(caPositions.length);
     for (let k = 0; k < caPositions.length; k++) {
@@ -82,14 +87,10 @@ export function extractChainBackbones(snapshot: Snapshot): ChainBackbone[] {
   return chains;
 }
 
-/**
- * Split an array of per-Cα SS types into contiguous segments.
- * Each segment has the same ss type and at least one residue.
- */
+/** Split per-Cα SS types into contiguous segments. Kept for backwards-compatible API. */
 export function buildSegments(ssTypes: Uint8Array): BackboneSegment[] {
   const segments: BackboneSegment[] = [];
   if (ssTypes.length === 0) return segments;
-
   let start = 0;
   let current = ssTypes[0];
   for (let i = 1; i < ssTypes.length; i++) {
@@ -103,36 +104,211 @@ export function buildSegments(ssTypes: Uint8Array): BackboneSegment[] {
   return segments;
 }
 
-// ─── Geometry builders ────────────────────────────────────────────────────────
+// ─── Tunable geometry parameters ──────────────────────────────────────────────
 
-const COIL_RADIUS = 0.25; // Å
-const HELIX_HALF_WIDTH = 0.8; // Å — half-width of the ribbon cross-section
-const HELIX_HALF_THICK = 0.15; // Å — half-thickness of the ribbon
-const SHEET_RADIUS = 0.3; // Å — tube radius for the arrow shaft
-const SHEET_ARROW_RADIUS = 0.75; // Å — arrowhead base radius
-const SHEET_ARROW_LENGTH = 2.0; // Å — arrowhead cone height
-const CURVE_SEGMENTS = 4; // radial segments for TubeGeometry
-
-/** Extract 3D points for a slice of the chain backbone using current positions. */
-function extractPoints(
-  atomIndices: Uint32Array,
-  start: number,
-  end: number,
-  positions: Float32Array,
-): THREE.Vector3[] {
-  const pts: THREE.Vector3[] = [];
-  for (let i = start; i < end; i++) {
-    const ai = atomIndices[i] * 3;
-    pts.push(new THREE.Vector3(positions[ai], positions[ai + 1], positions[ai + 2]));
-  }
-  return pts;
+/** Cross-section profile for one Cα residue (Å). */
+interface CrossSection {
+  halfWidth: number;
+  halfThick: number;
+  cornerRadius: number;
 }
 
-/** Build a smooth CatmullRomCurve3 from control points, adding padding at ends to avoid flat caps. */
+const COIL_PROFILE: CrossSection = { halfWidth: 0.22, halfThick: 0.22, cornerRadius: 0.22 };
+const HELIX_PROFILE: CrossSection = { halfWidth: 0.95, halfThick: 0.2, cornerRadius: 0.12 };
+const SHEET_PROFILE: CrossSection = { halfWidth: 1.05, halfThick: 0.2, cornerRadius: 0.1 };
+const SHEET_ARROW_BASE_HALF_WIDTH = 1.65;
+const SHEET_ARROW_TIP_HALF_WIDTH = 0.0;
+
+const SAMPLES_PER_RESIDUE = 10;
+const CROSS_SECTION_POINTS = 16;
+
+// ─── Geometry helpers ─────────────────────────────────────────────────────────
+
+/** Look up the base cross-section profile for an SS type. */
+function profileFor(ss: number): CrossSection {
+  if (ss === SS_HELIX) return HELIX_PROFILE;
+  if (ss === SS_SHEET) return SHEET_PROFILE;
+  return COIL_PROFILE;
+}
+
+/**
+ * Compute per-residue cross-section parameters and color, applying the sheet-arrow
+ * profile to the final 2 residues of every β-strand run.
+ *
+ * The arrow profile widens the second-to-last sheet residue to ARROW_BASE width
+ * then collapses the very last one to a knife-edge tip (width 0). This produces
+ * the iconic Mol* / PyMOL arrowhead while keeping the geometry one continuous mesh.
+ */
+export function computeRibbonProfile(ssTypes: Uint8Array): {
+  profiles: CrossSection[];
+  colors: THREE.Color[];
+} {
+  const n = ssTypes.length;
+  const profiles: CrossSection[] = new Array(n);
+  const colors: THREE.Color[] = new Array(n);
+
+  for (let i = 0; i < n; i++) {
+    const ss = ssTypes[i];
+    profiles[i] = { ...profileFor(ss) };
+    colors[i] = SS_COLOR_VECS[ss] ?? SS_COLOR_VECS[SS_COIL];
+  }
+
+  // Arrow profile: locate sheet runs of length ≥ 2 and reshape their last 2 residues.
+  let runStart = -1;
+  for (let i = 0; i <= n; i++) {
+    const inSheet = i < n && ssTypes[i] === SS_SHEET;
+    if (inSheet && runStart < 0) {
+      runStart = i;
+    } else if (!inSheet && runStart >= 0) {
+      const runEnd = i; // exclusive
+      const len = runEnd - runStart;
+      if (len >= 2) {
+        // second-to-last → arrow base (wide)
+        profiles[runEnd - 2] = {
+          halfWidth: SHEET_ARROW_BASE_HALF_WIDTH,
+          halfThick: SHEET_PROFILE.halfThick,
+          cornerRadius: SHEET_PROFILE.cornerRadius,
+        };
+        // last → knife-edge tip
+        profiles[runEnd - 1] = {
+          halfWidth: SHEET_ARROW_TIP_HALF_WIDTH,
+          halfThick: SHEET_PROFILE.halfThick,
+          cornerRadius: 0,
+        };
+      }
+      runStart = -1;
+    }
+  }
+
+  return { profiles, colors };
+}
+
+/**
+ * Sample K points uniformly along the perimeter (by arclength) of an axis-aligned
+ * rounded rectangle with given half-width W, half-thickness T, corner radius R.
+ *
+ * Returns positions in 2D cross-section space (x = ribbon-side direction,
+ * y = ribbon-face direction) plus outward unit normals.
+ *
+ * Degenerate case W ≈ 0: collapse to a knife-edge — cross-section becomes a
+ * vertical line of doubled vertices (top half on +x side, bottom half on −x).
+ * This produces a flat triangular sheet arrow tip in world space.
+ */
+export function buildCrossSection(
+  K: number,
+  W: number,
+  T: number,
+  R: number,
+): { x: number; y: number; nx: number; ny: number }[] {
+  // Knife-edge degenerate: use a vertical line, half the ring on each face normal.
+  // Each "side" gets K/2 points distributed along y from +T to −T (or back).
+  if (W < 1e-4) {
+    const out: { x: number; y: number; nx: number; ny: number }[] = [];
+    const half = K / 2;
+    // First half: top → bottom on the +x face
+    for (let i = 0; i < half; i++) {
+      const u = i / Math.max(1, half - 1); // 0..1
+      out.push({ x: 0, y: T * (1 - 2 * u), nx: 1, ny: 0 });
+    }
+    // Second half: bottom → top on the −x face
+    for (let i = 0; i < K - half; i++) {
+      const u = i / Math.max(1, K - half - 1);
+      out.push({ x: 0, y: T * (-1 + 2 * u), nx: -1, ny: 0 });
+    }
+    return out;
+  }
+
+  R = Math.max(0, Math.min(R, Math.min(W, T)));
+
+  // Perimeter as a piecewise curve, walked counter-clockwise starting from +x axis.
+  // Segments: right-side (up), top-right corner, top side (left), top-left corner,
+  // left side (down), bottom-left corner, bottom side (right), bottom-right corner.
+  const sideY = 2 * (T - R); // length of vertical sides
+  const sideX = 2 * (W - R); // length of horizontal sides
+  const cornerLen = (Math.PI / 2) * R;
+  const total = 2 * sideX + 2 * sideY + 4 * cornerLen;
+
+  const out: { x: number; y: number; nx: number; ny: number }[] = new Array(K);
+  for (let i = 0; i < K; i++) {
+    let s = (i / K) * total;
+    // Right side
+    if (s < sideY) {
+      const u = s / Math.max(1e-9, sideY); // 0..1 bottom→top
+      out[i] = { x: W, y: -(T - R) + u * sideY, nx: 1, ny: 0 };
+      continue;
+    }
+    s -= sideY;
+    // Top-right corner: arc from (W, T-R) sweeping to (W-R, T)
+    if (s < cornerLen) {
+      const a = (s / Math.max(1e-9, cornerLen)) * (Math.PI / 2); // 0..π/2
+      const cx = W - R;
+      const cy = T - R;
+      const nx = Math.cos(a);
+      const ny = Math.sin(a);
+      out[i] = { x: cx + R * nx, y: cy + R * ny, nx, ny };
+      continue;
+    }
+    s -= cornerLen;
+    // Top side
+    if (s < sideX) {
+      const u = s / Math.max(1e-9, sideX); // 0..1 right→left
+      out[i] = { x: W - R - u * sideX, y: T, nx: 0, ny: 1 };
+      continue;
+    }
+    s -= sideX;
+    // Top-left corner: arc centered at (-W+R, T-R)
+    if (s < cornerLen) {
+      const a = Math.PI / 2 + (s / Math.max(1e-9, cornerLen)) * (Math.PI / 2); // π/2..π
+      const cx = -W + R;
+      const cy = T - R;
+      const nx = Math.cos(a);
+      const ny = Math.sin(a);
+      out[i] = { x: cx + R * nx, y: cy + R * ny, nx, ny };
+      continue;
+    }
+    s -= cornerLen;
+    // Left side
+    if (s < sideY) {
+      const u = s / Math.max(1e-9, sideY); // top→bottom
+      out[i] = { x: -W, y: T - R - u * sideY, nx: -1, ny: 0 };
+      continue;
+    }
+    s -= sideY;
+    // Bottom-left corner
+    if (s < cornerLen) {
+      const a = Math.PI + (s / Math.max(1e-9, cornerLen)) * (Math.PI / 2); // π..3π/2
+      const cx = -W + R;
+      const cy = -T + R;
+      const nx = Math.cos(a);
+      const ny = Math.sin(a);
+      out[i] = { x: cx + R * nx, y: cy + R * ny, nx, ny };
+      continue;
+    }
+    s -= cornerLen;
+    // Bottom side
+    if (s < sideX) {
+      const u = s / Math.max(1e-9, sideX); // left→right
+      out[i] = { x: -W + R + u * sideX, y: -T, nx: 0, ny: -1 };
+      continue;
+    }
+    s -= sideX;
+    // Bottom-right corner
+    const a = (3 * Math.PI) / 2 + (s / Math.max(1e-9, cornerLen)) * (Math.PI / 2); // 3π/2..2π
+    const cx = W - R;
+    const cy = -T + R;
+    const nx = Math.cos(a);
+    const ny = Math.sin(a);
+    out[i] = { x: cx + R * nx, y: cy + R * ny, nx, ny };
+  }
+  return out;
+}
+
+/**
+ * Build a smooth Catmull-Rom curve through the chain's Cα points, padded at the
+ * ends with reflected ghost points so the first/last segment isn't shortened.
+ */
 function makeCurve(pts: THREE.Vector3[]): THREE.CatmullRomCurve3 | null {
   if (pts.length < 2) return null;
-  // Pad the curve with a reflected ghost point at each end so the first/last
-  // segment isn't shortened by the catmull-rom tangent computation.
   const padded = [
     pts[0]
       .clone()
@@ -147,103 +323,145 @@ function makeCurve(pts: THREE.Vector3[]): THREE.CatmullRomCurve3 | null {
   return new THREE.CatmullRomCurve3(padded, false, "catmullrom", 0.5);
 }
 
-/** Coil segment: thin TubeGeometry. */
-function buildCoilMesh(pts: THREE.Vector3[]): THREE.Mesh | null {
-  const curve = makeCurve(pts);
-  if (!curve) return null;
-  const tubeSeg = Math.max(pts.length * 4, 8);
-  const geo = new THREE.TubeGeometry(curve, tubeSeg, COIL_RADIUS, CURVE_SEGMENTS, false);
-  const mat = new THREE.MeshPhongMaterial({ color: SS_COLORS[SS_COIL] });
-  return new THREE.Mesh(geo, mat);
+/** Read Cα positions for a chain into Vector3 array. */
+function readChainPositions(chain: ChainBackbone, positions: Float32Array): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i < chain.atomIndices.length; i++) {
+    const a = chain.atomIndices[i] * 3;
+    pts.push(new THREE.Vector3(positions[a], positions[a + 1], positions[a + 2]));
+  }
+  return pts;
 }
 
-/** Helix segment: flat ribbon using a custom BufferGeometry along the backbone curve. */
-function buildHelixMesh(pts: THREE.Vector3[]): THREE.Mesh | null {
-  if (pts.length < 2) return null;
-  const curve = makeCurve(pts);
+/** Linear interpolation of cross-section parameters between two residues. */
+function lerpProfile(a: CrossSection, b: CrossSection, t: number): CrossSection {
+  return {
+    halfWidth: a.halfWidth + (b.halfWidth - a.halfWidth) * t,
+    halfThick: a.halfThick + (b.halfThick - a.halfThick) * t,
+    cornerRadius: a.cornerRadius + (b.cornerRadius - a.cornerRadius) * t,
+  };
+}
+
+/**
+ * Build a single continuous ribbon mesh for a chain by sweeping a parameterized
+ * cross-section along the smoothed Cα backbone. SS-dependent cross-sections are
+ * interpolated per-sample to give smooth tapers at boundaries.
+ */
+function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): THREE.Mesh | null {
+  const ca = readChainPositions(chain, positions);
+  if (ca.length < 2) return null;
+  const curve = makeCurve(ca);
   if (!curve) return null;
 
-  const numSamples = Math.max(pts.length * 4, 8);
-  const frenetFrames = curve.computeFrenetFrames(numSamples, false);
+  const { profiles, colors } = computeRibbonProfile(chain.ssTypes);
 
-  const verts: number[] = [];
-  const indices: number[] = [];
-  const normals: number[] = [];
+  // Total samples: SAMPLES_PER_RESIDUE between each adjacent residue pair, +1 for the final endpoint.
+  const nResidues = ca.length;
+  const nSamples = (nResidues - 1) * SAMPLES_PER_RESIDUE + 1;
+  const frames = curve.computeFrenetFrames(nSamples - 1, false);
 
-  // Build 4 vertices per sample (2 wide × 2 thick)
-  for (let i = 0; i <= numSamples; i++) {
-    const t = i / numSamples;
-    const pos = curve.getPoint(t);
-    const N = frenetFrames.normals[i] ?? frenetFrames.normals[frenetFrames.normals.length - 1];
-    const B =
-      frenetFrames.binormals[i] ?? frenetFrames.binormals[frenetFrames.binormals.length - 1];
+  const K = CROSS_SECTION_POINTS;
+  const totalVerts = nSamples * K;
+  const positionsArr = new Float32Array(totalVerts * 3);
+  const normalsArr = new Float32Array(totalVerts * 3);
+  const colorsArr = new Float32Array(totalVerts * 3);
 
-    // 4 corners of the rectangle cross-section: (±w, ±t)
-    for (const sW of [-1, 1]) {
-      for (const sT of [-1, 1]) {
-        verts.push(
-          pos.x + N.x * HELIX_HALF_WIDTH * sW + B.x * HELIX_HALF_THICK * sT,
-          pos.y + N.y * HELIX_HALF_WIDTH * sW + B.y * HELIX_HALF_THICK * sT,
-          pos.z + N.z * HELIX_HALF_WIDTH * sW + B.z * HELIX_HALF_THICK * sT,
-        );
-        // Approximate outward normal: blend N * sW + B * sT
-        const nx = N.x * sW + B.x * sT;
-        const ny = N.y * sW + B.y * sT;
-        const nz = N.z * sW + B.z * sT;
-        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-        normals.push(nx / len, ny / len, nz / len);
-      }
+  // Each adjacent pair of cross-section rings gets K quads = 2K triangles.
+  const indicesArr = new Uint32Array((nSamples - 1) * K * 6);
+
+  const vP = new THREE.Vector3();
+  const vN = new THREE.Vector3();
+  const vB = new THREE.Vector3();
+  const tmpA = new THREE.Vector3();
+  const tmpB = new THREE.Vector3();
+  const tmpColor = new THREE.Color();
+
+  for (let s = 0; s < nSamples; s++) {
+    const t = s / (nSamples - 1); // 0..1 along the curve
+    curve.getPointAt(t, vP);
+    // Frenet frames: one normal & binormal per segment endpoint, length = nSamples
+    // (computeFrenetFrames(N) returns N+1 frames). Index by s directly.
+    const N = frames.normals[s] ?? frames.normals[frames.normals.length - 1];
+    const B = frames.binormals[s] ?? frames.binormals[frames.binormals.length - 1];
+    vN.copy(N);
+    vB.copy(B);
+
+    // Determine which residues we're between and the local interpolation factor.
+    const fResidue = t * (nResidues - 1);
+    const i0 = Math.min(nResidues - 1, Math.floor(fResidue));
+    const i1 = Math.min(nResidues - 1, i0 + 1);
+    const lerpT = fResidue - i0;
+    const cs = lerpProfile(profiles[i0], profiles[i1], lerpT);
+
+    // Vertex color: interpolated between residue colors.
+    tmpColor.copy(colors[i0]).lerp(colors[i1], lerpT);
+
+    // Build the cross-section ring at this sample.
+    const ring = buildCrossSection(K, cs.halfWidth, cs.halfThick, cs.cornerRadius);
+
+    const base = s * K;
+    for (let k = 0; k < K; k++) {
+      const r = ring[k];
+      // Position: curve(t) + r.x * N + r.y * B
+      const px = vP.x + r.x * vN.x + r.y * vB.x;
+      const py = vP.y + r.x * vN.y + r.y * vB.y;
+      const pz = vP.z + r.x * vN.z + r.y * vB.z;
+
+      // World-space outward normal: r.nx * N + r.ny * B (cross-section is locally flat in N,B plane).
+      tmpA.copy(vN).multiplyScalar(r.nx);
+      tmpB.copy(vB).multiplyScalar(r.ny);
+      tmpA.add(tmpB);
+      const nLen = tmpA.length() || 1;
+      tmpA.divideScalar(nLen);
+
+      const v3 = (base + k) * 3;
+      positionsArr[v3] = px;
+      positionsArr[v3 + 1] = py;
+      positionsArr[v3 + 2] = pz;
+      normalsArr[v3] = tmpA.x;
+      normalsArr[v3 + 1] = tmpA.y;
+      normalsArr[v3 + 2] = tmpA.z;
+      colorsArr[v3] = tmpColor.r;
+      colorsArr[v3 + 1] = tmpColor.g;
+      colorsArr[v3 + 2] = tmpColor.b;
     }
   }
 
-  // Connect each ring of 4 vertices to the next with 4 quads (8 triangles per step)
-  for (let i = 0; i < numSamples; i++) {
-    const base = i * 4;
-    const next = base + 4;
-    // top/bottom wide faces
-    indices.push(base, next, base + 1, base + 1, next, next + 1);
-    indices.push(base + 2, base + 3, next + 2, base + 3, next + 3, next + 2);
-    // left/right narrow faces
-    indices.push(base, base + 2, next, base + 2, next + 2, next);
-    indices.push(base + 1, next + 1, base + 3, base + 3, next + 1, next + 3);
+  // Stitch consecutive rings: each pair of rings (s, s+1) gives K quads.
+  // Vertex k of ring s connects to vertex k of ring s+1 and (k+1)%K.
+  let idx = 0;
+  for (let s = 0; s < nSamples - 1; s++) {
+    const baseA = s * K;
+    const baseB = (s + 1) * K;
+    for (let k = 0; k < K; k++) {
+      const k1 = (k + 1) % K;
+      const a0 = baseA + k;
+      const a1 = baseA + k1;
+      const b0 = baseB + k;
+      const b1 = baseB + k1;
+      // Two triangles per quad, outward-facing (CCW when viewed from outside).
+      indicesArr[idx++] = a0;
+      indicesArr[idx++] = b0;
+      indicesArr[idx++] = a1;
+      indicesArr[idx++] = a1;
+      indicesArr[idx++] = b0;
+      indicesArr[idx++] = b1;
+    }
   }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-  geo.setIndex(indices);
-  const mat = new THREE.MeshPhongMaterial({ color: SS_COLORS[SS_HELIX], side: THREE.DoubleSide });
+  geo.setAttribute("position", new THREE.BufferAttribute(positionsArr, 3));
+  geo.setAttribute("normal", new THREE.BufferAttribute(normalsArr, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colorsArr, 3));
+  geo.setIndex(new THREE.BufferAttribute(indicesArr, 1));
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.0,
+    roughness: 0.55,
+    side: THREE.DoubleSide,
+  });
   return new THREE.Mesh(geo, mat);
-}
-
-/** Sheet segment: tube shaft + cone arrowhead at the C-terminal end. */
-function buildSheetMesh(pts: THREE.Vector3[]): THREE.Group | null {
-  if (pts.length < 2) return null;
-  const group = new THREE.Group();
-
-  // Shaft — leave room for the arrowhead (exclude last point from tube)
-  const shaftPts = pts.length > 2 ? pts.slice(0, pts.length - 1) : pts;
-  const curve = makeCurve(shaftPts);
-  if (curve) {
-    const tubeSeg = Math.max(shaftPts.length * 4, 8);
-    const tubeGeo = new THREE.TubeGeometry(curve, tubeSeg, SHEET_RADIUS, CURVE_SEGMENTS, false);
-    const tubeMat = new THREE.MeshPhongMaterial({ color: SS_COLORS[SS_SHEET] });
-    group.add(new THREE.Mesh(tubeGeo, tubeMat));
-  }
-
-  // Arrowhead cone at the last Cα position, pointing toward the last tangent.
-  const last = pts[pts.length - 1];
-  const prev = pts[pts.length - 2];
-  const dir = new THREE.Vector3().subVectors(last, prev).normalize();
-  const coneGeo = new THREE.ConeGeometry(SHEET_ARROW_RADIUS, SHEET_ARROW_LENGTH, 8);
-  const coneMat = new THREE.MeshPhongMaterial({ color: SS_COLORS[SS_SHEET] });
-  const cone = new THREE.Mesh(coneGeo, coneMat);
-  // THREE ConeGeometry points along +Y; align it to `dir`
-  cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-  cone.position.copy(last).addScaledVector(dir, SHEET_ARROW_LENGTH / 2);
-  group.add(cone);
-
-  return group;
 }
 
 // ─── CartoonRenderer class ────────────────────────────────────────────────────
@@ -274,26 +492,12 @@ export class CartoonRenderer {
   }
 
   private _rebuild(positions: Float32Array): void {
-    // Dispose existing children
+    this._disposeChildren();
     this.mesh.clear();
 
     for (const chain of this.chains) {
-      const segments = buildSegments(chain.ssTypes);
-      for (const seg of segments) {
-        const pts = extractPoints(chain.atomIndices, seg.caSliceStart, seg.caSliceEnd, positions);
-        let obj: THREE.Object3D | null = null;
-        switch (seg.ssType) {
-          case SS_HELIX:
-            obj = buildHelixMesh(pts);
-            break;
-          case SS_SHEET:
-            obj = buildSheetMesh(pts);
-            break;
-          default:
-            obj = buildCoilMesh(pts);
-        }
-        if (obj) this.mesh.add(obj);
-      }
+      const ribbon = buildChainRibbon(chain, positions);
+      if (ribbon) this.mesh.add(ribbon);
     }
   }
 
@@ -304,6 +508,11 @@ export class CartoonRenderer {
 
   /** Free all Three.js GPU resources. */
   dispose(): void {
+    this._disposeChildren();
+    this.mesh.clear();
+  }
+
+  private _disposeChildren(): void {
     this.mesh.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose();
@@ -314,6 +523,5 @@ export class CartoonRenderer {
         }
       }
     });
-    this.mesh.clear();
   }
 }
