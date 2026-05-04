@@ -261,9 +261,7 @@ class Color(PipelineNode):
     def __init__(
         self,
         *,
-        mode: Literal[
-            "uniform", "byElement", "byResidue", "byChain", "byBFactor", "byProperty"
-        ] = "uniform",
+        mode: Literal["uniform", "byElement", "byResidue", "byChain", "byBFactor", "byProperty"] = "uniform",
         uniform_color: str = "#ff8800",
         range: tuple[float, float] | None = None,
     ) -> None:
