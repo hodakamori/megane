@@ -21,6 +21,20 @@ import {
 } from "./protocol/protocol";
 import type { Snapshot, Frame, Measurement } from "./types";
 import type { MeganeCameraState } from "./renderer/MoleculeRenderer";
+// Accepted structure extensions — mirrors WIDGET_STRUCTURE_EXTS in WidgetViewer.tsx.
+// Kept here as a plain constant so the WASM module is never imported statically.
+const WIDGET_STRUCTURE_EXTS = [
+  ".pdb",
+  ".gro",
+  ".xyz",
+  ".mol",
+  ".sdf",
+  ".mol2",
+  ".cif",
+  ".data",
+  ".lammps",
+  ".traj",
+];
 
 interface AnyWidgetModel {
   get(key: string): unknown;
@@ -55,6 +69,11 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   let currentFrame: Frame | null = null;
   let disposed = false;
 
+  // Client-side trajectory loaded via the in-widget file picker.
+  // Seeking is handled locally without a Python round-trip.
+  let localFrames: Frame[] = [];
+  let localFrameIndex: number = 0;
+
   function parseSnapshot(): Snapshot | null {
     const data = model.get("_snapshot_data") as DataView | null;
     if (!data || data.byteLength === 0) return null;
@@ -80,6 +99,17 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
   }
 
   function handleSeek(frame: number) {
+    if (localFrames.length > 0) {
+      // Local trajectory from file picker — seek without Python round-trip.
+      const total = localFrames.length + 1; // +1: frame 0 uses snapshot positions
+      const target = frame === -1 ? (localFrameIndex + 1) % total : frame;
+      localFrameIndex = target;
+      // Frame 0 → snapshot positions (currentFrame = null); subsequent frames
+      // → the corresponding localFrames entry.
+      currentFrame = target === 0 ? null : localFrames[target - 1];
+      renderApp();
+      return;
+    }
     const totalFrames = (model.get("total_frames") as number) || 0;
     if (frame === -1) {
       // "next frame" signal from playback
@@ -90,6 +120,25 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
       model.set("frame_index", frame);
     }
     model.save_changes();
+  }
+
+  async function handleFilePick(file: File): Promise<void> {
+    const lower = file.name.toLowerCase();
+    if (!WIDGET_STRUCTURE_EXTS.some((ext) => lower.endsWith(ext))) {
+      throw new Error(`Unsupported format: ${file.name}`);
+    }
+    // Dynamic import so the WASM bundle is only fetched when the user actually
+    // picks a file, keeping the widget startup cost unchanged.
+    const { parseStructureFile } = await import("./parsers/structure");
+    const result = await parseStructureFile(file);
+    currentSnapshot = result.snapshot;
+    currentFrame = null;
+    localFrames = result.frames;
+    localFrameIndex = 0;
+    // Notify Python so it can fire the "file_load" event.
+    model.set("_uploaded_file_name", file.name);
+    model.save_changes();
+    renderApp();
   }
 
   function handleMeasurementChange(measurement: Measurement | null) {
@@ -124,8 +173,10 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
 
   function renderApp() {
     if (!root || disposed) return;
-    const frameIndex = (model.get("frame_index") as number) || 0;
-    const totalFrames = (model.get("total_frames") as number) || 0;
+    const frameIndex =
+      localFrames.length > 0 ? localFrameIndex : (model.get("frame_index") as number) || 0;
+    const totalFrames =
+      localFrames.length > 0 ? localFrames.length + 1 : (model.get("total_frames") as number) || 0;
     const selectedAtoms = (model.get("selected_atoms") as number[]) || [];
     const pipelineJson = (model.get("_pipeline_json") as string) || "";
     const nodeSnapshotsData = (model.get("_node_snapshots_data") as Record<string, DataView>) || {};
@@ -144,6 +195,7 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
         onPipelineChange: handlePipelineChange,
         initialCameraState: getInitialCameraState(),
         onCameraStateChange: handleCameraStateChange,
+        onFilePick: handleFilePick,
       }),
     );
   }

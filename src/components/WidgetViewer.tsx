@@ -25,6 +25,21 @@ import type { ViewportState, AddBondParams } from "../pipeline/types";
 import type { Snapshot, Frame, Measurement, HoverInfo } from "../types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
+/** Accepted structure file extensions (no WASM required). */
+export const WIDGET_STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.data,.lammps,.traj";
+export const WIDGET_STRUCTURE_EXTS = [
+  ".pdb",
+  ".gro",
+  ".xyz",
+  ".mol",
+  ".sdf",
+  ".mol2",
+  ".cif",
+  ".data",
+  ".lammps",
+  ".traj",
+];
+
 interface WidgetViewerProps {
   snapshot: Snapshot | null;
   frame: Frame | null;
@@ -40,6 +55,14 @@ interface WidgetViewerProps {
   initialCameraState?: MeganeCameraState | null;
   /** Called when camera state changes (after user interaction ends). */
   onCameraStateChange?: (state: MeganeCameraState) => void;
+  /**
+   * Called when the user selects or drops a structure file via the in-widget
+   * picker. The parent (widget.ts) is responsible for parsing and updating the
+   * snapshot; this async hook should resolve on success or reject with an Error
+   * message on failure. When provided, an empty-state overlay with drag-drop
+   * support is shown until the first structure is loaded.
+   */
+  onFilePick?: (file: File) => Promise<void>;
   // Optional pipeline store override. Each Jupyter widget mount creates its
   // own private store so multiple MolecularViewers in the same notebook do
   // not share state. Tests pass their own store to inspect internal state.
@@ -70,6 +93,7 @@ export function WidgetViewer({
   nodeSnapshotsData,
   initialCameraState,
   onCameraStateChange,
+  onFilePick,
   pipelineStore: pipelineStoreProp,
 }: WidgetViewerProps) {
   // Each WidgetViewer instance owns a private pipeline store. The webapp
@@ -92,6 +116,14 @@ export function WidgetViewer({
   onCameraStateChangeRef.current = onCameraStateChange;
   const initialCameraStateRef = useRef(initialCameraState);
 
+  // File picker state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [fileLoadError, setFileLoadError] = useState<string | null>(null);
+  const onFilePickRef = useRef(onFilePick);
+  onFilePickRef.current = onFilePick;
+
   const {
     selection,
     measurement,
@@ -100,6 +132,54 @@ export function WidgetViewer({
     handleFrameUpdated,
     setExternalSelection,
   } = useAtomSelection(rendererRef, onMeasurementChange);
+
+  // File picker handlers
+  const handleFileSelect = useCallback(async (file: File) => {
+    if (!onFilePickRef.current) return;
+    const lower = file.name.toLowerCase();
+    if (!WIDGET_STRUCTURE_EXTS.some((ext) => lower.endsWith(ext))) {
+      setFileLoadError(`Unsupported format: ${file.name}`);
+      return;
+    }
+    setFileLoadError(null);
+    setIsLoadingFile(true);
+    try {
+      await onFilePickRef.current(file);
+    } catch (e) {
+      setFileLoadError(e instanceof Error ? e.message : "Failed to load file");
+    } finally {
+      setIsLoadingFile(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      const file = Array.from(e.dataTransfer.files)[0];
+      if (file) handleFileSelect(file);
+    },
+    [handleFileSelect],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleFileSelect(file);
+      e.target.value = "";
+    },
+    [handleFileSelect],
+  );
 
   // Keep a ref so handleRendererReady can apply the initial selection
   const selectedAtomsRef = useRef(selectedAtoms);
@@ -358,6 +438,59 @@ export function WidgetViewer({
         elements={effectiveSnapshot?.elements ?? null}
         onClear={handleClearSelection}
       />
+
+      {onFilePick && !effectiveSnapshot && !pipelineJson && (
+        <div
+          data-testid="widget-file-picker"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            background: isDragOver ? "rgba(99,102,241,0.08)" : "transparent",
+            border: `2px dashed ${isDragOver ? "#6366f1" : "#9ca3af"}`,
+            borderRadius: "8px",
+            cursor: "pointer",
+            pointerEvents: isLoadingFile ? "none" : "auto",
+          }}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {isLoadingFile ? (
+            <span style={{ opacity: 0.6, fontSize: "0.875rem" }}>Loading...</span>
+          ) : (
+            <>
+              <span style={{ opacity: 0.5, fontSize: "0.875rem", textAlign: "center" }}>
+                Drop a structure file here, or click to browse
+              </span>
+              <span style={{ opacity: 0.35, fontSize: "0.75rem" }}>
+                PDB, GRO, XYZ, MOL/SDF, CIF, LAMMPS, ASE .traj
+              </span>
+              {fileLoadError && (
+                <span
+                  data-testid="widget-file-error"
+                  style={{ color: "#ef4444", fontSize: "0.75rem" }}
+                >
+                  {fileLoadError}
+                </span>
+              )}
+            </>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={WIDGET_STRUCTURE_ACCEPT}
+            style={{ display: "none" }}
+            onChange={handleFileInputChange}
+            data-testid="widget-file-input"
+          />
+        </div>
+      )}
     </div>
   );
 }

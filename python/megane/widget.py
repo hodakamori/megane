@@ -80,6 +80,10 @@ class MolecularViewer(anywidget.AnyWidget):
         value_trait=traitlets.Bytes(),
     ).tag(sync=True)
 
+    # File picker: JS sets this to the file name when the user loads a
+    # structure via the in-widget drag-drop / file-input overlay.
+    _uploaded_file_name = traitlets.Unicode("").tag(sync=True)
+
     # Internal (not synced)
     _structure = None
     _trajectory = None
@@ -212,6 +216,13 @@ class MolecularViewer(anywidget.AnyWidget):
             },
         )
 
+    @traitlets.observe("_uploaded_file_name")
+    def _on_file_name_change(self, change: dict) -> None:
+        """Fire file_load event when the user loads a file via the in-widget picker."""
+        name = change["new"]
+        if name:
+            self._fire_event("file_load", {"file_name": name})
+
     @traitlets.observe("_measurement_json")
     def _on_measurement_change(self, change: dict) -> None:
         """Fire measurement event when JS sends measurement data."""
@@ -264,6 +275,8 @@ class MolecularViewer(anywidget.AnyWidget):
             - "measurement": fired when a measurement is computed.
               Data: {"type": str, "value": float, "label": str,
                      "atoms": list[int]} or None
+            - "file_load": fired when the user loads a file via the in-widget
+              file picker. Data: {"file_name": str}
 
         Args:
             event_name: Name of the event.

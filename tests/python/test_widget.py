@@ -115,3 +115,59 @@ def test_deprecated_load_warns():
     assert len(w) == 1
     assert issubclass(w[0].category, DeprecationWarning)
     assert "set_pipeline" in str(w[0].message)
+
+
+# ── File picker traitlet tests ────────────────────────────────────────────────
+
+
+def test_uploaded_file_name_default():
+    """_uploaded_file_name starts as empty string."""
+    v = MolecularViewer()
+    assert v._uploaded_file_name == ""
+
+
+def test_uploaded_file_name_is_synced():
+    """_uploaded_file_name is in get_state() (sync=True)."""
+    v = MolecularViewer()
+    state = v.get_state()
+    assert "_uploaded_file_name" in state
+
+
+def test_file_load_event_fired_on_name_change():
+    """Setting _uploaded_file_name fires the 'file_load' event with the name."""
+    v = MolecularViewer()
+    received = []
+    v.on_event("file_load", lambda data: received.append(data))
+
+    v._uploaded_file_name = "protein.pdb"
+
+    assert len(received) == 1
+    assert received[0] == {"file_name": "protein.pdb"}
+
+
+def test_file_load_event_not_fired_for_empty_name():
+    """Setting _uploaded_file_name to '' does not fire the event."""
+    v = MolecularViewer()
+    received = []
+    v.on_event("file_load", lambda data: received.append(data))
+
+    # Simulate a round-trip reset (JS clears the field after loading)
+    v._uploaded_file_name = "protein.pdb"
+    v._uploaded_file_name = ""
+
+    # Only the non-empty set should trigger the event.
+    assert len(received) == 1
+
+
+def test_file_load_event_multiple_files():
+    """Each non-empty _uploaded_file_name change triggers a separate event."""
+    v = MolecularViewer()
+    received = []
+    v.on_event("file_load", lambda data: received.append(data))
+
+    v._uploaded_file_name = "mol_a.pdb"
+    v._uploaded_file_name = "mol_b.gro"
+
+    assert len(received) == 2
+    assert received[0] == {"file_name": "mol_a.pdb"}
+    assert received[1] == {"file_name": "mol_b.gro"}

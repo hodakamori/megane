@@ -58,19 +58,21 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 
 | Feature | Standalone | Jupyter widget | JupyterLab | VSCode | Python |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Drag-and-drop into viewer | ✓ | — | — | — | n/a |
-| Built-in file picker | ✓ | — | host | host | n/a |
+| Drag-and-drop into viewer | ✓ | ✓¹ | — | — | n/a |
+| Built-in file picker | ✓ | ✓¹ | host | host | n/a |
 | Visual pipeline editor | ✓ | — | ✓ | ✓ (`.megane.json`) | n/a |
 | Trajectory timeline / scrubbing | ✓ | ✓ | ✓ | ✓ | n/a |
 | WebSocket trajectory streaming | ✓ | — | — | — | n/a |
 | Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | — | ✓ | — | — | n/a |
+| `file_load` event (in-widget picker) | — | ✓ | — | — | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | — | — | n/a |
 
 Notes:
 
 - **host** means the parent app provides the file picker (the JupyterLab file browser, the VS Code explorer); megane itself does not render one.
+- ¹ The Jupyter widget shows an in-cell drag-drop overlay and file-input button when no structure has been loaded via the Python API. Supported formats match `LoadStructure` (PDB, GRO, XYZ, MOL/SDF, CIF, LAMMPS data, ASE .traj). Separate trajectory files (XTC, DCD) still require the Python API.
 - The Jupyter widget intentionally does not mount the visual pipeline editor — pipelines are built in Python (`megane.Pipeline`) and pushed via `MolecularViewer.set_pipeline()`. Use the standalone app, JupyterLab labextension, or VSCode extension to edit pipelines visually.
 - The standalone app is the only platform with `megane serve` WebSocket streaming; other platforms load full trajectories into memory.
 - The standalone React `MeganeViewer` exposes an `onFrameChange?: (frame: number) => void` prop that fires on every trajectory frame transition — useful for keeping a host Plotly figure in sync.
@@ -82,7 +84,7 @@ How data gets into the viewer on each platform:
 | Platform | Primary load path | API surface |
 |---|---|---|
 | **Standalone** | Drag-and-drop, file dialog, `megane serve <file>`, WebSocket | `parseStructureFile(file)` (TypeScript), pipeline node `LoadStructure` / `LoadTrajectory` |
-| **Jupyter widget** | Python only — no in-cell file picker | `MolecularViewer.load(pdb_path, xtc=, traj=)` (deprecated) or `MolecularViewer.set_pipeline(Pipeline)` (recommended) |
+| **Jupyter widget** | Python API, or in-cell drag-drop / file picker (structure files only) | `MolecularViewer.load(pdb_path, xtc=, traj=)` (deprecated) or `MolecularViewer.set_pipeline(Pipeline)` (recommended); `on_event("file_load", cb)` to react to picker loads |
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VSCode** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **Python** | `from megane.parsers import …` | `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`, and the `parse_*` PyO3 functions |
@@ -92,7 +94,7 @@ How data gets into the viewer on each platform:
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
 - **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` / `.nc` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
-- **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
+- **Jupyter widget file picker supports structure formats only.** Separate trajectory files (XTC, DCD, AMBER NetCDF, LAMMPS dump) require the Python API (`set_pipeline()` or `load()`). The in-cell picker only appears when no structure has been loaded via Python.
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
 - **`selection_change` / `measurement` events are widget-only.** Other platforms do not emit these to a host. The standalone React component does expose `onFrameChange` (see UI features table).
 - **`frame_change` callback for JupyterLab is surfaced as a status-bar frame counter.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Instead, when `IStatusBar` is available, the current frame index is shown in the JupyterLab status bar (right side). The `subscribeFrameChange` method on `MeganeReactView` can also be used by other JupyterLab extensions to react to frame changes.
