@@ -19,7 +19,6 @@ import type {
 } from "./types";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { getVectorsForFrame } from "../logic/vectorSourceLogic";
-import type { ColorScheme } from "../colorSchemes";
 
 /**
  * Apply the current ViewportState to the renderer.
@@ -31,7 +30,7 @@ export function applyViewportState(
   current: ViewportState,
   previous: ViewportState | null,
   primaryNodeId?: string | null,
-  atomLabels?: string[] | null,
+  _atomLabels?: string[] | null,
 ): void {
   // ─── Determine which node IDs are primary vs layer ─────────
   const currentNodeIds = collectSourceNodeIds(current);
@@ -158,10 +157,6 @@ export function applyViewportState(
   if (!previous || current.representationMode !== previous.representationMode) {
     renderer.setRepresentationType(current.representationMode ?? "atoms");
   }
-  const prevScheme: ColorScheme = previous?.colorScheme ?? "byElement";
-  if (!previous || current.colorScheme !== prevScheme) {
-    renderer.setColorScheme(current.colorScheme ?? "byElement", atomLabels ?? null);
-  }
 
   // ─── Labels (primary structure only for now) ───────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);
@@ -207,53 +202,29 @@ function applyParticleOverrides(
       renderer.clearAtomOverrides();
       renderer.setAtomScale(1.0);
       renderer.setAtomOpacity(1.0);
+      renderer.applyAtomColorOverrides(null);
     }
     return;
   }
 
-  // Merge overrides from all particle streams for the primary structure
-  let mergedScale: Float32Array | null = null;
-  let mergedOpacity: Float32Array | null = null;
+  const merged = mergeParticleOverrides(particles);
 
-  for (const p of particles) {
-    if (p.scaleOverrides) {
-      if (!mergedScale) {
-        mergedScale = new Float32Array(p.scaleOverrides);
-      } else {
-        for (let i = 0; i < mergedScale.length; i++) {
-          if (p.scaleOverrides[i] !== 1.0) {
-            mergedScale[i] = p.scaleOverrides[i];
-          }
-        }
-      }
-    }
-    if (p.opacityOverrides) {
-      if (!mergedOpacity) {
-        mergedOpacity = new Float32Array(p.opacityOverrides);
-      } else {
-        for (let i = 0; i < mergedOpacity.length; i++) {
-          if (p.opacityOverrides[i] !== 1.0) {
-            mergedOpacity[i] = p.opacityOverrides[i];
-          }
-        }
-      }
-    }
-  }
-
-  if (mergedScale) {
+  if (merged.scale) {
     renderer.setAtomScale(1.0);
-    renderer.setAtomScaleOverrides(mergedScale);
+    renderer.setAtomScaleOverrides(merged.scale);
   } else {
     renderer.clearAtomOverrides();
     renderer.setAtomScale(1.0);
   }
 
-  if (mergedOpacity) {
+  if (merged.opacity) {
     renderer.setAtomOpacity(1.0);
-    renderer.setAtomOpacityOverrides(mergedOpacity);
+    renderer.setAtomOpacityOverrides(merged.opacity);
   } else {
     renderer.setAtomOpacity(1.0);
   }
+
+  renderer.applyAtomColorOverrides(merged.color);
 }
 
 /** Apply overrides to a StructureLayer. */
@@ -264,51 +235,83 @@ function applyLayerParticleOverrides(
     setAtomScaleOverrides: (o: Float32Array) => void;
     setAtomOpacityOverrides: (o: Float32Array) => void;
     clearAtomOverrides: () => void;
+    applyAtomColorOverrides: (overrides: Float32Array | null) => void;
   },
   particles: ParticleData[],
 ): void {
-  let mergedScale: Float32Array | null = null;
-  let mergedOpacity: Float32Array | null = null;
+  const merged = mergeParticleOverrides(particles);
 
-  for (const p of particles) {
-    if (p.scaleOverrides) {
-      if (!mergedScale) {
-        mergedScale = new Float32Array(p.scaleOverrides);
-      } else {
-        for (let i = 0; i < mergedScale.length; i++) {
-          if (p.scaleOverrides[i] !== 1.0) {
-            mergedScale[i] = p.scaleOverrides[i];
-          }
-        }
-      }
-    }
-    if (p.opacityOverrides) {
-      if (!mergedOpacity) {
-        mergedOpacity = new Float32Array(p.opacityOverrides);
-      } else {
-        for (let i = 0; i < mergedOpacity.length; i++) {
-          if (p.opacityOverrides[i] !== 1.0) {
-            mergedOpacity[i] = p.opacityOverrides[i];
-          }
-        }
-      }
-    }
-  }
-
-  if (mergedScale) {
+  if (merged.scale) {
     layer.setAtomScale(1.0);
-    layer.setAtomScaleOverrides(mergedScale);
+    layer.setAtomScaleOverrides(merged.scale);
   } else {
     layer.clearAtomOverrides();
     layer.setAtomScale(1.0);
   }
 
-  if (mergedOpacity) {
+  if (merged.opacity) {
     layer.setAtomOpacity(1.0);
-    layer.setAtomOpacityOverrides(mergedOpacity);
+    layer.setAtomOpacityOverrides(merged.opacity);
   } else {
     layer.setAtomOpacity(1.0);
   }
+
+  layer.applyAtomColorOverrides(merged.color);
+}
+
+/**
+ * Merge per-atom overrides across multiple particle streams targeting the
+ * same structure. Scale / opacity collapse to "any non-1.0 wins"; color
+ * collapses to "any non-NaN wins" (last-write semantics in stream order).
+ */
+function mergeParticleOverrides(particles: ParticleData[]): {
+  scale: Float32Array | null;
+  opacity: Float32Array | null;
+  color: Float32Array | null;
+} {
+  let scale: Float32Array | null = null;
+  let opacity: Float32Array | null = null;
+  let color: Float32Array | null = null;
+
+  for (const p of particles) {
+    if (p.scaleOverrides) {
+      if (!scale) {
+        scale = new Float32Array(p.scaleOverrides);
+      } else {
+        for (let i = 0; i < scale.length; i++) {
+          if (p.scaleOverrides[i] !== 1.0) {
+            scale[i] = p.scaleOverrides[i];
+          }
+        }
+      }
+    }
+    if (p.opacityOverrides) {
+      if (!opacity) {
+        opacity = new Float32Array(p.opacityOverrides);
+      } else {
+        for (let i = 0; i < opacity.length; i++) {
+          if (p.opacityOverrides[i] !== 1.0) {
+            opacity[i] = p.opacityOverrides[i];
+          }
+        }
+      }
+    }
+    if (p.colorOverrides) {
+      if (!color) {
+        color = new Float32Array(p.colorOverrides);
+      } else {
+        for (let i = 0; i < color.length; i += 3) {
+          if (!Number.isNaN(p.colorOverrides[i])) {
+            color[i] = p.colorOverrides[i];
+            color[i + 1] = p.colorOverrides[i + 1];
+            color[i + 2] = p.colorOverrides[i + 2];
+          }
+        }
+      }
+    }
+  }
+
+  return { scale, opacity, color };
 }
 
 function applyBondSettings(

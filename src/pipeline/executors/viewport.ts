@@ -43,7 +43,6 @@ export function executeViewport(
     cellAxesVisible: params.cellAxesVisible,
     pivotMarkerVisible: params.pivotMarkerVisible ?? true,
     representationMode: params.representationMode ?? "atoms",
-    colorScheme: params.colorScheme ?? "byElement",
   };
 }
 

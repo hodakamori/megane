@@ -1,8 +1,10 @@
 import type { PipelineData, ParticleData, BondData, ModifyParams } from "../types";
+import { ensureColorOverridesBuffer, makeColorWriter } from "../colorWriter";
 
 export function executeModify(
   params: ModifyParams,
   inputs: Map<string, PipelineData[]>,
+  atomLabels: string[] | null = null,
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
   const inData = inputs.get("in")?.[0];
@@ -44,10 +46,31 @@ export function executeModify(
       }
     }
 
+    let colorArr: Float32Array | null = particle.colorOverrides;
+    if (params.colorEnabled) {
+      const buf = ensureColorOverridesBuffer(particle);
+      const writer = makeColorWriter(
+        params.colorMode,
+        params.uniformColor,
+        particle,
+        atomLabels,
+        params.colorRange,
+      );
+      if (particle.indices === null) {
+        for (let i = 0; i < nAtoms; i++) writer(buf, i);
+      } else {
+        for (let k = 0; k < particle.indices.length; k++) {
+          writer(buf, particle.indices[k]);
+        }
+      }
+      colorArr = buf;
+    }
+
     const modified: ParticleData = {
       ...particle,
       scaleOverrides: scaleArr,
       opacityOverrides: opacityArr,
+      colorOverrides: colorArr,
     };
     outputs.set("out", modified);
   } else if (inData.type === "bond") {

@@ -6,7 +6,6 @@
 
 import * as THREE from "three";
 import type { Snapshot, Frame, AtomRenderer, BondRenderer } from "../types";
-import type { ColorContext } from "../colorSchemes";
 import { ImpostorAtomMesh } from "./ImpostorAtomMesh";
 import { ImpostorBondMesh } from "./ImpostorBondMesh";
 import { CellRenderer } from "./CellRenderer";
@@ -25,13 +24,14 @@ export class StructureLayer {
   private atomOpacity = 1.0;
   private bondScale = 1.0;
   private bondOpacity = 1.0;
+  private currentColorOverrides: Float32Array | null = null;
 
   constructor(id: string, scene: THREE.Scene) {
     this.id = id;
     this.scene = scene;
   }
 
-  loadSnapshot(snapshot: Snapshot, colorCtx?: ColorContext): void {
+  loadSnapshot(snapshot: Snapshot): void {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
@@ -40,7 +40,10 @@ export class StructureLayer {
       this.atomRenderer = atoms;
       this.scene.add(atoms.mesh);
     }
-    this.atomRenderer.loadSnapshot(snapshot, colorCtx);
+    this.atomRenderer.loadSnapshot(snapshot);
+    if (this.currentColorOverrides) {
+      (this.atomRenderer as ImpostorAtomMesh).applyColorOverrides(this.currentColorOverrides);
+    }
 
     if (this.atomScale !== 1.0 && this.atomRenderer.setScale) {
       this.atomRenderer.setScale(this.atomScale, snapshot);
@@ -68,11 +71,32 @@ export class StructureLayer {
     }
   }
 
-  /** Recolor the already-loaded snapshot with a new color context (no camera reset). */
-  loadSnapshotWithColor(colorCtx: ColorContext | undefined): void {
-    if (this.snapshot && this.atomRenderer) {
-      this.atomRenderer.loadSnapshot(this.snapshot, colorCtx);
+  /**
+   * Apply per-atom RGB color overrides on this layer's atom mesh. Null reverts
+   * the layer to base CPK colors. Bond colors are re-derived from the atom
+   * buffer in the same call.
+   */
+  applyAtomColorOverrides(overrides: Float32Array | null): void {
+    if (overrides === this.currentColorOverrides) return;
+    this.currentColorOverrides = overrides;
+    if (!this.snapshot || !this.atomRenderer) return;
+
+    this.atomRenderer.loadSnapshot(this.snapshot);
+    if (this.atomScale !== 1.0 && this.atomRenderer.setScale) {
+      this.atomRenderer.setScale(this.atomScale, this.snapshot);
     }
+    if (overrides) {
+      (this.atomRenderer as ImpostorAtomMesh).applyColorOverrides(overrides);
+    }
+    this.syncBondColorsToAtoms();
+  }
+
+  private syncBondColorsToAtoms(snapshot?: Snapshot): void {
+    const snap = snapshot ?? this.snapshot;
+    if (!snap || !this.atomRenderer || !this.bondRenderer || snap.nBonds === 0) return;
+    const atom = this.atomRenderer as ImpostorAtomMesh;
+    const bond = this.bondRenderer as ImpostorBondMesh;
+    bond.recomputeColorsFromAtomBuffer(atom.getColorBuffer(), snap);
   }
 
   updateFrame(frame: Frame): void {
@@ -96,7 +120,7 @@ export class StructureLayer {
     const pos = positions ?? this.currentPositions ?? this.snapshot.positions;
     const elems = elements ?? this.snapshot.elements;
     const atomCount = nAtoms || this.snapshot.nAtoms;
-    this.bondRenderer.loadSnapshot({
+    const extSnap = {
       ...this.snapshot,
       nAtoms: atomCount,
       nBonds: bonds.length / 2,
@@ -104,10 +128,12 @@ export class StructureLayer {
       bondOrders,
       positions: pos,
       elements: elems,
-    });
+    };
+    this.bondRenderer.loadSnapshot(extSnap);
     if (this.bondScale !== 1.0 && this.bondRenderer.setScale) {
       this.bondRenderer.setScale(this.bondScale, this.snapshot);
     }
+    this.syncBondColorsToAtoms(extSnap);
   }
 
   setAtomScale(scale: number): void {
