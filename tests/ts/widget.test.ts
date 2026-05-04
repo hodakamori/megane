@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Snapshot, Frame } from "@/types";
 
 /**
  * Tests for src/widget.ts — the anywidget render entry point.
@@ -36,6 +37,13 @@ vi.mock("react-dom/client", () => ({
 vi.mock("@/perf", () => ({
   perfMark: vi.fn(),
   perfMeasure: vi.fn(),
+}));
+
+// Stub the WASM-backed structure parser so handleFilePick can be exercised
+// without a real WASM build. Tests configure the return value per-case.
+const mockParseStructureFile = vi.fn();
+vi.mock("@/parsers/structure", () => ({
+  parseStructureFile: mockParseStructureFile,
 }));
 
 // Stub protocol decoders so parseSnapshot/parseFrame return null in tests
@@ -272,5 +280,133 @@ describe("widget.ts — render", () => {
     const el = makeContainer();
     const cleanup = widgetEntry.render({ model: model as never, el }) as () => void;
     expect(() => cleanup()).not.toThrow();
+  });
+
+  // ── handleFilePick ────────────────────────────────────────────────────────
+
+  it("handleFilePick parses the file and notifies Python with the file name", async () => {
+    const mockSnapshot = { atoms: [] } as unknown as Snapshot;
+    const mockFrames = [{ positions: new Float32Array([1, 2, 3]) }] as unknown as Frame[];
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: mockSnapshot,
+      frames: mockFrames,
+    });
+
+    const model = makeMockModel();
+    const el = makeContainer();
+    widgetEntry.render({ model: model as never, el });
+
+    const last = renderedElements[renderedElements.length - 1];
+    const onFilePick = last.props.onFilePick as (file: File) => Promise<void>;
+    const file = new File([""], "protein.pdb");
+    await onFilePick(file);
+
+    expect(mockParseStructureFile).toHaveBeenCalledWith(file);
+    expect(model.set).toHaveBeenCalledWith("_uploaded_file_name", "protein.pdb");
+    expect(model.save_changes).toHaveBeenCalled();
+  });
+
+  it("handleFilePick re-renders with snapshot from parsed file", async () => {
+    const mockSnapshot = { atoms: [{ x: 1, y: 2, z: 3 }] } as unknown as Snapshot;
+    mockParseStructureFile.mockResolvedValueOnce({ snapshot: mockSnapshot, frames: [] });
+
+    const model = makeMockModel();
+    const el = makeContainer();
+    widgetEntry.render({ model: model as never, el });
+
+    const { onFilePick } = renderedElements[renderedElements.length - 1].props;
+    await (onFilePick as (f: File) => Promise<void>)(new File([""], "mol.gro"));
+
+    const afterLoad = renderedElements[renderedElements.length - 1];
+    expect(afterLoad.props.snapshot).toBe(mockSnapshot);
+    expect(afterLoad.props.frame).toBeNull();
+  });
+
+  it("handleFilePick throws for unsupported file extensions", async () => {
+    const model = makeMockModel();
+    const el = makeContainer();
+    widgetEntry.render({ model: model as never, el });
+
+    const { onFilePick } = renderedElements[renderedElements.length - 1].props;
+    await expect(
+      (onFilePick as (f: File) => Promise<void>)(new File([""], "video.mp4")),
+    ).rejects.toThrow("Unsupported format: video.mp4");
+  });
+
+  // ── local-frame trajectory (after handleFilePick) ─────────────────────────
+
+  it("handleSeek uses local frames after file pick (no Python round-trip)", async () => {
+    const frames = [
+      { positions: new Float32Array([1]) },
+      { positions: new Float32Array([2]) },
+    ] as unknown as Frame[];
+    mockParseStructureFile.mockResolvedValueOnce({ snapshot: {} as Snapshot, frames });
+
+    const model = makeMockModel();
+    const el = makeContainer();
+    widgetEntry.render({ model: model as never, el });
+
+    await (renderedElements[renderedElements.length - 1].props.onFilePick as (f: File) => Promise<void>)(
+      new File([""], "mol.pdb"),
+    );
+
+    // After load, localFrameIndex=0 (snapshot frame). Seek to frame 2.
+    const onSeek = renderedElements[renderedElements.length - 1].props.onSeek as (f: number) => void;
+    onSeek(2);
+
+    // model.set("frame_index") must NOT be called — seeking is local.
+    expect(model.set).not.toHaveBeenCalledWith("frame_index", expect.anything());
+
+    // renderApp reflects localFrameIndex=2, totalFrames=3 (frames.length+1).
+    const after = renderedElements[renderedElements.length - 1];
+    expect(after.props.currentFrame).toBe(2);
+    expect(after.props.totalFrames).toBe(3);
+  });
+
+  it("handleSeek -1 advances local frame index with wrap-around", async () => {
+    const frames = [
+      { positions: new Float32Array([1]) },
+      { positions: new Float32Array([2]) },
+    ] as unknown as Frame[];
+    mockParseStructureFile.mockResolvedValueOnce({ snapshot: {} as Snapshot, frames });
+
+    const model = makeMockModel();
+    const el = makeContainer();
+    widgetEntry.render({ model: model as never, el });
+
+    await (renderedElements[renderedElements.length - 1].props.onFilePick as (f: File) => Promise<void>)(
+      new File([""], "mol.pdb"),
+    );
+
+    const onSeek = renderedElements[renderedElements.length - 1].props.onSeek as (f: number) => void;
+    // localFrameIndex=0, total=3; -1 → 1
+    onSeek(-1);
+    expect(renderedElements[renderedElements.length - 1].props.currentFrame).toBe(1);
+
+    // -1 again → 2
+    onSeek(-1);
+    expect(renderedElements[renderedElements.length - 1].props.currentFrame).toBe(2);
+
+    // -1 again wraps → 0
+    onSeek(-1);
+    expect(renderedElements[renderedElements.length - 1].props.currentFrame).toBe(0);
+  });
+
+  it("handleSeek frame 0 after local load sets currentFrame to null (snapshot positions)", async () => {
+    const frames = [{ positions: new Float32Array([1]) }] as unknown as Frame[];
+    mockParseStructureFile.mockResolvedValueOnce({ snapshot: {} as Snapshot, frames });
+
+    const model = makeMockModel();
+    const el = makeContainer();
+    widgetEntry.render({ model: model as never, el });
+
+    await (renderedElements[renderedElements.length - 1].props.onFilePick as (f: File) => Promise<void>)(
+      new File([""], "mol.pdb"),
+    );
+
+    const onSeek = renderedElements[renderedElements.length - 1].props.onSeek as (f: number) => void;
+    onSeek(1); // advance to frame 1
+    onSeek(0); // back to frame 0 (snapshot)
+    expect(renderedElements[renderedElements.length - 1].props.frame).toBeNull();
   });
 });
