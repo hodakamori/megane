@@ -23,7 +23,14 @@ import { useViewStateStore } from "../stores/useViewStateStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
-import type { HoverInfo, BondSource, LabelSource, VectorSource, SelectionState, Measurement } from "../types";
+import type {
+  HoverInfo,
+  BondSource,
+  LabelSource,
+  VectorSource,
+  SelectionState,
+  Measurement,
+} from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
