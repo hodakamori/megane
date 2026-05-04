@@ -60,6 +60,8 @@ from megane import (
     LoadVector,
     Filter,
     Modify,
+    Color,
+    Representation,
     AddBonds,
     AddLabels,
     AddPolyhedra,
@@ -165,6 +167,47 @@ Modify(*, scale: float = 1.0, opacity: float = 1.0)
 |-----------|------|---------|-------------|
 | `scale` | `float` | `1.0` | Atom sphere radius multiplier (0.1–2.0) |
 | `opacity` | `float` | `1.0` | Transparency (0 = invisible, 1 = opaque) |
+
+**Ports:** `inp.particle`, `out.particle`
+
+### Color
+
+Recolor the upstream particle stream by a chosen scheme. Color was split out
+of `Modify` so each modifier owns a single visual property (Ovito-style
+modifier stack).
+
+```python
+Color(
+    *,
+    mode: Literal["uniform", "byElement", "byResidue", "byChain", "byBFactor", "byProperty"] = "uniform",
+    uniform_color: str = "#ff8800",
+    range: tuple[float, float] | None = None,
+)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | `str` | `"uniform"` | Coloring scheme |
+| `uniform_color` | `str` | `"#ff8800"` | Hex color used when `mode == "uniform"` |
+| `range` | `tuple[float, float] \| None` | `None` | Optional explicit range for `byBFactor` / `byProperty` |
+
+**Ports:** `inp.particle`, `out.particle`
+
+### Representation
+
+Tag the particle stream with the visual representation the Viewport should
+display. Stacks Ovito-style: the Viewport reads the override from the first
+particle stream that carries one, so a downstream `Representation` node
+wins over an upstream one on the same chain. When no chain has an override,
+the Viewport falls back to `"atoms"`.
+
+```python
+Representation(*, mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms")
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | `str` | `"atoms"` | Visual representation: `"atoms"`, `"cartoon"`, `"both"`, or `"surface"` |
 
 **Ports:** `inp.particle`, `out.particle`
 

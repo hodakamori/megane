@@ -8,6 +8,7 @@ from megane.pipeline import (
     AddBonds,
     AddLabels,
     AddPolyhedra,
+    Color,
     Filter,
     LoadStructure,
     LoadTrajectory,
@@ -16,6 +17,7 @@ from megane.pipeline import (
     NodePort,
     Pipeline,
     PortNamespace,
+    Representation,
     VectorOverlay,
     Viewport,
     build_pipeline,
@@ -49,6 +51,28 @@ class TestNodeClasses:
         n = Modify(scale=1.5, opacity=0.3)
         assert n.scale == 1.5
         assert n.opacity == 0.3
+
+    def test_color_defaults(self):
+        n = Color()
+        assert n.mode == "uniform"
+        assert n.uniform_color == "#ff8800"
+        assert n.range is None
+        assert n._node_type == "color"
+
+    def test_color_custom(self):
+        n = Color(mode="byElement", uniform_color="#112233", range=(0.0, 10.0))
+        assert n.mode == "byElement"
+        assert n.uniform_color == "#112233"
+        assert n.range == (0.0, 10.0)
+
+    def test_representation_defaults(self):
+        n = Representation()
+        assert n.mode == "atoms"
+        assert n._node_type == "representation"
+
+    def test_representation_custom(self):
+        n = Representation(mode="cartoon")
+        assert n.mode == "cartoon"
 
     def test_add_bonds_default(self):
         n = AddBonds()
@@ -406,6 +430,54 @@ class TestPipelineSerialization:
         assert bond_node["bondFileName"] == str(FIXTURES / "test_topology.top")
         assert isinstance(bond_node["bondFileData"], list)
         assert len(bond_node["bondFileData"]) > 0
+
+    def test_color_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        c = pipe.add_node(Color(mode="byChain", uniform_color="#abcdef"))
+        pipe.add_edge(s.out.particle, c.inp.particle)
+        result = pipe.to_dict()
+
+        color_node = next(n for n in result["nodes"] if n["type"] == "color")
+        assert color_node["mode"] == "byChain"
+        assert color_node["uniformColor"] == "#abcdef"
+        assert "range" not in color_node
+
+    def test_color_serialization_with_range(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        c = pipe.add_node(Color(mode="byBFactor", range=(0.0, 50.0)))
+        pipe.add_edge(s.out.particle, c.inp.particle)
+        result = pipe.to_dict()
+
+        color_node = next(n for n in result["nodes"] if n["type"] == "color")
+        assert color_node["mode"] == "byBFactor"
+        assert color_node["range"] == [0.0, 50.0]
+
+    def test_representation_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        r = pipe.add_node(Representation(mode="surface"))
+        pipe.add_edge(s.out.particle, r.inp.particle)
+        result = pipe.to_dict()
+
+        rep_node = next(n for n in result["nodes"] if n["type"] == "representation")
+        assert rep_node["mode"] == "surface"
+
+    def test_color_representation_round_trip(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        c = pipe.add_node(Color(mode="byElement"))
+        r = pipe.add_node(Representation(mode="cartoon"))
+        v = pipe.add_node(Viewport())
+        pipe.add_edge(s.out.particle, c.inp.particle)
+        pipe.add_edge(c.out.particle, r.inp.particle)
+        pipe.add_edge(r.out.particle, v.inp.particle)
+
+        rebuilt = Pipeline.from_dict(pipe.to_dict())
+        types = [config["type"] for _, config in rebuilt._nodes.values()]
+        assert "color" in types
+        assert "representation" in types
 
     def test_polyhedra_serialization(self):
         pipe = Pipeline()

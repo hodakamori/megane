@@ -58,6 +58,7 @@ function makeParticle(
     scaleOverrides: null,
     opacityOverrides: null,
     colorOverrides,
+    representationOverride: null,
   };
 }
 

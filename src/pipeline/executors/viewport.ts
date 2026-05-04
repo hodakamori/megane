@@ -9,6 +9,7 @@ import type {
   ViewportParams,
   ViewportState,
   PipelineData,
+  RepresentationMode,
 } from "../types";
 
 export function executeViewport(
@@ -42,8 +43,20 @@ export function executeViewport(
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
     pivotMarkerVisible: params.pivotMarkerVisible ?? true,
-    representationMode: params.representationMode ?? "atoms",
+    representationMode: pickRepresentationMode(particles),
   };
+}
+
+/**
+ * Pick the effective representation mode from the incoming particle streams.
+ * The first non-null `representationOverride` wins; if no upstream
+ * Representation node is wired in, fall back to "atoms" (the prior default).
+ */
+function pickRepresentationMode(particles: ParticleData[]): RepresentationMode {
+  for (const p of particles) {
+    if (p.representationOverride) return p.representationOverride;
+  }
+  return "atoms";
 }
 
 /**

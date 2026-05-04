@@ -115,6 +115,28 @@ No additional parameters.
 | `scale` | `number` | Atom sphere radius multiplier (0.1–2.0) |
 | `opacity` | `number` | Transparency (0–1) |
 
+#### `color`
+
+Per-stream coloring (Ovito-style). Accepts a `particle` input on the `in`
+handle and emits the recolored particle stream on `out`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | `string` | `"uniform"`, `"byElement"`, `"byResidue"`, `"byChain"`, `"byBFactor"`, or `"byProperty"` |
+| `uniformColor` | `string` | Hex color used when `mode === "uniform"` |
+| `range` | `[number, number]?` | Optional `[min, max]` for `byBFactor` / `byProperty` |
+
+#### `representation`
+
+Per-stream representation override (Ovito-style). The Viewport reads the
+mode from the first connected particle stream that carries an override and
+falls back to `"atoms"` otherwise. Accepts a `particle` input on the `in`
+handle and emits the tagged particle stream on `out`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | `string` | `"atoms"` (default), `"cartoon"`, `"both"`, or `"surface"` |
+
 #### `add_bond`
 
 | Field | Type | Description |

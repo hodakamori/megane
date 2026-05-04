@@ -40,7 +40,8 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 │                                                             │
 │  executePipeline() → topological sort → per-node executor   │
 │                                                             │
-│  LoadStructure → Filter → Modify → AddBond → Viewport      │
+│  LoadStructure → Filter → Modify → Color → Representation │
+│                       → AddBond → Viewport                  │
 │       │            │         │         │          │         │
 │  ParticleData  ParticleData  ...    BondData  ViewportState │
 └────────────────────────────┬────────────────────────────────┘
@@ -63,7 +64,7 @@ Seven typed channels flow through pipeline edges. Defined in `src/pipeline/types
 
 | Channel | Interface | Key Fields | Produced By | Consumed By |
 |---------|-----------|------------|-------------|-------------|
-| `particle` | `ParticleData` | `source` (Snapshot), `indices`, `scaleOverrides`, `opacityOverrides` | LoadStructure, Streaming, Filter, Modify | Filter, Modify, AddBond, Labels, Polyhedra, Viewport |
+| `particle` | `ParticleData` | `source` (Snapshot), `indices`, `scaleOverrides`, `opacityOverrides`, `colorOverrides`, `representationOverride` | LoadStructure, Streaming, Filter, Modify, Color, Representation | Filter, Modify, Color, Representation, AddBond, Labels, Polyhedra, Viewport |
 | `bond` | `BondData` | `bondIndices`, `bondOrders`, `nBonds`, `scale`, `opacity` | AddBond, Streaming, Filter, Modify | Filter, Modify, Viewport |
 | `cell` | `CellData` | `box` (3x3 Float32Array), `visible`, `axesVisible` | LoadStructure, Streaming | Viewport |
 | `trajectory` | `TrajectoryData` | `provider` (FrameProvider), `meta` | LoadStructure, LoadTrajectory, Streaming | Viewport |
@@ -71,7 +72,7 @@ Seven typed channels flow through pipeline edges. Defined in `src/pipeline/types
 | `mesh` | `MeshData` | `positions`, `indices`, `normals`, `colors` | PolyhedronGenerator | Viewport |
 | `vector` | `VectorData` | `frames` (VectorFrame[]), `scale` | LoadVector, VectorOverlay | VectorOverlay, Viewport |
 
-Each edge in the UI is color-coded by data type (`DATA_TYPE_COLORS`). Filter and Modify nodes are generic — they accept both `particle` and `bond` inputs via `GENERIC_NODE_ACCEPTS`.
+Each edge in the UI is color-coded by data type (`DATA_TYPE_COLORS`). Filter and Modify nodes are generic — they accept both `particle` and `bond` inputs via `GENERIC_NODE_ACCEPTS`. The Color and Representation nodes are particle-only modifiers that share the same Modify category in the toolbar (Ovito-style stack: each modifier owns one visual property — Modify = scale & opacity, Color = per-atom palette, Representation = atoms/cartoon/both/surface).
 
 ## Pipeline Execution
 

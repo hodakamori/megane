@@ -215,6 +215,10 @@ class Filter(PipelineNode):
 class Modify(PipelineNode):
     """Modify per-atom visual properties (scale, opacity).
 
+    Color and representation now live on dedicated :class:`Color` and
+    :class:`Representation` nodes so each modifier owns a single visual
+    property (Ovito-style modifier stack).
+
     Ports:
         inp.particle — atom data in
         out.particle — modified atom data
@@ -233,6 +237,67 @@ class Modify(PipelineNode):
         super().__init__()
         self.scale = scale
         self.opacity = opacity
+
+
+class Color(PipelineNode):
+    """Recolor the upstream particle stream by a chosen scheme.
+
+    Args:
+        mode: One of ``"uniform"``, ``"byElement"``, ``"byResidue"``,
+              ``"byChain"``, ``"byBFactor"``, ``"byProperty"``.
+        uniform_color: Hex color used when ``mode == "uniform"``
+                       (e.g. ``"#ff8800"``).
+        range: Optional ``(min, max)`` for ``byBFactor`` / ``byProperty``.
+
+    Ports:
+        inp.particle — atom data in
+        out.particle — recolored atom data
+    """
+
+    _node_type = "color"
+    _out_ports = {"particle": "out"}
+    _inp_ports = {"particle": "in"}
+
+    def __init__(
+        self,
+        *,
+        mode: Literal["uniform", "byElement", "byResidue", "byChain", "byBFactor", "byProperty"] = "uniform",
+        uniform_color: str = "#ff8800",
+        range: tuple[float, float] | None = None,
+    ) -> None:
+        super().__init__()
+        self.mode = mode
+        self.uniform_color = uniform_color
+        self.range = range
+
+
+class Representation(PipelineNode):
+    """Tag the particle stream with a visual representation.
+
+    Stacks Ovito-style: the Viewport reads the override from the first
+    particle stream that carries one, so a downstream Representation node
+    wins over an upstream one on the same chain.
+
+    Args:
+        mode: One of ``"atoms"`` (default), ``"cartoon"``, ``"both"``,
+              ``"surface"``.
+
+    Ports:
+        inp.particle — atom data in
+        out.particle — atom data tagged with the representation override
+    """
+
+    _node_type = "representation"
+    _out_ports = {"particle": "out"}
+    _inp_ports = {"particle": "in"}
+
+    def __init__(
+        self,
+        *,
+        mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms",
+    ) -> None:
+        super().__init__()
+        self.mode = mode
 
 
 class AddBonds(PipelineNode):
@@ -566,6 +631,15 @@ class Pipeline:
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
         elif ntype == "modify":
             return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0))
+        elif ntype == "color":
+            range_val = nd.get("range")
+            return Color(
+                mode=nd.get("mode", "uniform"),
+                uniform_color=nd.get("uniformColor", "#ff8800"),
+                range=tuple(range_val) if range_val is not None else None,
+            )
+        elif ntype == "representation":
+            return Representation(mode=nd.get("mode", "atoms"))
         elif ntype == "add_bond":
             bond_source = nd.get("bondSource", "distance")
             if bond_source == "file":
@@ -719,6 +793,13 @@ class Pipeline:
         elif isinstance(node, Modify):
             base["scale"] = node.scale
             base["opacity"] = node.opacity
+        elif isinstance(node, Color):
+            base["mode"] = node.mode
+            base["uniformColor"] = node.uniform_color
+            if node.range is not None:
+                base["range"] = list(node.range)
+        elif isinstance(node, Representation):
+            base["mode"] = node.mode
         elif isinstance(node, AddBonds):
             if node.top is not None:
                 base["bondSource"] = "file"

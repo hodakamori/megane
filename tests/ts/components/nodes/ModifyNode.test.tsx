@@ -96,4 +96,12 @@ describe("ModifyNode", () => {
     expect(screen.getByTestId("modify-node-scale").className).toContain("nodrag");
     expect(screen.getByTestId("modify-node-opacity").className).toContain("nodrag");
   });
+
+  it("does not render any color controls (moved to the dedicated Color node)", () => {
+    const seeded = seedPipelineStore("modify", { id: "m1" });
+    render(<ModifyNode {...nodeProps("m1", seeded.data.params as ModifyParams)} />);
+    expect(screen.queryByTestId("modify-node-color-enabled")).toBeNull();
+    expect(screen.queryByTestId("modify-node-color-mode")).toBeNull();
+    expect(screen.queryByTestId("modify-node-uniform-color")).toBeNull();
+  });
 });

@@ -66,6 +66,8 @@ import {
   LoadVector,
   Filter,
   Modify,
+  Color,
+  Representation,
   AddBonds,
   AddLabels,
   AddPolyhedra,
@@ -82,6 +84,8 @@ Constructor parameters mirror the Python API (using an options object instead of
 | `LoadStructure("path")` | `new LoadStructure('path')` |
 | `Filter(query="element == 'C'")` | `new Filter({ query: "element == 'C'" })` |
 | `Modify(scale=1.3, opacity=0.8)` | `new Modify({ scale: 1.3, opacity: 0.8 })` |
+| `Color(mode="byElement")` | `new Color({ mode: "byElement" })` |
+| `Representation(mode="cartoon")` | `new Representation({ mode: "cartoon" })` |
 | `AddBonds(source="distance")` | `new AddBonds({ source: 'distance' })` |
 | `AddLabels(source="element")` | `new AddLabels({ source: 'element' })` |
 | `AddPolyhedra(center_elements=[22])` | `new AddPolyhedra({ centerElements: [22] })` |

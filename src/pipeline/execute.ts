@@ -17,6 +17,8 @@ import type {
   AddBondParams,
   FilterParams,
   ModifyParams,
+  ColorParams,
+  RepresentationParams,
   LabelGeneratorParams,
   PolyhedronGeneratorParams,
   VectorOverlayParams,
@@ -33,6 +35,8 @@ import { executeLoadTrajectory } from "./executors/loadTrajectory";
 import { executeAddBond } from "./executors/addBond";
 import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
+import { executeColor } from "./executors/color";
+import { executeRepresentation } from "./executors/representation";
 import { executeLabelGenerator } from "./executors/labelGenerator";
 import { executePolyhedronGenerator } from "./executors/polyhedronGenerator";
 import { executeLoadVector } from "./executors/loadVector";
@@ -192,7 +196,23 @@ export function executePipeline(
         break;
       }
       case "modify": {
-        const outputs = executeModify(data.params as ModifyParams, inputs, ctx.atomLabels ?? null);
+        const outputs = executeModify(data.params as ModifyParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("in")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "color": {
+        const outputs = executeColor(data.params as ColorParams, inputs, ctx.atomLabels ?? null);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("in")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "representation": {
+        const outputs = executeRepresentation(data.params as RepresentationParams, inputs);
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
