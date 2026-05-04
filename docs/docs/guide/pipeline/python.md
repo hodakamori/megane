@@ -81,17 +81,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.data`, `.lammps`, `.traj` (ASE binary). |
-
-> **Note — MOL2 and CIF in Python pipelines.** The Rust/PyO3 layer ships
-> `parse_mol2` and `parse_cif`, but the Python `LoadStructure` extension
-> dispatcher (`_load_structure_file()` in `python/megane/pipeline.py`) does not
-> route those two extensions yet, so `LoadStructure("foo.mol2")` /
-> `LoadStructure("foo.cif")` will raise an unsupported-format error. Until the
-> dispatcher is wired up, parse them directly with
-> `from megane import megane_parser; megane_parser.parse_mol2(text)` or open
-> the file in the standalone web app, JupyterLab, or VSCode where MOL2/CIF
-> are fully supported.
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
