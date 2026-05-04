@@ -3,6 +3,8 @@ import * as THREE from "three";
 import {
   extractChainBackbones,
   buildSegments,
+  buildCrossSection,
+  computeRibbonProfile,
   CartoonRenderer,
   SS_COIL,
   SS_HELIX,
@@ -283,5 +285,183 @@ describe("CartoonRenderer", () => {
     // Children should be rebuilt, not accumulated
     expect(cr.mesh.children.length).toBeGreaterThan(0);
     expect(cr.mesh.children.length).toBeLessThanOrEqual(first + 5);
+  });
+
+  it("renders one continuous mesh per chain", () => {
+    // Two chains × one mesh each = 2 children.
+    const snap = makeSnapshot(
+      [0, 1, 2, 3, 4, 5],
+      [65, 65, 65, 66, 66, 66], // chain A=65, chain B=66
+      [1, 2, 3, 1, 2, 3],
+      [SS_HELIX, SS_HELIX, SS_HELIX, SS_SHEET, SS_SHEET, SS_SHEET],
+    );
+    const positions = new Float32Array(6 * 3);
+    for (let i = 0; i < 6; i++) positions[i * 3] = i * 3.8;
+    const cr = new CartoonRenderer();
+    cr.loadSnapshot({ ...snap, positions });
+    expect(cr.mesh.children.length).toBe(2);
+    // Each child is a single mesh with vertex colors enabled.
+    for (const child of cr.mesh.children) {
+      expect(child).toBeInstanceOf(THREE.Mesh);
+      const mesh = child as THREE.Mesh;
+      expect(mesh.geometry.getAttribute("color")).toBeDefined();
+      expect(mesh.geometry.getAttribute("position")).toBeDefined();
+      expect(mesh.geometry.getAttribute("normal")).toBeDefined();
+      expect(mesh.geometry.getIndex()).not.toBeNull();
+    }
+  });
+});
+
+// ─── buildCrossSection ────────────────────────────────────────────────────────
+
+describe("buildCrossSection", () => {
+  it("returns K points with normalized outward normals", () => {
+    const K = 16;
+    const ring = buildCrossSection(K, 1.0, 0.2, 0.1);
+    expect(ring.length).toBe(K);
+    for (const p of ring) {
+      const len = Math.hypot(p.nx, p.ny);
+      expect(len).toBeGreaterThan(0.95);
+      expect(len).toBeLessThan(1.05);
+    }
+  });
+
+  it("produces a circular ring when W = T = R (coil profile)", () => {
+    const K = 24;
+    const r = 0.3;
+    const ring = buildCrossSection(K, r, r, r);
+    for (const p of ring) {
+      // Every point lies on a circle of radius r centered at origin.
+      const dist = Math.hypot(p.x, p.y);
+      expect(dist).toBeGreaterThan(r * 0.95);
+      expect(dist).toBeLessThan(r * 1.05);
+    }
+  });
+
+  it("clamps cornerRadius greater than min(W, T)", () => {
+    // R is huge but should be clamped to min(W, T) = 0.2; should not throw or NaN.
+    const ring = buildCrossSection(16, 1.0, 0.2, 5.0);
+    expect(ring.length).toBe(16);
+    for (const p of ring) {
+      expect(Number.isFinite(p.x)).toBe(true);
+      expect(Number.isFinite(p.y)).toBe(true);
+    }
+  });
+
+  it("zero cornerRadius produces a sharp rectangle", () => {
+    const ring = buildCrossSection(20, 1.0, 0.5, 0);
+    expect(ring.length).toBe(20);
+    // Every point should lie on the rectangle border (max(|x|/W, |y|/T) ≈ 1)
+    for (const p of ring) {
+      const m = Math.max(Math.abs(p.x) / 1.0, Math.abs(p.y) / 0.5);
+      expect(m).toBeGreaterThan(0.99);
+      expect(m).toBeLessThan(1.01);
+    }
+  });
+
+  it("collapses to a knife edge when W ≈ 0 (arrow tip)", () => {
+    const K = 12;
+    const ring = buildCrossSection(K, 0, 0.2, 0);
+    expect(ring.length).toBe(K);
+    // All x coordinates are zero; normals split evenly between +x and −x sides.
+    let plus = 0;
+    let minus = 0;
+    for (const p of ring) {
+      expect(Math.abs(p.x)).toBeLessThan(1e-9);
+      if (p.nx > 0) plus++;
+      else if (p.nx < 0) minus++;
+    }
+    expect(plus).toBe(K / 2);
+    expect(minus).toBe(K / 2);
+  });
+
+  it("samples are spread around the perimeter (no collapsed cluster)", () => {
+    const K = 16;
+    const ring = buildCrossSection(K, 1.0, 0.2, 0.1);
+    // The unique angles (atan2) should span the full circle.
+    const angles = ring.map((p) => Math.atan2(p.ny, p.nx)).sort((a, b) => a - b);
+    // Maximum gap between consecutive sorted angles (with wrap) should be < π/2.
+    let maxGap = 0;
+    for (let i = 0; i < angles.length; i++) {
+      const a = angles[i];
+      const b = i + 1 < angles.length ? angles[i + 1] : angles[0] + 2 * Math.PI;
+      maxGap = Math.max(maxGap, b - a);
+    }
+    // No half-perimeter is missing; samples don't pile up on a single side.
+    expect(maxGap).toBeLessThan(Math.PI);
+  });
+});
+
+// ─── computeRibbonProfile ─────────────────────────────────────────────────────
+
+describe("computeRibbonProfile", () => {
+  it("produces one profile per residue with reasonable defaults", () => {
+    const ss = new Uint8Array([SS_COIL, SS_HELIX, SS_SHEET]);
+    const { profiles, colors } = computeRibbonProfile(ss);
+    expect(profiles.length).toBe(3);
+    expect(colors.length).toBe(3);
+    // Coil should be narrow & roughly square; helix and sheet should be wider than coil.
+    expect(profiles[0].halfWidth).toBeLessThan(0.5);
+    expect(profiles[1].halfWidth).toBeGreaterThan(profiles[0].halfWidth);
+    expect(profiles[2].halfWidth).toBeGreaterThan(profiles[0].halfWidth);
+  });
+
+  it("applies arrow profile to the last 2 residues of a sheet run (length ≥ 2)", () => {
+    // coil, sheet × 4, coil
+    const ss = new Uint8Array([SS_COIL, SS_SHEET, SS_SHEET, SS_SHEET, SS_SHEET, SS_COIL]);
+    const { profiles } = computeRibbonProfile(ss);
+    // Indices 1, 2: regular sheet; index 3: arrow base (wide); index 4: tip (zero width)
+    expect(profiles[1].halfWidth).toBeGreaterThan(0.5);
+    expect(profiles[1].halfWidth).toBeLessThan(1.5);
+    expect(profiles[3].halfWidth).toBeGreaterThan(profiles[1].halfWidth);
+    expect(profiles[4].halfWidth).toBe(0);
+  });
+
+  it("does not modify a 1-residue sheet (no arrow)", () => {
+    // coil, sheet, coil — sheet run of length 1
+    const ss = new Uint8Array([SS_COIL, SS_SHEET, SS_COIL]);
+    const { profiles } = computeRibbonProfile(ss);
+    // Single sheet residue keeps the regular sheet width (not collapsed to tip)
+    expect(profiles[1].halfWidth).toBeGreaterThan(0.5);
+  });
+
+  it("handles a sheet run that ends at the chain terminus", () => {
+    const ss = new Uint8Array([SS_COIL, SS_SHEET, SS_SHEET, SS_SHEET]);
+    const { profiles } = computeRibbonProfile(ss);
+    // Last 2 residues become arrow base + tip
+    expect(profiles[2].halfWidth).toBeGreaterThan(profiles[1].halfWidth);
+    expect(profiles[3].halfWidth).toBe(0);
+  });
+
+  it("handles multiple sheet runs independently", () => {
+    // Two β-strands separated by a helix.
+    const ss = new Uint8Array([
+      SS_SHEET, SS_SHEET, SS_SHEET,
+      SS_HELIX,
+      SS_SHEET, SS_SHEET,
+    ]);
+    const { profiles } = computeRibbonProfile(ss);
+    // First strand arrow tip at index 2
+    expect(profiles[2].halfWidth).toBe(0);
+    // Helix profile in the middle
+    expect(profiles[3].halfWidth).toBeGreaterThan(0.5);
+    // Second strand arrow tip at index 5
+    expect(profiles[5].halfWidth).toBe(0);
+  });
+
+  it("handles all-coil input without errors", () => {
+    const ss = new Uint8Array([SS_COIL, SS_COIL, SS_COIL]);
+    const { profiles, colors } = computeRibbonProfile(ss);
+    expect(profiles.length).toBe(3);
+    expect(colors.length).toBe(3);
+    for (const p of profiles) {
+      expect(p.halfWidth).toBeGreaterThan(0);
+    }
+  });
+
+  it("handles empty input", () => {
+    const { profiles, colors } = computeRibbonProfile(new Uint8Array(0));
+    expect(profiles.length).toBe(0);
+    expect(colors.length).toBe(0);
   });
 });
