@@ -21,6 +21,7 @@ import type {
   RepresentationParams,
   LabelGeneratorParams,
   PolyhedronGeneratorParams,
+  SurfaceMeshParams,
   VectorOverlayParams,
   PipelineNodeType,
   NodeError,
@@ -39,6 +40,7 @@ import { executeColor } from "./executors/color";
 import { executeRepresentation } from "./executors/representation";
 import { executeLabelGenerator } from "./executors/labelGenerator";
 import { executePolyhedronGenerator } from "./executors/polyhedronGenerator";
+import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
 import { executeViewport } from "./executors/viewport";
@@ -241,6 +243,14 @@ export function executePipeline(
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
         } else if (!outputs.has("mesh")) {
           addError(id, { message: "No polyhedra matched the criteria", severity: "warning" });
+        }
+        break;
+      }
+      case "surface_mesh": {
+        const outputs = executeSurfaceMesh(data.params as SurfaceMeshParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
         }
         break;
       }
