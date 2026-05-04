@@ -41,6 +41,7 @@ import { ColorNode } from "./nodes/ColorNode";
 import { RepresentationNode } from "./nodes/RepresentationNode";
 import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
 import { PolyhedronGeneratorNode } from "./nodes/PolyhedronGeneratorNode";
+import { SurfaceMeshNode } from "./nodes/SurfaceMeshNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
@@ -62,6 +63,7 @@ const nodeTypes = {
   representation: RepresentationNode,
   label_generator: LabelGeneratorNode,
   polyhedron_generator: PolyhedronGeneratorNode,
+  surface_mesh: SurfaceMeshNode,
   vector_overlay: VectorOverlayNode,
 };
 

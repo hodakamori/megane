@@ -192,6 +192,7 @@ export type PipelineNodeType =
   | "representation"
   | "label_generator"
   | "polyhedron_generator"
+  | "surface_mesh"
   | "vector_overlay";
 
 /** Human-readable labels for node types. */
@@ -208,6 +209,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   representation: "Representation",
   label_generator: "Labels",
   polyhedron_generator: "Polyhedra",
+  surface_mesh: "Surface Mesh",
   vector_overlay: "Vectors",
 };
 
@@ -228,6 +230,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   representation: "modify",
   label_generator: "overlay",
   polyhedron_generator: "overlay",
+  surface_mesh: "overlay",
   vector_overlay: "overlay",
   viewport: "viewport",
 };
@@ -312,6 +315,10 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     outputs: [{ name: "label", dataType: "label", label: "Label" }],
   },
   polyhedron_generator: {
+    inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+    outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
+  },
+  surface_mesh: {
     inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
     outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
   },
@@ -436,6 +443,17 @@ export interface PolyhedronGeneratorParams {
   edgeWidth: number; // edge line width in pixels
 }
 
+/** Parameters for the OVITO-style surface mesh (alpha-shape envelope). */
+export interface SurfaceMeshParams {
+  type: "surface_mesh";
+  /** Probe sphere radius in Å (alpha value). Larger = smoother, smaller = more detail. */
+  alphaRadius: number;
+  /** Surface color as hex string (e.g. "#4488ff"). */
+  color: string;
+  /** Surface opacity [0, 1]. */
+  opacity: number;
+}
+
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
@@ -450,6 +468,7 @@ export type PipelineNodeParams =
   | RepresentationParams
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
+  | SurfaceMeshParams
   | VectorOverlayParams;
 
 /** Default parameters for each node type. */
@@ -503,6 +522,13 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         showEdges: false,
         edgeColor: "#dddddd",
         edgeWidth: 3,
+      };
+    case "surface_mesh":
+      return {
+        type,
+        alphaRadius: 3.0,
+        color: "#4488ff",
+        opacity: 0.5,
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
