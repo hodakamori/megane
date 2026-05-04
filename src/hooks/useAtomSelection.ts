@@ -19,11 +19,19 @@ export interface AtomSelectionState {
 export function useAtomSelection(
   rendererRef: React.MutableRefObject<MoleculeRenderer | null>,
   onMeasurementChange?: (measurement: Measurement | null) => void,
+  onSelectionChange?: (selection: SelectionState) => void,
 ): AtomSelectionState {
   const [selection, setSelection] = useState<SelectionState>({ atoms: [] });
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
   const onMeasurementChangeRef = useRef(onMeasurementChange);
   onMeasurementChangeRef.current = onMeasurementChange;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
+
+  const updateSelection = useCallback((s: SelectionState) => {
+    setSelection(s);
+    onSelectionChangeRef.current?.(s);
+  }, []);
 
   const updateMeasurement = useCallback((m: Measurement | null) => {
     setMeasurement(m);
@@ -34,17 +42,17 @@ export function useAtomSelection(
     (atomIndex: number) => {
       if (!rendererRef.current) return;
       const newSelection = rendererRef.current.toggleAtomSelection(atomIndex);
-      setSelection(newSelection);
+      updateSelection(newSelection);
       updateMeasurement(rendererRef.current.getMeasurement());
     },
-    [rendererRef, updateMeasurement],
+    [rendererRef, updateSelection, updateMeasurement],
   );
 
   const handleClearSelection = useCallback(() => {
     rendererRef.current?.clearSelection();
-    setSelection({ atoms: [] });
+    updateSelection({ atoms: [] });
     updateMeasurement(null);
-  }, [rendererRef, updateMeasurement]);
+  }, [rendererRef, updateSelection, updateMeasurement]);
 
   const handleFrameUpdated = useCallback(() => {
     if (!rendererRef.current) return;
@@ -57,15 +65,15 @@ export function useAtomSelection(
       if (!rendererRef.current) return;
       if (atoms.length === 0) {
         rendererRef.current.clearSelection();
-        setSelection({ atoms: [] });
+        updateSelection({ atoms: [] });
         updateMeasurement(null);
       } else {
         const newSelection = rendererRef.current.setSelection(atoms);
-        setSelection(newSelection);
+        updateSelection(newSelection);
         updateMeasurement(rendererRef.current.getMeasurement());
       }
     },
-    [rendererRef, updateMeasurement],
+    [rendererRef, updateSelection, updateMeasurement],
   );
 
   return {
