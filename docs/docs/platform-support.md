@@ -42,12 +42,13 @@ Legend:
 | Format | Extensions | Standalone | Jupyter widget | JupyterLab | VSCode | Python |
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
-| DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓ |
+| DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | API |
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
-| LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
+| LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | API |
+| AMBER NetCDF | `.nc` | ✓ | API | ✓¹ | ✓¹ | API |
 
 ¹ Trajectory-only formats need a topology already loaded. Opening a `.xtc` /
-`.dcd` / `.lammpstrj` / `.dump` directly surfaces an actionable error; recover by
+`.dcd` / `.lammpstrj` / `.dump` / `.nc` directly surfaces an actionable error; recover by
 opening a structure file (PDB, GRO, …) first or by wiring a Load Structure
 node in the always-mounted pipeline editor.
 
@@ -64,7 +65,7 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | WebSocket trajectory streaming | ✓ | — | — | — | n/a |
 | Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | Solvent-accessible surface (SAS) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
-| `frame_change` callback | ✓ (React prop) | ✓ (Python event) | — | ✓ (status bar) | n/a |
+| `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | — | ✓ | — | — | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | — | — | n/a |
 
@@ -85,14 +86,14 @@ How data gets into the viewer on each platform:
 | **Jupyter widget** | Python only — no in-cell file picker | `MolecularViewer.load(pdb_path, xtc=, traj=)` (deprecated) or `MolecularViewer.set_pipeline(Pipeline)` (recommended) |
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VSCode** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
-| **Python** | `from megane.parsers import …` | `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), and the `parse_*` PyO3 functions |
+| **Python** | `from megane.parsers import …` | `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`, and the `parse_*` PyO3 functions |
 
 ## Known gaps
 
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
-- **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
+- **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` / `.nc` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
 - **`selection_change` / `measurement` events are widget-only.** Other platforms do not emit these to a host. The standalone React component does expose `onFrameChange` (see UI features table).
-- **`frame_change` callback is not yet wired for JupyterLab.** The JupyterLab DocWidget has no Python kernel connection, so there is no callback surface to fire. The VSCode extension surfaces it as a status-bar frame counter.
+- **`frame_change` callback for JupyterLab is surfaced as a status-bar frame counter.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Instead, when `IStatusBar` is available, the current frame index is shown in the JupyterLab status bar (right side). The `subscribeFrameChange` method on `MeganeReactView` can also be used by other JupyterLab extensions to react to frame changes.

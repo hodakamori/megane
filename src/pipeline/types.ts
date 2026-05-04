@@ -5,7 +5,6 @@
  */
 
 import type { Snapshot, Frame, TrajectoryMeta, BondSource, VectorFrame } from "../types";
-import type { ColorScheme } from "../colorSchemes";
 
 // ─── Pipeline Data Types ──────────────────────────────────────────────
 
@@ -38,6 +37,12 @@ export interface ParticleData {
   indices: Uint32Array | null; // null = all atoms
   scaleOverrides: Float32Array | null;
   opacityOverrides: Float32Array | null;
+  /**
+   * Per-atom RGB overrides in [0,1]. length === nAtoms * 3 (interleaved r,g,b).
+   * NaN in the r channel for an atom signals "no override; fall through to base".
+   * null = this stream carries no color overrides at all.
+   */
+  colorOverrides: Float32Array | null;
 }
 
 /** Bond data flowing through the pipeline. */
@@ -345,7 +350,6 @@ export interface ViewportParams {
   pivotMarkerVisible: boolean;
   /** Visual representation: "atoms" (default), "cartoon", or "both". */
   representationMode: RepresentationMode;
-  colorScheme?: ColorScheme;
 }
 
 export interface FilterParams {
@@ -354,10 +358,26 @@ export interface FilterParams {
   bond_query?: string; // bond selection query (empty/undefined = no filtering)
 }
 
+/** Per-atom palette modes for the Modify node's color section. */
+export type ColorMode =
+  | "uniform"
+  | "byElement"
+  | "byResidue"
+  | "byChain"
+  | "byBFactor"
+  | "byProperty";
+
 export interface ModifyParams {
   type: "modify";
   scale: number;
   opacity: number;
+  /** When true, recolor the upstream selection using colorMode. */
+  colorEnabled: boolean;
+  colorMode: ColorMode;
+  /** Hex color string used when colorMode === "uniform" (e.g. "#ff8800"). */
+  uniformColor: string;
+  /** Optional explicit range for byBFactor / byProperty. Undefined = auto. */
+  colorRange?: [number, number];
 }
 
 export interface LabelGeneratorParams {
@@ -420,12 +440,18 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         cellAxesVisible: true,
         pivotMarkerVisible: true,
         representationMode: "atoms" as RepresentationMode,
-        colorScheme: "byElement",
       };
     case "filter":
       return { type, query: "", bond_query: "" };
     case "modify":
-      return { type, scale: 1.0, opacity: 1.0 };
+      return {
+        type,
+        scale: 1.0,
+        opacity: 1.0,
+        colorEnabled: false,
+        colorMode: "uniform",
+        uniformColor: "#ff8800",
+      };
     case "label_generator":
       return { type, source: "element" };
     case "polyhedron_generator":
@@ -501,7 +527,6 @@ export interface ViewportState {
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
   representationMode: RepresentationMode;
-  colorScheme: ColorScheme;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -516,7 +541,6 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   cellAxesVisible: true,
   pivotMarkerVisible: true,
   representationMode: "atoms",
-  colorScheme: "byElement",
 };
 
 // ─── Node Errors ──────────────────────────────────────────────────────
