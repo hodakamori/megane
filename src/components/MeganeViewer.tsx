@@ -23,7 +23,14 @@ import { useViewStateStore } from "../stores/useViewStateStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
-import type { HoverInfo, BondSource, LabelSource, VectorSource } from "../types";
+import type {
+  HoverInfo,
+  BondSource,
+  LabelSource,
+  VectorSource,
+  SelectionState,
+  Measurement,
+} from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
@@ -48,6 +55,19 @@ interface MeganeViewerProps {
    * keyed on the same frame index.
    */
   onFrameChange?: (frame: number) => void;
+  /**
+   * Fired whenever the atom selection changes (right-click to toggle, clear).
+   * Mirrors the Jupyter widget's `selection_change` event — useful for keeping
+   * a host Plotly figure or table highlighted in sync with the 3D selection.
+   * Data: `{ atoms: number[] }` — 0-based atom indices (max 4).
+   */
+  onSelectionChange?: (selection: SelectionState) => void;
+  /**
+   * Fired whenever the active measurement changes (distance, angle, dihedral)
+   * or is cleared. Mirrors the Jupyter widget's `measurement` event.
+   * Data: `{ atoms, type, value, label }` or `null` when selection is cleared.
+   */
+  onMeasurementChange?: (measurement: Measurement | null) => void;
   width?: string | number;
   height?: string | number;
   /** Host context tag for E2E tests: "webapp" | "jupyterlab-doc" | "vscode". Defaults to "webapp". */
@@ -81,6 +101,8 @@ export function MeganeViewer({
   onLoadVectorFile: _onLoadVectorFile,
   onLoadDemoVectors: _onLoadDemoVectors,
   onFrameChange,
+  onSelectionChange,
+  onMeasurementChange,
   width = "100%",
   height = "100%",
   testContext = "webapp",
@@ -99,7 +121,7 @@ export function MeganeViewer({
 
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
-    useAtomSelection(rendererRef);
+    useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
