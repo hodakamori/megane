@@ -10,6 +10,7 @@ import {
 } from "@megane/pipeline/storeSnapshot";
 import { useTour } from "@megane/tour/useTour";
 import { useThemeStore } from "@megane/stores/useThemeStore";
+import { usePlaybackStore } from "@megane/stores/usePlaybackStore";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
@@ -214,6 +215,11 @@ export class MeganeReactView extends ReactWidget {
 
   /** Subscribe to trajectory frame-change events emitted by the viewer. */
   readonly subscribeFrameChange = this._frameSub.subscribe.bind(this._frameSub);
+
+  /** Programmatically seek the viewer to a specific trajectory frame. */
+  seekFrame(index: number): void {
+    usePlaybackStore.getState().seekFrame(index);
+  }
 
   private readonly _handleFrameChange = (frame: number): void => {
     this._frameSub.emit(frame);

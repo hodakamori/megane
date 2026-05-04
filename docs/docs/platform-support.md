@@ -68,7 +68,11 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | Surface mesh (alpha-shape envelope) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | ✓ (React props) | ✓ | — | — | n/a |
-| Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | — | — | n/a |
+| Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | ✓² | ✓³ | n/a |
+
+² JupyterLab: call `meganeReactView.seekFrame(N)` on a `MeganeReactView` instance obtained from the widget tracker. This delegates to `usePlaybackStore.seekFrame(N)` in the viewer.
+
+³ VSCode: call `vscode.commands.executeCommand('megane.seekFrame', N)` from another extension, or call `meganeEditorProvider.seekFrame(N)` on an `MeganeEditorProvider` reference. The command posts a `seekFrame` message to the most recently active megane webview panel.
 
 Notes:
 
