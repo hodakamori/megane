@@ -120,6 +120,21 @@ class TestNodeClasses:
         assert n.xtc == "traj.xtc"
         assert n._node_type == "load_trajectory"
 
+    def test_load_trajectory_dcd(self):
+        n = LoadTrajectory(dcd="run.dcd")
+        assert n.dcd == "run.dcd"
+        assert n.xtc is None
+
+    def test_load_trajectory_nc(self):
+        n = LoadTrajectory(nc="traj.nc")
+        assert n.nc == "traj.nc"
+        assert n.dcd is None
+
+    def test_load_trajectory_lammpstrj(self):
+        n = LoadTrajectory(lammpstrj="dump.lammpstrj")
+        assert n.lammpstrj == "dump.lammpstrj"
+        assert n.xtc is None
+
 
 class TestPortObjects:
     """NodePort and PortNamespace work correctly."""
@@ -540,6 +555,33 @@ class TestPipelineDataLoading:
         with pytest.raises(ValueError, match="Unsupported"):
             pipe.add_node(LoadStructure(str(dummy)))
 
+    def test_add_edge_loads_dcd_trajectory(self):
+        """Wiring LoadStructure → LoadTrajectory(dcd=...) populates _trajectories."""
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        t = pipe.add_node(LoadTrajectory(dcd=str(FIXTURES / "water.dcd")))
+        pipe.add_edge(s.out.particle, t.inp.particle)
+        assert t._id in pipe._trajectories
+        assert pipe._trajectories[t._id].n_frames == 5
+
+    def test_add_edge_loads_netcdf_trajectory(self):
+        """Wiring LoadStructure → LoadTrajectory(nc=...) populates _trajectories."""
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        t = pipe.add_node(LoadTrajectory(nc=str(FIXTURES / "water.nc")))
+        pipe.add_edge(s.out.particle, t.inp.particle)
+        assert t._id in pipe._trajectories
+        assert pipe._trajectories[t._id].n_frames == 5
+
+    def test_add_edge_loads_lammpstrj_trajectory(self):
+        """Wiring LoadStructure → LoadTrajectory(lammpstrj=...) populates _trajectories."""
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        t = pipe.add_node(LoadTrajectory(lammpstrj=str(FIXTURES / "water.lammpstrj")))
+        pipe.add_edge(s.out.particle, t.inp.particle)
+        assert t._id in pipe._trajectories
+        assert pipe._trajectories[t._id].n_frames == 3
+
 
 class TestPipelineDAG:
     """Pipeline supports DAG branching correctly."""
@@ -758,6 +800,40 @@ class TestPipelineJsonImport:
         vp_cfg = next(cfg for _, cfg in pipe2._nodes.values() if cfg["type"] == "viewport")
         assert vp_cfg["perspective"] is True
         assert vp_cfg["cellAxesVisible"] is False
+
+    def test_load_trajectory_dcd_round_trip(self):
+        """LoadTrajectory with .dcd survives to_dict → from_dict."""
+        pipe = Pipeline()
+        t = pipe.add_node(LoadTrajectory(dcd="run.dcd"))
+        traj_cfg = next(cfg for _, cfg in pipe._nodes.values() if cfg["type"] == "load_trajectory")
+        assert traj_cfg["fileName"] == "run.dcd"
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        node2: LoadTrajectory = next(n for n, _ in pipe2._nodes.values() if isinstance(n, LoadTrajectory))
+        assert node2.dcd == "run.dcd"
+
+    def test_load_trajectory_nc_round_trip(self):
+        """LoadTrajectory with .nc survives to_dict → from_dict."""
+        pipe = Pipeline()
+        pipe.add_node(LoadTrajectory(nc="traj.nc"))
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        node2: LoadTrajectory = next(n for n, _ in pipe2._nodes.values() if isinstance(n, LoadTrajectory))
+        assert node2.nc == "traj.nc"
+
+    def test_load_trajectory_lammpstrj_round_trip(self):
+        """LoadTrajectory with .lammpstrj survives to_dict → from_dict."""
+        pipe = Pipeline()
+        pipe.add_node(LoadTrajectory(lammpstrj="dump.lammpstrj"))
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        node2: LoadTrajectory = next(n for n, _ in pipe2._nodes.values() if isinstance(n, LoadTrajectory))
+        assert node2.lammpstrj == "dump.lammpstrj"
+
+    def test_load_trajectory_dump_extension_round_trip(self):
+        """LoadTrajectory with .dump extension survives to_dict → from_dict."""
+        pipe = Pipeline()
+        pipe.add_node(LoadTrajectory(lammpstrj="output.dump"))
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        node2: LoadTrajectory = next(n for n, _ in pipe2._nodes.values() if isinstance(n, LoadTrajectory))
+        assert node2.lammpstrj == "output.dump"
 
 
 class TestPipelineJsonImportErrors:

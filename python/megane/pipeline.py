@@ -112,7 +112,10 @@ class LoadStructure(PipelineNode):
 
 
 class LoadTrajectory(PipelineNode):
-    """Load an external trajectory file (XTC, ASE .traj, or multi-frame XYZ).
+    """Load an external trajectory file.
+
+    Supported formats: XTC, DCD, AMBER NetCDF (.nc), ASE .traj,
+    LAMMPS dump (.lammpstrj / .dump), and multi-frame XYZ.
 
     Requires connection from a ``LoadStructure`` node via
     ``pipe.add_edge(s.out.particle, t.inp.particle)``.
@@ -120,8 +123,11 @@ class LoadTrajectory(PipelineNode):
 
     Args:
         xtc: Path to XTC trajectory file.
+        dcd: Path to DCD trajectory file (CHARMM/NAMD/X-PLOR).
+        nc: Path to AMBER NetCDF trajectory file.
         traj: Path to ASE .traj file.
         xyz: Path to multi-frame XYZ file.
+        lammpstrj: Path to LAMMPS dump trajectory (.lammpstrj / .dump).
 
     Ports:
         inp.particle — atom topology source
@@ -136,13 +142,19 @@ class LoadTrajectory(PipelineNode):
         self,
         *,
         xtc: str | None = None,
+        dcd: str | None = None,
+        nc: str | None = None,
         traj: str | None = None,
         xyz: str | None = None,
+        lammpstrj: str | None = None,
     ) -> None:
         super().__init__()
         self.xtc = xtc
+        self.dcd = dcd
+        self.nc = nc
         self.traj = traj
         self.xyz = xyz
+        self.lammpstrj = lammpstrj
 
 
 class Streaming(PipelineNode):
@@ -624,8 +636,11 @@ class Pipeline:
             ext = pathlib.Path(fname).suffix.lower()
             return LoadTrajectory(
                 xtc=fname if ext == ".xtc" else None,
+                dcd=fname if ext == ".dcd" else None,
+                nc=fname if ext == ".nc" else None,
                 traj=fname if ext == ".traj" else None,
                 xyz=fname if ext == ".xyz" else None,
+                lammpstrj=fname if ext in (".lammpstrj", ".dump") else None,
             )
         elif ntype == "filter":
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
@@ -784,7 +799,7 @@ class Pipeline:
             base["hasTrajectory"] = False
             base["hasCell"] = has_cell
         elif isinstance(node, LoadTrajectory):
-            base["fileName"] = node.xtc or node.traj or node.xyz
+            base["fileName"] = node.xtc or node.dcd or node.nc or node.traj or node.xyz or node.lammpstrj
         elif isinstance(node, Streaming):
             base["connected"] = False
         elif isinstance(node, Filter):
@@ -862,6 +877,21 @@ class Pipeline:
             from megane.parsers.xtc import load_trajectory
 
             trajectory = load_trajectory(source.path, node.xtc)
+            self._trajectories[node._id] = trajectory
+        elif node.dcd is not None:
+            from megane.parsers.dcd import load_dcd
+
+            trajectory = load_dcd(node.dcd)
+            self._trajectories[node._id] = trajectory
+        elif node.nc is not None:
+            from megane.parsers.netcdf import load_netcdf
+
+            trajectory = load_netcdf(node.nc)
+            self._trajectories[node._id] = trajectory
+        elif node.lammpstrj is not None:
+            from megane.parsers.lammpstrj import load_lammpstrj
+
+            trajectory = load_lammpstrj(node.lammpstrj)
             self._trajectories[node._id] = trajectory
         elif node.traj is not None:
             from megane.parsers.traj import load_traj
