@@ -88,7 +88,7 @@ How data gets into the viewer on each platform:
 | **Jupyter widget** | Python only — no in-cell file picker | `MolecularViewer.load(pdb_path, xtc=, traj=)` (deprecated) or `MolecularViewer.set_pipeline(Pipeline)` (recommended) |
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VSCode** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
-| **Python** | `from megane.parsers import …` | `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`, and the `parse_*` PyO3 functions |
+| **Python** | `from megane.parsers import …` | `load_pdb`, `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`, and the `parse_*` PyO3 functions |
 
 ## Known gaps
 
