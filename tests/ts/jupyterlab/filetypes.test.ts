@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships nine text structure filetypes (incl. LAMMPS dump trajectory)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(9);
+  it("ships ten text structure filetypes (incl. LAMMPS dump trajectory and AMBER prmtop)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(10);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / LAMMPS-data / LAMMPS-dump names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -51,6 +51,7 @@ describe("jupyterlab filetypes", () => {
         "megane-cif",
         "megane-lammps-data",
         "megane-lammps-dump",
+        "megane-amber-prmtop",
       ].sort(),
     );
   });
@@ -105,7 +106,7 @@ describe("jupyterlab filetypes", () => {
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
       STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
     );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(9);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(10);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

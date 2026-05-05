@@ -33,6 +33,7 @@ describe("vscode-megane package.json", () => {
         "*.mol2",
         "*.nc",
         "*.pdb",
+        "*.prmtop",
         "*.sdf",
         "*.traj",
         "*.xtc",
