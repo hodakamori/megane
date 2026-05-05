@@ -77,6 +77,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 | **Add Bond** | Detect bonds from structure or by distance | particle | bond |
 | **Label Generator** | Generate text labels at atom positions | particle | label |
 | **Polyhedron Generator** | Render coordination polyhedra (convex hulls) | particle | mesh |
+| **Surface Mesh** | Generate an alpha-shape surface envelope around atoms | particle | mesh |
 | **Vector Overlay** | Configure per-atom vector visualization (e.g. forces) | vector | vector |
 
 ### Output
@@ -151,6 +152,14 @@ The **Query** field filters which atoms pass through when the Filter node is con
 | Show edges | boolean | off | Display wireframe edges |
 | Edge color | string | `#dddddd` | Wireframe edge color (hex) |
 | Edge width | number | 3.0 | Wireframe edge width (px) |
+
+### Surface Mesh
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| Alpha radius | number | 3.0 Å | Probe sphere radius (alpha value). Larger = smoother surface, smaller = more detail |
+| Color | string | `#4488ff` | Surface color (hex) |
+| Opacity | number | 0.5 | Surface transparency (0–1) |
 
 ### Vector Overlay
 
