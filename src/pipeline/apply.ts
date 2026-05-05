@@ -195,15 +195,15 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
 function applyParticleOverrides(
   renderer: MoleculeRenderer,
   particles: ParticleData[],
-  prevParticles: ParticleData[] | null,
+  _prevParticles: ParticleData[] | null,
 ): void {
   if (particles.length === 0) {
-    if (prevParticles && prevParticles.length > 0) {
-      renderer.clearAtomOverrides();
-      renderer.setAtomScale(1.0);
-      renderer.setAtomOpacity(1.0);
-      renderer.applyAtomColorOverrides(null);
-    }
+    // Idempotent reset: callers may pass `previous=null`, so we cannot rely
+    // on prev to detect a prior non-empty state when scrubbing overrides.
+    renderer.clearAtomOverrides();
+    renderer.setAtomScale(1.0);
+    renderer.setAtomOpacity(1.0);
+    renderer.applyAtomColorOverrides(null);
     return;
   }
 
@@ -354,11 +354,12 @@ function applyBondSettings(
 function applyLabels(
   renderer: MoleculeRenderer,
   labels: LabelData[],
-  prevLabels: LabelData[] | null,
+  _prevLabels: LabelData[] | null,
 ): void {
   if (labels.length > 0) {
     renderer.setLabels(labels[0].labels);
-  } else if (prevLabels && prevLabels.length > 0) {
+  } else {
+    // Idempotent: callers may pass `previous=null`, so always clear.
     renderer.setLabels(null);
   }
 }
@@ -366,11 +367,12 @@ function applyLabels(
 function applyMeshes(
   renderer: MoleculeRenderer,
   meshes: MeshData[],
-  prevMeshes: MeshData[] | null,
+  _prevMeshes: MeshData[] | null,
 ): void {
   if (meshes.length > 0) {
     renderer.loadPolyhedra(meshes[0]);
-  } else if (prevMeshes && prevMeshes.length > 0) {
+  } else {
+    // Idempotent: callers may pass `previous=null`, so always clear.
     renderer.clearPolyhedra();
   }
 }
@@ -378,14 +380,15 @@ function applyMeshes(
 function applyVectors(
   renderer: MoleculeRenderer,
   vectors: VectorData[],
-  prevVectors: VectorData[] | null,
+  _prevVectors: VectorData[] | null,
 ): void {
   if (vectors.length > 0) {
     const vd = vectors[0];
     const frameVectors = getVectorsForFrame({ fileVectors: vd.frames }, 0);
     renderer.setVectors(frameVectors);
     renderer.setVectorScale(vd.scale);
-  } else if (prevVectors && prevVectors.length > 0) {
+  } else {
+    // Idempotent: callers may pass `previous=null`, so always clear.
     renderer.setVectors(null);
   }
 }
