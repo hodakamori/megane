@@ -12,8 +12,11 @@ export interface PlaybackStore {
   // State
   playing: boolean;
   fps: number;
+  speedMultiplier: number;
   currentFrame: number;
   totalFrames: number;
+  loopStart: number;
+  loopEnd: number;
 
   // Frame delivery
   provider: FrameProvider | null;
@@ -29,6 +32,10 @@ export interface PlaybackStore {
   pause: () => void;
   togglePlayPause: () => void;
   setFps: (fps: number) => void;
+  setSpeedMultiplier: (speed: number) => void;
+  setLoopRange: (start: number, end: number) => void;
+  stepForward: () => void;
+  stepBackward: () => void;
 
   // Internal: called by StreamFrameProvider when async frame arrives
   _onAsyncFrame: (frame: Frame) => void;
@@ -42,8 +49,11 @@ export interface PlaybackStore {
 export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
   playing: false,
   fps: 30,
+  speedMultiplier: 1,
   currentFrame: 0,
   totalFrames: 0,
+  loopStart: 0,
+  loopEnd: 0,
   provider: null,
   currentFrameData: null,
   _currentFrameRef: { current: 0 },
@@ -60,6 +70,8 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
       currentFrame: 0,
       currentFrameData: frame0,
       playing: false,
+      loopStart: 0,
+      loopEnd: totalFrames > 0 ? totalFrames - 1 : 0,
     });
     state._currentFrameRef.current = 0;
   },
@@ -94,15 +106,48 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
 
   setFps: (fps) => {
     set({ fps });
-    // Restart interval if playing
     if (get().playing) {
       get()._stopInterval();
       get()._startInterval();
     }
   },
 
+  setSpeedMultiplier: (speed) => {
+    set({ speedMultiplier: speed });
+    if (get().playing) {
+      get()._stopInterval();
+      get()._startInterval();
+    }
+  },
+
+  setLoopRange: (start, end) => {
+    const { totalFrames } = get();
+    const clampedStart = Math.max(0, Math.min(start, totalFrames - 1));
+    const clampedEnd = Math.max(0, Math.min(end, totalFrames - 1));
+    set({ loopStart: clampedStart, loopEnd: clampedEnd });
+  },
+
+  stepForward: () => {
+    const { provider, currentFrame, loopEnd, totalFrames, _currentFrameRef } = get();
+    if (!provider) return;
+    const effectiveEnd = Math.min(loopEnd, totalFrames - 1);
+    const next = Math.min(currentFrame + 1, effectiveEnd);
+    const frame = provider.getFrame(next);
+    _currentFrameRef.current = next;
+    set({ currentFrame: next, currentFrameData: frame });
+  },
+
+  stepBackward: () => {
+    const { provider, currentFrame, loopStart, _currentFrameRef } = get();
+    if (!provider) return;
+    const effectiveStart = Math.max(loopStart, 0);
+    const prev = Math.max(currentFrame - 1, effectiveStart);
+    const frame = provider.getFrame(prev);
+    _currentFrameRef.current = prev;
+    set({ currentFrame: prev, currentFrameData: frame });
+  },
+
   _onAsyncFrame: (frame) => {
-    // Called by StreamFrameProvider when a requested frame arrives
     const { currentFrame } = get();
     if (frame.frameId === currentFrame) {
       set({ currentFrameData: frame });
@@ -113,13 +158,16 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
     const state = get();
     if (state._intervalId !== null) return;
     const id = setInterval(() => {
-      const { totalFrames, _currentFrameRef, provider } = get();
+      const { totalFrames, loopStart, loopEnd, _currentFrameRef, provider } = get();
       if (!provider || totalFrames <= 1) return;
-      const nextFrame = (_currentFrameRef.current + 1) % totalFrames;
+      const effectiveEnd = Math.min(loopEnd, totalFrames - 1);
+      const effectiveStart = Math.max(loopStart, 0);
+      let nextFrame = _currentFrameRef.current + 1;
+      if (nextFrame > effectiveEnd) nextFrame = effectiveStart;
       const frame = provider.getFrame(nextFrame);
       _currentFrameRef.current = nextFrame;
       set({ currentFrame: nextFrame, currentFrameData: frame });
-    }, 1000 / state.fps);
+    }, 1000 / (state.fps * state.speedMultiplier));
     set({ _intervalId: id });
   },
 

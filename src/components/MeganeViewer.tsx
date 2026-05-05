@@ -246,9 +246,16 @@ export function MeganeViewer({
 
   const storePlaying = usePlaybackStore((s) => s.playing);
   const storeFps = usePlaybackStore((s) => s.fps);
+  const storeSpeedMultiplier = usePlaybackStore((s) => s.speedMultiplier);
+  const storeLoopStart = usePlaybackStore((s) => s.loopStart);
+  const storeLoopEnd = usePlaybackStore((s) => s.loopEnd);
   const storeSeek = usePlaybackStore((s) => s.seekFrame);
   const storeTogglePlayPause = usePlaybackStore((s) => s.togglePlayPause);
   const storeSetFps = usePlaybackStore((s) => s.setFps);
+  const storeSetSpeedMultiplier = usePlaybackStore((s) => s.setSpeedMultiplier);
+  const storeSetLoopRange = usePlaybackStore((s) => s.setLoopRange);
+  const storeStepForward = usePlaybackStore((s) => s.stepForward);
+  const storeStepBackward = usePlaybackStore((s) => s.stepBackward);
 
   // Hosts may forward custom playback callbacks (the webapp wraps them to
   // pause on file uploads). When omitted (VSCode webview, JupyterLab
@@ -453,9 +460,16 @@ export function MeganeViewer({
         totalFrames={totalFrames}
         playing={effectivePlaying}
         fps={effectiveFps}
+        speedMultiplier={storeSpeedMultiplier}
+        loopStart={storeLoopStart}
+        loopEnd={storeLoopEnd}
         onSeek={effectiveOnSeek}
         onPlayPause={effectiveOnPlayPause}
         onFpsChange={effectiveOnFpsChange}
+        onSpeedChange={storeSetSpeedMultiplier}
+        onLoopRangeChange={storeSetLoopRange}
+        onStepBackward={storeStepBackward}
+        onStepForward={storeStepForward}
       />
       <Tooltip info={hoverInfo} />
       <MeasurementPanel
