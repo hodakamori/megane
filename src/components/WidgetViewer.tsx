@@ -84,6 +84,12 @@ export function WidgetViewer({
   const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [playing, setPlaying] = useState(false);
   const [fps, setFps] = useState(30);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [loopStart, setLoopStart] = useState(0);
+  const [loopEnd, setLoopEnd] = useState(0);
+  const currentFrameRef = useRef(0);
+  const loopStartRef = useRef(0);
+  const loopEndRef = useRef(0);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [bondCount, setBondCount] = useState<number>(0);
   const prevViewportStateRef = useRef<ViewportState | null>(null);
@@ -104,6 +110,17 @@ export function WidgetViewer({
   // Keep a ref so handleRendererReady can apply the initial selection
   const selectedAtomsRef = useRef(selectedAtoms);
   selectedAtomsRef.current = selectedAtoms;
+
+  // Keep loop refs in sync with state for use inside setInterval closure
+  currentFrameRef.current = currentFrame;
+  loopStartRef.current = loopStart;
+  loopEndRef.current = loopEnd;
+
+  // Reset loop range when a new trajectory loads
+  useEffect(() => {
+    setLoopStart(0);
+    setLoopEnd(totalFrames > 0 ? totalFrames - 1 : 0);
+  }, [totalFrames]);
 
   // Sync external atom selection from Python
   useEffect(() => {
@@ -270,6 +287,24 @@ export function WidgetViewer({
     [setExternalSelection, pipelineStore],
   );
 
+  const startPlayInterval = useCallback(
+    (intervalFps: number, intervalSpeed: number) => {
+      if (playIntervalRef.current) clearInterval(playIntervalRef.current);
+      playIntervalRef.current = setInterval(
+        () => {
+          const next = currentFrameRef.current + 1;
+          if (next > loopEndRef.current) {
+            onSeek(loopStartRef.current);
+          } else {
+            onSeek(next);
+          }
+        },
+        1000 / (intervalFps * intervalSpeed),
+      );
+    },
+    [onSeek],
+  );
+
   const handlePlayPause = useCallback(() => {
     setPlaying((prev) => {
       if (prev) {
@@ -279,26 +314,47 @@ export function WidgetViewer({
         }
         return false;
       } else {
-        playIntervalRef.current = setInterval(() => {
-          onSeek(-1);
-        }, 1000 / fps);
+        startPlayInterval(fps, speedMultiplier);
         return true;
       }
     });
-  }, [fps, onSeek]);
+  }, [fps, speedMultiplier, startPlayInterval]);
 
   const handleFpsChange = useCallback(
     (newFps: number) => {
       setFps(newFps);
-      if (playIntervalRef.current) {
-        clearInterval(playIntervalRef.current);
-        playIntervalRef.current = setInterval(() => {
-          onSeek(-1);
-        }, 1000 / newFps);
-      }
+      if (playIntervalRef.current) startPlayInterval(newFps, speedMultiplier);
     },
-    [onSeek],
+    [speedMultiplier, startPlayInterval],
   );
+
+  const handleSpeedChange = useCallback(
+    (newSpeed: number) => {
+      setSpeedMultiplier(newSpeed);
+      if (playIntervalRef.current) startPlayInterval(fps, newSpeed);
+    },
+    [fps, startPlayInterval],
+  );
+
+  const handleLoopRangeChange = useCallback(
+    (start: number, end: number) => {
+      const cStart = Math.max(0, Math.min(start, totalFrames - 1));
+      const cEnd = Math.max(0, Math.min(end, totalFrames - 1));
+      setLoopStart(cStart);
+      setLoopEnd(cEnd);
+    },
+    [totalFrames],
+  );
+
+  const handleStepForward = useCallback(() => {
+    const next = Math.min(currentFrame + 1, loopEndRef.current);
+    onSeek(next);
+  }, [currentFrame, onSeek]);
+
+  const handleStepBackward = useCallback(() => {
+    const prev = Math.max(currentFrame - 1, loopStartRef.current);
+    onSeek(prev);
+  }, [currentFrame, onSeek]);
 
   const handleSeek = useCallback(
     (frame: number) => {
@@ -346,9 +402,16 @@ export function WidgetViewer({
           totalFrames={totalFrames}
           playing={playing}
           fps={fps}
+          speedMultiplier={speedMultiplier}
+          loopStart={loopStart}
+          loopEnd={loopEnd}
           onSeek={handleSeek}
           onPlayPause={handlePlayPause}
           onFpsChange={handleFpsChange}
+          onSpeedChange={handleSpeedChange}
+          onLoopRangeChange={handleLoopRangeChange}
+          onStepBackward={handleStepBackward}
+          onStepForward={handleStepForward}
         />
       )}
       <Tooltip info={hoverInfo} />
