@@ -171,19 +171,17 @@ fn read_flag_sections(text: &str) -> HashMap<String, String> {
     let mut expect_format = false;
 
     for line in text.lines() {
-        if line.starts_with("%FLAG") {
+        if let Some(rest) = line.strip_prefix("%FLAG") {
             if let Some(flag) = current_flag.take() {
                 map.insert(flag, std::mem::take(&mut buf));
             }
-            current_flag = Some(line[5..].trim().to_string());
+            current_flag = Some(rest.trim().to_string());
             expect_format = true;
         } else if expect_format && line.starts_with("%FORMAT") {
             expect_format = false;
-        } else if !expect_format {
-            if current_flag.is_some() {
-                buf.push_str(line);
-                buf.push('\n');
-            }
+        } else if !expect_format && current_flag.is_some() {
+            buf.push_str(line);
+            buf.push('\n');
         }
     }
 
