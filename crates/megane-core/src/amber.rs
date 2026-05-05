@@ -20,27 +20,47 @@ pub fn parse_prmtop(text: &str) -> Result<ParsedStructure, String> {
         return Err("NATOM is 0 in prmtop".into());
     }
 
-    let atom_names =
-        parse_char4(sections.get("ATOM_NAME").map(String::as_str).unwrap_or(""), n_atoms);
+    let atom_names = parse_char4(
+        sections.get("ATOM_NAME").map(String::as_str).unwrap_or(""),
+        n_atoms,
+    );
 
     let elements: Vec<u8> = if let Some(sec) = sections.get("ATOMIC_NUMBER") {
         let nums = parse_ints(sec)?;
         nums.into_iter().map(|n| n.clamp(0, 255) as u8).collect()
     } else {
         // Fallback: guess from atom names (older prmtop without ATOMIC_NUMBER)
-        atom_names.iter().map(|n| crate::atomic::element_from_atom_name(n)).collect()
+        atom_names
+            .iter()
+            .map(|n| crate::atomic::element_from_atom_name(n))
+            .collect()
     };
 
-    let res_labels =
-        parse_char4(sections.get("RESIDUE_LABEL").map(String::as_str).unwrap_or(""), 0);
-    let res_ptrs =
-        parse_ints(sections.get("RESIDUE_POINTER").map(String::as_str).unwrap_or(""))?;
+    let res_labels = parse_char4(
+        sections
+            .get("RESIDUE_LABEL")
+            .map(String::as_str)
+            .unwrap_or(""),
+        0,
+    );
+    let res_ptrs = parse_ints(
+        sections
+            .get("RESIDUE_POINTER")
+            .map(String::as_str)
+            .unwrap_or(""),
+    )?;
 
     let atom_labels = build_atom_labels(&atom_names, &res_labels, &res_ptrs, n_atoms);
 
     let bonds = parse_bond_sections(
-        sections.get("BONDS_INC_HYDROGEN").map(String::as_str).unwrap_or(""),
-        sections.get("BONDS_WITHOUT_HYDROGEN").map(String::as_str).unwrap_or(""),
+        sections
+            .get("BONDS_INC_HYDROGEN")
+            .map(String::as_str)
+            .unwrap_or(""),
+        sections
+            .get("BONDS_WITHOUT_HYDROGEN")
+            .map(String::as_str)
+            .unwrap_or(""),
         n_atoms,
     )?;
     let n_file_bonds = bonds.len();
@@ -93,7 +113,10 @@ pub fn parse_inpcrd(text: &str, n_atoms: usize) -> Result<(Vec<f32>, Option<[f32
         .map_err(|_| "inpcrd: cannot parse NATOM")?;
 
     if natom != n_atoms {
-        return Err(format!("inpcrd NATOM={} but topology has {}", natom, n_atoms));
+        return Err(format!(
+            "inpcrd NATOM={} but topology has {}",
+            natom, n_atoms
+        ));
     }
 
     // Coordinates in F12.7 format, 6 per line. Collect all remaining lines and
@@ -191,7 +214,10 @@ fn parse_char4(text: &str, max_items: usize) -> Vec<String> {
         let mut i = 0;
         while i < bytes.len() {
             let end = (i + 4).min(bytes.len());
-            let field = std::str::from_utf8(&bytes[i..end]).unwrap_or("").trim().to_string();
+            let field = std::str::from_utf8(&bytes[i..end])
+                .unwrap_or("")
+                .trim()
+                .to_string();
             if !field.is_empty() {
                 result.push(field);
             }
@@ -392,8 +418,7 @@ water box
 
     #[test]
     fn test_read_flag_sections() {
-        let text =
-            "%FLAG TITLE\n%FORMAT(20a4)\nhello\n%FLAG POINTERS\n%FORMAT(10I8)\n   3\n   2\n";
+        let text = "%FLAG TITLE\n%FORMAT(20a4)\nhello\n%FLAG POINTERS\n%FORMAT(10I8)\n   3\n   2\n";
         let sections = read_flag_sections(text);
         assert!(sections.contains_key("TITLE"));
         assert!(sections.contains_key("POINTERS"));
@@ -466,8 +491,8 @@ MOL
 ";
         let result = parse_prmtop(prmtop).expect("parse_prmtop failed");
         assert_eq!(result.n_atoms, 2);
-        assert_eq!(result.elements[0], 6);  // C
-        assert_eq!(result.elements[1], 7);  // N
+        assert_eq!(result.elements[0], 6); // C
+        assert_eq!(result.elements[1], 7); // N
         assert_eq!(result.bonds.len(), 1);
         assert!(result.bonds.contains(&(0, 1)));
     }
