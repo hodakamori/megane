@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, netcdf, parser, psf, top, traj, xtc,
-    xyz,
+    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, netcdf, parser, psf, top,
+    traj, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -405,6 +405,13 @@ pub fn parse_cif(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_lammps_data(text: &str) -> Result<ParseResult, JsError> {
     let data = lammps_data::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse an AMBER prmtop topology file (topology only, positions at origin).
+#[wasm_bindgen]
+pub fn parse_prmtop(text: &str) -> Result<ParseResult, JsError> {
+    let data = amber::parse_prmtop(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 

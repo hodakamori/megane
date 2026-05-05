@@ -36,6 +36,7 @@ Legend:
 | MOL2 | `.mol2` | ✓ | API | ✓ | ✓ | ✓ |
 | CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
+| AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | ✓ |
 
 ### Trajectory formats
 

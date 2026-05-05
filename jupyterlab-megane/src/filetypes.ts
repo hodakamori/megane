@@ -81,6 +81,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-amber-prmtop",
+    displayName: "AMBER topology",
+    extensions: [".prmtop"],
+    mimeTypes: ["chemical/x-amber-prmtop"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
     extensions: [".lammpstrj", ".dump"],
