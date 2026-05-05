@@ -64,6 +64,7 @@ interface WasmModule {
   parse_traj: BinaryParseFn;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
+  parse_psf_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
   extract_labels: (text: string, format: string) => string;
 }
@@ -91,6 +92,7 @@ async function ensureInit(): Promise<void> {
         parse_traj: wasm.parse_traj,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
+        parse_psf_bonds: wasm.parse_psf_bonds,
         parse_pdb_bonds: wasm.parse_pdb_bonds,
         extract_labels: wasm.extract_labels,
       };
@@ -232,6 +234,12 @@ export async function inferBondsVdw(
 export async function parseTopBonds(text: string, nAtoms: number): Promise<Uint32Array> {
   await ensureInit();
   return wasmModule!.parse_top_bonds(text, nAtoms);
+}
+
+/** Parse CHARMM/NAMD PSF topology file and extract bond pairs. */
+export async function parsePsfBonds(text: string, nAtoms: number): Promise<Uint32Array> {
+  await ensureInit();
+  return wasmModule!.parse_psf_bonds(text, nAtoms);
 }
 
 /** Extract only CONECT bonds from a PDB file. */

@@ -10,7 +10,7 @@ import type { AddBondParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
 import { TabSelector, smallBtnStyle, fileNameStyle } from "../ui";
-import { parseTopBonds } from "../../parsers/structure";
+import { parseTopBonds, parsePsfBonds } from "../../parsers/structure";
 import type { BondSource } from "../../types";
 import { useRef, useCallback } from "react";
 
@@ -24,8 +24,8 @@ const sectionLabelStyle: React.CSSProperties = {
   marginTop: 0,
 };
 
-const TOPOLOGY_ACCEPT = ".top";
-const TOPOLOGY_EXTS = [".top"];
+const TOPOLOGY_ACCEPT = ".top,.psf";
+const TOPOLOGY_EXTS = [".top", ".psf"];
 
 export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
@@ -38,7 +38,9 @@ export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
       if (!TOPOLOGY_EXTS.some((ext) => lower.endsWith(ext))) return;
       const text = await file.text();
       // Parse with max n_atoms; executor filters to actual atom count
-      const bondIndices = await parseTopBonds(text, 0xffffffff);
+      const bondIndices = lower.endsWith(".psf")
+        ? await parsePsfBonds(text, 0xffffffff)
+        : await parseTopBonds(text, 0xffffffff);
       updateNodeParams(id, {
         bondSource: "file" as BondSource,
         bondFileName: file.name,
@@ -73,7 +75,7 @@ export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
             onClick={() => inputRef.current?.click()}
             style={{ ...smallBtnStyle, marginTop: 6, width: "100%" }}
           >
-            Load .top...
+            Load .top / .psf...
           </button>
           <input
             ref={inputRef}
