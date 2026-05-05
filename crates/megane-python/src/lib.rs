@@ -145,6 +145,20 @@ fn parse_cif(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     PyStructure::from_parsed(py, data)
 }
 
+/// Parse an AMBER prmtop topology file (positions at origin, no inpcrd).
+#[pyfunction]
+fn parse_prmtop(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::amber::parse_prmtop(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
+
+/// Parse AMBER prmtop topology and inpcrd/rst7 coordinates together.
+#[pyfunction]
+fn parse_amber(py: Python<'_>, prmtop: &str, inpcrd: &str) -> PyResult<PyStructure> {
+    let data = megane_core::amber::parse(prmtop, inpcrd).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
+
 /// Parse an XTC trajectory binary and return frame data.
 #[pyfunction]
 fn parse_xtc(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
@@ -387,6 +401,8 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cif, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_prmtop, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_amber, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xtc, m)?)?;
     m.add_function(wrap_pyfunction!(parse_dcd, m)?)?;
     m.add_function(wrap_pyfunction!(parse_traj, m)?)?;

@@ -160,6 +160,7 @@ function App() {
 | MOL2 | `.mol2` | Tripos MOL2 (multi-molecule, aromatic bonds) |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | CIF | `.cif` | Crystallographic Information File |
+| AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
 
 ### Trajectory formats (`LoadTrajectory` node)
 
