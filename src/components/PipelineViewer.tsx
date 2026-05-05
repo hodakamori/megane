@@ -86,6 +86,9 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
   const [currentFrameData, setCurrentFrameData] = useState<Frame | null>(null);
   const [playing, setPlaying] = useState(false);
   const [fps, setFpsState] = useState(30);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [loopStart, setLoopStart] = useState(0);
+  const [loopEnd, setLoopEnd] = useState(0);
 
   // Refs for setInterval (avoids stale closure)
   const rendererRef = useRef<MoleculeRenderer | null>(null);
@@ -95,12 +98,18 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
   const providerRef = useRef<FrameProvider | null>(null);
   const totalFramesRef = useRef(0);
   const fpsRef = useRef(30);
+  const speedRef = useRef(1);
+  const loopStartRef = useRef(0);
+  const loopEndRef = useRef(0);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
   // Keep refs in sync
   providerRef.current = provider;
   totalFramesRef.current = totalFrames;
   fpsRef.current = fps;
+  speedRef.current = speedMultiplier;
+  loopStartRef.current = loopStart;
+  loopEndRef.current = loopEnd;
 
   const { handleAtomRightClick, handleFrameUpdated } = useAtomSelection(rendererRef);
 
@@ -122,6 +131,8 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     currentFrameRef.current = 0;
     setCurrentFrame(0);
     setCurrentFrameData(null);
+    setLoopStart(0);
+    setLoopEnd(0);
 
     async function init() {
       try {
@@ -183,6 +194,8 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
         currentFrameRef.current = 0;
         setCurrentFrame(0);
         setCurrentFrameData(frame0);
+        setLoopStart(0);
+        setLoopEnd(frames > 0 ? frames - 1 : 0);
         setStatus("ready");
       } catch (err) {
         if (signal.aborted) return;
@@ -272,16 +285,22 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
 
   const startInterval = useCallback(() => {
     if (playIntervalRef.current !== null) return;
-    playIntervalRef.current = setInterval(() => {
-      const prov = providerRef.current;
-      const total = totalFramesRef.current;
-      if (!prov || total <= 1) return;
-      const next = (currentFrameRef.current + 1) % total;
-      const frame = prov.getFrame(next);
-      currentFrameRef.current = next;
-      setCurrentFrame(next);
-      setCurrentFrameData(frame);
-    }, 1000 / fpsRef.current);
+    playIntervalRef.current = setInterval(
+      () => {
+        const prov = providerRef.current;
+        const total = totalFramesRef.current;
+        if (!prov || total <= 1) return;
+        const effectiveEnd = Math.min(loopEndRef.current, total - 1);
+        const effectiveStart = Math.max(loopStartRef.current, 0);
+        let next = currentFrameRef.current + 1;
+        if (next > effectiveEnd) next = effectiveStart;
+        const frame = prov.getFrame(next);
+        currentFrameRef.current = next;
+        setCurrentFrame(next);
+        setCurrentFrameData(frame);
+      },
+      1000 / (fpsRef.current * speedRef.current),
+    );
   }, []);
 
   const stopInterval = useCallback(() => {
@@ -328,6 +347,48 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     },
     [playing, startInterval, stopInterval],
   );
+
+  const handleSpeedChange = useCallback(
+    (newSpeed: number) => {
+      setSpeedMultiplier(newSpeed);
+      speedRef.current = newSpeed;
+      if (playing) {
+        stopInterval();
+        startInterval();
+      }
+    },
+    [playing, startInterval, stopInterval],
+  );
+
+  const handleLoopRangeChange = useCallback(
+    (start: number, end: number) => {
+      const cStart = Math.max(0, Math.min(start, totalFrames - 1));
+      const cEnd = Math.max(0, Math.min(end, totalFrames - 1));
+      setLoopStart(cStart);
+      setLoopEnd(cEnd);
+    },
+    [totalFrames],
+  );
+
+  const handleStepForward = useCallback(() => {
+    const prov = providerRef.current;
+    if (!prov) return;
+    const next = Math.min(currentFrameRef.current + 1, loopEndRef.current);
+    const frame = prov.getFrame(next);
+    currentFrameRef.current = next;
+    setCurrentFrame(next);
+    setCurrentFrameData(frame);
+  }, []);
+
+  const handleStepBackward = useCallback(() => {
+    const prov = providerRef.current;
+    if (!prov) return;
+    const prev = Math.max(currentFrameRef.current - 1, loopStartRef.current);
+    const frame = prov.getFrame(prev);
+    currentFrameRef.current = prev;
+    setCurrentFrame(prev);
+    setCurrentFrameData(frame);
+  }, []);
 
   // Cleanup interval on unmount
   useEffect(() => {
@@ -399,9 +460,16 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
           totalFrames={totalFrames}
           playing={playing}
           fps={fps}
+          speedMultiplier={speedMultiplier}
+          loopStart={loopStart}
+          loopEnd={loopEnd}
           onSeek={handleSeek}
           onPlayPause={handlePlayPause}
           onFpsChange={handleFpsChange}
+          onSpeedChange={handleSpeedChange}
+          onLoopRangeChange={handleLoopRangeChange}
+          onStepBackward={handleStepBackward}
+          onStepForward={handleStepForward}
         />
       )}
       <Tooltip info={hoverInfo} />

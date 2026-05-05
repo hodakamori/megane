@@ -210,6 +210,13 @@ export class MoleculeRenderer {
   private bondScale = 1.0;
   private bondOpacity = 1.0;
   /**
+   * Whether the active pipeline produces bonds for the primary structure.
+   * Composed with `representationType` to decide bond mesh visibility, so a
+   * pipeline that doesn't generate bonds never re-shows stale geometry from a
+   * previous structure when the representation toggles back to "atoms"/"both".
+   */
+  private bondsAvailable = false;
+  /**
    * Current per-atom RGB overrides applied to the primary structure
    * (length === nAtoms*3, NaN sentinel for "fall through to base"). Null
    * means atoms render with the default CPK palette.
@@ -753,7 +760,9 @@ export class MoleculeRenderer {
     const showSurface = type === "surface";
 
     if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
-    if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms;
+    // Bonds also depend on whether the pipeline emits any bonds; otherwise
+    // stale geometry from a previous structure would resurface here.
+    if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms && this.bondsAvailable;
     if (this.cartoonRenderer) {
       // Only show cartoon when it has backbone data
       const hasBackbone = this.snapshot?.caIndices != null && this.snapshot.caIndices.length > 0;
@@ -767,10 +776,18 @@ export class MoleculeRenderer {
     }
   }
 
-  /** Toggle bond visibility. */
+  /**
+   * Set whether the active pipeline emits bonds for the primary structure.
+   * The bond mesh is only shown when this AND the current representation
+   * (`atoms`/`both`) both call for bonds — otherwise switching templates
+   * would resurface stale bond geometry once the representation toggles
+   * back to atoms.
+   */
   setBondsVisible(visible: boolean): void {
+    this.bondsAvailable = visible;
     if (this.bondRenderer) {
-      this.bondRenderer.mesh.visible = visible;
+      const showAtoms = this.representationType === "atoms" || this.representationType === "both";
+      this.bondRenderer.mesh.visible = visible && showAtoms;
     }
   }
 

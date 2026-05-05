@@ -32,8 +32,11 @@ describe("usePlaybackStore", () => {
     usePlaybackStore.setState({
       playing: false,
       fps: 30,
+      speedMultiplier: 1,
       currentFrame: 0,
       totalFrames: 0,
+      loopStart: 0,
+      loopEnd: 0,
       provider: null,
       currentFrameData: null,
       _intervalId: null,
@@ -50,8 +53,11 @@ describe("usePlaybackStore", () => {
     const state = usePlaybackStore.getState();
     expect(state.playing).toBe(false);
     expect(state.fps).toBe(30);
+    expect(state.speedMultiplier).toBe(1);
     expect(state.currentFrame).toBe(0);
     expect(state.totalFrames).toBe(0);
+    expect(state.loopStart).toBe(0);
+    expect(state.loopEnd).toBe(0);
     expect(state.provider).toBeNull();
     expect(state.currentFrameData).toBeNull();
   });
@@ -65,6 +71,13 @@ describe("usePlaybackStore", () => {
       expect(state.totalFrames).toBe(10);
       expect(state.currentFrame).toBe(0);
       expect(state.currentFrameData).not.toBeNull();
+    });
+
+    it("resets loopStart and loopEnd to full range", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      const state = usePlaybackStore.getState();
+      expect(state.loopStart).toBe(0);
+      expect(state.loopEnd).toBe(9);
     });
 
     it("clears state when provider is null", () => {
@@ -136,6 +149,90 @@ describe("usePlaybackStore", () => {
     });
   });
 
+  describe("setSpeedMultiplier", () => {
+    it("updates speedMultiplier", () => {
+      usePlaybackStore.getState().setSpeedMultiplier(2);
+      expect(usePlaybackStore.getState().speedMultiplier).toBe(2);
+    });
+
+    it("restarts interval if playing", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().play();
+      const idBefore = usePlaybackStore.getState()._intervalId;
+      usePlaybackStore.getState().setSpeedMultiplier(2);
+      const idAfter = usePlaybackStore.getState()._intervalId;
+      expect(idAfter).not.toBe(idBefore);
+    });
+
+    it("does not restart interval if not playing", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setSpeedMultiplier(2);
+      expect(usePlaybackStore.getState()._intervalId).toBeNull();
+    });
+  });
+
+  describe("setLoopRange", () => {
+    it("updates loopStart and loopEnd", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setLoopRange(2, 7);
+      const state = usePlaybackStore.getState();
+      expect(state.loopStart).toBe(2);
+      expect(state.loopEnd).toBe(7);
+    });
+
+    it("clamps values to valid range", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setLoopRange(-5, 50);
+      const state = usePlaybackStore.getState();
+      expect(state.loopStart).toBe(0);
+      expect(state.loopEnd).toBe(9);
+    });
+  });
+
+  describe("stepForward", () => {
+    it("advances by one frame", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().seekFrame(3);
+      usePlaybackStore.getState().stepForward();
+      expect(usePlaybackStore.getState().currentFrame).toBe(4);
+    });
+
+    it("clamps at loopEnd", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setLoopRange(0, 5);
+      usePlaybackStore.getState().seekFrame(5);
+      usePlaybackStore.getState().stepForward();
+      expect(usePlaybackStore.getState().currentFrame).toBe(5);
+    });
+
+    it("does nothing without provider", () => {
+      usePlaybackStore.getState().stepForward();
+      expect(usePlaybackStore.getState().currentFrame).toBe(0);
+    });
+  });
+
+  describe("stepBackward", () => {
+    it("goes back by one frame", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().seekFrame(5);
+      usePlaybackStore.getState().stepBackward();
+      expect(usePlaybackStore.getState().currentFrame).toBe(4);
+    });
+
+    it("clamps at loopStart", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setLoopRange(3, 9);
+      usePlaybackStore.getState().seekFrame(3);
+      usePlaybackStore.getState().stepBackward();
+      expect(usePlaybackStore.getState().currentFrame).toBe(3);
+    });
+
+    it("does nothing without provider", () => {
+      usePlaybackStore.getState().stepBackward();
+      expect(usePlaybackStore.getState().currentFrame).toBe(0);
+    });
+  });
+
   describe("interval playback", () => {
     it("advances frames on interval tick", () => {
       usePlaybackStore.getState().setProvider(makeProvider(5));
@@ -147,14 +244,36 @@ describe("usePlaybackStore", () => {
       expect(usePlaybackStore.getState().currentFrame).toBe(1);
     });
 
-    it("wraps around at end", () => {
-      usePlaybackStore.getState().setProvider(makeProvider(3));
+    it("wraps around at loopEnd", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(5));
       usePlaybackStore.getState().play();
       const interval = 1000 / 30;
 
-      // Advance through all frames: 0→1→2→0
-      vi.advanceTimersByTime(interval * 3 + 1);
+      // 0→1→2→3→4→0 (5 frames, wraps)
+      vi.advanceTimersByTime(interval * 5 + 1);
       expect(usePlaybackStore.getState().currentFrame).toBe(0);
+    });
+
+    it("respects custom loop range", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setLoopRange(2, 4);
+      usePlaybackStore.getState().seekFrame(2);
+      usePlaybackStore.getState().play();
+      const interval = 1000 / 30;
+
+      // 2→3→4→2 (loop between 2 and 4)
+      vi.advanceTimersByTime(interval * 3 + 1);
+      expect(usePlaybackStore.getState().currentFrame).toBe(2);
+    });
+
+    it("advances faster with speedMultiplier > 1", () => {
+      usePlaybackStore.getState().setProvider(makeProvider(10));
+      usePlaybackStore.getState().setSpeedMultiplier(2);
+      usePlaybackStore.getState().play();
+
+      // At 2× speed with 30fps, interval = 1000/(30*2) ≈ 16.7ms
+      vi.advanceTimersByTime(17);
+      expect(usePlaybackStore.getState().currentFrame).toBe(1);
     });
   });
 
