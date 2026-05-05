@@ -39,3 +39,15 @@ declare module "@megane/tour/useTour" {
     autoStartDelayMs?: number;
   }): { startTour: () => void };
 }
+
+declare module "@megane/types" {
+  export interface SelectionState {
+    atoms: number[];
+  }
+  export interface Measurement {
+    atoms: number[];
+    type: "distance" | "angle" | "dihedral";
+    value: number;
+    label: string;
+  }
+}
