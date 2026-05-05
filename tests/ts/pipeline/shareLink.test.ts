@@ -84,6 +84,31 @@ describe("buildShareUrl", () => {
     expect(tooLong).toBe(true);
   });
 
+  it("resolves promptly without deadlock under CompressionStream backpressure (regression: buildShareUrl hung in browsers when the deflate writer awaited before any reader drained)", async () => {
+    // Larger payload exercises chunking; if the implementation awaits
+    // writer.write() before draining cs.readable the promise will never
+    // resolve in real browsers. Vitest's jsdom uses Node's polyfill which
+    // also follows the backpressure protocol.
+    const big: SerializedPipeline = {
+      version: 3,
+      nodes: Array.from({ length: 50 }, (_, i) => ({
+        id: `n-${i}`,
+        type: "load_structure",
+        position: { x: i, y: i },
+        enabled: true,
+        fileName: `node-${i}-${"abcdefghij".repeat(20)}`,
+        hasTrajectory: false,
+        hasCell: false,
+      })) as SerializedPipeline["nodes"],
+      edges: [],
+    };
+    const result = await Promise.race([
+      buildShareUrl(big),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+    ]);
+    expect(result.url).toContain("#pipeline=");
+  });
+
   it("falls back to plain base64url when CompressionStream is unavailable", async () => {
     const original = globalThis.CompressionStream;
     // @ts-expect-error - intentional removal for fallback test
