@@ -8,6 +8,7 @@ import { seedPipelineStore } from "./_helpers";
 vi.mock("@xyflow/react", () => import("./_xyflowMock"));
 vi.mock("@/parsers/structure", () => ({
   parseTopBonds: vi.fn(async () => new Uint32Array([0, 1, 2, 3])),
+  parsePsfBonds: vi.fn(async () => new Uint32Array([])),
 }));
 
 import { parseTopBonds } from "@/parsers/structure";
@@ -82,7 +83,7 @@ describe("AddBondNode", () => {
     });
     render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
 
-    expect(screen.queryByText("Load .top...")).toBeNull();
+    expect(screen.queryByText("Load .top / .psf...")).toBeNull();
     expect(screen.queryByText("No topology loaded")).toBeNull();
   });
 
@@ -94,7 +95,7 @@ describe("AddBondNode", () => {
     render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
 
     expect(screen.getByText("No topology loaded")).toBeInTheDocument();
-    expect(screen.getByText("Load .top...")).toBeInTheDocument();
+    expect(screen.getByText("Load .top / .psf...")).toBeInTheDocument();
   });
 
   it("shows the topology filename when bondSource='file' and bondFileName is set", () => {
@@ -120,7 +121,7 @@ describe("AddBondNode", () => {
 
     const fileText = "[ bonds ]\n1 2";
     const file = makeFileWithText("system.top", fileText);
-    const input = screen.getByText("Load .top...").parentElement!.querySelector(
+    const input = screen.getByText("Load .top / .psf...").parentElement!.querySelector(
       'input[type="file"]',
     ) as HTMLInputElement;
     Object.defineProperty(input, "files", {
@@ -154,7 +155,7 @@ describe("AddBondNode", () => {
     render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
 
     const file = new File(["junk"], "system.json", { type: "application/json" });
-    const input = screen.getByText("Load .top...").parentElement!.querySelector(
+    const input = screen.getByText("Load .top / .psf...").parentElement!.querySelector(
       'input[type="file"]',
     ) as HTMLInputElement;
     Object.defineProperty(input, "files", {

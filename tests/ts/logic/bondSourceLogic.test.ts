@@ -4,11 +4,13 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/parsers/structure", () => ({
   inferBondsVdw: vi.fn().mockResolvedValue(new Uint32Array([0, 1])),
   parseTopBonds: vi.fn().mockResolvedValue(new Uint32Array([])),
+  parsePsfBonds: vi.fn().mockResolvedValue(new Uint32Array([])),
   parsePdbBonds: vi.fn().mockResolvedValue(new Uint32Array([])),
 }));
 
-import { withBonds, computeBondsForSource } from "@/logic/bondSourceLogic";
+import { withBonds, computeBondsForSource, loadBondFileData } from "@/logic/bondSourceLogic";
 import type { BondSourceRefs } from "@/logic/bondSourceLogic";
+import * as structureParsers from "@/parsers/structure";
 import type { Snapshot } from "@/types";
 
 function makeSnapshot(): Snapshot {
@@ -98,5 +100,51 @@ describe("computeBondsForSource", () => {
     const result = await computeBondsForSource("distance", refs);
     expect(result).not.toBeNull();
     expect(result!.bonds).toBe(vdwBonds);
+  });
+});
+
+describe("loadBondFileData", () => {
+  // jsdom does not implement File.text(); create a minimal File-like stub.
+  function makeFile(name: string, content: string): File {
+    const blob = new Blob([content], { type: "text/plain" });
+    return Object.assign(blob, {
+      name,
+      lastModified: 0,
+      webkitRelativePath: "",
+      text: () => Promise.resolve(content),
+    }) as unknown as File;
+  }
+
+  it("calls parseTopBonds for .top files", async () => {
+    const spy = vi.spyOn(structureParsers, "parseTopBonds").mockResolvedValue(new Uint32Array([0, 1]));
+    const file = makeFile("topology.top", "[ bonds ]\n1 2\n");
+    const result = await loadBondFileData(file, 3);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(result.fileName).toBe("topology.top");
+    expect(result.bonds.length).toBe(2);
+  });
+
+  it("calls parsePsfBonds for .psf files", async () => {
+    const spy = vi.spyOn(structureParsers, "parsePsfBonds").mockResolvedValue(new Uint32Array([0, 1]));
+    const file = makeFile("water.psf", "PSF\n");
+    const result = await loadBondFileData(file, 3);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(result.fileName).toBe("water.psf");
+    expect(result.bonds.length).toBe(2);
+  });
+
+  it("calls parsePdbBonds for .pdb files", async () => {
+    const spy = vi.spyOn(structureParsers, "parsePdbBonds").mockResolvedValue(new Uint32Array([0, 1]));
+    const file = makeFile("mol.pdb", "ATOM\n");
+    const result = await loadBondFileData(file, 3);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(result.fileName).toBe("mol.pdb");
+  });
+
+  it("calls parsePdbBonds as fallback for unknown extensions", async () => {
+    const spy = vi.spyOn(structureParsers, "parsePdbBonds").mockResolvedValue(new Uint32Array([]));
+    const file = makeFile("bonds.txt", "");
+    await loadBondFileData(file, 3);
+    expect(spy).toHaveBeenCalledOnce();
   });
 });

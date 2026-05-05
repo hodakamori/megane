@@ -2,7 +2,8 @@ use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, netcdf, parser, top, traj, xtc, xyz,
+    bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, netcdf, parser, psf, top, traj, xtc,
+    xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -553,6 +554,19 @@ pub fn parse_netcdf_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
         vector_channel_meta,
         vector_channel_data,
     })
+}
+
+/// Parse a CHARMM/NAMD PSF topology file and extract bond pairs.
+/// Returns flat Uint32Array [a0, b0, a1, b1, ...] with 0-indexed pairs.
+#[wasm_bindgen]
+pub fn parse_psf_bonds(text: &str, n_atoms: u32) -> Uint32Array {
+    let result = psf::parse_psf_bonds(text, n_atoms as usize);
+    let mut flat: Vec<u32> = Vec::with_capacity(result.len() * 2);
+    for (a, b) in &result {
+        flat.push(*a);
+        flat.push(*b);
+    }
+    Uint32Array::from(&flat[..])
 }
 
 /// Extract only CONECT bonds from a PDB file text.

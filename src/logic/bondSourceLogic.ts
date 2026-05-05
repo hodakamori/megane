@@ -2,7 +2,7 @@
  * Shared bond source logic used by both useMeganeLocal and useMeganeWebSocket.
  */
 
-import { inferBondsVdw, parseTopBonds, parsePdbBonds } from "../parsers/structure";
+import { inferBondsVdw, parseTopBonds, parsePsfBonds, parsePdbBonds } from "../parsers/structure";
 import type { Snapshot, BondSource } from "../types";
 
 /** Rebuild a snapshot with different bonds. */
@@ -67,6 +67,8 @@ export async function loadBondFileData(
   let bonds: Uint32Array;
   if (ext === ".top") {
     bonds = await parseTopBonds(text, nAtoms);
+  } else if (ext === ".psf") {
+    bonds = await parsePsfBonds(text, nAtoms);
   } else {
     bonds = await parsePdbBonds(text, nAtoms);
   }
