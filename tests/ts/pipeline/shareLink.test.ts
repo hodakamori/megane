@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   buildShareUrl,
+  commitShareHashToHistory,
+  copyShareUrl,
   readPipelineFromHash,
   restorePipelineFromHash,
   shareCurrentPipeline,
@@ -72,7 +74,6 @@ describe("buildShareUrl", () => {
         type: "load_structure",
         position: { x: i, y: i },
         enabled: true,
-        // pad with random-ish unique data so deflate cannot collapse it
         fileName: `${i}-${Math.random().toString(36).repeat(5)}-${"x".repeat(30)}`,
         hasTrajectory: false,
         hasCell: false,
@@ -85,15 +86,11 @@ describe("buildShareUrl", () => {
 
   it("falls back to plain base64url when CompressionStream is unavailable", async () => {
     const original = globalThis.CompressionStream;
-    // Simulate older browsers by removing CompressionStream entirely.
-    // The implementation catches the resulting ReferenceError/TypeError and
-    // falls back to encoding the raw JSON bytes.
     // @ts-expect-error - intentional removal for fallback test
     delete globalThis.CompressionStream;
     try {
       const { url } = await buildShareUrl(samplePipeline);
       const encoded = url.split("#pipeline=")[1];
-      // The fallback path stores the raw JSON, so atob(decode) should yield JSON text.
       const padded = encoded.replace(/-/g, "+").replace(/_/g, "/");
       const padding = (4 - (padded.length % 4)) % 4;
       const decoded = atob(padded + "=".repeat(padding));
@@ -127,7 +124,6 @@ describe("readPipelineFromHash", () => {
   });
 
   it("returns null when decoded JSON is malformed", async () => {
-    // base64url("not json") → "bm90IGpzb24"
     const encoded = btoa("not json").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
     setHash(`pipeline=${encoded}`);
     expect(await readPipelineFromHash()).toBeNull();
@@ -177,16 +173,11 @@ describe("readPipelineFromHash", () => {
 
 describe("buildShareUrl ↔ readPipelineFromHash compatibility", () => {
   let originalCompression: typeof CompressionStream | undefined;
-  let originalDecompression: typeof DecompressionStream | undefined;
 
   afterEach(() => {
     if (originalCompression !== undefined) {
       globalThis.CompressionStream = originalCompression;
       originalCompression = undefined;
-    }
-    if (originalDecompression !== undefined) {
-      globalThis.DecompressionStream = originalDecompression;
-      originalDecompression = undefined;
     }
     setHash("");
   });
@@ -200,9 +191,6 @@ describe("buildShareUrl ↔ readPipelineFromHash compatibility", () => {
     const hashIndex = url.indexOf("#");
     setHash(url.slice(hashIndex + 1));
 
-    // Restore compression so the decoder will try inflate first; the inflate
-    // attempt should fail on plain bytes, and the catch should fall through
-    // to the plain UTF-8 path.
     globalThis.CompressionStream = originalCompression;
     originalCompression = undefined;
 
@@ -227,11 +215,38 @@ describe("buildShareUrl ↔ readPipelineFromHash compatibility", () => {
   });
 });
 
-describe("shareCurrentPipeline", () => {
+describe("commitShareHashToHistory", () => {
+  let replaceStateSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    replaceStateSpy = vi.spyOn(history, "replaceState").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    replaceStateSpy.mockRestore();
+  });
+
+  it("calls history.replaceState with the URL's hash fragment", () => {
+    commitShareHashToHistory("https://example.com/path#pipeline=abc123");
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    expect(String(replaceStateSpy.mock.calls[0][2])).toBe("#pipeline=abc123");
+  });
+
+  it("swallows replaceState exceptions so the share flow continues", () => {
+    replaceStateSpy.mockImplementationOnce(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    expect(() =>
+      commitShareHashToHistory("https://example.com/path#pipeline=abc123"),
+    ).not.toThrow();
+  });
+});
+
+describe("copyShareUrl", () => {
   let writeText: ReturnType<typeof vi.fn>;
   let originalClipboard: PropertyDescriptor | undefined;
-  let replaceStateSpy: ReturnType<typeof vi.spyOn>;
   let infoSpy: ReturnType<typeof vi.spyOn>;
+  let originalExec: typeof document.execCommand;
 
   beforeEach(() => {
     writeText = vi.fn().mockResolvedValue(undefined);
@@ -240,9 +255,8 @@ describe("shareCurrentPipeline", () => {
       value: { writeText },
       configurable: true,
     });
-    replaceStateSpy = vi.spyOn(history, "replaceState").mockImplementation(() => {});
     infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-    window.location.hash = "";
+    originalExec = document.execCommand;
   });
 
   afterEach(() => {
@@ -252,25 +266,106 @@ describe("shareCurrentPipeline", () => {
       // @ts-expect-error - remove the test-installed property
       delete navigator.clipboard;
     }
-    replaceStateSpy.mockRestore();
     infoSpy.mockRestore();
+    document.execCommand = originalExec;
   });
 
-  it("ok path: writes to clipboard, mirrors hash, returns success outcome", async () => {
-    const outcome = await shareCurrentPipeline(samplePipeline);
-    expect(outcome.tooLong).toBe(false);
-    expect(outcome.copyFailed).toBe(false);
-    expect(outcome.message).toBe("Link copied to clipboard!");
-    expect(outcome.clearAfterMs).toBe(3000);
-    expect(outcome.url).toContain("#pipeline=");
-    expect(writeText).toHaveBeenCalledWith(outcome.url);
+  it("returns 'copied' on navigator.clipboard.writeText success", async () => {
+    const result = await copyShareUrl("https://example.com/#pipeline=abc");
+    expect(result).toBe("copied");
+    expect(writeText).toHaveBeenCalledWith("https://example.com/#pipeline=abc");
+  });
+
+  it("falls back to execCommand('copy') when writeText rejects", async () => {
+    writeText.mockRejectedValueOnce(new Error("denied"));
+    const exec = vi.fn().mockReturnValue(true);
+    document.execCommand = exec as unknown as typeof document.execCommand;
+
+    const before = document.body.querySelectorAll("textarea").length;
+    const result = await copyShareUrl("https://example.com/#pipeline=abc");
+    const after = document.body.querySelectorAll("textarea").length;
+
+    expect(result).toBe("copied");
+    expect(exec).toHaveBeenCalledWith("copy");
+    expect(after).toBe(before);
+  });
+
+  it("falls back to execCommand('copy') when navigator.clipboard is missing", async () => {
+    // @ts-expect-error - simulate missing API
+    delete navigator.clipboard;
+    const exec = vi.fn().mockReturnValue(true);
+    document.execCommand = exec as unknown as typeof document.execCommand;
+
+    const result = await copyShareUrl("https://example.com/#pipeline=abc");
+    expect(result).toBe("copied");
+    expect(exec).toHaveBeenCalledWith("copy");
+  });
+
+  it("returns 'failed' and logs the URL when both paths fail", async () => {
+    writeText.mockRejectedValueOnce(new Error("denied"));
+    const exec = vi.fn().mockReturnValue(false);
+    document.execCommand = exec as unknown as typeof document.execCommand;
+
+    const result = await copyShareUrl("https://example.com/#pipeline=abc");
+    expect(result).toBe("failed");
+    expect(infoSpy).toHaveBeenCalledWith("Share URL:", "https://example.com/#pipeline=abc");
+  });
+
+  it("returns 'failed' when execCommand throws after clipboard fails", async () => {
+    writeText.mockRejectedValueOnce(new Error("denied"));
+    document.execCommand = (() => {
+      throw new Error("blocked");
+    }) as unknown as typeof document.execCommand;
+
+    const result = await copyShareUrl("https://example.com/#pipeline=abc");
+    expect(result).toBe("failed");
+  });
+});
+
+describe("shareCurrentPipeline", () => {
+  let replaceStateSpy: ReturnType<typeof vi.spyOn>;
+  let writeText: ReturnType<typeof vi.fn>;
+  let originalClipboard: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    replaceStateSpy = vi.spyOn(history, "replaceState").mockImplementation(() => {});
+    writeText = vi.fn().mockResolvedValue(undefined);
+    originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    window.location.hash = "";
+  });
+
+  afterEach(() => {
+    replaceStateSpy.mockRestore();
+    if (originalClipboard) {
+      Object.defineProperty(navigator, "clipboard", originalClipboard);
+    } else {
+      // @ts-expect-error - remove the test-installed property
+      delete navigator.clipboard;
+    }
+  });
+
+  it("returns the URL and tooLong=false on the success path", async () => {
+    const out = await shareCurrentPipeline(samplePipeline);
+    expect(out.tooLong).toBe(false);
+    expect(out.url).toContain("#pipeline=");
+  });
+
+  it("mirrors the hash to history.replaceState before returning", async () => {
+    await shareCurrentPipeline(samplePipeline);
     expect(replaceStateSpy).toHaveBeenCalledTimes(1);
-    // Second arg of replaceState is the URL fragment (e.g. "#pipeline=...")
-    const replaceArgs = replaceStateSpy.mock.calls[0];
-    expect(String(replaceArgs[2])).toMatch(/^#pipeline=/);
+    expect(String(replaceStateSpy.mock.calls[0][2])).toMatch(/^#pipeline=/);
   });
 
-  it("tooLong path: skips clipboard, returns 4-second toast", async () => {
+  it("never touches the clipboard (copy is owned by the dialog)", async () => {
+    await shareCurrentPipeline(samplePipeline);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("skips replaceState on the tooLong path but still returns the URL", async () => {
     const big: SerializedPipeline = {
       version: 3,
       nodes: Array.from({ length: 800 }, (_, i) => ({
@@ -284,24 +379,11 @@ describe("shareCurrentPipeline", () => {
       })) as SerializedPipeline["nodes"],
       edges: [],
     };
-    const outcome = await shareCurrentPipeline(big);
-    expect(outcome.tooLong).toBe(true);
-    expect(outcome.copyFailed).toBe(false);
-    expect(outcome.message).toBe("Pipeline too large for a share link — use Export instead");
-    expect(outcome.clearAfterMs).toBe(5000);
+    const out = await shareCurrentPipeline(big);
+    expect(out.tooLong).toBe(true);
+    expect(out.url).toContain("#pipeline=");
+    expect(replaceStateSpy).not.toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
-    expect(replaceStateSpy).not.toHaveBeenCalled();
-  });
-
-  it("copyFailed path: clipboard rejection logs URL and returns failure outcome", async () => {
-    writeText.mockRejectedValueOnce(new Error("denied"));
-    const outcome = await shareCurrentPipeline(samplePipeline);
-    expect(outcome.tooLong).toBe(false);
-    expect(outcome.copyFailed).toBe(true);
-    expect(outcome.message).toBe("Copy failed — see console for the link");
-    expect(outcome.clearAfterMs).toBe(3000);
-    expect(infoSpy).toHaveBeenCalledWith("Share URL:", outcome.url);
-    expect(replaceStateSpy).not.toHaveBeenCalled();
   });
 });
 

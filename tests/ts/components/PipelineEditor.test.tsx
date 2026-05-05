@@ -101,78 +101,60 @@ describe("PipelineEditor — collapsed state", () => {
   });
 });
 
-describe("PipelineEditor — Share button feedback", () => {
+describe("PipelineEditor — Share button opens dialog", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let alertSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     shareCurrentPipelineMock.mockReset();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    alertSpy.mockRestore();
   });
 
-  it("shows the success pill when shareCurrentPipeline resolves with copied", async () => {
+  it("opens the share dialog with the URL when shareCurrentPipeline resolves", async () => {
     shareCurrentPipelineMock.mockResolvedValue({
-      message: "Link copied to clipboard!",
-      clearAfterMs: 3000,
       url: "http://example.test/#pipeline=abc",
       tooLong: false,
-      copyFailed: false,
     });
 
     render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
     fireEvent.click(screen.getByTestId("pipeline-editor-share"));
 
-    const feedback = await screen.findByTestId("pipeline-editor-share-feedback");
-    expect(feedback.textContent).toContain("Link copied to clipboard!");
-    expect(feedback.getAttribute("data-tone")).toBe("success");
+    const input = await screen.findByTestId("share-dialog-url-input");
+    expect((input as HTMLInputElement).value).toBe("http://example.test/#pipeline=abc");
+    expect(screen.queryByTestId("share-dialog-warning")).toBeNull();
   });
 
-  it("shows the warning pill when the pipeline is too long", async () => {
+  it("renders the tooLong warning and disables Copy when the pipeline is too long", async () => {
     shareCurrentPipelineMock.mockResolvedValue({
-      message: "Pipeline too large for a share link — use Export instead",
-      clearAfterMs: 5000,
       url: "http://example.test/#pipeline=zzz",
       tooLong: true,
-      copyFailed: false,
     });
 
     render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
     fireEvent.click(screen.getByTestId("pipeline-editor-share"));
 
-    const feedback = await screen.findByTestId("pipeline-editor-share-feedback");
-    expect(feedback.getAttribute("data-tone")).toBe("warning");
+    expect(await screen.findByTestId("share-dialog-warning")).toBeTruthy();
+    const copyBtn = screen.getByTestId("share-dialog-copy") as HTMLButtonElement;
+    expect(copyBtn.disabled).toBe(true);
   });
 
-  it("shows the error pill when clipboard write fails", async () => {
-    shareCurrentPipelineMock.mockResolvedValue({
-      message: "Copy failed — see console for the link",
-      clearAfterMs: 3000,
-      url: "http://example.test/#pipeline=abc",
-      tooLong: false,
-      copyFailed: true,
-    });
-
-    render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
-    fireEvent.click(screen.getByTestId("pipeline-editor-share"));
-
-    const feedback = await screen.findByTestId("pipeline-editor-share-feedback");
-    expect(feedback.getAttribute("data-tone")).toBe("error");
-  });
-
-  it("surfaces silent rejections as a visible error pill (regression for the void-handler bug)", async () => {
+  it("alerts and skips the dialog when shareCurrentPipeline rejects", async () => {
     shareCurrentPipelineMock.mockRejectedValue(new Error("boom"));
 
     render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
     fireEvent.click(screen.getByTestId("pipeline-editor-share"));
 
-    const feedback = await screen.findByTestId("pipeline-editor-share-feedback");
-    expect(feedback.textContent).toContain("Share failed");
-    expect(feedback.getAttribute("data-tone")).toBe("error");
     await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalled();
     });
+    expect(alertSpy.mock.calls[0][0]).toContain("Share failed");
+    expect(screen.queryByTestId("share-dialog")).toBeNull();
+    expect(consoleErrorSpy).toHaveBeenCalled();
   });
 });
