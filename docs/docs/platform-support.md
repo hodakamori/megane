@@ -52,7 +52,19 @@ Legend:
 opening a structure file (PDB, GRO, …) first or by wiring a Load Structure
 node in the always-mounted pipeline editor.
 
-Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VSCode `customEditors`).
+### Topology formats
+
+Topology files carry bond information but no coordinates. They are used with
+the **Add Bond** pipeline node to supply explicit connectivity when the
+structure file does not encode it (e.g. pairing a PDB with a PSF, or a GRO
+with a GROMACS `.top`).
+
+| Format | Extensions | Standalone (Add Bond node) | Python |
+|---|---|:---:|:---:|
+| GROMACS topology | `.top` | ✓ | ✓ |
+| CHARMM/NAMD PSF | `.psf` | ✓ | ✓ |
+
+Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VSCode `customEditors`).
 
 ## UI features
 

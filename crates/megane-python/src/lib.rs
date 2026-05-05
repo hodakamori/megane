@@ -318,6 +318,27 @@ fn parse_netcdf(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     })
 }
 
+/// Parse a CHARMM/NAMD PSF topology file and return bond pairs.
+///
+/// Returns an (n_bonds, 2) uint32 array of 0-indexed atom index pairs.
+/// PSF files carry no coordinate data; positions are not returned.
+#[pyfunction]
+fn parse_psf_bonds(py: Python<'_>, text: &str) -> PyResult<Py<PyArray2<u32>>> {
+    let bonds = megane_core::psf::parse_psf_bonds(text, usize::MAX);
+    let n = bonds.len();
+    let flat: Vec<u32> = bonds.iter().flat_map(|(a, b)| [*a, *b]).collect();
+    let arr = if n > 0 {
+        Array2::from_shape_vec((n, 2), flat).map_err(|e| {
+            PyValueError::new_err(format!("failed to reshape bonds into ({n}, 2): {e}"))
+        })?
+    } else {
+        Array2::from_shape_vec((0, 2), vec![]).map_err(|e| {
+            PyValueError::new_err(format!("failed to create empty bonds array: {e}"))
+        })?
+    };
+    Ok(arr.into_pyarray(py).into())
+}
+
 /// Infer bonds from interatomic distances using VDW radii.
 ///
 /// Returns an (n_bonds, 2) uint32 array of atom index pairs.  Mirrors the
@@ -371,6 +392,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_traj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammpstrj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_netcdf, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_psf_bonds, m)?)?;
     m.add_function(wrap_pyfunction!(infer_bonds_vdw, m)?)?;
     Ok(())
 }
