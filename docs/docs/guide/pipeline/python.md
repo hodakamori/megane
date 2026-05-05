@@ -93,18 +93,24 @@ Load an external trajectory file. Requires connection from a `LoadStructure` nod
 LoadTrajectory(
     *,
     xtc: str | None = None,
+    dcd: str | None = None,
+    nc: str | None = None,
     traj: str | None = None,
     xyz: str | None = None,
+    lammpstrj: str | None = None,
 )
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
+| `dcd` | `str \| None` | `None` | Path to DCD trajectory file (CHARMM/NAMD/X-PLOR) |
+| `nc` | `str \| None` | `None` | Path to AMBER NetCDF trajectory file |
 | `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
 | `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
+| `lammpstrj` | `str \| None` | `None` | Path to LAMMPS dump trajectory (`.lammpstrj` / `.dump`) |
 
-Pass exactly one of the three. **Ports:** `inp.particle`, `out.traj`
+Pass exactly one. **Ports:** `inp.particle`, `out.traj`
 
 ### Streaming
 
@@ -206,12 +212,13 @@ Representation(*, mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms"
 Compute and display bonds.
 
 ```python
-AddBonds(*, source: Literal["distance", "structure"] = "distance")
+AddBonds(*, source: Literal["distance", "structure"] = "distance", top: str | None = None)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `source` | `str` | `"distance"` | `"distance"` for VDW-based inference, `"structure"` for file-based bonds |
+| `top` | `str \| None` | `None` | Path to a GROMACS `.top` topology file. When provided, `source` is ignored and bonds are read from the topology file. |
 
 **Ports:** `inp.particle`, `out.bond`
 
