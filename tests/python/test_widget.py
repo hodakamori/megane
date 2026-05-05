@@ -115,3 +115,133 @@ def test_deprecated_load_warns():
     assert len(w) == 1
     assert issubclass(w[0].category, DeprecationWarning)
     assert "set_pipeline" in str(w[0].message)
+
+
+# ── File drop (drag-and-drop) tests ──────────────────────────────────────
+
+
+def test_file_drop_traitlets_exist():
+    """_drop_file_name and _drop_file_b64 traitlets are present and synced."""
+    v = MolecularViewer()
+    state = v.get_state()
+    assert "_drop_file_name" in state
+    assert "_drop_file_b64" in state
+    assert v._drop_file_name == ""
+    assert v._drop_file_b64 == ""
+
+
+def test_file_drop_loads_pdb(tmp_path):
+    """Dropping a PDB file populates the pipeline and fires file_drop event."""
+    import base64
+
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    pdb_bytes = (FIXTURES / "1crn.pdb").read_bytes()
+    b64 = base64.b64encode(pdb_bytes).decode()
+
+    v._drop_file_name = "1crn.pdb"
+    v._drop_file_b64 = b64
+
+    assert len(events) == 1
+    assert events[0]["name"] == "1crn.pdb"
+    assert "error" not in events[0]
+    assert v._pipeline_json != ""
+    assert len(v._node_snapshots_data) > 0
+
+
+def test_file_drop_loads_xyz():
+    """Dropping an XYZ file populates the pipeline."""
+    import base64
+
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    xyz_bytes = (FIXTURES / "perovskite_srtio3.xyz").read_bytes()
+    b64 = base64.b64encode(xyz_bytes).decode()
+
+    v._drop_file_name = "perovskite_srtio3.xyz"
+    v._drop_file_b64 = b64
+
+    assert len(events) == 1
+    assert "error" not in events[0]
+    assert v._pipeline_json != ""
+
+
+def test_file_drop_unknown_extension_fires_error():
+    """Dropping an unsupported format fires file_drop with error key."""
+    import base64
+
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    b64 = base64.b64encode(b"not a real file").decode()
+    v._drop_file_name = "structure.unknownfmt"
+    v._drop_file_b64 = b64
+
+    assert len(events) == 1
+    assert events[0]["name"] == "structure.unknownfmt"
+    assert "error" in events[0]
+
+
+def test_file_drop_invalid_base64_fires_error():
+    """Invalid base64 payload fires file_drop event with error."""
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    v._drop_file_name = "test.pdb"
+    v._drop_file_b64 = "!!!not-valid-base64!!!"
+
+    assert len(events) == 1
+    assert "error" in events[0]
+
+
+def test_file_drop_empty_b64_does_nothing():
+    """Setting _drop_file_b64 to empty string is ignored."""
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    v._drop_file_name = "test.pdb"
+    v._drop_file_b64 = ""
+
+    assert len(events) == 0
+    assert v._pipeline_json == ""
+
+
+def test_file_drop_empty_name_does_nothing():
+    """Setting _drop_file_b64 without a filename is ignored."""
+    import base64
+
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    b64 = base64.b64encode(b"ATOM  1  N   ALA A   1\n").decode()
+    v._drop_file_name = ""
+    v._drop_file_b64 = b64
+
+    assert len(events) == 0
+
+
+def test_file_drop_successive_files():
+    """Two successive file drops each load correctly."""
+    import base64
+
+    v = MolecularViewer()
+    events = []
+    v.on_event("file_drop", lambda d: events.append(d))
+
+    for pdb in ("1crn.pdb", "1ubq.pdb"):
+        b64 = base64.b64encode((FIXTURES / pdb).read_bytes()).decode()
+        v._drop_file_name = pdb
+        v._drop_file_b64 = b64
+
+    assert len(events) == 2
+    assert all("error" not in e for e in events)
+    assert events[0]["name"] == "1crn.pdb"
+    assert events[1]["name"] == "1ubq.pdb"

@@ -80,6 +80,12 @@ class MolecularViewer(anywidget.AnyWidget):
         value_trait=traitlets.Bytes(),
     ).tag(sync=True)
 
+    # Drag-and-drop file loading (JS → Python).
+    # The JS frontend sets these when the user drops a file onto the widget;
+    # _drop_file_b64 triggers _on_file_drop which parses and loads the file.
+    _drop_file_name = traitlets.Unicode("").tag(sync=True)
+    _drop_file_b64 = traitlets.Unicode("").tag(sync=True)
+
     # Internal (not synced)
     _structure = None
     _trajectory = None
@@ -232,6 +238,53 @@ class MolecularViewer(anywidget.AnyWidget):
             },
         )
 
+    @traitlets.observe("_drop_file_b64")
+    def _on_file_drop(self, change: dict) -> None:
+        """Parse and load a file dropped onto the widget from the browser.
+
+        The JS frontend sends the file as base64 together with its filename
+        (_drop_file_name).  This observer decodes the bytes, writes a
+        temporary file, parses it with the appropriate Rust parser, and calls
+        :meth:`set_pipeline` so the viewer displays the structure.
+
+        A ``"file_drop"`` event is fired with ``{"name": <filename>}`` on
+        success, or ``{"name": <filename>, "error": <message>}`` on failure.
+        """
+        import base64 as _base64
+        import tempfile
+
+        from megane.pipeline import AddBonds, LoadStructure, Pipeline
+
+        b64 = change["new"]
+        name = self._drop_file_name
+        if not b64 or not name:
+            return
+
+        try:
+            raw = _base64.b64decode(b64)
+        except Exception as exc:
+            self._fire_event("file_drop", {"name": name, "error": f"base64 decode failed: {exc}"})
+            return
+
+        ext = pathlib.Path(name).suffix.lower()
+        tmp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+                f.write(raw)
+                tmp_path = f.name
+
+            pipe = Pipeline()
+            s = pipe.add_node(LoadStructure(tmp_path))
+            b_node = pipe.add_node(AddBonds(source="structure"))
+            pipe.add_edge(s.out.particle, b_node.inp.particle)
+            self.set_pipeline(pipe)
+            self._fire_event("file_drop", {"name": name})
+        except Exception as exc:
+            self._fire_event("file_drop", {"name": name, "error": str(exc)})
+        finally:
+            if tmp_path is not None:
+                pathlib.Path(tmp_path).unlink(missing_ok=True)
+
     @property
     def measurement(self) -> dict | None:
         """Current measurement result, or None if fewer than 2 atoms selected.
@@ -264,6 +317,9 @@ class MolecularViewer(anywidget.AnyWidget):
             - "measurement": fired when a measurement is computed.
               Data: {"type": str, "value": float, "label": str,
                      "atoms": list[int]} or None
+            - "file_drop": fired when a file is dropped onto the widget.
+              Data: {"name": str} on success, or
+                    {"name": str, "error": str} on failure.
 
         Args:
             event_name: Name of the event.

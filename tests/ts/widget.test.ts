@@ -273,4 +273,112 @@ describe("widget.ts — render", () => {
     const cleanup = widgetEntry.render({ model: model as never, el }) as () => void;
     expect(() => cleanup()).not.toThrow();
   });
+
+  describe("drag-and-drop file loading", () => {
+    it("registers change listener for _drop_file_b64", () => {
+      const model = makeMockModel();
+      const el = makeContainer();
+      widgetEntry.render({ model: model as never, el });
+      // The drag-drop handler writes to the model; verify model listeners
+      // include the standard pipeline change listener (not a model.on event —
+      // drag-drop uses DOM events, not model.on).
+      expect(model.listeners.has("change:_pipeline_json")).toBe(true);
+    });
+
+    it("dragover event on container prevents default", () => {
+      const model = makeMockModel();
+      const el = makeContainer();
+      widgetEntry.render({ model: model as never, el });
+
+      const container = el.firstChild as HTMLElement;
+      const event = new Event("dragover", { bubbles: true, cancelable: true });
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+      container.dispatchEvent(event);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+    });
+
+    it("drop with no files does not write to model", () => {
+      const model = makeMockModel();
+      const el = makeContainer();
+      widgetEntry.render({ model: model as never, el });
+      model.set.mockClear();
+
+      const container = el.firstChild as HTMLElement;
+      const event = new Event("drop", { bubbles: true, cancelable: true });
+      // dataTransfer is null → drop handler early-returns
+      container.dispatchEvent(event);
+      expect(model.set).not.toHaveBeenCalledWith("_drop_file_name", expect.anything());
+    });
+
+    it("drop with a file triggers FileReader.readAsDataURL", () => {
+      const model = makeMockModel();
+      const el = makeContainer();
+      widgetEntry.render({ model: model as never, el });
+
+      const container = el.firstChild as HTMLElement;
+
+      const readAsDataURLSpy = vi.fn();
+      const mockReader = {
+        readAsDataURL: readAsDataURLSpy,
+        onload: null as null | ((e: ProgressEvent<FileReader>) => void),
+      };
+      vi.stubGlobal(
+        "FileReader",
+        vi.fn(() => mockReader),
+      );
+
+      const file = new File(["ATOM  1  N   ALA\n"], "test.pdb", { type: "text/plain" });
+      const dt = { files: [file] } as unknown as DataTransfer;
+      const dropEvent = Object.assign(
+        new Event("drop", { bubbles: true, cancelable: true }),
+        { dataTransfer: dt },
+      );
+      container.dispatchEvent(dropEvent);
+
+      expect(readAsDataURLSpy).toHaveBeenCalledWith(file);
+      vi.unstubAllGlobals();
+    });
+
+    it("FileReader onload sets _drop_file_name and _drop_file_b64 on model", () => {
+      const model = makeMockModel();
+      const el = makeContainer();
+      widgetEntry.render({ model: model as never, el });
+      model.set.mockClear();
+      model.save_changes.mockClear();
+
+      const container = el.firstChild as HTMLElement;
+
+      let capturedOnLoad: ((e: ProgressEvent<FileReader>) => void) | null = null;
+      const mockReader = {
+        readAsDataURL: vi.fn(),
+        set onload(fn: (e: ProgressEvent<FileReader>) => void) {
+          capturedOnLoad = fn;
+        },
+      };
+      vi.stubGlobal(
+        "FileReader",
+        vi.fn(() => mockReader),
+      );
+
+      const file = new File(["ATOM\n"], "mol.pdb", { type: "text/plain" });
+      const dt = { files: [file] } as unknown as DataTransfer;
+      const dropEvent = Object.assign(
+        new Event("drop", { bubbles: true, cancelable: true }),
+        { dataTransfer: dt },
+      );
+      container.dispatchEvent(dropEvent);
+
+      // Simulate FileReader completing
+      const fakeB64 = "QVRPTQ=="; // base64 of "ATOM\n" roughly
+      capturedOnLoad!({
+        target: { result: `data:text/plain;base64,${fakeB64}` },
+      } as unknown as ProgressEvent<FileReader>);
+
+      expect(model.set).toHaveBeenCalledWith("_drop_file_name", "mol.pdb");
+      expect(model.set).toHaveBeenCalledWith("_drop_file_b64", fakeB64);
+      expect(model.save_changes).toHaveBeenCalled();
+
+      vi.unstubAllGlobals();
+    });
+  });
 });

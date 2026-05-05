@@ -50,6 +50,64 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
       : null;
   mq?.addEventListener("change", _syncSystemTheme);
 
+  // Drag-and-drop overlay for file loading
+  const dropOverlay = document.createElement("div");
+  dropOverlay.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "display:none",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(59,130,246,0.12)",
+    "border:2px dashed #3b82f6",
+    "border-radius:8px",
+    "pointer-events:none",
+    "font-size:1rem",
+    "font-weight:600",
+    "color:#3b82f6",
+    "z-index:10",
+  ].join(";");
+  dropOverlay.textContent = "Drop structure file to load";
+  container.appendChild(dropOverlay);
+
+  function showDropOverlay(): void {
+    dropOverlay.style.display = "flex";
+  }
+  function hideDropOverlay(): void {
+    dropOverlay.style.display = "none";
+  }
+
+  container.addEventListener("dragover", (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showDropOverlay();
+  });
+
+  container.addEventListener("dragleave", (e: DragEvent) => {
+    if (!container.contains(e.relatedTarget as Node | null)) {
+      hideDropOverlay();
+    }
+  });
+
+  container.addEventListener("drop", (e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hideDropOverlay();
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev: ProgressEvent<FileReader>) => {
+      const dataUrl = ev.target?.result;
+      if (typeof dataUrl !== "string") return;
+      const b64 = dataUrl.split(",")[1];
+      if (!b64) return;
+      model.set("_drop_file_name", file.name);
+      model.set("_drop_file_b64", b64);
+      model.save_changes();
+    };
+    reader.readAsDataURL(file);
+  });
+
   let root: Root | null = null;
   let currentSnapshot: Snapshot | null = null;
   let currentFrame: Frame | null = null;
