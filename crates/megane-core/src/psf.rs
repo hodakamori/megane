@@ -74,10 +74,7 @@ pub fn parse_psf(text: &str) -> Result<ParsedStructure, String> {
 
     let first = lines.next().ok_or("empty PSF file")?;
     if !first.trim_start().starts_with("PSF") {
-        return Err(format!(
-            "not a PSF file (first line: {:?})",
-            first.trim()
-        ));
+        return Err(format!("not a PSF file (first line: {:?})", first.trim()));
     }
 
     let mut atoms: Vec<PsfAtom> = Vec::new();

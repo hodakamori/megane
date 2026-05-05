@@ -46,7 +46,7 @@ def parse_psf_bonds(path: str) -> np.ndarray:
                 bond_values.clear()
 
             bang = trimmed.index("!")
-            kw = trimmed[bang + 1:].split()[0].rstrip(":") if trimmed[bang + 1:].split() else ""
+            kw = trimmed[bang + 1 :].split()[0].rstrip(":") if trimmed[bang + 1 :].split() else ""
             try:
                 count = int(trimmed[:bang].strip())
             except ValueError:
