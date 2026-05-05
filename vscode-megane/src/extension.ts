@@ -140,17 +140,20 @@ export function createSelectionStatusBarItem(): vscode.StatusBarItem {
   return item;
 }
 
-class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
-  private static readonly viewType = "megane.structureViewer";
+export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
+  static readonly viewType = "megane.structureViewer";
+  private activePanel: vscode.WebviewPanel | null = null;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  static register(context: vscode.ExtensionContext): vscode.Disposable {
-    const provider = new MeganeEditorProvider(context);
-    return vscode.window.registerCustomEditorProvider(MeganeEditorProvider.viewType, provider, {
-      webviewOptions: { retainContextWhenHidden: true },
-      supportsMultipleEditorsPerDocument: false,
-    });
+  /**
+   * Programmatically seek the active megane viewer to a trajectory frame.
+   * Returns `true` if a panel was active and the message was posted, `false` otherwise.
+   */
+  seekFrame(frame: number): boolean {
+    if (!this.activePanel) return false;
+    this.activePanel.webview.postMessage({ type: "seekFrame", frame });
+    return true;
   }
 
   openCustomDocument(
@@ -200,6 +203,11 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
     const selectionStatusBar = createSelectionStatusBarItem();
 
+    this.activePanel = webviewPanel;
+    webviewPanel.onDidChangeViewState(({ webviewPanel: panel }) => {
+      if (panel.active) this.activePanel = panel;
+    });
+
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
         webview.postMessage(payload);
@@ -237,6 +245,7 @@ class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
     });
 
     webviewPanel.onDidDispose(() => {
+      if (this.activePanel === webviewPanel) this.activePanel = null;
       frameStatusBar.dispose();
       selectionStatusBar.dispose();
     });
@@ -301,8 +310,19 @@ function getNonce(): string {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  context.subscriptions.push(MeganeEditorProvider.register(context));
+  const editorProvider = new MeganeEditorProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider(MeganeEditorProvider.viewType, editorProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+      supportsMultipleEditorsPerDocument: false,
+    }),
+  );
   context.subscriptions.push(MeganePipelineEditorProvider.register(context));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("megane.seekFrame", (frame: number) => {
+      editorProvider.seekFrame(frame);
+    }),
+  );
 }
 
 export function deactivate() {}

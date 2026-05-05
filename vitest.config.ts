@@ -5,6 +5,14 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      // `@megane/*` is the webpack alias used by jupyterlab-megane to import from
+      // the shared `src/` tree. Mirror it in vitest so jupyterlab-megane source
+      // files can be imported directly in tests without mocking every module.
+      "@megane": path.resolve(__dirname, "src"),
+      "@jupyterlab/ui-components": path.resolve(
+        __dirname,
+        "tests/ts/__stubs__/jupyterlab-ui-components.ts",
+      ),
       // The `@jupyterlab/*` packages live in jupyterlab-megane/package.json,
       // not the root, so vitest's import-analysis can't resolve bare specifiers
       // referenced by `jupyterlab-megane/src/`. Tests mock these via vi.mock();
