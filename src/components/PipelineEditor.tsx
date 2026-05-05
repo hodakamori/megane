@@ -47,6 +47,7 @@ import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
+import { ShareDialog } from "./ShareDialog";
 import { startTour, startPipelineTutorial } from "../tour/MeganeTour";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 
@@ -387,36 +388,6 @@ const shareBtnStyle: React.CSSProperties = {
   color: "#059669",
 };
 
-const shareFeedbackBase: React.CSSProperties = {
-  display: "inline-block",
-  fontSize: 12,
-  fontWeight: 600,
-  padding: "4px 10px",
-  borderRadius: 4,
-  lineHeight: 1.2,
-};
-
-const SHARE_FEEDBACK_STYLES: Record<"success" | "warning" | "error", React.CSSProperties> = {
-  success: {
-    ...shareFeedbackBase,
-    background: "rgba(16, 185, 129, 0.12)",
-    border: "1px solid rgba(16, 185, 129, 0.35)",
-    color: "#047857",
-  },
-  warning: {
-    ...shareFeedbackBase,
-    background: "rgba(220, 38, 38, 0.12)",
-    border: "1px solid rgba(220, 38, 38, 0.35)",
-    color: "#b91c1c",
-  },
-  error: {
-    ...shareFeedbackBase,
-    background: "rgba(220, 38, 38, 0.12)",
-    border: "1px solid rgba(220, 38, 38, 0.35)",
-    color: "#b91c1c",
-  },
-};
-
 const guideBtnStyle: React.CSSProperties = {
   ...textBtnBase,
   background: "rgba(100, 116, 139, 0.08)",
@@ -557,9 +528,9 @@ function PipelineEditorInner({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [showRenderModal, setShowRenderModal] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState<{
-    message: string;
-    tone: "success" | "warning" | "error";
+  const [shareDialog, setShareDialog] = useState<{
+    url: string;
+    tooLong: boolean;
   } | null>(null);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -719,18 +690,11 @@ function PipelineEditorInner({
   const handleShare = useCallback(async () => {
     try {
       const serialized = usePipelineStore.getState().serialize();
-      const outcome = await shareCurrentPipeline(serialized);
-      const tone: "success" | "warning" | "error" = outcome.tooLong
-        ? "warning"
-        : outcome.copyFailed
-          ? "error"
-          : "success";
-      setShareFeedback({ message: outcome.message, tone });
-      setTimeout(() => setShareFeedback(null), outcome.clearAfterMs);
+      const { url, tooLong } = await shareCurrentPipeline(serialized);
+      setShareDialog({ url, tooLong });
     } catch (err) {
       console.error("Share failed:", err);
-      setShareFeedback({ message: "Share failed — see console", tone: "error" });
-      setTimeout(() => setShareFeedback(null), 5000);
+      window.alert("Share failed: " + (err as Error).message);
     }
   }, []);
 
@@ -860,20 +824,6 @@ function PipelineEditorInner({
           {IconRender} Render
         </button>
       </div>
-      {shareFeedback && (
-        <div style={{ padding: "2px 0 0 68px" }}>
-          <span
-            data-testid="pipeline-editor-share-feedback"
-            data-tone={shareFeedback.tone}
-            style={SHARE_FEEDBACK_STYLES[shareFeedback.tone]}
-            role="status"
-            aria-live="polite"
-          >
-            {shareFeedback.message}
-          </span>
-        </div>
-      )}
-
       {/* Row 3 — Others: help & appearance */}
       <div style={toolbarRowStyle}>
         <span style={toolbarCategoryLabelStyle}>Others</span>
@@ -998,6 +948,12 @@ function PipelineEditorInner({
         totalFrames={totalFrames}
         currentFrame={currentFrame}
         onSeek={onSeek}
+      />
+      <ShareDialog
+        open={shareDialog !== null}
+        url={shareDialog?.url ?? ""}
+        tooLong={shareDialog?.tooLong ?? false}
+        onClose={() => setShareDialog(null)}
       />
     </CollapsiblePanel>
   );

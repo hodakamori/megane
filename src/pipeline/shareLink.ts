@@ -1,10 +1,16 @@
 /**
  * URL permalink encoding/decoding for pipeline state.
- * Serializes the pipeline JSON to a base64url string stored in the URL hash
- * so viewers can share a reproducible pipeline state via link.
  *
  * Format: `#pipeline=<base64url(deflate-raw(JSON))>`
  * Falls back to uncompressed base64url when CompressionStream is unavailable.
+ *
+ * Side-effect contract for the share button flow:
+ *   - `shareCurrentPipeline` ALWAYS commits the hash to the address bar
+ *     before returning (when the payload fits), independently of clipboard
+ *     availability. The dialog UI then drives the user-visible copy step.
+ *   - `copyShareUrl` tries the modern Clipboard API first and falls back to
+ *     a hidden-textarea + `document.execCommand('copy')` for non-secure
+ *     contexts and sandboxed iframes.
  */
 
 import type { SerializedPipeline } from "./types";
@@ -12,13 +18,6 @@ import type { SerializedPipeline } from "./types";
 const HASH_PARAM = "pipeline";
 /** Warn the user when the hash fragment would exceed this many characters. */
 const MAX_HASH_LENGTH = 8000;
-
-const TOO_LONG_MESSAGE = "Pipeline too large for a share link — use Export instead";
-const COPIED_MESSAGE = "Link copied to clipboard!";
-const COPY_FAILED_MESSAGE = "Copy failed — see console for the link";
-
-const COPIED_TOAST_MS = 3000;
-const TOO_LONG_TOAST_MS = 5000;
 
 // ── byte ↔ base64url ────────────────────────────────────────────────────────
 
@@ -91,7 +90,6 @@ export async function buildShareUrl(
   try {
     encoded = bytesToBase64url(await deflate(raw));
   } catch {
-    // CompressionStream not available — fall back to plain base64url
     encoded = bytesToBase64url(raw);
   }
 
@@ -119,7 +117,6 @@ export async function readPipelineFromHash(): Promise<SerializedPipeline | null>
     try {
       json = new TextDecoder().decode(await inflate(bytes));
     } catch {
-      // Not compressed — treat as plain UTF-8 base64url
       json = new TextDecoder().decode(bytes);
     }
 
@@ -139,60 +136,74 @@ export async function readPipelineFromHash(): Promise<SerializedPipeline | null>
   }
 }
 
-// ── share-button outcome helper ─────────────────────────────────────────────
-
-export type ShareOutcome = {
-  /** Toast message to surface to the user. */
-  message: string;
-  /** Milliseconds the toast should remain visible before auto-clearing. */
-  clearAfterMs: number;
-  /** The share URL (always set, even when copy failed). */
-  url: string;
-  /** True when the pipeline was too large to fit a shareable hash. */
-  tooLong: boolean;
-  /** True when navigator.clipboard.writeText threw. */
-  copyFailed: boolean;
-};
+// ── side-effect helpers ─────────────────────────────────────────────────────
 
 /**
- * Build a share URL for the given pipeline, copy it to the clipboard, and
- * mirror the resulting hash into the address bar. Returns a presentation-ready
- * outcome that the caller can render as a toast.
- *
- * Pure side effects (clipboard write, history.replaceState, console.info on
- * failure) are kept out of the React component so the flow is testable.
+ * Mirror the URL's hash fragment into the browser address bar.
+ * Swallows `SecurityError` from sandboxed iframes so a missing history API
+ * never blocks the share flow.
  */
-export async function shareCurrentPipeline(pipeline: SerializedPipeline): Promise<ShareOutcome> {
-  const { url, tooLong } = await buildShareUrl(pipeline);
-  if (tooLong) {
-    return {
-      message: TOO_LONG_MESSAGE,
-      clearAfterMs: TOO_LONG_TOAST_MS,
-      url,
-      tooLong: true,
-      copyFailed: false,
-    };
-  }
+export function commitShareHashToHistory(url: string): void {
   try {
-    await navigator.clipboard.writeText(url);
     history.replaceState(null, "", new URL(url).hash);
-    return {
-      message: COPIED_MESSAGE,
-      clearAfterMs: COPIED_TOAST_MS,
-      url,
-      tooLong: false,
-      copyFailed: false,
-    };
   } catch {
-    console.info("Share URL:", url);
-    return {
-      message: COPY_FAILED_MESSAGE,
-      clearAfterMs: COPIED_TOAST_MS,
-      url,
-      tooLong: false,
-      copyFailed: true,
-    };
+    // Sandboxed iframes / non-browser hosts: nothing to do.
   }
+}
+
+/**
+ * Copy `url` to the user's clipboard.
+ *
+ * Tries the modern async Clipboard API first; falls back to a hidden
+ * `<textarea>` + `document.execCommand('copy')` so non-secure contexts and
+ * permission-denied environments still get a working copy. On full failure
+ * the URL is logged via `console.info` so it can still be retrieved.
+ */
+export async function copyShareUrl(url: string): Promise<"copied" | "failed"> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(url);
+      return "copied";
+    } catch {
+      // fall through to legacy path
+    }
+  }
+
+  if (typeof document !== "undefined" && document.body) {
+    const textarea = document.createElement("textarea");
+    textarea.value = url;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+    document.body.appendChild(textarea);
+    try {
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand("copy");
+      if (ok) return "copied";
+    } catch {
+      // ignore — handled below
+    } finally {
+      textarea.remove();
+    }
+  }
+
+  console.info("Share URL:", url);
+  return "failed";
+}
+
+/**
+ * Build a share URL for `pipeline` and commit the hash to the address bar.
+ * Returns the dialog payload (URL + tooLong flag); does NOT touch the
+ * clipboard — that is driven by an explicit user click in `<ShareDialog>`.
+ */
+export async function shareCurrentPipeline(
+  pipeline: SerializedPipeline,
+): Promise<{ url: string; tooLong: boolean }> {
+  const { url, tooLong } = await buildShareUrl(pipeline);
+  if (!tooLong) commitShareHashToHistory(url);
+  return { url, tooLong };
 }
 
 // ── hash-restore helper ─────────────────────────────────────────────────────
