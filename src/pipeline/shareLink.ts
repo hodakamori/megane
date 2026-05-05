@@ -38,40 +38,38 @@ function base64urlToBytes(str: string): Uint8Array<ArrayBuffer> {
 
 // ── deflate-raw helpers (async, CompressionStream) ──────────────────────────
 
+// CompressionStream's writer.write() / writer.close() promises only resolve
+// once a reader drains the produced chunks (backpressure protocol). The naive
+// "await writer.write(data); await writer.close(); then read" sequence hangs
+// forever in Chromium and WebKit because nothing is reading. Pipe the input
+// through the stream and read it via Response so the producer and consumer
+// run concurrently.
 async function deflate(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
-  const cs = new CompressionStream("deflate-raw");
-  const writer = cs.writable.getWriter();
-  await writer.write(data);
-  await writer.close();
-  return collectStream(cs.readable);
+  return runStream(data, new CompressionStream("deflate-raw"));
 }
 
 async function inflate(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
-  const ds = new DecompressionStream("deflate-raw");
-  const writer = ds.writable.getWriter();
-  await writer.write(data);
-  await writer.close();
-  return collectStream(ds.readable);
+  return runStream(data, new DecompressionStream("deflate-raw"));
 }
 
-async function collectStream(
-  readable: ReadableStream<Uint8Array>,
+async function runStream(
+  data: Uint8Array<ArrayBuffer>,
+  transform: CompressionStream | DecompressionStream,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const chunks: Uint8Array[] = [];
-  const reader = readable.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  const total = chunks.reduce((n, c) => n + c.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const c of chunks) {
-    out.set(c, offset);
-    offset += c.length;
-  }
-  return out;
+  const input = new ReadableStream({
+    start(controller) {
+      controller.enqueue(data);
+      controller.close();
+    },
+  });
+  // CompressionStream / DecompressionStream both implement
+  // ReadableWritablePair<BufferSource, Uint8Array>; the lib.dom typings model
+  // it loosely, so cast to the structural pair pipeThrough expects.
+  const piped = input.pipeThrough(
+    transform as unknown as ReadableWritablePair<Uint8Array, Uint8Array>,
+  );
+  const buf = await new Response(piped).arrayBuffer();
+  return new Uint8Array(buf);
 }
 
 // ── public API ───────────────────────────────────────────────────────────────
