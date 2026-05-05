@@ -15,7 +15,8 @@ import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
 import { TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
-import { createFrameSubscription } from "./frameSubscription";
+import { createSubscription, createFrameSubscription } from "./frameSubscription";
+import type { SelectionState, Measurement } from "@megane/types";
 
 const BINARY_EXTENSIONS = new Set(
   STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
@@ -34,6 +35,8 @@ interface DocBodyProps {
   context: DocumentRegistry.Context;
   subscribeActivation: ActivationSubscribe;
   onFrameChange?: (frame: number) => void;
+  onSelectionChange?: (selection: SelectionState) => void;
+  onMeasurementChange?: (measurement: Measurement | null) => void;
 }
 
 type LoadState = "loading" | "ready" | { error: string };
@@ -55,7 +58,13 @@ function ThemeSync() {
   return null;
 }
 
-function DocBody({ context, subscribeActivation, onFrameChange }: DocBodyProps): JSX.Element {
+function DocBody({
+  context,
+  subscribeActivation,
+  onFrameChange,
+  onSelectionChange,
+  onMeasurementChange,
+}: DocBodyProps): JSX.Element {
   const local = useMeganeLocal();
   const [state, setState] = useState<LoadState>("loading");
   useTour({ host: "jupyterlab" });
@@ -204,6 +213,8 @@ function DocBody({ context, subscribeActivation, onFrameChange }: DocBodyProps):
         onLoadVectorFile={(f: File) => local.loadVectorFile(f)}
         onLoadDemoVectors={() => local.loadDemoVectors()}
         onFrameChange={onFrameChange}
+        onSelectionChange={onSelectionChange}
+        onMeasurementChange={onMeasurementChange}
       />
     </div>
   );
@@ -212,9 +223,15 @@ function DocBody({ context, subscribeActivation, onFrameChange }: DocBodyProps):
 export class MeganeReactView extends ReactWidget {
   private readonly listeners = new Set<() => void>();
   private readonly _frameSub = createFrameSubscription();
+  private readonly _selectionSub = createSubscription<SelectionState>();
+  private readonly _measurementSub = createSubscription<Measurement | null>();
 
   /** Subscribe to trajectory frame-change events emitted by the viewer. */
   readonly subscribeFrameChange = this._frameSub.subscribe.bind(this._frameSub);
+  /** Subscribe to atom selection-change events emitted by the viewer. */
+  readonly subscribeSelectionChange = this._selectionSub.subscribe.bind(this._selectionSub);
+  /** Subscribe to measurement-change events emitted by the viewer. */
+  readonly subscribeMeasurementChange = this._measurementSub.subscribe.bind(this._measurementSub);
 
   /** Programmatically seek the viewer to a specific trajectory frame. */
   seekFrame(index: number): void {
@@ -223,6 +240,14 @@ export class MeganeReactView extends ReactWidget {
 
   private readonly _handleFrameChange = (frame: number): void => {
     this._frameSub.emit(frame);
+  };
+
+  private readonly _handleSelectionChange = (selection: SelectionState): void => {
+    this._selectionSub.emit(selection);
+  };
+
+  private readonly _handleMeasurementChange = (measurement: Measurement | null): void => {
+    this._measurementSub.emit(measurement);
   };
 
   constructor(private readonly context: DocumentRegistry.Context) {
@@ -255,6 +280,8 @@ export class MeganeReactView extends ReactWidget {
         context={this.context}
         subscribeActivation={this.subscribeActivation}
         onFrameChange={this._handleFrameChange}
+        onSelectionChange={this._handleSelectionChange}
+        onMeasurementChange={this._handleMeasurementChange}
       />
     );
   }

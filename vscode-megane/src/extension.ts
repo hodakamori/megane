@@ -134,6 +134,12 @@ export function createFrameStatusBarItem(): vscode.StatusBarItem {
   return item;
 }
 
+export function createSelectionStatusBarItem(): vscode.StatusBarItem {
+  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  item.tooltip = "Current atom selection or measurement";
+  return item;
+}
+
 export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
   static readonly viewType = "megane.structureViewer";
   private activePanel: vscode.WebviewPanel | null = null;
@@ -195,6 +201,8 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
 
     const frameStatusBar = createFrameStatusBarItem();
 
+    const selectionStatusBar = createSelectionStatusBarItem();
+
     this.activePanel = webviewPanel;
     webviewPanel.onDidChangeViewState(({ webviewPanel: panel }) => {
       if (panel.active) this.activePanel = panel;
@@ -209,12 +217,37 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
         const frame = message.frame as number;
         frameStatusBar.text = `$(megane-frame) Frame ${frame}`;
         frameStatusBar.show();
+        return;
+      }
+      if (message.type === "selectionChange") {
+        const atoms = (message.selection as { atoms: number[] }).atoms;
+        if (atoms.length === 0) {
+          selectionStatusBar.hide();
+        } else {
+          selectionStatusBar.text = `$(megane-atom) ${atoms.length} atom${atoms.length === 1 ? "" : "s"} selected`;
+          selectionStatusBar.show();
+        }
+        return;
+      }
+      if (message.type === "measurementChange") {
+        const measurement = message.measurement as {
+          type: string;
+          value: number;
+          label: string;
+        } | null;
+        if (!measurement) {
+          selectionStatusBar.hide();
+        } else {
+          selectionStatusBar.text = `$(megane-atom) ${measurement.label}`;
+          selectionStatusBar.show();
+        }
       }
     });
 
     webviewPanel.onDidDispose(() => {
       if (this.activePanel === webviewPanel) this.activePanel = null;
       frameStatusBar.dispose();
+      selectionStatusBar.dispose();
     });
 
     webview.html = getHtmlForWebview(webview, mediaDir);

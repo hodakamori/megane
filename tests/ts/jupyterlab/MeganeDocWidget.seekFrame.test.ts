@@ -18,9 +18,21 @@ vi.mock("../../../jupyterlab-megane/src/filetypes", () => ({
 vi.mock("../../../jupyterlab-megane/src/trajectoryUtils", () => ({
   TRAJECTORY_ONLY_EXTENSIONS: new Set<string>(),
 }));
-vi.mock("../../../jupyterlab-megane/src/frameSubscription", () => ({
-  createFrameSubscription: () => ({ subscribe: vi.fn(() => vi.fn()), emit: vi.fn() }),
-}));
+vi.mock("../../../jupyterlab-megane/src/frameSubscription", () => {
+  const factory = () => {
+    const listeners = new Set<(value: unknown) => void>();
+    return {
+      subscribe(cb: (value: unknown) => void) {
+        listeners.add(cb);
+        return () => listeners.delete(cb);
+      },
+      emit(value: unknown) {
+        for (const cb of listeners) cb(value);
+      },
+    };
+  };
+  return { createFrameSubscription: factory, createSubscription: factory };
+});
 
 const mockSeekFrame = vi.fn();
 vi.mock("@megane/stores/usePlaybackStore", () => ({
@@ -70,5 +82,52 @@ describe("MeganeReactView.seekFrame", () => {
     expect(mockSeekFrame).toHaveBeenCalledTimes(2);
     expect(mockSeekFrame).toHaveBeenNthCalledWith(1, 5);
     expect(mockSeekFrame).toHaveBeenNthCalledWith(2, 10);
+  });
+});
+
+describe("MeganeReactView.subscribeSelectionChange / subscribeMeasurementChange", () => {
+  it("forwards selection state to subscribers when the viewer reports a change", () => {
+    const view = new MeganeReactView(makeContext()) as unknown as {
+      subscribeSelectionChange: (cb: (s: { atoms: number[] }) => void) => () => void;
+      _handleSelectionChange: (s: { atoms: number[] }) => void;
+    };
+    const received: Array<{ atoms: number[] }> = [];
+    view.subscribeSelectionChange((s) => received.push(s));
+    view._handleSelectionChange({ atoms: [1, 2, 3] });
+    expect(received).toEqual([{ atoms: [1, 2, 3] }]);
+  });
+
+  it("forwards measurement (and null) to subscribers", () => {
+    const view = new MeganeReactView(makeContext()) as unknown as {
+      subscribeMeasurementChange: (cb: (m: { label: string } | null) => void) => () => void;
+      _handleMeasurementChange: (m: { label: string } | null) => void;
+    };
+    const received: Array<{ label: string } | null> = [];
+    view.subscribeMeasurementChange((m) => received.push(m));
+    view._handleMeasurementChange({ label: "1.23 Å" });
+    view._handleMeasurementChange(null);
+    expect(received).toEqual([{ label: "1.23 Å" }, null]);
+  });
+
+  it("render() wires the new selection/measurement handlers onto DocBody", () => {
+    const view = new MeganeReactView(makeContext()) as unknown as {
+      render: () => { props: Record<string, unknown> };
+    };
+    const element = view.render();
+    expect(typeof element.props.onSelectionChange).toBe("function");
+    expect(typeof element.props.onMeasurementChange).toBe("function");
+  });
+
+  it("returns an unsubscribe function from subscribeSelectionChange", () => {
+    const view = new MeganeReactView(makeContext()) as unknown as {
+      subscribeSelectionChange: (cb: (s: { atoms: number[] }) => void) => () => void;
+      _handleSelectionChange: (s: { atoms: number[] }) => void;
+    };
+    const received: Array<{ atoms: number[] }> = [];
+    const unsub = view.subscribeSelectionChange((s) => received.push(s));
+    view._handleSelectionChange({ atoms: [42] });
+    unsub();
+    view._handleSelectionChange({ atoms: [99] });
+    expect(received).toEqual([{ atoms: [42] }]);
   });
 });

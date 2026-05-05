@@ -43,6 +43,7 @@ interface FakeStatusBarItem {
   tooltip: string;
   text: string;
   show: ReturnType<typeof vi.fn>;
+  hide: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
 }
 
@@ -107,6 +108,7 @@ vi.mock("vscode", () => {
           tooltip: "",
           text: "",
           show: vi.fn(),
+          hide: vi.fn(),
           dispose: vi.fn(),
         };
         mockState.statusBarItems.push(item);
@@ -128,6 +130,7 @@ import {
   activate,
   deactivate,
   createFrameStatusBarItem,
+  createSelectionStatusBarItem,
   MeganeEditorProvider,
 } from "../../../vscode-megane/src/extension";
 
@@ -416,7 +419,7 @@ describe("MeganeEditorProvider — frameChange message handling", () => {
     activate(makeContext("/ext") as unknown as Parameters<typeof activate>[0]);
   });
 
-  it("creates a status bar item when resolveCustomEditor is called", async () => {
+  it("creates frame and selection status bar items when resolveCustomEditor is called", async () => {
     const provider = getProvider("megane.structureViewer");
     mockState.readFile.mockResolvedValue(new Uint8Array([1]));
 
@@ -424,7 +427,7 @@ describe("MeganeEditorProvider — frameChange message handling", () => {
     const { panel } = makeWebviewPanel();
     await provider.resolveCustomEditor(doc, panel, {});
 
-    expect(mockState.statusBarItems).toHaveLength(1);
+    expect(mockState.statusBarItems).toHaveLength(2);
   });
 
   it("updates the status bar text when a frameChange message arrives", async () => {
@@ -458,7 +461,7 @@ describe("MeganeEditorProvider — frameChange message handling", () => {
     expect(item.show).toHaveBeenCalledTimes(2);
   });
 
-  it("disposes the status bar item when the panel is disposed", async () => {
+  it("disposes both status bar items when the panel is disposed", async () => {
     const provider = getProvider("megane.structureViewer");
     mockState.readFile.mockResolvedValue(new Uint8Array([1]));
 
@@ -466,11 +469,13 @@ describe("MeganeEditorProvider — frameChange message handling", () => {
     const { panel, fireDispose } = makeWebviewPanel();
     await provider.resolveCustomEditor(doc, panel, {});
 
-    const item = mockState.statusBarItems[0];
-    expect(item.dispose).not.toHaveBeenCalled();
-
+    for (const item of mockState.statusBarItems) {
+      expect(item.dispose).not.toHaveBeenCalled();
+    }
     fireDispose();
-    expect(item.dispose).toHaveBeenCalledTimes(1);
+    for (const item of mockState.statusBarItems) {
+      expect(item.dispose).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("does not call postMessage for frameChange messages", async () => {
@@ -483,6 +488,101 @@ describe("MeganeEditorProvider — frameChange message handling", () => {
 
     fireMessage({ type: "frameChange", frame: 10 });
     expect(panel.webview.postMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("createSelectionStatusBarItem", () => {
+  it("returns a status bar item with a selection tooltip", () => {
+    const item = createSelectionStatusBarItem();
+    expect(item).toBeDefined();
+    expect(mockState.statusBarItems).toHaveLength(1);
+    expect(mockState.statusBarItems[0].tooltip).toBe("Current atom selection or measurement");
+  });
+});
+
+describe("MeganeEditorProvider — selectionChange and measurementChange message handling", () => {
+  beforeEach(() => {
+    activate(makeContext("/ext") as unknown as Parameters<typeof activate>[0]);
+  });
+
+  it("shows atom count in selection status bar when selectionChange arrives", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    // statusBarItems[1] is the selection status bar (frame is [0])
+    const selItem = mockState.statusBarItems[1];
+    fireMessage({ type: "selectionChange", selection: { atoms: [0, 1, 2] } });
+    expect(selItem.text).toContain("3");
+    expect(selItem.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses singular 'atom' for a single atom selection", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    const selItem = mockState.statusBarItems[1];
+    fireMessage({ type: "selectionChange", selection: { atoms: [5] } });
+    expect(selItem.text).toContain("1 atom selected");
+    expect(selItem.text).not.toContain("atoms");
+  });
+
+  it("hides selection status bar when selectionChange arrives with empty atoms", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    const selItem = mockState.statusBarItems[1];
+    // First show it
+    fireMessage({ type: "selectionChange", selection: { atoms: [0] } });
+    expect(selItem.show).toHaveBeenCalledTimes(1);
+    // Then clear
+    fireMessage({ type: "selectionChange", selection: { atoms: [] } });
+    expect(selItem.hide).toHaveBeenCalled();
+  });
+
+  it("shows measurement label in selection status bar when measurementChange arrives", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    const selItem = mockState.statusBarItems[1];
+    fireMessage({
+      type: "measurementChange",
+      measurement: { type: "distance", value: 1.5, label: "d=1.50 Å", atoms: [0, 1] },
+    });
+    expect(selItem.text).toContain("d=1.50 Å");
+    expect(selItem.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides selection status bar when measurementChange arrives with null", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    const selItem = mockState.statusBarItems[1];
+    fireMessage({
+      type: "measurementChange",
+      measurement: { type: "distance", value: 1.5, label: "d=1.50 Å", atoms: [0, 1] },
+    });
+    fireMessage({ type: "measurementChange", measurement: null });
+    expect(selItem.hide).toHaveBeenCalled();
   });
 });
 

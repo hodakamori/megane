@@ -67,12 +67,12 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | Solvent-accessible surface (SAS) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | Surface mesh (alpha-shape envelope) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
-| `selection_change` / `measurement` events | ✓ (React props) | ✓ | — | — | n/a |
-| Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | ✓² | ✓³ | n/a |
+| `selection_change` / `measurement` events | ✓ (React props) | ✓ | ✓² | ✓² | n/a |
+| Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | ✓³ | ✓⁴ | n/a |
 
-² JupyterLab: call `meganeReactView.seekFrame(N)` on a `MeganeReactView` instance obtained from the widget tracker. This delegates to `usePlaybackStore.seekFrame(N)` in the viewer.
+³ JupyterLab: call `meganeReactView.seekFrame(N)` on a `MeganeReactView` instance obtained from the widget tracker. This delegates to `usePlaybackStore.seekFrame(N)` in the viewer.
 
-³ VSCode: call `vscode.commands.executeCommand('megane.seekFrame', N)` from another extension, or call `meganeEditorProvider.seekFrame(N)` on an `MeganeEditorProvider` reference. The command posts a `seekFrame` message to the most recently active megane webview panel.
+⁴ VSCode: call `vscode.commands.executeCommand('megane.seekFrame', N)` from another extension, or call `meganeEditorProvider.seekFrame(N)` on an `MeganeEditorProvider` reference. The command posts a `seekFrame` message to the most recently active megane webview panel.
 
 Notes:
 
@@ -81,6 +81,7 @@ Notes:
 - The standalone app is the only platform with `megane serve` WebSocket streaming; other platforms load full trajectories into memory.
 - The standalone React `MeganeViewer` exposes an `onFrameChange?: (frame: number) => void` prop that fires on every trajectory frame transition — useful for keeping a host Plotly figure in sync.
 - The standalone React `MeganeViewer` also exposes `onSelectionChange?: (selection: SelectionState) => void` (fires on every atom selection change; data: `{ atoms: number[] }`) and `onMeasurementChange?: (measurement: Measurement | null) => void` (fires when a distance/angle/dihedral measurement is computed or cleared) — both mirror the Jupyter widget's `selection_change` and `measurement` events.
+- ² On **JupyterLab**, `selection_change` / `measurement` events are surfaced via `MeganeReactView.subscribeSelectionChange` and `subscribeMeasurementChange` — consumable by other JupyterLab extensions. On **VSCode**, they are forwarded to the extension host as `selectionChange` / `measurementChange` webview messages and reflected in the status bar (atom count or measurement label).
 
 ## Load methods / APIs
 
@@ -101,5 +102,5 @@ These are formats or features that the parser layer supports but a given platfor
 - **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` / `.nc` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
-- **`selection_change` / `measurement` events on JupyterLab and VSCode are not yet wired.** The standalone React component exposes `onSelectionChange?: (selection: SelectionState) => void` and `onMeasurementChange?: (measurement: Measurement | null) => void` props (mirroring the Jupyter widget's `selection_change` and `measurement` events). These are not yet surfaced on the JupyterLab DocWidget or VSCode extension.
+- **`selection_change` / `measurement` events on JupyterLab use a subscription API, not a Python callback.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Use `MeganeReactView.subscribeSelectionChange` and `subscribeMeasurementChange` from another JupyterLab extension.
 - **`frame_change` callback for JupyterLab is surfaced as a status-bar frame counter.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Instead, when `IStatusBar` is available, the current frame index is shown in the JupyterLab status bar (right side). The `subscribeFrameChange` method on `MeganeReactView` can also be used by other JupyterLab extensions to react to frame changes.
