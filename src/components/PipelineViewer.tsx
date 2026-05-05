@@ -285,19 +285,22 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
 
   const startInterval = useCallback(() => {
     if (playIntervalRef.current !== null) return;
-    playIntervalRef.current = setInterval(() => {
-      const prov = providerRef.current;
-      const total = totalFramesRef.current;
-      if (!prov || total <= 1) return;
-      const effectiveEnd = Math.min(loopEndRef.current, total - 1);
-      const effectiveStart = Math.max(loopStartRef.current, 0);
-      let next = currentFrameRef.current + 1;
-      if (next > effectiveEnd) next = effectiveStart;
-      const frame = prov.getFrame(next);
-      currentFrameRef.current = next;
-      setCurrentFrame(next);
-      setCurrentFrameData(frame);
-    }, 1000 / (fpsRef.current * speedRef.current));
+    playIntervalRef.current = setInterval(
+      () => {
+        const prov = providerRef.current;
+        const total = totalFramesRef.current;
+        if (!prov || total <= 1) return;
+        const effectiveEnd = Math.min(loopEndRef.current, total - 1);
+        const effectiveStart = Math.max(loopStartRef.current, 0);
+        let next = currentFrameRef.current + 1;
+        if (next > effectiveEnd) next = effectiveStart;
+        const frame = prov.getFrame(next);
+        currentFrameRef.current = next;
+        setCurrentFrame(next);
+        setCurrentFrameData(frame);
+      },
+      1000 / (fpsRef.current * speedRef.current),
+    );
   }, []);
 
   const stopInterval = useCallback(() => {

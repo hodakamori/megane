@@ -157,17 +157,20 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
   _startInterval: () => {
     const state = get();
     if (state._intervalId !== null) return;
-    const id = setInterval(() => {
-      const { totalFrames, loopStart, loopEnd, _currentFrameRef, provider } = get();
-      if (!provider || totalFrames <= 1) return;
-      const effectiveEnd = Math.min(loopEnd, totalFrames - 1);
-      const effectiveStart = Math.max(loopStart, 0);
-      let nextFrame = _currentFrameRef.current + 1;
-      if (nextFrame > effectiveEnd) nextFrame = effectiveStart;
-      const frame = provider.getFrame(nextFrame);
-      _currentFrameRef.current = nextFrame;
-      set({ currentFrame: nextFrame, currentFrameData: frame });
-    }, 1000 / (state.fps * state.speedMultiplier));
+    const id = setInterval(
+      () => {
+        const { totalFrames, loopStart, loopEnd, _currentFrameRef, provider } = get();
+        if (!provider || totalFrames <= 1) return;
+        const effectiveEnd = Math.min(loopEnd, totalFrames - 1);
+        const effectiveStart = Math.max(loopStart, 0);
+        let nextFrame = _currentFrameRef.current + 1;
+        if (nextFrame > effectiveEnd) nextFrame = effectiveStart;
+        const frame = provider.getFrame(nextFrame);
+        _currentFrameRef.current = nextFrame;
+        set({ currentFrame: nextFrame, currentFrameData: frame });
+      },
+      1000 / (state.fps * state.speedMultiplier),
+    );
     set({ _intervalId: id });
   },
 

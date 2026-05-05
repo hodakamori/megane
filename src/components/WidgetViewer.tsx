@@ -290,14 +290,17 @@ export function WidgetViewer({
   const startPlayInterval = useCallback(
     (intervalFps: number, intervalSpeed: number) => {
       if (playIntervalRef.current) clearInterval(playIntervalRef.current);
-      playIntervalRef.current = setInterval(() => {
-        const next = currentFrameRef.current + 1;
-        if (next > loopEndRef.current) {
-          onSeek(loopStartRef.current);
-        } else {
-          onSeek(next);
-        }
-      }, 1000 / (intervalFps * intervalSpeed));
+      playIntervalRef.current = setInterval(
+        () => {
+          const next = currentFrameRef.current + 1;
+          if (next > loopEndRef.current) {
+            onSeek(loopStartRef.current);
+          } else {
+            onSeek(next);
+          }
+        },
+        1000 / (intervalFps * intervalSpeed),
+      );
     },
     [onSeek],
   );
