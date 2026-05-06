@@ -15,6 +15,8 @@ interface ViewportProps {
   onRendererReady?: (renderer: MoleculeRenderer) => void;
   onHover?: (info: HoverInfo) => void;
   onAtomRightClick?: (atomIndex: number) => void;
+  /** Left-click on an atom. additive=true when Shift is held. */
+  onAtomClick?: (atomIndex: number, additive: boolean) => void;
   onFrameUpdated?: () => void;
 }
 
@@ -26,17 +28,20 @@ export function Viewport({
   onRendererReady,
   onHover,
   onAtomRightClick,
+  onAtomClick,
   onFrameUpdated,
 }: ViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const onHoverRef = useRef(onHover);
   const onAtomRightClickRef = useRef(onAtomRightClick);
+  const onAtomClickRef = useRef(onAtomClick);
   const onFrameUpdatedRef = useRef(onFrameUpdated);
 
   // Keep callback refs up to date
   onHoverRef.current = onHover;
   onAtomRightClickRef.current = onAtomRightClick;
+  onAtomClickRef.current = onAtomClick;
   onFrameUpdatedRef.current = onFrameUpdated;
 
   useEffect(() => {
@@ -80,6 +85,14 @@ export function Viewport({
 
     const handleMouseLeave = () => {
       onHoverRef.current?.(null);
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      if (!onAtomClickRef.current) return;
+      const info = renderer.raycastAtPixel(e.clientX, e.clientY);
+      if (info && info.kind === "atom") {
+        onAtomClickRef.current(info.atomIndex, e.shiftKey);
+      }
     };
 
     const handleDblClick = (e: MouseEvent) => {
@@ -129,6 +142,7 @@ export function Viewport({
     canvas.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("contextmenu", handleContextMenu);
     canvas.addEventListener("mouseleave", handleMouseLeave);
+    canvas.addEventListener("click", handleClick);
     canvas.addEventListener("dblclick", handleDblClick);
     canvas.addEventListener("pointerdown", handlePointerDown);
     canvas.addEventListener("pointermove", handlePointerMove);
@@ -139,6 +153,7 @@ export function Viewport({
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("contextmenu", handleContextMenu);
       canvas.removeEventListener("mouseleave", handleMouseLeave);
+      canvas.removeEventListener("click", handleClick);
       canvas.removeEventListener("dblclick", handleDblClick);
       canvas.removeEventListener("pointerdown", handlePointerDown);
       canvas.removeEventListener("pointermove", handlePointerMove);

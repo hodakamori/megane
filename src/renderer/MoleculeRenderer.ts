@@ -276,9 +276,13 @@ export class MoleculeRenderer {
 
   // (screen-space picking replaces Three.js raycasting)
 
-  // Atom selection & measurement
+  // Atom selection & measurement (right-click, up to 4 atoms)
   private selectedAtoms: number[] = [];
   private selectionGroup = new THREE.Group();
+
+  // Structural selection (left-click, granularity-based, any number of atoms)
+  private structuralAtoms: number[] = [];
+  private structuralSelectionGroup = new THREE.Group();
 
   /** Mount the viewer into a DOM element. */
   mount(container: HTMLElement): void {
@@ -368,8 +372,9 @@ export class MoleculeRenderer {
     rimLight.position.set(0, -30, -50);
     this.scene.add(rimLight);
 
-    // Selection overlay group
+    // Selection overlay groups
     this.scene.add(this.selectionGroup);
+    this.scene.add(this.structuralSelectionGroup);
 
     // Pivot marker (3D crosshair at rotation center)
     this.pivotMarker = new PivotMarker();
@@ -500,6 +505,9 @@ export class MoleculeRenderer {
     }
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
+    }
+    if (this.structuralAtoms.length > 0) {
+      this.updateStructuralSelectionVisuals();
     }
 
     const _ready = _getTestReady();
@@ -1345,6 +1353,23 @@ export class MoleculeRenderer {
     this.updateSelectionVisuals();
   }
 
+  /** Set the structural selection (granularity-based, left-click). */
+  setStructuralSelection(atomIndices: number[]): void {
+    this.structuralAtoms = atomIndices;
+    this.updateStructuralSelectionVisuals();
+  }
+
+  /** Clear the structural selection. */
+  clearStructuralSelection(): void {
+    this.structuralAtoms = [];
+    this.updateStructuralSelectionVisuals();
+  }
+
+  /** Returns the current structural selection atom indices. */
+  getStructuralSelection(): number[] {
+    return [...this.structuralAtoms];
+  }
+
   /** Compute the current geometric measurement based on selected atoms. */
   getMeasurement(): Measurement | null {
     if (!this.snapshot || this.selectedAtoms.length < 2) return null;
@@ -1399,6 +1424,36 @@ export class MoleculeRenderer {
       const line = new THREE.Line(lineGeo, lineMat);
       line.renderOrder = 999;
       this.selectionGroup.add(line);
+    }
+  }
+
+  private updateStructuralSelectionVisuals(): void {
+    while (this.structuralSelectionGroup.children.length > 0) {
+      const child = this.structuralSelectionGroup.children[0];
+      this.structuralSelectionGroup.remove(child);
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (!Array.isArray(child.material)) child.material.dispose();
+      }
+    }
+
+    if (!this.snapshot || this.structuralAtoms.length === 0) return;
+
+    const pos = this.getCurrentPositions();
+    const elements = this.snapshot.elements;
+
+    for (const atomIdx of this.structuralAtoms) {
+      const r = getRadius(elements[atomIdx]) * BALL_STICK_ATOM_SCALE * 1.5;
+      const geo = new THREE.SphereGeometry(r, 12, 12);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x34a853,
+        transparent: true,
+        opacity: 0.3,
+        depthWrite: false,
+      });
+      const sphere = new THREE.Mesh(geo, mat);
+      sphere.position.set(pos[atomIdx * 3], pos[atomIdx * 3 + 1], pos[atomIdx * 3 + 2]);
+      this.structuralSelectionGroup.add(sphere);
     }
   }
 
@@ -1546,6 +1601,7 @@ export class MoleculeRenderer {
       cancelAnimationFrame(this.animationId);
     }
     this.clearSelection();
+    this.clearStructuralSelection();
     if (this.atomRenderer) this.atomRenderer.dispose();
     if (this.bondRenderer) this.bondRenderer.dispose();
     if (this.cellRenderer) this.cellRenderer.dispose();

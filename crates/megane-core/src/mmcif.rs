@@ -207,6 +207,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut atom_labels: Vec<String> = Vec::new();
     let mut chain_ids: Vec<u8> = Vec::new();
     let mut bfactors: Vec<f32> = Vec::new();
+    let mut atom_res_nums_raw: Vec<u32> = Vec::new();
     let mut ca_indices: Vec<u32> = Vec::new();
     let mut ca_chain_ids: Vec<u8> = Vec::new();
     let mut ca_res_nums: Vec<u32> = Vec::new();
@@ -384,10 +385,22 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                     ca_ss_type.push(0); // coil; secondary structure via _struct_conf is future work
                 }
 
+                let atom_res_num = cols
+                    .label_seq_id
+                    .and_then(|c| raw_fields.get(c))
+                    .and_then(|s| parse_u32_field(s))
+                    .or_else(|| {
+                        cols.auth_seq_id
+                            .and_then(|c| raw_fields.get(c))
+                            .and_then(|s| parse_u32_field(s))
+                    })
+                    .unwrap_or(0);
+
                 elements.push(elem);
                 atom_labels.push(atom_name);
                 chain_ids.push(chain_byte);
                 bfactors.push(bfac);
+                atom_res_nums_raw.push(atom_res_num);
                 positions.push(x);
                 positions.push(y);
                 positions.push(z);
@@ -416,6 +429,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let has_bfactors = bfactors.iter().any(|&b| b != 0.0);
     let has_labels = atom_labels.iter().any(|l| !l.is_empty());
 
+    let has_atom_res_nums = atom_res_nums_raw.iter().any(|&r| r != 0);
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -433,6 +447,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids,
         ca_res_nums,
         ca_ss_type,
+        atom_res_nums: if has_atom_res_nums {
+            Some(atom_res_nums_raw)
+        } else {
+            None
+        },
     })
 }
 

@@ -67,6 +67,9 @@ pub struct ParseResult {
     ca_chain_ids: Vec<u8>,
     ca_res_nums: Vec<u32>,
     ca_ss_type: Vec<u8>,
+    // Per-atom residue sequence numbers
+    has_atom_res_nums: bool,
+    atom_res_nums: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -202,6 +205,16 @@ impl ParseResult {
     pub fn ca_ss_type(&self) -> Uint8Array {
         Uint8Array::from(&self.ca_ss_type[..])
     }
+
+    #[wasm_bindgen(getter)]
+    pub fn has_atom_res_nums(&self) -> bool {
+        self.has_atom_res_nums
+    }
+
+    /// Per-atom residue sequence numbers.
+    pub fn atom_res_nums(&self) -> Uint32Array {
+        Uint32Array::from(&self.atom_res_nums[..])
+    }
 }
 
 impl ParseResult {
@@ -259,6 +272,8 @@ impl ParseResult {
             ca_chain_ids: data.ca_chain_ids,
             ca_res_nums: data.ca_res_nums,
             ca_ss_type: data.ca_ss_type,
+            has_atom_res_nums: data.atom_res_nums.is_some(),
+            atom_res_nums: data.atom_res_nums.unwrap_or_default(),
         }
     }
 }

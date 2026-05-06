@@ -44,6 +44,8 @@ pub struct ParsedStructure {
     pub ca_res_nums: Vec<u32>,
     /// Per-Cα secondary-structure type: 0 = coil, 1 = helix, 2 = sheet.
     pub ca_ss_type: Vec<u8>,
+    /// Per-atom residue sequence number. None when the format does not carry residue info.
+    pub atom_res_nums: Option<Vec<u32>>,
 }
 
 /// Secondary-structure range from a PDB HELIX or SHEET record.
@@ -267,9 +269,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let mut current_labels: Vec<String> = Vec::new();
     let mut current_chain_ids: Vec<u8> = Vec::new();
     let mut current_bfactors: Vec<f32> = Vec::new();
+    let mut current_res_nums: Vec<u32> = Vec::new();
     let mut first_model_labels: Vec<String> = Vec::new();
     let mut first_model_chain_ids: Vec<u8> = Vec::new();
     let mut first_model_bfactors: Vec<f32> = Vec::new();
+    let mut first_model_res_nums: Vec<u32> = Vec::new();
     let mut has_model_record = false;
     let mut model_count: usize = 0;
 
@@ -302,12 +306,14 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 current_labels = Vec::new();
                 current_chain_ids = Vec::new();
                 current_bfactors = Vec::new();
+                current_res_nums = Vec::new();
             }
             "ENDMDL" => {
                 if model_count == 0 {
                     first_model_labels = std::mem::take(&mut current_labels);
                     first_model_chain_ids = std::mem::take(&mut current_chain_ids);
                     first_model_bfactors = std::mem::take(&mut current_bfactors);
+                    first_model_res_nums = std::mem::take(&mut current_res_nums);
                 }
                 all_models.push(std::mem::take(&mut current_model));
                 model_count += 1;
@@ -339,6 +345,8 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         ""
                     };
                     current_labels.push(format!("{}{}", res_name, res_seq));
+                    let res_num_val: u32 = res_seq.parse().unwrap_or(0);
+                    current_res_nums.push(res_num_val);
                     // parse_atom_line guarantees line.len() >= 54, so col 21 is always safe
                     current_chain_ids.push(line.as_bytes()[21]);
                     // Extract B-factor (cols 60-66, 0-indexed); absent in truncated lines
@@ -364,6 +372,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         first_model_labels = current_labels;
         first_model_chain_ids = current_chain_ids;
         first_model_bfactors = current_bfactors;
+        first_model_res_nums = current_res_nums;
         all_models.push(current_model);
     }
 
@@ -451,6 +460,12 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    let atom_res_nums = if first_model_res_nums.iter().any(|&r| r != 0) {
+        Some(first_model_res_nums)
+    } else {
+        None
+    };
+
     Ok(ParsedStructure {
         n_atoms,
         positions,
@@ -468,6 +483,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids,
         ca_res_nums,
         ca_ss_type,
+        atom_res_nums,
     })
 }
 
@@ -641,5 +657,37 @@ END
         assert_eq!(result.n_atoms, 1);
         // No non-zero B-factor => bfactors should be None
         assert!(result.bfactors.is_none());
+    }
+
+    #[test]
+    fn test_pdb_atom_res_nums_populated() {
+        // Three atoms: two in residue 1, one in residue 2
+        let pdb = "\
+ATOM      1  N   THR A   1      17.047  14.099   3.625  1.00 13.79           N  \n\
+ATOM      2  CA  THR A   1      16.967  12.784   4.338  1.00 10.80           C  \n\
+ATOM      3  N   ALA A   2      15.000  12.000   4.000  1.00  5.00           N  \n\
+END\n";
+        let result = parse(pdb).expect("parse failed");
+        let res_nums = result.atom_res_nums.expect("atom_res_nums should be Some");
+        assert_eq!(res_nums.len(), 3);
+        assert_eq!(res_nums[0], 1);
+        assert_eq!(res_nums[1], 1);
+        assert_eq!(res_nums[2], 2);
+    }
+
+    #[test]
+    fn test_pdb_atom_res_nums_multi_model() {
+        // Multi-model PDB: only first model's res nums are kept
+        let pdb = "\
+MODEL        1\n\
+ATOM      1  CA  ALA A   5       1.000   2.000   3.000  1.00  0.00           C  \n\
+ENDMDL\n\
+MODEL        2\n\
+ATOM      1  CA  ALA A   5       4.000   5.000   6.000  1.00  0.00           C  \n\
+ENDMDL\n";
+        let result = parse(pdb).expect("parse failed");
+        let res_nums = result.atom_res_nums.expect("atom_res_nums should be Some");
+        assert_eq!(res_nums.len(), 1);
+        assert_eq!(res_nums[0], 5);
     }
 }

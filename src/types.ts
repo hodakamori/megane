@@ -14,6 +14,8 @@ export interface Snapshot {
   atomChainIds: Uint8Array | null;
   /** Per-atom B-factors (temperature factors) in Å². Null for formats without B-factor info. */
   atomBFactors: Float32Array | null;
+  /** Per-atom residue sequence numbers. Null for formats without residue info (e.g. XYZ). */
+  atomResNums: Uint32Array | null;
   // Cα backbone data for cartoon rendering (undefined for non-PDB or structures without atom names)
   caIndices?: Uint32Array; // indices of Cα atoms in positions array
   caChainIds?: Uint8Array; // per-Cα chain ID as ASCII byte (e.g. 65 = 'A')
@@ -117,9 +119,18 @@ export interface BondHoverInfo {
 
 export type HoverInfo = AtomHoverInfo | BondHoverInfo | null;
 
+/** Granularity for structural selection (left-click). */
+export type SelectionGranularity = "atom" | "residue" | "chain" | "ss";
+
 /** Atom selection state. */
 export interface SelectionState {
   atoms: number[];
+}
+
+/** Structural selection state (granularity-based, separate from measurement selection). */
+export interface StructuralSelectionState {
+  atoms: number[];
+  granularity: SelectionGranularity;
 }
 
 /** Geometric measurement result. */

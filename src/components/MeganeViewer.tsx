@@ -23,7 +23,10 @@ import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { useViewStateStore } from "../stores/useViewStateStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { useAtomSelection } from "../hooks/useAtomSelection";
+import { useStructuralSelection } from "../hooks/useStructuralSelection";
 import { useNodeLoadHandlers } from "../hooks/useNodeLoadHandlers";
+import { SelectionGranularityToggle } from "./SelectionGranularityToggle";
+import { SelectionInspectorPanel } from "./SelectionInspectorPanel";
 import type {
   HoverInfo,
   BondSource,
@@ -111,6 +114,7 @@ export function MeganeViewer({
   onCameraStateChange,
 }: MeganeViewerProps) {
   const rendererRef = useRef<MoleculeRenderer | null>(null);
+  const snapshotRef = useRef<typeof snapshot>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [bondCount, setBondCount] = useState<number>(0);
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
@@ -123,6 +127,10 @@ export function MeganeViewer({
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
     useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
+
+  // Structural selection (granularity-based, left-click)
+  const { structuralSelection, granularity, setGranularity, handleAtomClick, clearStructuralSelection } =
+    useStructuralSelection(rendererRef, snapshotRef);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
@@ -142,6 +150,7 @@ export function MeganeViewer({
   // tree because it changes identity only on file load (snapshots are
   // pinned to the LoadStructure's NodeSnapshotData).
   const snapshot = usePipelineStore((s) => s.viewportState.particles[0]?.source ?? null);
+  snapshotRef.current = snapshot;
 
   // Wire up node load handlers (structure, trajectory, vector) and track primary node
   const primaryNodeIdRef = useNodeLoadHandlers({
@@ -408,6 +417,7 @@ export function MeganeViewer({
         onRendererReady={handleRendererReady}
         onHover={setHoverInfo}
         onAtomRightClick={handleAtomRightClick}
+        onAtomClick={handleAtomClick}
         onFrameUpdated={handleFrameUpdated}
       />
       <div
@@ -473,6 +483,25 @@ export function MeganeViewer({
         onStepForward={storeStepForward}
       />
       <Tooltip info={hoverInfo} />
+      {snapshot && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 80,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 15,
+            pointerEvents: "auto",
+          }}
+        >
+          <SelectionGranularityToggle granularity={granularity} onChange={setGranularity} />
+        </div>
+      )}
+      <SelectionInspectorPanel
+        selection={structuralSelection}
+        snapshot={snapshot}
+        onClear={clearStructuralSelection}
+      />
       <MeasurementPanel
         selection={selection}
         measurement={measurement}

@@ -30,6 +30,7 @@ interface WasmParseResult {
   has_atom_labels: boolean;
   has_chain_ids: boolean;
   has_bfactors: boolean;
+  has_atom_res_nums: boolean;
   atom_labels: string;
   vector_channel_count: number;
   vector_channel_meta: string;
@@ -47,6 +48,7 @@ interface WasmParseResult {
   ca_chain_ids(): Uint8Array;
   ca_res_nums(): Uint32Array;
   ca_ss_type(): Uint8Array;
+  atom_res_nums(): Uint32Array;
   free(): void;
 }
 
@@ -197,6 +199,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
     box: result.has_box ? result.box_matrix() : null,
     atomChainIds: result.has_chain_ids ? result.chain_ids() : null,
     atomBFactors: result.has_bfactors ? result.bfactors() : null,
+    atomResNums: result.has_atom_res_nums ? result.atom_res_nums() : null,
     ...(caCount > 0 && {
       caIndices: result.ca_indices(),
       caChainIds: result.ca_chain_ids(),

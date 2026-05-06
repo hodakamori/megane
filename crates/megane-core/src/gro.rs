@@ -41,6 +41,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let mut positions = Vec::with_capacity(n_atoms * 3);
     let mut elements = Vec::with_capacity(n_atoms);
     let mut labels = Vec::with_capacity(n_atoms);
+    let mut res_nums: Vec<u32> = Vec::with_capacity(n_atoms);
     // Velocity buffer: filled only when ALL atoms have velocity columns (line.len() >= 68).
     let mut velocities: Vec<f32> = Vec::with_capacity(n_atoms * 3);
     let mut has_velocities = true;
@@ -63,6 +64,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             ""
         };
         labels.push(format!("{}{}", res_name, res_num));
+        res_nums.push(res_num.parse().unwrap_or(0));
 
         // Atom name: columns 11-15 (0-indexed: 10..15)
         let atom_name = if line.len() >= 15 { &line[10..15] } else { "" };
@@ -135,6 +137,12 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         vec![]
     };
 
+    let atom_res_nums = if res_nums.iter().any(|&r| r != 0) {
+        Some(res_nums)
+    } else {
+        None
+    };
+
     Ok(crate::parser::ParsedStructure {
         n_atoms,
         positions,
@@ -152,6 +160,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         ca_chain_ids: vec![],
         ca_res_nums: vec![],
         ca_ss_type: vec![],
+        atom_res_nums,
     })
 }
 

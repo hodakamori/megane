@@ -175,6 +175,7 @@ fn parse_v3000_ctab(lines: &[&str]) -> Result<crate::parser::ParsedStructure, St
         ca_chain_ids: vec![],
         ca_res_nums: vec![],
         ca_ss_type: vec![],
+        atom_res_nums: None,
     })
 }
 
@@ -306,6 +307,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         ca_chain_ids: vec![],
         ca_res_nums: vec![],
         ca_ss_type: vec![],
+        atom_res_nums: None,
     })
 }
 

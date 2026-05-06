@@ -80,6 +80,7 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
     box,
     atomChainIds: null,
     atomBFactors: null,
+    atomResNums: null,
   };
 }
 
