@@ -29,8 +29,9 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Rust / WASM Parsers  (crates/megane-wasm/)                 │
-│  PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data,            │
-│  XTC, DCD, AMBER NetCDF, ASE .traj, .lammpstrj/.dump        │
+│  PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data,    │
+│  AMBER prmtop, XTC, DCD, AMBER NetCDF, ASE .traj,           │
+│  .lammpstrj/.dump                                           │
 │  → Snapshot { positions, elements, bonds, box }             │
 └────────────────────────────┬────────────────────────────────┘
                              │  wasm-bindgen FFI
