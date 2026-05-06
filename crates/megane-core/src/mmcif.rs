@@ -107,19 +107,25 @@ fn is_missing(s: &str) -> bool {
 
 /// Parse a float field, returning `None` for missing values or parse errors.
 fn parse_float_field(s: &str) -> Option<f32> {
-    if is_missing(s) { None } else { s.parse().ok() }
+    if is_missing(s) {
+        None
+    } else {
+        s.parse().ok()
+    }
 }
 
 /// Parse a u32 field, returning `None` for missing values or parse errors.
 fn parse_u32_field(s: &str) -> Option<u32> {
-    if is_missing(s) { None } else { s.parse().ok() }
+    if is_missing(s) {
+        None
+    } else {
+        s.parse().ok()
+    }
 }
 
 /// Strip surrounding single- or double-quote characters from a CIF token.
 fn strip_quotes(s: &str) -> &str {
-    if (s.starts_with('\'') && s.ends_with('\''))
-        || (s.starts_with('"') && s.ends_with('"'))
-    {
+    if (s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')) {
         &s[1..s.len() - 1]
     } else {
         s
@@ -291,9 +297,18 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 }
 
                 // Coordinates
-                let x = cols.cartn_x.and_then(|c| raw_fields.get(c)).and_then(|s| parse_float_field(s));
-                let y = cols.cartn_y.and_then(|c| raw_fields.get(c)).and_then(|s| parse_float_field(s));
-                let z = cols.cartn_z.and_then(|c| raw_fields.get(c)).and_then(|s| parse_float_field(s));
+                let x = cols
+                    .cartn_x
+                    .and_then(|c| raw_fields.get(c))
+                    .and_then(|s| parse_float_field(s));
+                let y = cols
+                    .cartn_y
+                    .and_then(|c| raw_fields.get(c))
+                    .and_then(|s| parse_float_field(s));
+                let z = cols
+                    .cartn_z
+                    .and_then(|c| raw_fields.get(c))
+                    .and_then(|s| parse_float_field(s));
 
                 let (x, y, z) = match (x, y, z) {
                     (Some(x), Some(y), Some(z)) => (x, y, z),
@@ -483,11 +498,11 @@ Na1 Na 0.0 0.0 0.0
     fn test_parse_minimal_mmcif() {
         let result = parse(MINIMAL_MMCIF).expect("parse failed");
         assert_eq!(result.n_atoms, 5);
-        assert_eq!(result.elements[0], 7);  // N
-        assert_eq!(result.elements[1], 6);  // C (CA)
-        assert_eq!(result.elements[2], 6);  // C
-        assert_eq!(result.elements[3], 8);  // O
-        assert_eq!(result.elements[4], 6);  // CB
+        assert_eq!(result.elements[0], 7); // N
+        assert_eq!(result.elements[1], 6); // C (CA)
+        assert_eq!(result.elements[2], 6); // C
+        assert_eq!(result.elements[3], 8); // O
+        assert_eq!(result.elements[4], 6); // CB
     }
 
     #[test]
