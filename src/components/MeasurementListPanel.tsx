@@ -102,7 +102,13 @@ function MeasurementRow({ id, name, type, label, atoms, hidden, elements }: RowP
           data-testid="measurement-toggle-visibility"
           title={hidden ? "Show" : "Hide"}
           onClick={() => toggleVisibility(id)}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 2 }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 12,
+            padding: 2,
+          }}
         >
           {hidden ? "○" : "●"}
         </button>
@@ -171,9 +177,7 @@ export function MeasurementListPanel({ elements }: MeasurementListPanelProps) {
           marginBottom: 6,
         }}
       >
-        <strong style={{ letterSpacing: "-0.01em" }}>
-          Measurements ({measurements.length})
-        </strong>
+        <strong style={{ letterSpacing: "-0.01em" }}>Measurements ({measurements.length})</strong>
         <button
           data-testid="measurement-list-clear"
           onClick={clearAll}

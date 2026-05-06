@@ -61,9 +61,7 @@ export const useMeasurementStore = create<MeasurementStore>((set) => ({
 
   toggleVisibility: (id: string) =>
     set((state) => ({
-      measurements: state.measurements.map((m) =>
-        m.id === id ? { ...m, hidden: !m.hidden } : m,
-      ),
+      measurements: state.measurements.map((m) => (m.id === id ? { ...m, hidden: !m.hidden } : m)),
     })),
 
   clearAll: () => set({ measurements: [] }),
