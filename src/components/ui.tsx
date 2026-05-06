@@ -133,14 +133,28 @@ export function TabSelector<T extends string>({
   value,
   onChange,
   disabledOptions,
+  ariaLabel,
+  tabIdFor,
+  panelIdFor,
+  testIdFor,
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   disabledOptions?: Set<T>;
+  /** Accessible label for the tablist as a whole. */
+  ariaLabel?: string;
+  /** Optional id generator so panels can reference the tab via aria-labelledby. */
+  tabIdFor?: (v: T) => string;
+  /** Optional id generator for the controlled tabpanel (used in aria-controls). */
+  panelIdFor?: (v: T) => string;
+  /** Optional data-testid generator for each tab button. */
+  testIdFor?: (v: T) => string;
 }) {
   return (
     <div
+      role="tablist"
+      aria-label={ariaLabel}
       style={{
         display: "flex",
         borderRadius: 10,
@@ -155,6 +169,13 @@ export function TabSelector<T extends string>({
         return (
           <button
             key={opt.value}
+            type="button"
+            role="tab"
+            id={tabIdFor?.(opt.value)}
+            aria-selected={isActive}
+            aria-controls={panelIdFor?.(opt.value)}
+            data-testid={testIdFor?.(opt.value)}
+            tabIndex={isActive ? 0 : -1}
             onClick={isActive || isDisabled ? undefined : () => onChange(opt.value)}
             style={{
               flex: 1,

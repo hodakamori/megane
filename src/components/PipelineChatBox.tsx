@@ -1,6 +1,6 @@
 /**
  * Chat interface for AI-powered pipeline generation.
- * Renders at the bottom of the PipelineEditor panel.
+ * Renders inside the Chat tab of the PipelineEditor panel.
  * Includes inline config panel for API key and model settings.
  */
 
@@ -9,6 +9,7 @@ import { useAIConfigStore, PROVIDER_MODELS } from "../ai/config";
 import type { AIProvider } from "../ai/config";
 import { generatePipeline, extractPipelineJSON } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
+import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 
 interface ChatMessage {
   role: "user" | "assistant" | "error";
@@ -18,15 +19,16 @@ interface ChatMessage {
 // ─── Styles ──────────────────────────────────────────────────────────
 
 const containerStyle: React.CSSProperties = {
-  flexShrink: 0,
-  borderTop: "1px solid rgba(226,232,240,0.6)",
+  flex: 1,
+  minHeight: 0,
   display: "flex",
   flexDirection: "column",
   background: "rgba(248, 250, 252, 0.95)",
 };
 
 const messagesAreaStyle: React.CSSProperties = {
-  maxHeight: 120,
+  flex: 1,
+  minHeight: 0,
   overflowY: "auto",
   padding: "6px 10px",
   display: "flex",
@@ -247,6 +249,9 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       const pipeline = extractPipelineJSON(fullResponse);
       deserialize(pipeline);
       autoLayout();
+      // Surface the result on the editor tab and trigger fitView via the
+      // panel's mode-change effect.
+      usePipelineUIStore.getState().markPipelineApplied();
       onPipelineApplied?.();
 
       setMessages((prev) => [
@@ -335,10 +340,21 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
         </div>
       )}
 
-      {/* Messages area */}
-      {messages.length > 0 && (
-        <div style={messagesAreaStyle}>
-          {messages.map((msg, i) => {
+      {/* Messages area (always rendered so the chat tab fills the panel) */}
+      <div style={messagesAreaStyle} data-testid="pipeline-chat-messages">
+        {messages.length === 0 ? (
+          <div
+            style={{
+              color: "var(--megane-text-muted)",
+              fontStyle: "italic",
+              fontSize: 11,
+              padding: "8px 0",
+            }}
+          >
+            Ask the assistant to build or edit the pipeline.
+          </div>
+        ) : (
+          messages.map((msg, i) => {
             if (msg.role === "user") {
               return (
                 <div key={i} style={userMsgStyle}>
@@ -371,10 +387,10 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 {display}
               </div>
             );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
-      )}
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
 
       {/* Input row */}
       <div style={inputRowStyle}>
