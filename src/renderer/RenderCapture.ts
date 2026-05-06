@@ -3,6 +3,8 @@
  */
 
 import type { MoleculeRenderer } from "./MoleculeRenderer";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 
 /** Composite WebGL canvas and label overlay onto an offscreen canvas. */
 export function compositeCanvases(
@@ -227,6 +229,22 @@ export async function captureGif(
     });
     gif.render();
   });
+}
+
+/** Export the current scene as a binary glTF (.glb) file. */
+export async function captureGltf(renderer: MoleculeRenderer): Promise<Blob> {
+  const scene = renderer.getScene();
+  const exporter = new GLTFExporter();
+  const result = await exporter.parseAsync(scene, { binary: true });
+  return new Blob([result as ArrayBuffer], { type: "model/gltf-binary" });
+}
+
+/** Export the current scene as an OBJ text file (geometry only, no materials). */
+export function captureObj(renderer: MoleculeRenderer): Blob {
+  const scene = renderer.getScene();
+  const exporter = new OBJExporter();
+  const objString = exporter.parse(scene);
+  return new Blob([objString], { type: "text/plain" });
 }
 
 /** Capture animation frames as MP4/WebM using MediaRecorder. */
