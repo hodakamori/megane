@@ -45,3 +45,4 @@ docs/public/notebooks/
 dev-preview/
 coverage/
 .coverage
+lcov.info

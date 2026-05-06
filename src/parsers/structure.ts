@@ -60,6 +60,7 @@ interface WasmModule {
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
+  parse_mmcif: ParseFn;
   parse_lammps_data: ParseFn;
   parse_prmtop: ParseFn;
   parse_traj: BinaryParseFn;
@@ -89,6 +90,7 @@ async function ensureInit(): Promise<void> {
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
+        parse_mmcif: wasm.parse_mmcif,
         parse_lammps_data: wasm.parse_lammps_data,
         parse_prmtop: wasm.parse_prmtop,
         parse_traj: wasm.parse_traj,
@@ -117,6 +119,8 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_mol2;
     case ".cif":
       return wasmModule!.parse_cif;
+    case ".mmcif":
+      return wasmModule!.parse_mmcif;
     case ".data":
     case ".lammps":
       return wasmModule!.parse_lammps_data;

@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, netcdf, parser, psf, top, traj,
-    xtc, xyz,
+    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser, psf,
+    top, traj, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -395,9 +395,24 @@ pub fn parse_mol2(text: &str) -> Result<ParseResult, JsError> {
 }
 
 /// Parse a CIF file text and return structured data.
+///
+/// Auto-detects mmCIF (PDBx/macromolecular) vs small-molecule CIF and routes
+/// to the appropriate parser.
 #[wasm_bindgen]
 pub fn parse_cif(text: &str) -> Result<ParseResult, JsError> {
-    let data = cif::parse(text).map_err(|e| JsError::new(&e))?;
+    let data = if mmcif::is_mmcif(text) {
+        mmcif::parse(text)
+    } else {
+        cif::parse(text)
+    }
+    .map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse an mmCIF (PDBx) file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_mmcif(text: &str) -> Result<ParseResult, JsError> {
+    let data = mmcif::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 
