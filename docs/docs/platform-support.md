@@ -35,6 +35,7 @@ Legend:
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ |
 | MOL2 | `.mol2` | ✓ | API | ✓ | ✓ | ✓ |
 | CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
+| mmCIF | `.mmcif` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | ✓ |
 

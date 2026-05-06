@@ -45,6 +45,9 @@
             "filenamePattern": "*.cif"
           },
           {
+            "filenamePattern": "*.mmcif"
+          },
+          {
             "filenamePattern": "*.data"
           },
           {

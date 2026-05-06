@@ -73,6 +73,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-mmcif",
+    displayName: "mmCIF",
+    extensions: [".mmcif"],
+    mimeTypes: ["chemical/x-mmcif"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-data",
     displayName: "LAMMPS data",
     extensions: [".data", ".lammps"],

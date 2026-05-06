@@ -59,6 +59,7 @@ const STRUCTURE_EXTS = [
   ".mol",
   ".sdf",
   ".cif",
+  ".mmcif",
   ".data",
   ".lammps",
   ".traj",
