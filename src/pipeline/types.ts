@@ -16,7 +16,8 @@ export type PipelineDataType =
   | "label"
   | "mesh"
   | "trajectory"
-  | "vector";
+  | "vector"
+  | "plot";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -27,6 +28,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   mesh: "#6b7280", // gray
   trajectory: "#ec4899", // pink
   vector: "#ef4444", // red
+  plot: "#06b6d4", // cyan
 };
 
 /** Particle data flowing through the pipeline. */
@@ -154,6 +156,18 @@ export interface VectorData {
   scale: number;
 }
 
+/** Time-series or per-atom scalar data for analysis plots (RMSD, RMSF, etc.). */
+export interface PlotData {
+  type: "plot";
+  title: string;
+  xLabel: string;
+  yLabel: string;
+  /** X-axis values (e.g. frame indices or atom indices). */
+  xValues: Float32Array;
+  /** Y-axis values (e.g. RMSD in Å or RMSF in Å). */
+  yValues: Float32Array;
+}
+
 /** Union of all pipeline data types. */
 export type PipelineData =
   | ParticleData
@@ -162,7 +176,8 @@ export type PipelineData =
   | LabelData
   | MeshData
   | TrajectoryData
-  | VectorData;
+  | VectorData
+  | PlotData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -193,7 +208,9 @@ export type PipelineNodeType =
   | "label_generator"
   | "polyhedron_generator"
   | "surface_mesh"
-  | "vector_overlay";
+  | "vector_overlay"
+  | "rmsd"
+  | "rmsf";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -211,12 +228,21 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   polyhedron_generator: "Polyhedra",
   surface_mesh: "Surface Mesh",
   vector_overlay: "Vectors",
+  rmsd: "RMSD",
+  rmsf: "RMSF",
 };
 
 // ─── Node Categories ──────────────────────────────────────────────────
 
 /** Categories for visual grouping and color-coding. */
-export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay" | "viewport";
+export type NodeCategory =
+  | "data_load"
+  | "bond"
+  | "filter"
+  | "modify"
+  | "overlay"
+  | "analysis"
+  | "viewport";
 
 export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   load_structure: "data_load",
@@ -232,6 +258,8 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   polyhedron_generator: "overlay",
   surface_mesh: "overlay",
   vector_overlay: "overlay",
+  rmsd: "analysis",
+  rmsf: "analysis",
   viewport: "viewport",
 };
 
@@ -241,6 +269,7 @@ export const NODE_CATEGORY_COLORS: Record<NodeCategory, string> = {
   filter: "#10b981", // green
   modify: "#8b5cf6", // purple
   overlay: "#ec4899", // pink
+  analysis: "#06b6d4", // cyan
   viewport: "#64748b", // slate
 };
 
@@ -291,6 +320,7 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
       { name: "label", dataType: "label", label: "Label" },
       { name: "mesh", dataType: "mesh", label: "Mesh" },
       { name: "vector", dataType: "vector", label: "Vector" },
+      { name: "plot", dataType: "plot", label: "Plot" },
     ],
     outputs: [],
   },
@@ -325,6 +355,20 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   vector_overlay: {
     inputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
     outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
+  },
+  rmsd: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+    outputs: [{ name: "plot", dataType: "plot", label: "Plot" }],
+  },
+  rmsf: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+    outputs: [{ name: "plot", dataType: "plot", label: "Plot" }],
   },
 };
 
@@ -454,6 +498,22 @@ export interface SurfaceMeshParams {
   opacity: number;
 }
 
+/** Parameters for the RMSD (Root Mean Square Deviation) analysis node. */
+export interface RmsdParams {
+  type: "rmsd";
+  /** Atom selection query for which atoms to include in RMSD calculation (empty = all). */
+  selection: string;
+  /** Reference frame index (0-based). */
+  referenceFrame: number;
+}
+
+/** Parameters for the RMSF (Root Mean Square Fluctuation) analysis node. */
+export interface RmsfParams {
+  type: "rmsf";
+  /** Atom selection query for which atoms to include in RMSF calculation (empty = all). */
+  selection: string;
+}
+
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
@@ -469,7 +529,9 @@ export type PipelineNodeParams =
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
   | SurfaceMeshParams
-  | VectorOverlayParams;
+  | VectorOverlayParams
+  | RmsdParams
+  | RmsfParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -532,6 +594,10 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
+    case "rmsd":
+      return { type, selection: "", referenceFrame: 0 };
+    case "rmsf":
+      return { type, selection: "" };
   }
 }
 
@@ -593,6 +659,7 @@ export interface ViewportState {
   labels: LabelData[];
   meshes: MeshData[];
   vectors: VectorData[];
+  plots: PlotData[];
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
@@ -607,6 +674,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   labels: [],
   meshes: [],
   vectors: [],
+  plots: [],
   perspective: false,
   cellAxesVisible: true,
   pivotMarkerVisible: true,

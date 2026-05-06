@@ -15,6 +15,7 @@ import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MeasurementListPanel } from "./MeasurementListPanel";
+import { AnalysisPlotsPanel } from "./AnalysisPlotsPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -480,6 +481,7 @@ export function MeganeViewer({
         onClear={handleClearSelection}
       />
       <MeasurementListPanel elements={snapshot?.elements ?? null} />
+      <AnalysisPlotsPanel onSeek={effectiveOnSeek} />
     </div>
   );
 }

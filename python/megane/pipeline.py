@@ -416,6 +416,50 @@ class VectorOverlay(PipelineNode):
         self.scale = scale
 
 
+class Rmsd(PipelineNode):
+    """Compute per-frame RMSD (Root Mean Square Deviation) relative to a reference frame.
+
+    Args:
+        selection:       Atom selection query (empty string = all atoms).
+        reference_frame: 0-based index of the reference frame (default 0).
+
+    Ports:
+        inp.particle   — reference structure
+        inp.trajectory — trajectory frames
+        out.plot       — per-frame RMSD plot data
+    """
+
+    _node_type = "rmsd"
+    _out_ports = {"plot": "plot"}
+    _inp_ports = {"particle": "particle", "trajectory": "trajectory"}
+
+    def __init__(self, *, selection: str = "", reference_frame: int = 0) -> None:
+        super().__init__()
+        self.selection = selection
+        self.reference_frame = reference_frame
+
+
+class Rmsf(PipelineNode):
+    """Compute per-atom RMSF (Root Mean Square Fluctuation) over trajectory frames.
+
+    Args:
+        selection: Atom selection query (empty string = all atoms).
+
+    Ports:
+        inp.particle   — reference structure
+        inp.trajectory — trajectory frames
+        out.plot       — per-atom RMSF plot data
+    """
+
+    _node_type = "rmsf"
+    _out_ports = {"plot": "plot"}
+    _inp_ports = {"particle": "particle", "trajectory": "trajectory"}
+
+    def __init__(self, *, selection: str = "") -> None:
+        super().__init__()
+        self.selection = selection
+
+
 class Viewport(PipelineNode):
     """3D rendering output node.
 
@@ -674,6 +718,13 @@ class Pipeline:
             )
         elif ntype == "vector_overlay":
             return VectorOverlay(scale=nd.get("scale", 1.0))
+        elif ntype == "rmsd":
+            return Rmsd(
+                selection=nd.get("selection", ""),
+                reference_frame=nd.get("referenceFrame", 0),
+            )
+        elif ntype == "rmsf":
+            return Rmsf(selection=nd.get("selection", ""))
         elif ntype == "viewport":
             return Viewport(
                 perspective=nd.get("perspective", False),
@@ -836,6 +887,11 @@ class Pipeline:
             base["fileName"] = node.path
         elif isinstance(node, VectorOverlay):
             base["scale"] = node.scale
+        elif isinstance(node, Rmsd):
+            base["selection"] = node.selection
+            base["referenceFrame"] = node.reference_frame
+        elif isinstance(node, Rmsf):
+            base["selection"] = node.selection
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible

@@ -23,6 +23,8 @@ import type {
   PolyhedronGeneratorParams,
   SurfaceMeshParams,
   VectorOverlayParams,
+  RmsdParams,
+  RmsfParams,
   PipelineNodeType,
   NodeError,
   ParticleData,
@@ -43,6 +45,8 @@ import { executePolyhedronGenerator } from "./executors/polyhedronGenerator";
 import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
+import { executeRmsd } from "./executors/rmsd";
+import { executeRmsf } from "./executors/rmsf";
 import { executeViewport } from "./executors/viewport";
 
 export interface PipelineNodeData {
@@ -259,6 +263,28 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "rmsd": {
+        const outputs = executeRmsd(data.params as RmsdParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length || !inputs.get("trajectory")?.length) {
+          addError(id, {
+            message: "Connect both a Particle and a Trajectory input",
+            severity: "warning",
+          });
+        }
+        break;
+      }
+      case "rmsf": {
+        const outputs = executeRmsf(data.params as RmsfParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length || !inputs.get("trajectory")?.length) {
+          addError(id, {
+            message: "Connect both a Particle and a Trajectory input",
+            severity: "warning",
+          });
         }
         break;
       }
