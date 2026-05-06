@@ -262,8 +262,7 @@ export function RenderModal({
   if (!open) return null;
 
   const hasAnimation = totalFrames > 1;
-  const is3DFormat =
-    mode === "snapshot" && (snapshotFormat === "gltf" || snapshotFormat === "obj");
+  const is3DFormat = mode === "snapshot" && (snapshotFormat === "gltf" || snapshotFormat === "obj");
 
   return createPortal(
     <div
