@@ -15,7 +15,7 @@ import {
 } from "../renderer/RenderCapture";
 
 type Mode = "snapshot" | "animation";
-type SnapshotFormat = "png" | "eps" | "gltf" | "obj";
+type SnapshotFormat = "png" | "eps" | "svg" | "gltf" | "obj";
 type AnimationFormat = "gif" | "mp4";
 
 interface RenderModalProps {
@@ -202,9 +202,9 @@ export function RenderModal({
             width: finalW,
             height: finalH,
             transparent: transparent && snapshotFormat === "png",
-            format: snapshotFormat as "png" | "eps",
+            format: snapshotFormat as "png" | "eps" | "svg",
           });
-          const ext = snapshotFormat === "eps" ? "eps" : "png";
+          const ext = snapshotFormat === "eps" ? "eps" : snapshotFormat === "svg" ? "svg" : "png";
           downloadBlob(blob, `megane-render.${ext}`);
         }
       } else {
@@ -262,7 +262,8 @@ export function RenderModal({
   if (!open) return null;
 
   const hasAnimation = totalFrames > 1;
-  const is3DFormat = mode === "snapshot" && (snapshotFormat === "gltf" || snapshotFormat === "obj");
+  const is3DFormat =
+    mode === "snapshot" && (snapshotFormat === "gltf" || snapshotFormat === "obj");
 
   return createPortal(
     <div
@@ -337,6 +338,11 @@ export function RenderModal({
                 label="EPS"
                 active={snapshotFormat === "eps"}
                 onClick={() => setSnapshotFormat("eps")}
+              />
+              <TabButton
+                label="SVG"
+                active={snapshotFormat === "svg"}
+                onClick={() => setSnapshotFormat("svg")}
               />
               <TabButton
                 label="glTF"
