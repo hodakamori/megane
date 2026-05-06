@@ -485,8 +485,8 @@ pub fn parse_top_bonds_with_includes(
     }
 
     let vfs = top::VirtualTopFileSystem::new(files);
-    let result = top::parse_top_bonds_with_fs(text, &vfs, n_atoms as usize)
-        .map_err(|e| JsError::new(&e))?;
+    let result =
+        top::parse_top_bonds_with_fs(text, &vfs, n_atoms as usize).map_err(|e| JsError::new(&e))?;
 
     let mut flat: Vec<u32> = Vec::with_capacity(result.len() * 2);
     for (a, b) in &result {

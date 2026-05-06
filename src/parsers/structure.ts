@@ -66,7 +66,11 @@ interface WasmModule {
   parse_traj: BinaryParseFn;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
-  parse_top_bonds_with_includes: (text: string, include_files: Record<string, string>, n_atoms: number) => Uint32Array;
+  parse_top_bonds_with_includes: (
+    text: string,
+    include_files: Record<string, string>,
+    n_atoms: number,
+  ) => Uint32Array;
   parse_psf_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
   extract_labels: (text: string, format: string) => string;

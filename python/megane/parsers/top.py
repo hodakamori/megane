@@ -7,7 +7,7 @@ Extracts bond pairs from the ``[ bonds ]`` section and resolves
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
+
 import numpy as np
 
 
@@ -16,11 +16,11 @@ def _parse_include_directive(line: str) -> str | None:
     stripped = line.strip()
     if not stripped.startswith("#include"):
         return None
-    rest = stripped[len("#include"):].strip()
+    rest = stripped[len("#include") :].strip()
     if rest.startswith('"') and '"' in rest[1:]:
-        return rest[1:rest.index('"', 1)]
+        return rest[1 : rest.index('"', 1)]
     if rest.startswith("<") and ">" in rest[1:]:
-        return rest[1:rest.index(">", 1)]
+        return rest[1 : rest.index(">", 1)]
     return None
 
 

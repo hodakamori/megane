@@ -64,11 +64,9 @@ fn parse_include_directive(line: &str) -> Option<String> {
         return None;
     }
     let rest = trimmed["#include".len()..].trim();
-    if rest.starts_with('"') {
-        let inner = &rest[1..];
+    if let Some(inner) = rest.strip_prefix('"') {
         inner.find('"').map(|end| inner[..end].to_string())
-    } else if rest.starts_with('<') {
-        let inner = &rest[1..];
+    } else if let Some(inner) = rest.strip_prefix('<') {
         inner.find('>').map(|end| inner[..end].to_string())
     } else {
         None
@@ -208,8 +206,7 @@ pub fn parse_top_bonds_from_path(path: &str, n_atoms: usize) -> Result<Vec<(u32,
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| ".".to_string());
 
-    let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("Cannot read {path}: {e}"))?;
+    let text = std::fs::read_to_string(path).map_err(|e| format!("Cannot read {path}: {e}"))?;
 
     let fs = RealTopFileSystem { base_dir };
     parse_top_bonds_with_fs(&text, &fs, n_atoms)
@@ -303,10 +300,7 @@ protein  3
     #[test]
     fn test_vfs_flat_include() {
         // molecule.itp provides the [ bonds ] section
-        let vfs = make_vfs(&[(
-            "molecule.itp",
-            "[ bonds ]\n1 2 1\n2 3 1\n",
-        )]);
+        let vfs = make_vfs(&[("molecule.itp", "[ bonds ]\n1 2 1\n2 3 1\n")]);
         let top = r#"#include "molecule.itp""#;
         let bonds = parse_top_bonds_with_fs(top, &vfs, 10).unwrap();
         assert_eq!(bonds.len(), 2);
@@ -360,8 +354,8 @@ protein  3
         // Bonds from main file: (0,1)
         // After include expansion the extra section follows; parser sees two [ bonds ] sections.
         // The second occurrence resets in_bonds_section = true, so both are collected.
-        assert!(bonds.iter().any(|&b| b == (0, 1)));
-        assert!(bonds.iter().any(|&b| b == (2, 3)));
+        assert!(bonds.contains(&(0, 1)));
+        assert!(bonds.contains(&(2, 3)));
     }
 
     #[test]
@@ -391,12 +385,11 @@ protein  3
         let itp_path = dir.path().join("mol.itp");
         fs::write(&itp_path, "[ bonds ]\n1 2 1\n2 3 1\n").unwrap();
 
-        let top_content = format!("#include \"mol.itp\"\n");
+        let top_content = "#include \"mol.itp\"\n".to_string();
         let top_path = dir.path().join("system.top");
         fs::write(&top_path, top_content).unwrap();
 
-        let bonds =
-            parse_top_bonds_from_path(top_path.to_str().unwrap(), 10).unwrap();
+        let bonds = parse_top_bonds_from_path(top_path.to_str().unwrap(), 10).unwrap();
         assert_eq!(bonds.len(), 2);
         assert_eq!(bonds[0], (0, 1));
         assert_eq!(bonds[1], (1, 2));
