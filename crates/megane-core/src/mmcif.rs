@@ -671,7 +671,7 @@ ATOM 1 N N A 1 0.0 0.0 0.0 1
         .expect("read fixture");
         let result = parse(&text).expect("parse failed");
         assert!(result.n_atoms > 0);
-        assert!(result.ca_indices.len() > 0);
+        assert!(!result.ca_indices.is_empty());
         assert!(result.chain_ids.is_some());
         assert!(result.bfactors.is_some());
     }
