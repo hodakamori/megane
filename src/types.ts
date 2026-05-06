@@ -129,3 +129,15 @@ export interface Measurement {
   value: number;
   label: string;
 }
+
+/** A measurement pinned to the persistent list. */
+export interface StoredMeasurement {
+  id: string;
+  name: string;
+  atoms: number[];
+  type: "distance" | "angle" | "dihedral";
+  value: number;
+  label: string;
+  hidden: boolean;
+  createdAt: number;
+}
