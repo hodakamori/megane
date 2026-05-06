@@ -5,6 +5,7 @@ import type {
   FilterParams,
   ModifyParams,
   RepresentationParams,
+  SurfaceMeshParams,
 } from "@/pipeline/types";
 
 describe("PIPELINE_TEMPLATES", () => {
@@ -88,5 +89,57 @@ describe("PIPELINE_TEMPLATES protein", () => {
     const rep = nodes.find((n) => n.type === "representation");
     expect(rep).toBeDefined();
     expect((rep!.data.params as RepresentationParams).mode).toBe("both");
+  });
+});
+
+describe("PIPELINE_TEMPLATES surface mesh", () => {
+  const surface = PIPELINE_TEMPLATES.find((t) => t.id === "surface_mesh");
+
+  it("is registered", () => {
+    expect(surface).toBeDefined();
+  });
+
+  it("loads the quartz_sio2_2x2x2.xyz fixture with cell metadata", () => {
+    const { nodes } = surface!.create();
+    const loader = nodes.find((n) => n.type === "load_structure");
+    expect(loader).toBeDefined();
+    const params = loader!.data.params as LoadStructureParams;
+    expect(params.fileName).toBe("quartz_sio2_2x2x2.xyz");
+    expect(params.hasCell).toBe(true);
+  });
+
+  it("includes a surface_mesh node with documented default params", () => {
+    const { nodes } = surface!.create();
+    const mesh = nodes.find((n) => n.type === "surface_mesh");
+    expect(mesh).toBeDefined();
+    const params = mesh!.data.params as SurfaceMeshParams;
+    expect(params.alphaRadius).toBe(3.0);
+    expect(params.color).toBe("#4488ff");
+    expect(params.opacity).toBe(0.5);
+  });
+
+  it("wires loader→surface_mesh on particle and surface_mesh→viewport on mesh", () => {
+    const { nodes, edges } = surface!.create();
+    const loader = nodes.find((n) => n.type === "load_structure")!;
+    const mesh = nodes.find((n) => n.type === "surface_mesh")!;
+    const viewport = nodes.find((n) => n.type === "viewport")!;
+
+    const loaderToMesh = edges.find(
+      (e) =>
+        e.source === loader.id &&
+        e.target === mesh.id &&
+        e.sourceHandle === "particle" &&
+        e.targetHandle === "particle",
+    );
+    expect(loaderToMesh).toBeDefined();
+
+    const meshToViewport = edges.find(
+      (e) =>
+        e.source === mesh.id &&
+        e.target === viewport.id &&
+        e.sourceHandle === "mesh" &&
+        e.targetHandle === "mesh",
+    );
+    expect(meshToViewport).toBeDefined();
   });
 });
