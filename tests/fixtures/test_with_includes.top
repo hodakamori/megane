@@ -1,0 +1,11 @@
+; GROMACS topology using #include directives
+; Tests that megane resolves includes correctly.
+#include <forcefield.itp>
+
+[ system ]
+Protein
+
+[ molecules ]
+protein  1
+
+#include "test_nested.itp"

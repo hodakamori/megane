@@ -1,0 +1,6 @@
+; GROMACS .itp file with bond definitions
+[ bonds ]
+     1     2     1  ; N-CA
+     2     3     1  ; CA-C
+     3     4     1  ; C-O
+     2     5     1  ; CA-CB

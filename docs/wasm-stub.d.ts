@@ -13,5 +13,6 @@ export function infer_bonds_vdw(
 ): any;
 export function parse_xtc_file(data: Uint8Array): any;
 export function parse_top_bonds(text: string, n_atoms: number): any;
+export function parse_top_bonds_with_includes(text: string, include_files: Record<string, string>, n_atoms: number): any;
 export function parse_pdb_bonds(text: string, n_atoms: number): any;
 export function extract_labels(text: string, format: string): string;
