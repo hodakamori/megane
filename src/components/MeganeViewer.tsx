@@ -129,8 +129,13 @@ export function MeganeViewer({
     useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
 
   // Structural selection (granularity-based, left-click)
-  const { structuralSelection, granularity, setGranularity, handleAtomClick, clearStructuralSelection } =
-    useStructuralSelection(rendererRef, snapshotRef);
+  const {
+    structuralSelection,
+    granularity,
+    setGranularity,
+    handleAtomClick,
+    clearStructuralSelection,
+  } = useStructuralSelection(rendererRef, snapshotRef);
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;

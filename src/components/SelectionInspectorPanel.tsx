@@ -75,7 +75,15 @@ export function SelectionInspectorPanel({
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 600, fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <span
+          style={{
+            fontWeight: 600,
+            fontSize: 11,
+            color: "#64748b",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
           Selection
         </span>
         <button
@@ -106,7 +114,10 @@ export function SelectionInspectorPanel({
       {topElements.length > 0 && (
         <div style={{ marginTop: 8, borderTop: "1px solid rgba(226,232,240,0.6)", paddingTop: 6 }}>
           {topElements.map(([sym, count]) => (
-            <div key={sym} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+            <div
+              key={sym}
+              style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}
+            >
               <span style={{ color: "#64748b" }}>{sym}</span>
               <span style={{ fontVariantNumeric: "tabular-nums" }}>{count}</span>
             </div>
