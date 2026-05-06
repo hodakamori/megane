@@ -1,0 +1,5 @@
+; Intermediate .itp that includes the bonds definition
+[ moleculetype ]
+protein  3
+
+#include "test_bonds.itp"
