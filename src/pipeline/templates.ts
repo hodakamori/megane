@@ -243,6 +243,94 @@ function createSolidTemplate(): {
 }
 
 /**
+ * Surface mesh template: quartz SiO2 wrapped in an OVITO-style alpha-shape
+ * surface mesh.
+ * LoadStructure → SurfaceMesh → Viewport (mesh)
+ *              → Viewport (particle, cell)
+ */
+function createSurfaceMeshTemplate(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "loader-1",
+        type: "load_structure",
+        position: { x: 425, y: 0 },
+        data: {
+          params: {
+            type: "load_structure",
+            fileName: "quartz_sio2_2x2x2.xyz",
+            hasTrajectory: false,
+            hasCell: true,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "surface-1",
+        type: "surface_mesh",
+        position: { x: 680, y: 310 },
+        data: {
+          params: {
+            type: "surface_mesh",
+            alphaRadius: 3.0,
+            color: "#4488ff",
+            opacity: 0.5,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 425, y: 615 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+            pivotMarkerVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "surface-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e2",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e3",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+      {
+        id: "e4",
+        source: "surface-1",
+        target: "viewport-1",
+        sourceHandle: "mesh",
+        targetHandle: "mesh",
+      },
+    ],
+  };
+}
+
+/**
  * Streaming template: WebSocket streaming with bonds and trajectory.
  * Streaming → Viewport (particle, bond, trajectory, cell)
  */
@@ -495,6 +583,12 @@ export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
     label: "Solid",
     description: "Perovskite with coordination polyhedra",
     create: createSolidTemplate,
+  },
+  {
+    id: "surface_mesh",
+    label: "Surface Mesh",
+    description: "Quartz SiO2 with OVITO-style alpha-shape surface envelope",
+    create: createSurfaceMeshTemplate,
   },
   {
     id: "protein",
