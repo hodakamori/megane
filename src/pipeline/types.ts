@@ -16,7 +16,8 @@ export type PipelineDataType =
   | "label"
   | "mesh"
   | "trajectory"
-  | "vector";
+  | "vector"
+  | "volumetric";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -27,6 +28,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   mesh: "#6b7280", // gray
   trajectory: "#ec4899", // pink
   vector: "#ef4444", // red
+  volumetric: "#06b6d4", // cyan
 };
 
 /** Particle data flowing through the pipeline. */
@@ -102,6 +104,26 @@ export interface MeshData {
   edgeWidth: number; // edge line width in pixels
 }
 
+/** Volumetric data from a CUBE (or similar) file. */
+export interface VolumetricData {
+  type: "volumetric";
+  /** Number of voxels along each axis (CUBE order: ix outer, iz inner). */
+  nx: number;
+  ny: number;
+  nz: number;
+  /** Grid origin in Angstroms [ox, oy, oz]. */
+  origin: Float32Array;
+  /**
+   * 3×3 row-major step matrix in Angstroms.
+   * stepX = [step[0], step[1], step[2]], stepY = [step[3]…], stepZ = [step[6]…].
+   */
+  step: Float32Array;
+  /** Scalar field values, length nx*ny*nz; ix outermost, iz innermost. */
+  data: Float32Array;
+  dataMin: number;
+  dataMax: number;
+}
+
 // ─── Frame Provider ──────────────────────────────────────────────────
 
 /** Abstract interface for frame delivery (memory or streaming). */
@@ -162,7 +184,8 @@ export type PipelineData =
   | LabelData
   | MeshData
   | TrajectoryData
-  | VectorData;
+  | VectorData
+  | VolumetricData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -193,7 +216,9 @@ export type PipelineNodeType =
   | "label_generator"
   | "polyhedron_generator"
   | "surface_mesh"
-  | "vector_overlay";
+  | "vector_overlay"
+  | "load_volumetric"
+  | "isosurface";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -211,6 +236,8 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   polyhedron_generator: "Polyhedra",
   surface_mesh: "Surface Mesh",
   vector_overlay: "Vectors",
+  load_volumetric: "Load Volumetric",
+  isosurface: "Isosurface",
 };
 
 // ─── Node Categories ──────────────────────────────────────────────────
@@ -232,6 +259,8 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   polyhedron_generator: "overlay",
   surface_mesh: "overlay",
   vector_overlay: "overlay",
+  load_volumetric: "data_load",
+  isosurface: "overlay",
   viewport: "viewport",
 };
 
@@ -325,6 +354,14 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   vector_overlay: {
     inputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
     outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
+  },
+  load_volumetric: {
+    inputs: [],
+    outputs: [{ name: "volumetric", dataType: "volumetric", label: "Volumetric" }],
+  },
+  isosurface: {
+    inputs: [{ name: "volumetric", dataType: "volumetric", label: "Volumetric" }],
+    outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
   },
 };
 
@@ -454,6 +491,27 @@ export interface SurfaceMeshParams {
   opacity: number;
 }
 
+export interface LoadVolumetricParams {
+  type: "load_volumetric";
+  fileName: string | null;
+  /** Ephemeral: parsed volumetric data from file. Not serialized. */
+  volumetricData?: VolumetricData | null;
+}
+
+export interface IsosurfaceParams {
+  type: "isosurface";
+  /** Iso level for the positive contour. */
+  isoLevel: number;
+  /** Hex color for the positive isosurface (e.g. "#4488ff"). */
+  color: string;
+  /** Opacity [0, 1]. */
+  opacity: number;
+  /** Show a second isosurface at -isoLevel (dual contour for ESP maps). */
+  showNegative: boolean;
+  /** Hex color for the negative isosurface. */
+  negativeColor: string;
+}
+
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
@@ -469,7 +527,9 @@ export type PipelineNodeParams =
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
   | SurfaceMeshParams
-  | VectorOverlayParams;
+  | VectorOverlayParams
+  | LoadVolumetricParams
+  | IsosurfaceParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -532,6 +592,17 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
+    case "load_volumetric":
+      return { type, fileName: null };
+    case "isosurface":
+      return {
+        type,
+        isoLevel: 0.05,
+        color: "#4488ff",
+        opacity: 0.7,
+        showNegative: false,
+        negativeColor: "#ff4444",
+      };
   }
 }
 

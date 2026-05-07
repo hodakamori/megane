@@ -416,6 +416,54 @@ class VectorOverlay(PipelineNode):
         self.scale = scale
 
 
+class LoadVolumetric(PipelineNode):
+    """Load a Gaussian CUBE file and output volumetric data.
+
+    The file is parsed in the browser; this node only tracks the filename.
+    Volumetric data flows to :class:`Isosurface` nodes.
+
+    Ports:
+        out.volumetric — volumetric data
+    """
+
+    _node_type = "load_volumetric"
+    _out_ports = {"volumetric": "volumetric"}
+    _inp_ports: dict[str, str] = {}
+
+    def __init__(self, path: str = "") -> None:
+        super().__init__()
+        self.path = path
+
+
+class Isosurface(PipelineNode):
+    """Extract an isosurface from volumetric data using marching cubes.
+
+    Ports:
+        inp.volumetric — volumetric data (from :class:`LoadVolumetric`)
+        out.mesh       — isosurface mesh
+    """
+
+    _node_type = "isosurface"
+    _out_ports = {"mesh": "mesh"}
+    _inp_ports = {"volumetric": "volumetric"}
+
+    def __init__(
+        self,
+        *,
+        iso_level: float = 0.05,
+        color: str = "#4488ff",
+        opacity: float = 0.7,
+        show_negative: bool = False,
+        negative_color: str = "#ff4444",
+    ) -> None:
+        super().__init__()
+        self.iso_level = iso_level
+        self.color = color
+        self.opacity = opacity
+        self.show_negative = show_negative
+        self.negative_color = negative_color
+
+
 class Viewport(PipelineNode):
     """3D rendering output node.
 
@@ -684,6 +732,16 @@ class Pipeline:
             return Streaming()
         elif ntype == "load_vector":
             return LoadVector(nd.get("fileName") or "")
+        elif ntype == "load_volumetric":
+            return LoadVolumetric(nd.get("fileName") or "")
+        elif ntype == "isosurface":
+            return Isosurface(
+                iso_level=nd.get("isoLevel", 0.05),
+                color=nd.get("color", "#4488ff"),
+                opacity=nd.get("opacity", 0.7),
+                show_negative=nd.get("showNegative", False),
+                negative_color=nd.get("negativeColor", "#ff4444"),
+            )
         else:
             raise ValueError(f"Unknown node type {ntype!r}")
 
@@ -836,6 +894,14 @@ class Pipeline:
             base["fileName"] = node.path
         elif isinstance(node, VectorOverlay):
             base["scale"] = node.scale
+        elif isinstance(node, LoadVolumetric):
+            base["fileName"] = node.path
+        elif isinstance(node, Isosurface):
+            base["isoLevel"] = node.iso_level
+            base["color"] = node.color
+            base["opacity"] = node.opacity
+            base["showNegative"] = node.show_negative
+            base["negativeColor"] = node.negative_color
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible
