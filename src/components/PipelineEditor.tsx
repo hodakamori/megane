@@ -48,6 +48,8 @@ import { SurfaceMeshNode } from "./nodes/SurfaceMeshNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
+import { LoadVolumetricNode } from "./nodes/LoadVolumetricNode";
+import { IsosurfaceNode } from "./nodes/IsosurfaceNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
 import { ShareDialog } from "./ShareDialog";
@@ -69,6 +71,8 @@ const nodeTypes = {
   polyhedron_generator: PolyhedronGeneratorNode,
   surface_mesh: SurfaceMeshNode,
   vector_overlay: VectorOverlayNode,
+  load_volumetric: LoadVolumetricNode,
+  isosurface: IsosurfaceNode,
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
@@ -77,13 +81,18 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
     label: "Data Load",
     types: ["load_structure", "load_trajectory", "load_vector", "streaming"],
   },
+  {
+    category: "data_load",
+    label: "Volumetric",
+    types: ["load_volumetric"],
+  },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },
   { category: "modify", label: "Modify", types: ["modify", "color", "representation"] },
   {
     category: "overlay",
     label: "Overlay",
-    types: ["label_generator", "polyhedron_generator", "vector_overlay"],
+    types: ["label_generator", "polyhedron_generator", "vector_overlay", "isosurface"],
   },
 ];
 

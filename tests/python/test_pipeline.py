@@ -10,9 +10,11 @@ from megane.pipeline import (
     AddPolyhedra,
     Color,
     Filter,
+    Isosurface,
     LoadStructure,
     LoadTrajectory,
     LoadVector,
+    LoadVolumetric,
     Modify,
     NodePort,
     Pipeline,
@@ -114,6 +116,34 @@ class TestNodeClasses:
         n = VectorOverlay(scale=2.0)
         assert n.scale == 2.0
         assert n._node_type == "vector_overlay"
+
+    def test_load_volumetric(self):
+        n = LoadVolumetric("density.cube")
+        assert n.path == "density.cube"
+        assert n._node_type == "load_volumetric"
+
+    def test_load_volumetric_defaults(self):
+        n = LoadVolumetric()
+        assert n.path == ""
+        assert set(n._out_ports) == {"volumetric"}
+        assert n._inp_ports == {}
+
+    def test_isosurface(self):
+        n = Isosurface(iso_level=0.02, color="#ff0000", opacity=0.5)
+        assert n.iso_level == 0.02
+        assert n.color == "#ff0000"
+        assert n.opacity == 0.5
+        assert n._node_type == "isosurface"
+
+    def test_isosurface_defaults(self):
+        n = Isosurface()
+        assert n.iso_level == 0.05
+        assert n.color == "#4488ff"
+        assert n.opacity == 0.7
+        assert n.show_negative is False
+        assert n.negative_color == "#ff4444"
+        assert set(n._inp_ports) == {"volumetric"}
+        assert set(n._out_ports) == {"mesh"}
 
     def test_load_trajectory(self):
         n = LoadTrajectory(xtc="traj.xtc")
