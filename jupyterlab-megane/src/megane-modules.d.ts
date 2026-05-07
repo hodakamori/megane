@@ -40,6 +40,22 @@ declare module "@megane/tour/useTour" {
   }): { startTour: () => void };
 }
 
+declare module "@megane/stores/useThemeStore" {
+  export const useThemeStore: {
+    <T>(selector: (state: any) => T): T;
+    getState(): any;
+    setState(snapshot: any): void;
+  };
+}
+
+declare module "@megane/stores/usePlaybackStore" {
+  export const usePlaybackStore: {
+    <T>(selector: (state: any) => T): T;
+    getState(): { seekFrame(index: number): void; [key: string]: any };
+    setState(snapshot: any): void;
+  };
+}
+
 declare module "@megane/types" {
   export interface SelectionState {
     atoms: number[];
