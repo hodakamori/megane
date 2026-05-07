@@ -34,7 +34,7 @@ uv sync --extra dev          # Python dependencies
 
 megane is a molecular viewer: Rust core (parsers) + TypeScript/React frontend (Three.js) + Python backend (FastAPI/anywidget) + VSCode extension.
 Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace with three crates:
-- `megane-core` — Core parsers (PDB, GRO, XYZ, MOL, CIF, LAMMPS data + LAMMPS trajectory, GROMACS topology, XTC, ASE `.traj`)
+- `megane-core` — Core parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, LAMMPS dump, AMBER topology (.prmtop), GROMACS topology (.top), PSF topology (.psf), XTC, DCD, AMBER NetCDF (.nc), ASE `.traj`)
 - `megane-wasm` — WASM bindings (wasm-bindgen)
 - `megane-python` — PyO3 Python extension
 

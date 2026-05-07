@@ -94,7 +94,8 @@ class PipelineNode:
 class LoadStructure(PipelineNode):
     """Load a molecular structure from a file.
 
-    Supported formats: PDB, GRO, XYZ, MOL, LAMMPS data.
+    Supported formats: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data
+    (.data / .lammps), and ASE .traj.
 
     Ports:
         out.particle — atom data
@@ -997,7 +998,8 @@ def view(
     returns a :class:`~megane.widget.MolecularViewer` widget.
 
     Args:
-        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        path: Path to a structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF,
+            LAMMPS data, ASE .traj).
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
             ``"structure"`` (alias ``"file"``) reads bonds from the loaded
             structure file, ``None`` disables bonds.
@@ -1053,7 +1055,7 @@ def view_traj(
 
     Args:
         path: Path to a structure or self-contained trajectory file (PDB,
-            GRO, XYZ, MOL, LAMMPS data, ASE .traj).
+            GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE .traj).
         xtc: Path to an XTC trajectory file.
         traj: Path to an ASE ``.traj`` file.
         xyz: Path to a multi-frame XYZ trajectory file.

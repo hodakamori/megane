@@ -1,8 +1,8 @@
 /**
  * WASM-based structure parser wrapper.
  * Loads the Rust WASM module and converts results to megane Snapshot/Frame types.
- * Supports PDB, GRO, XYZ (single- or multi-frame), MOL/SDF, CIF,
- * LAMMPS data, and ASE .traj (binary, multi-frame) formats.
+ * Supports PDB, GRO, XYZ (single- or multi-frame), MOL/SDF, MOL2, CIF,
+ * mmCIF, LAMMPS data, AMBER topology (.prmtop), and ASE .traj (binary, multi-frame) formats.
  */
 
 import type { Snapshot, Frame, TrajectoryMeta, VectorChannel } from "../types";
@@ -154,8 +154,9 @@ export async function parseStructureText(
 /**
  * Parse a structure File object using the WASM parser.
  * Auto-detects format from file extension (.pdb, .gro, .xyz, .mol, .sdf,
- * .cif, .data/.lammps, .traj). Returns a Snapshot (first model) and optional
- * trajectory Frames (multi-frame XYZ, multi-model PDB, ASE .traj).
+ * .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj). Returns a Snapshot
+ * (first model) and optional trajectory Frames (multi-frame XYZ, multi-model
+ * PDB, ASE .traj).
  */
 export async function parseStructureFile(file: File): Promise<StructureParseResult> {
   await ensureInit();
