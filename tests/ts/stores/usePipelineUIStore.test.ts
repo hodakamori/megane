@@ -10,6 +10,7 @@ function resetStore() {
 describe("usePipelineUIStore", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     resetStore();
   });
 
@@ -22,17 +23,18 @@ describe("usePipelineUIStore", () => {
     expect(usePipelineUIStore.getState().pendingNotice).toBeNull();
   });
 
-  it("setMode persists the chosen tab to localStorage", () => {
+  it("setMode persists the chosen tab to sessionStorage (not localStorage)", () => {
     usePipelineUIStore.getState().setMode("chat");
 
     expect(usePipelineUIStore.getState().mode).toBe("chat");
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual({ mode: "chat" });
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY)!)).toEqual({ mode: "chat" });
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
 
     usePipelineUIStore.getState().setMode("editor");
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual({ mode: "editor" });
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY)!)).toEqual({ mode: "editor" });
   });
 
-  it("setMode tolerates a localStorage that throws", () => {
+  it("setMode tolerates a sessionStorage that throws", () => {
     const setItem = vi
       .spyOn(Storage.prototype, "setItem")
       .mockImplementation(() => {
@@ -51,7 +53,7 @@ describe("usePipelineUIStore", () => {
 
     expect(usePipelineUIStore.getState().mode).toBe("editor");
     expect(usePipelineUIStore.getState().pendingNotice).toMatchObject({ kind: "applied" });
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual({ mode: "editor" });
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY)!)).toEqual({ mode: "editor" });
   });
 
   it("each markPipelineApplied call yields a fresh notice id", () => {
@@ -77,31 +79,42 @@ describe("usePipelineUIStore initial load", () => {
   beforeEach(() => {
     vi.resetModules();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("hydrates the mode from localStorage when a valid value is stored", async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "chat" }));
+  it("hydrates the mode from sessionStorage when a valid value is stored", async () => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "chat" }));
     const mod = await import("@/stores/usePipelineUIStore");
     expect(mod.usePipelineUIStore.getState().mode).toBe("chat");
   });
 
+  it("ignores legacy localStorage entries and defaults to 'editor' on cold start", async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "chat" }));
+    const mod = await import("@/stores/usePipelineUIStore");
+    // Cold-start always opens on the editor so the pipeline is visible by
+    // default — even for users whose previous build persisted "chat" to
+    // localStorage. The legacy entry is also cleaned up.
+    expect(mod.usePipelineUIStore.getState().mode).toBe("editor");
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   it("falls back to 'editor' when the stored payload is malformed", async () => {
-    localStorage.setItem(STORAGE_KEY, "not-json");
+    sessionStorage.setItem(STORAGE_KEY, "not-json");
     const mod = await import("@/stores/usePipelineUIStore");
     expect(mod.usePipelineUIStore.getState().mode).toBe("editor");
   });
 
   it("falls back to 'editor' when the stored mode is unknown", async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "neon" }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ mode: "neon" }));
     const mod = await import("@/stores/usePipelineUIStore");
     expect(mod.usePipelineUIStore.getState().mode).toBe("editor");
   });
 
-  it("falls back to 'editor' when localStorage.getItem throws", async () => {
+  it("falls back to 'editor' when sessionStorage.getItem throws", async () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });

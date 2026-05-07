@@ -43,6 +43,7 @@ afterEach(() => {
   cleanup();
   usePipelineUIStore.setState({ mode: "editor", pendingNotice: null });
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 describe("PipelineEditor — tab switching", () => {
@@ -72,24 +73,33 @@ describe("PipelineEditor — tab switching", () => {
       "true",
     );
 
+    // Both panes share the same area; we toggle visibility (not display) so
+    // the editor stays laid out and ReactFlow keeps real dimensions.
     const editorPanel = document.getElementById("pipeline-tabpanel-editor");
     const chatPanel = document.getElementById("pipeline-tabpanel-chat");
-    expect(editorPanel?.style.display).toBe("none");
-    expect(chatPanel?.style.display).toBe("flex");
+    expect(editorPanel?.style.visibility).toBe("hidden");
+    expect(editorPanel?.getAttribute("aria-hidden")).toBe("true");
+    expect(chatPanel?.style.visibility).toBe("visible");
+    expect(chatPanel?.getAttribute("aria-hidden")).toBe("false");
   });
 
-  it("keeps the I/O and Others toolbar rows visible from both tabs", () => {
+  it("keeps the I/O row visible from both tabs and hides the Others row on chat", () => {
     render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
 
+    // Editor tab: I/O + Others both rendered.
     expect(screen.getByTestId("pipeline-editor-share")).toBeTruthy();
     expect(screen.getByTestId("pipeline-editor-render")).toBeTruthy();
+    expect(screen.getByTestId("pipeline-editor-others-row")).toBeTruthy();
     expect(screen.getByTestId("pipeline-editor-theme")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("pipeline-editor-tab-chat"));
 
+    // Chat tab: I/O still rendered (Render/Share apply to current pipeline)
+    // but the editor-side Others row is unmounted to give chat more room.
     expect(screen.getByTestId("pipeline-editor-share")).toBeTruthy();
     expect(screen.getByTestId("pipeline-editor-render")).toBeTruthy();
-    expect(screen.getByTestId("pipeline-editor-theme")).toBeTruthy();
+    expect(screen.queryByTestId("pipeline-editor-others-row")).toBeNull();
+    expect(screen.queryByTestId("pipeline-editor-theme")).toBeNull();
   });
 
   it("hides Pipeline-tab-only buttons (Templates) when the chat tab is active", () => {
@@ -98,9 +108,10 @@ describe("PipelineEditor — tab switching", () => {
     fireEvent.click(screen.getByTestId("pipeline-editor-tab-chat"));
 
     const editorPanel = document.getElementById("pipeline-tabpanel-editor")!;
-    expect(editorPanel.style.display).toBe("none");
-    // The Templates button lives inside the Editor tab — it is still in the
-    // DOM (display:none parent) so we assert its containing tabpanel is hidden.
+    // The Templates button lives inside the Editor tabpanel which is now
+    // visibility:hidden — Playwright treats it as hidden, and the DOM still
+    // contains it so the canvas stays measured.
+    expect(editorPanel.style.visibility).toBe("hidden");
     expect(editorPanel.contains(screen.getByTestId("pipeline-editor-templates"))).toBe(true);
   });
 

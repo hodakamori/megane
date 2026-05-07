@@ -838,7 +838,22 @@ function PipelineEditorInner({
 
   const headerExtra = (
     <>
-      {/* I/O: exchange and execute (visible from both tabs) */}
+      {/* Tabs: anchor at the top so the visual hierarchy reads
+          Title → Tabs → tab-relevant toolbars → pane content. */}
+      <div style={{ flexBasis: "100%" }}>
+        <TabSelector<PipelinePanelMode>
+          options={TAB_OPTIONS}
+          value={mode}
+          onChange={setMode}
+          ariaLabel="Pipeline panel mode"
+          tabIdFor={(v) => `pipeline-tab-${v}`}
+          panelIdFor={(v) => `pipeline-tabpanel-${v}`}
+          testIdFor={(v) => `pipeline-editor-tab-${v}`}
+          size="compact"
+        />
+      </div>
+      {/* I/O: exchange and execute (visible from both tabs — operates on the
+          current pipeline regardless of which pane is showing). */}
       <div style={toolbarRowStyle}>
         <span style={toolbarCategoryLabelStyle}>I/O</span>
         <button
@@ -875,48 +890,40 @@ function PipelineEditorInner({
           {IconRender} Render
         </button>
       </div>
-      {/* Others: help & appearance (visible from both tabs) */}
-      <div style={toolbarRowStyle}>
-        <span style={toolbarCategoryLabelStyle}>Others</span>
-        <button
-          data-testid="pipeline-editor-guide"
-          onClick={() => startTour()}
-          style={guideBtnStyle}
-          title="Show user guide"
-          aria-label="Show user guide"
-        >
-          {IconGuide} Guide
-        </button>
-        <button
-          data-testid="pipeline-editor-tutorial"
-          onClick={() => startPipelineTutorial()}
-          style={tutorialBtnStyle}
-          title="Walk through how to build a pipeline"
-          aria-label="Open pipeline tutorial"
-        >
-          {IconTutorial} Tutorial
-        </button>
-        <button
-          data-testid="pipeline-editor-theme"
-          onClick={handleCycleTheme}
-          style={themeBtnStyle}
-          title={`Theme: ${THEME_LABELS[theme]} (click to cycle)`}
-          aria-label={`Switch theme, current: ${THEME_LABELS[theme]}`}
-        >
-          {THEME_ICONS[theme]} {THEME_LABELS[theme]}
-        </button>
-      </div>
-      <div style={{ flexBasis: "100%", marginTop: 2 }}>
-        <TabSelector<PipelinePanelMode>
-          options={TAB_OPTIONS}
-          value={mode}
-          onChange={setMode}
-          ariaLabel="Pipeline panel mode"
-          tabIdFor={(v) => `pipeline-tab-${v}`}
-          panelIdFor={(v) => `pipeline-tabpanel-${v}`}
-          testIdFor={(v) => `pipeline-editor-tab-${v}`}
-        />
-      </div>
+      {/* Others: editor-side help & appearance. Hidden on the Chat tab so the
+          chat input gets more vertical room and the header stays compact. */}
+      {mode === "editor" && (
+        <div style={toolbarRowStyle} data-testid="pipeline-editor-others-row">
+          <span style={toolbarCategoryLabelStyle}>Others</span>
+          <button
+            data-testid="pipeline-editor-guide"
+            onClick={() => startTour()}
+            style={guideBtnStyle}
+            title="Show user guide"
+            aria-label="Show user guide"
+          >
+            {IconGuide} Guide
+          </button>
+          <button
+            data-testid="pipeline-editor-tutorial"
+            onClick={() => startPipelineTutorial()}
+            style={tutorialBtnStyle}
+            title="Walk through how to build a pipeline"
+            aria-label="Open pipeline tutorial"
+          >
+            {IconTutorial} Tutorial
+          </button>
+          <button
+            data-testid="pipeline-editor-theme"
+            onClick={handleCycleTheme}
+            style={themeBtnStyle}
+            title={`Theme: ${THEME_LABELS[theme]} (click to cycle)`}
+            aria-label={`Switch theme, current: ${THEME_LABELS[theme]}`}
+          >
+            {THEME_ICONS[theme]} {THEME_LABELS[theme]}
+          </button>
+        </div>
+      )}
     </>
   );
 
@@ -960,80 +967,97 @@ function PipelineEditorInner({
       containerExtra={resizeHandle}
     >
       {appliedNoticeBanner}
+      {/* Both tabpanels share the same absolute-positioned area inside a
+          relative wrapper, and we toggle `visibility` rather than `display`
+          or unmounting. That keeps ReactFlow's container measured at all
+          times — the graph never collapses to 0×0 when the user comes back
+          to the Editor tab — while still being treated as "hidden" by
+          Playwright/`toBeHidden` and inert to keyboard focus. */}
       <div
-        role="tabpanel"
-        id="pipeline-tabpanel-editor"
-        aria-labelledby="pipeline-tab-editor"
-        hidden={mode !== "editor"}
         style={{
-          display: mode === "editor" ? "flex" : "none",
-          flexDirection: "column",
+          position: "relative",
           flex: 1,
           minHeight: 0,
         }}
       >
-        {editorToolbar}
-        <div ref={flowContainerRef} style={{ flex: 1, position: "relative", minHeight: 0 }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={styledEdges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            isValidConnection={isValidConnection}
-            nodeTypes={memoizedNodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.1, maxZoom: 1.95 }}
-            minZoom={0.3}
-            maxZoom={2}
-            defaultEdgeOptions={{
-              type: "bezier",
-              animated: true,
-              style: { stroke: "#94a3b8", strokeWidth: 3 },
-            }}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={16}
-              size={1}
-              color="var(--megane-border-solid)"
-            />
-            <MiniMap
-              style={{
-                background: "var(--megane-surface-solid)",
-                border: "1px solid var(--megane-border-solid)",
-                borderRadius: 6,
-                width: 100,
-                height: 70,
+        <div
+          role="tabpanel"
+          id="pipeline-tabpanel-editor"
+          aria-labelledby="pipeline-tab-editor"
+          aria-hidden={mode !== "editor"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            visibility: mode === "editor" ? "visible" : "hidden",
+          }}
+        >
+          {editorToolbar}
+          <div ref={flowContainerRef} style={{ flex: 1, position: "relative", minHeight: 0 }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={styledEdges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              isValidConnection={isValidConnection}
+              nodeTypes={memoizedNodeTypes}
+              fitView
+              fitViewOptions={{ padding: 0.1, maxZoom: 1.95 }}
+              minZoom={0.3}
+              maxZoom={2}
+              defaultEdgeOptions={{
+                type: "bezier",
+                animated: true,
+                style: { stroke: "#94a3b8", strokeWidth: 3 },
               }}
-              nodeColor="var(--megane-primary)"
-              maskColor="rgba(59,130,246,0.05)"
-            />
-            <Controls
-              showInteractive={false}
-              style={{
-                border: "1px solid var(--megane-border-solid)",
-                borderRadius: 6,
-                boxShadow: "none",
-              }}
-            />
-          </ReactFlow>
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background
+                variant={BackgroundVariant.Dots}
+                gap={16}
+                size={1}
+                color="var(--megane-border-solid)"
+              />
+              <MiniMap
+                style={{
+                  background: "var(--megane-surface-solid)",
+                  border: "1px solid var(--megane-border-solid)",
+                  borderRadius: 6,
+                  width: 100,
+                  height: 70,
+                }}
+                nodeColor="var(--megane-primary)"
+                maskColor="rgba(59,130,246,0.05)"
+              />
+              <Controls
+                showInteractive={false}
+                style={{
+                  border: "1px solid var(--megane-border-solid)",
+                  borderRadius: 6,
+                  boxShadow: "none",
+                }}
+              />
+            </ReactFlow>
+          </div>
         </div>
-      </div>
-      <div
-        role="tabpanel"
-        id="pipeline-tabpanel-chat"
-        aria-labelledby="pipeline-tab-chat"
-        hidden={mode !== "chat"}
-        style={{
-          display: mode === "chat" ? "flex" : "none",
-          flexDirection: "column",
-          flex: 1,
-          minHeight: 0,
-        }}
-      >
-        <PipelineChatBox />
+        <div
+          role="tabpanel"
+          id="pipeline-tabpanel-chat"
+          aria-labelledby="pipeline-tab-chat"
+          aria-hidden={mode !== "chat"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "var(--megane-surface-solid)",
+            visibility: mode === "chat" ? "visible" : "hidden",
+          }}
+        >
+          <PipelineChatBox />
+        </div>
       </div>
       <input
         ref={importInputRef}

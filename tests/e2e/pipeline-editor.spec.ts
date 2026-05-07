@@ -70,16 +70,32 @@ test.describe("pipeline-editor: webapp default graph", () => {
     // Pipeline-tab-only buttons (Templates) are visible when on Editor.
     await expect(page.locator('[data-testid="pipeline-editor-templates"]')).toBeVisible();
 
+    // Regression guard: the editor canvas must have non-zero size. Earlier
+    // builds toggled with display:none, which collapsed ReactFlow to 0×0.
+    const editorBox = await editorPanel.boundingBox();
+    expect(editorBox?.width ?? 0).toBeGreaterThan(100);
+    expect(editorBox?.height ?? 0).toBeGreaterThan(100);
+
     await chatTab.click();
     await expect(chatTab).toHaveAttribute("aria-selected", "true");
     await expect(editorTab).toHaveAttribute("aria-selected", "false");
     await expect(chatPanel).toBeVisible();
+    // The editor pane stays in the layout (visibility:hidden) so ReactFlow
+    // keeps its measurements; Playwright still treats it as hidden.
     await expect(editorPanel).toBeHidden();
     // Templates button is inside the hidden editor tabpanel.
     await expect(page.locator('[data-testid="pipeline-editor-templates"]')).toBeHidden();
 
-    // Common toolbar (I/O + Others) stays visible from Chat tab.
+    // I/O row stays visible from Chat (Render/Share apply to the current pipeline).
     await expect(page.locator('[data-testid="pipeline-editor-render"]')).toBeVisible();
-    await expect(page.locator('[data-testid="pipeline-editor-theme"]')).toBeVisible();
+    // Editor-side Others row is unmounted on chat to give the input more room.
+    await expect(page.locator('[data-testid="pipeline-editor-theme"]')).toBeHidden();
+
+    // Toggle back to the Editor tab; canvas is still non-zero.
+    await editorTab.click();
+    await expect(editorPanel).toBeVisible();
+    const reboundBox = await editorPanel.boundingBox();
+    expect(reboundBox?.width ?? 0).toBeGreaterThan(100);
+    expect(reboundBox?.height ?? 0).toBeGreaterThan(100);
   });
 });
