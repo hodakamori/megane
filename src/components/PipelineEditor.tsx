@@ -48,6 +48,7 @@ import { SurfaceMeshNode } from "./nodes/SurfaceMeshNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
+import { RdfNode } from "./nodes/RdfNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
 import { ShareDialog } from "./ShareDialog";
@@ -69,6 +70,7 @@ const nodeTypes = {
   polyhedron_generator: PolyhedronGeneratorNode,
   surface_mesh: SurfaceMeshNode,
   vector_overlay: VectorOverlayNode,
+  rdf: RdfNode,
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
@@ -85,6 +87,7 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
     label: "Overlay",
     types: ["label_generator", "polyhedron_generator", "vector_overlay"],
   },
+  { category: "analysis", label: "Analysis", types: ["rdf"] },
 ];
 
 /* ── Inline SVG Icons (12×12, currentColor) ────────────────────────── */

@@ -23,6 +23,7 @@ import type {
   PolyhedronGeneratorParams,
   SurfaceMeshParams,
   VectorOverlayParams,
+  RdfParams,
   PipelineNodeType,
   NodeError,
   ParticleData,
@@ -44,6 +45,7 @@ import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
 import { executeViewport } from "./executors/viewport";
+import { executeRdf } from "./executors/rdf";
 
 export interface PipelineNodeData {
   params: PipelineNodeParams;
@@ -258,6 +260,14 @@ export function executePipeline(
         const outputs = executeVectorOverlay(data.params as VectorOverlayParams, inputs);
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "rdf": {
+        const outputs = executeRdf(data.params as RdfParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
         }
         break;

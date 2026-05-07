@@ -6,6 +6,7 @@ import type {
   LabelData,
   MeshData,
   VectorData,
+  PlotData,
   ViewportParams,
   ViewportState,
   PipelineData,
@@ -23,6 +24,7 @@ export function executeViewport(
   const labels = (inputs.get("label") ?? []) as LabelData[];
   const meshes = (inputs.get("mesh") ?? []) as MeshData[];
   const vectors = (inputs.get("vector") ?? []) as VectorData[];
+  const plots = (inputs.get("plot") ?? []) as PlotData[];
 
   const filteredBonds = filterBondsByParticles(bonds, particles);
 
@@ -40,6 +42,7 @@ export function executeViewport(
     labels,
     meshes,
     vectors,
+    plots,
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
     pivotMarkerVisible: params.pivotMarkerVisible ?? true,

@@ -416,6 +416,54 @@ class VectorOverlay(PipelineNode):
         self.scale = scale
 
 
+class Rdf(PipelineNode):
+    """Radial distribution function (RDF / g(r)) analysis pipeline node.
+
+    Computes the pair correlation g(r) between two element types over a
+    trajectory.  Connect the ``plot`` output to the Viewport's ``plot``
+    input to display the chart as an overlay panel.
+
+    Args:
+        element_a: Atomic number of type-A atoms (0 = all atoms).
+        element_b: Atomic number of type-B atoms (0 = all atoms).
+        bin_width: Histogram bin width in Å (default 0.1).
+        r_max: Maximum distance in Å (default 10.0).
+        use_pbc: Apply minimum-image PBC.  Requires a Cell connection.
+        frame_start: First frame index to include (0-based, default 0).
+        frame_end: Last frame index to include (-1 = last frame, default -1).
+
+    Ports:
+        inp.particle   — atom data (positions + elements)
+        inp.trajectory — optional trajectory for multi-frame averaging
+        inp.cell       — optional simulation cell for PBC
+        out.plot       — g(r) plot data for the Viewport overlay
+    """
+
+    _node_type = "rdf"
+    _out_ports = {"plot": "plot"}
+    _inp_ports = {"particle": "particle", "trajectory": "trajectory", "cell": "cell"}
+
+    def __init__(
+        self,
+        *,
+        element_a: int = 0,
+        element_b: int = 0,
+        bin_width: float = 0.1,
+        r_max: float = 10.0,
+        use_pbc: bool = True,
+        frame_start: int = 0,
+        frame_end: int = -1,
+    ) -> None:
+        super().__init__()
+        self.element_a = element_a
+        self.element_b = element_b
+        self.bin_width = bin_width
+        self.r_max = r_max
+        self.use_pbc = use_pbc
+        self.frame_start = frame_start
+        self.frame_end = frame_end
+
+
 class Viewport(PipelineNode):
     """3D rendering output node.
 
@@ -684,6 +732,16 @@ class Pipeline:
             return Streaming()
         elif ntype == "load_vector":
             return LoadVector(nd.get("fileName") or "")
+        elif ntype == "rdf":
+            return Rdf(
+                element_a=nd.get("elementA", 0),
+                element_b=nd.get("elementB", 0),
+                bin_width=nd.get("binWidth", 0.1),
+                r_max=nd.get("rMax", 10.0),
+                use_pbc=nd.get("usePbc", True),
+                frame_start=nd.get("frameStart", 0),
+                frame_end=nd.get("frameEnd", -1),
+            )
         else:
             raise ValueError(f"Unknown node type {ntype!r}")
 
@@ -836,6 +894,14 @@ class Pipeline:
             base["fileName"] = node.path
         elif isinstance(node, VectorOverlay):
             base["scale"] = node.scale
+        elif isinstance(node, Rdf):
+            base["elementA"] = node.element_a
+            base["elementB"] = node.element_b
+            base["binWidth"] = node.bin_width
+            base["rMax"] = node.r_max
+            base["usePbc"] = node.use_pbc
+            base["frameStart"] = node.frame_start
+            base["frameEnd"] = node.frame_end
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible

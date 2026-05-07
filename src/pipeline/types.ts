@@ -16,7 +16,8 @@ export type PipelineDataType =
   | "label"
   | "mesh"
   | "trajectory"
-  | "vector";
+  | "vector"
+  | "plot";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -27,6 +28,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   mesh: "#6b7280", // gray
   trajectory: "#ec4899", // pink
   vector: "#ef4444", // red
+  plot: "#14b8a6", // teal
 };
 
 /** Particle data flowing through the pipeline. */
@@ -154,6 +156,17 @@ export interface VectorData {
   scale: number;
 }
 
+/** 2D line plot produced by analysis nodes (RDF, RMSD, etc.). */
+export interface PlotData {
+  type: "plot";
+  kind: "line";
+  title: string;
+  xLabel: string;
+  yLabel: string;
+  x: number[];
+  y: number[];
+}
+
 /** Union of all pipeline data types. */
 export type PipelineData =
   | ParticleData
@@ -162,7 +175,8 @@ export type PipelineData =
   | LabelData
   | MeshData
   | TrajectoryData
-  | VectorData;
+  | VectorData
+  | PlotData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -193,7 +207,8 @@ export type PipelineNodeType =
   | "label_generator"
   | "polyhedron_generator"
   | "surface_mesh"
-  | "vector_overlay";
+  | "vector_overlay"
+  | "rdf";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -211,12 +226,13 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   polyhedron_generator: "Polyhedra",
   surface_mesh: "Surface Mesh",
   vector_overlay: "Vectors",
+  rdf: "RDF",
 };
 
 // ─── Node Categories ──────────────────────────────────────────────────
 
 /** Categories for visual grouping and color-coding. */
-export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay" | "viewport";
+export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay" | "viewport" | "analysis";
 
 export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   load_structure: "data_load",
@@ -233,6 +249,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   surface_mesh: "overlay",
   vector_overlay: "overlay",
   viewport: "viewport",
+  rdf: "analysis",
 };
 
 export const NODE_CATEGORY_COLORS: Record<NodeCategory, string> = {
@@ -242,6 +259,7 @@ export const NODE_CATEGORY_COLORS: Record<NodeCategory, string> = {
   modify: "#8b5cf6", // purple
   overlay: "#ec4899", // pink
   viewport: "#64748b", // slate
+  analysis: "#14b8a6", // teal
 };
 
 // ─── Port Definitions Per Node Type ───────────────────────────────────
@@ -291,6 +309,7 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
       { name: "label", dataType: "label", label: "Label" },
       { name: "mesh", dataType: "mesh", label: "Mesh" },
       { name: "vector", dataType: "vector", label: "Vector" },
+      { name: "plot", dataType: "plot", label: "Plot" },
     ],
     outputs: [],
   },
@@ -325,6 +344,14 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   vector_overlay: {
     inputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
     outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
+  },
+  rdf: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+      { name: "cell", dataType: "cell", label: "Cell" },
+    ],
+    outputs: [{ name: "plot", dataType: "plot", label: "Plot" }],
   },
 };
 
@@ -454,6 +481,25 @@ export interface SurfaceMeshParams {
   opacity: number;
 }
 
+/** Parameters for the RDF (radial distribution function) analysis node. */
+export interface RdfParams {
+  type: "rdf";
+  /** Atomic number of type-A atoms (0 = all atoms). */
+  elementA: number;
+  /** Atomic number of type-B atoms (0 = all atoms). */
+  elementB: number;
+  /** Histogram bin width in Å. */
+  binWidth: number;
+  /** Maximum distance in Å. */
+  rMax: number;
+  /** Apply minimum-image periodic boundary conditions (requires cell input). */
+  usePbc: boolean;
+  /** First frame index to include (0-based). */
+  frameStart: number;
+  /** Last frame index to include (-1 = last frame). */
+  frameEnd: number;
+}
+
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
@@ -469,7 +515,8 @@ export type PipelineNodeParams =
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
   | SurfaceMeshParams
-  | VectorOverlayParams;
+  | VectorOverlayParams
+  | RdfParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -532,6 +579,17 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
+    case "rdf":
+      return {
+        type,
+        elementA: 0,
+        elementB: 0,
+        binWidth: 0.1,
+        rMax: 10.0,
+        usePbc: true,
+        frameStart: 0,
+        frameEnd: -1,
+      };
   }
 }
 
@@ -593,6 +651,7 @@ export interface ViewportState {
   labels: LabelData[];
   meshes: MeshData[];
   vectors: VectorData[];
+  plots: PlotData[];
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
@@ -607,6 +666,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   labels: [],
   meshes: [],
   vectors: [],
+  plots: [],
   perspective: false,
   cellAxesVisible: true,
   pivotMarkerVisible: true,

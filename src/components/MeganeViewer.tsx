@@ -15,6 +15,7 @@ import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MeasurementListPanel } from "./MeasurementListPanel";
+import { AnalysisPlotsPanel } from "./AnalysisPlotsPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -32,7 +33,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
-import type { ViewportState, AddBondParams } from "../pipeline/types";
+import type { ViewportState, AddBondParams, PlotData } from "../pipeline/types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
 interface MeganeViewerProps {
@@ -113,6 +114,7 @@ export function MeganeViewer({
   const rendererRef = useRef<MoleculeRenderer | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [bondCount, setBondCount] = useState<number>(0);
+  const [analysisPlots, setAnalysisPlots] = useState<PlotData[]>([]);
   const isNarrow = typeof window !== "undefined" && window.innerWidth < 768;
   const [pipelineCollapsed, setPipelineCollapsed] = useState(isNarrow);
   const pipelineCollapsedRef = useRef(isNarrow);
@@ -212,6 +214,8 @@ export function MeganeViewer({
         const total = vs.bonds.reduce((sum, b) => sum + b.bondIndices.length / 2, 0);
         setBondCount((current) => (current === total ? current : total));
       }
+
+      setAnalysisPlots(vs.plots ?? []);
 
       const traj = vs.trajectories[0] ?? null;
       const provider = traj?.provider ?? null;
@@ -480,6 +484,7 @@ export function MeganeViewer({
         onClear={handleClearSelection}
       />
       <MeasurementListPanel elements={snapshot?.elements ?? null} />
+      <AnalysisPlotsPanel plots={analysisPlots} />
     </div>
   );
 }
