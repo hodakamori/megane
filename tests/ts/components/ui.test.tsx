@@ -92,4 +92,32 @@ describe("TabSelector", () => {
     fireEvent.click(gamma);
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("exposes tablist/tab roles with aria-selected reflecting the active option", () => {
+    render(
+      <TabSelector
+        options={options}
+        value="b"
+        onChange={() => {}}
+        ariaLabel="Choose"
+        tabIdFor={(v) => `t-${v}`}
+        panelIdFor={(v) => `p-${v}`}
+        testIdFor={(v) => `tab-${v}`}
+      />,
+    );
+
+    const tablist = screen.getByRole("tablist", { name: "Choose" });
+    expect(tablist).toBeTruthy();
+
+    const beta = screen.getByTestId("tab-b");
+    expect(beta.getAttribute("role")).toBe("tab");
+    expect(beta.getAttribute("aria-selected")).toBe("true");
+    expect(beta.getAttribute("aria-controls")).toBe("p-b");
+    expect(beta.getAttribute("id")).toBe("t-b");
+    expect(beta.getAttribute("tabindex")).toBe("0");
+
+    const alpha = screen.getByTestId("tab-a");
+    expect(alpha.getAttribute("aria-selected")).toBe("false");
+    expect(alpha.getAttribute("tabindex")).toBe("-1");
+  });
 });
