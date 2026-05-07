@@ -137,6 +137,7 @@ export function TabSelector<T extends string>({
   tabIdFor,
   panelIdFor,
   testIdFor,
+  size = "default",
 }: {
   options: { value: T; label: string }[];
   value: T;
@@ -150,17 +151,20 @@ export function TabSelector<T extends string>({
   panelIdFor?: (v: T) => string;
   /** Optional data-testid generator for each tab button. */
   testIdFor?: (v: T) => string;
+  /** "compact" trims font size + padding for in-header use. */
+  size?: "default" | "compact";
 }) {
+  const compact = size === "compact";
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
       style={{
         display: "flex",
-        borderRadius: 10,
+        borderRadius: compact ? 6 : 10,
         overflow: "hidden",
         border: "1px solid var(--megane-border-solid)",
-        marginBottom: 10,
+        marginBottom: compact ? 0 : 10,
       }}
     >
       {options.map((opt, idx) => {
@@ -183,10 +187,10 @@ export function TabSelector<T extends string>({
               border: "none",
               borderRight:
                 idx < options.length - 1 ? "1px solid var(--megane-border-solid)" : "none",
-              padding: "7px 0",
+              padding: compact ? "4px 0" : "7px 0",
               cursor: isActive || isDisabled ? "default" : "pointer",
-              fontSize: 19,
-              fontWeight: 500,
+              fontSize: compact ? 12 : 19,
+              fontWeight: compact ? 600 : 500,
               color: isDisabled
                 ? "var(--megane-text-muted)"
                 : isActive

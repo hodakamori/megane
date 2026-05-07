@@ -120,4 +120,29 @@ describe("TabSelector", () => {
     expect(alpha.getAttribute("aria-selected")).toBe("false");
     expect(alpha.getAttribute("tabindex")).toBe("-1");
   });
+
+  it("size=\"compact\" renders smaller buttons with no bottom margin", () => {
+    render(
+      <TabSelector
+        options={options}
+        value="a"
+        onChange={() => {}}
+        size="compact"
+        testIdFor={(v) => `tab-${v}`}
+      />,
+    );
+
+    const tablist = screen.getByRole("tablist");
+    expect(tablist.style.marginBottom).toBe("0px");
+
+    const alpha = screen.getByTestId("tab-a") as HTMLButtonElement;
+    expect(alpha.style.fontSize).toBe("12px");
+    expect(alpha.style.padding).toBe("4px 0px");
+  });
+
+  it("size defaults to the larger sizing when no size prop is passed", () => {
+    render(<TabSelector options={options} value="a" onChange={() => {}} />);
+    const tablist = screen.getByRole("tablist");
+    expect(tablist.style.marginBottom).toBe("10px");
+  });
 });
