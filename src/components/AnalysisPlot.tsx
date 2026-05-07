@@ -182,4 +182,3 @@ export function AnalysisPlot({ plot }: AnalysisPlotProps) {
     </svg>
   );
 }
-

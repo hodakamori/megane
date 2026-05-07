@@ -17,6 +17,7 @@ from megane.pipeline import (
     NodePort,
     Pipeline,
     PortNamespace,
+    Rdf,
     Representation,
     VectorOverlay,
     Viewport,
@@ -134,6 +135,34 @@ class TestNodeClasses:
         n = LoadTrajectory(lammpstrj="dump.lammpstrj")
         assert n.lammpstrj == "dump.lammpstrj"
         assert n.xtc is None
+
+    def test_rdf_defaults(self):
+        n = Rdf()
+        assert n._node_type == "rdf"
+        assert n.element_a == 0
+        assert n.element_b == 0
+        assert n.bin_width == 0.1
+        assert n.r_max == 10.0
+        assert n.use_pbc is True
+        assert n.frame_start == 0
+        assert n.frame_end == -1
+
+    def test_rdf_custom(self):
+        n = Rdf(element_a=8, element_b=6, bin_width=0.5, r_max=8.0, use_pbc=False, frame_start=2, frame_end=10)
+        assert n.element_a == 8
+        assert n.element_b == 6
+        assert n.bin_width == 0.5
+        assert n.r_max == 8.0
+        assert n.use_pbc is False
+        assert n.frame_start == 2
+        assert n.frame_end == 10
+
+    def test_rdf_ports(self):
+        n = Rdf()
+        assert hasattr(n.inp, "particle")
+        assert hasattr(n.inp, "trajectory")
+        assert hasattr(n.inp, "cell")
+        assert hasattr(n.out, "plot")
 
 
 class TestPortObjects:
@@ -834,6 +863,58 @@ class TestPipelineJsonImport:
         pipe2 = Pipeline.from_dict(pipe.to_dict())
         node2: LoadTrajectory = next(n for n, _ in pipe2._nodes.values() if isinstance(n, LoadTrajectory))
         assert node2.lammpstrj == "output.dump"
+
+    def test_rdf_serialization(self):
+        """Rdf params are serialized with camelCase keys."""
+        pipe = Pipeline()
+        pipe.add_node(Rdf(element_a=8, element_b=6, bin_width=0.5, r_max=8.0, use_pbc=False))
+        result = pipe.to_dict()
+        rdf_node = next(n for n in result["nodes"] if n["type"] == "rdf")
+        assert rdf_node["elementA"] == 8
+        assert rdf_node["elementB"] == 6
+        assert rdf_node["binWidth"] == 0.5
+        assert rdf_node["rMax"] == 8.0
+        assert rdf_node["usePbc"] is False
+
+    def test_rdf_round_trip(self):
+        """Rdf node survives to_dict → from_dict with all params preserved."""
+        pipe = Pipeline()
+        pipe.add_node(Rdf(element_a=8, element_b=6, bin_width=0.5, r_max=8.0, use_pbc=False, frame_start=1, frame_end=5))
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        node2: Rdf = next(n for n, _ in pipe2._nodes.values() if isinstance(n, Rdf))
+        assert node2.element_a == 8
+        assert node2.element_b == 6
+        assert node2.bin_width == 0.5
+        assert node2.r_max == 8.0
+        assert node2.use_pbc is False
+        assert node2.frame_start == 1
+        assert node2.frame_end == 5
+
+    def test_rdf_default_round_trip(self):
+        """Rdf node with default params survives to_dict → from_dict."""
+        pipe = Pipeline()
+        pipe.add_node(Rdf())
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        node2: Rdf = next(n for n, _ in pipe2._nodes.values() if isinstance(n, Rdf))
+        assert node2.element_a == 0
+        assert node2.element_b == 0
+        assert node2.bin_width == 0.1
+        assert node2.r_max == 10.0
+        assert node2.use_pbc is True
+
+    def test_rdf_edge_to_viewport(self):
+        """Rdf plot output connects to Viewport plot input."""
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        r = pipe.add_node(Rdf())
+        v = pipe.add_node(Viewport())
+        pipe.add_edge(s.out.particle, r.inp.particle)
+        pipe.add_edge(s.out.particle, v.inp.particle)
+        pipe.add_edge(r.out.plot, v.inp.plot)
+        result = pipe.to_dict()
+        plot_edges = [e for e in result["edges"] if e["sourceHandle"] == "plot"]
+        assert len(plot_edges) == 1
+        assert plot_edges[0]["targetHandle"] == "plot"
 
 
 class TestPipelineJsonImportErrors:

@@ -477,6 +477,7 @@ class Viewport(PipelineNode):
         inp.label    — text labels
         inp.mesh     — polyhedra mesh
         inp.vector   — vector field
+        inp.plot     — analysis plot overlay (e.g. from Rdf)
     """
 
     _node_type = "viewport"
@@ -489,6 +490,7 @@ class Viewport(PipelineNode):
         "label": "label",
         "mesh": "mesh",
         "vector": "vector",
+        "plot": "plot",
     }
 
     def __init__(

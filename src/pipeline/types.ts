@@ -232,7 +232,14 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
 // ─── Node Categories ──────────────────────────────────────────────────
 
 /** Categories for visual grouping and color-coding. */
-export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay" | "viewport" | "analysis";
+export type NodeCategory =
+  | "data_load"
+  | "bond"
+  | "filter"
+  | "modify"
+  | "overlay"
+  | "viewport"
+  | "analysis";
 
 export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   load_structure: "data_load",
