@@ -55,9 +55,9 @@ describe("AddBondNode", () => {
     const seeded = seedPipelineStore("add_bond", { id: "ab1" });
     render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
 
-    expect(screen.getByRole("button", { name: "File" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "VDW" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Topology" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "File" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "VDW" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Topology" })).toBeInTheDocument();
   });
 
   it("clicking a tab calls updateNodeParams with the new bondSource", () => {
@@ -69,10 +69,10 @@ describe("AddBondNode", () => {
     usePipelineStore.setState({ updateNodeParams });
     render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "File" }));
+    fireEvent.click(screen.getByRole("tab", { name: "File" }));
     expect(updateNodeParams).toHaveBeenCalledWith("ab1", { bondSource: "structure" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Topology" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Topology" }));
     expect(updateNodeParams).toHaveBeenCalledWith("ab1", { bondSource: "file" });
   });
 

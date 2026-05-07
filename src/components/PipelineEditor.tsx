@@ -3,7 +3,7 @@
  * Typed data-flow pipeline with color-coded handles per data type.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -15,6 +15,9 @@ import {
 } from "@xyflow/react";
 import { useThemeStore } from "../stores/useThemeStore";
 import type { Theme } from "../stores/useThemeStore";
+import { usePipelineUIStore } from "../stores/usePipelineUIStore";
+import type { PipelinePanelMode } from "../stores/usePipelineUIStore";
+import { TabSelector } from "./ui";
 import type { Connection } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { usePipelineStore } from "../pipeline/store";
@@ -545,6 +548,37 @@ function PipelineEditorInner({
     setTheme(next);
   }, [theme, setTheme]);
 
+  const mode = usePipelineUIStore((s) => s.mode);
+  const setMode = usePipelineUIStore((s) => s.setMode);
+  const pendingNotice = usePipelineUIStore((s) => s.pendingNotice);
+  const dismissNotice = usePipelineUIStore((s) => s.dismissNotice);
+
+  // When the panel switches back to the editor (e.g. after the chat assistant
+  // applies a generated pipeline) the ReactFlow viewport may have just been
+  // un-hidden, so we re-fit. Two RAFs give the layout/resize-observer a chance
+  // to pick up the new dimensions before fitView reads them.
+  useEffect(() => {
+    if (mode !== "editor") return;
+    let rafA = 0;
+    let rafB = 0;
+    rafA = window.requestAnimationFrame(() => {
+      rafB = window.requestAnimationFrame(() => {
+        fitView({ padding: 0.1, maxZoom: 1.95, duration: 300 });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(rafA);
+      window.cancelAnimationFrame(rafB);
+    };
+  }, [mode, fitView]);
+
+  // Auto-dismiss the "pipeline applied" notice after a short delay.
+  useEffect(() => {
+    if (!pendingNotice) return;
+    const handle = window.setTimeout(() => dismissNotice(), 3000);
+    return () => window.clearTimeout(handle);
+  }, [pendingNotice, dismissNotice]);
+
   // Resize drag handling
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -700,94 +734,102 @@ function PipelineEditorInner({
 
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
+  // Toolbar row that lives inside the Editor tab — its actions only make
+  // sense while the user can see the graph. Hidden on the Chat tab.
+  const editorToolbar = (
+    <div style={{ ...toolbarRowStyle, padding: "5px 8px" }}>
+      <span style={toolbarCategoryLabelStyle}>Pipeline</span>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => {
+            setShowAddMenu(!showAddMenu);
+            setShowTemplateMenu(false);
+          }}
+          style={addBtnStyle}
+          title="Add Node"
+        >
+          {IconPlus} Add Node
+        </button>
+        {showAddMenu && (
+          <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
+            {ADD_NODE_GROUPS.map((group) => (
+              <div key={group.category}>
+                <div style={{ ...groupHeaderStyle, color: NODE_CATEGORY_COLORS[group.category] }}>
+                  {CATEGORY_ICONS[group.category]}
+                  <span style={{ color: "#94a3b8" }}>{group.label}</span>
+                </div>
+                {group.types.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => handleAddNode(type)}
+                    style={dropdownItemStyle}
+                    onMouseEnter={(e) => {
+                      (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLElement).style.background = "none";
+                    }}
+                  >
+                    {NODE_TYPE_LABELS[type]}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <button
+        onClick={handleAutoLayout}
+        style={layoutBtnStyle}
+        title="Auto Layout"
+        aria-label="Auto Layout"
+      >
+        {IconLayout} Layout
+      </button>
+      <div style={{ position: "relative" }}>
+        <button
+          data-testid="pipeline-editor-templates"
+          onClick={() => {
+            setShowTemplateMenu(!showTemplateMenu);
+            setShowAddMenu(false);
+          }}
+          style={templateBtnStyle}
+          title="Templates"
+        >
+          {IconTemplates} Templates
+        </button>
+        {showTemplateMenu && (
+          <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
+            {PIPELINE_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => handleApplyTemplate(template.id)}
+                style={{ ...dropdownItemStyle, padding: "8px 14px" }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLElement).style.background = "none";
+                }}
+              >
+                <div style={{ fontWeight: 500 }}>{template.label}</div>
+                <div style={templateItemDescStyle}>{template.description}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const TAB_OPTIONS: { value: PipelinePanelMode; label: string }[] = [
+    { value: "editor", label: "Editor" },
+    { value: "chat", label: "Chat" },
+  ];
+
   const headerExtra = (
     <>
-      {/* Row 1 — Pipeline: compose the graph */}
-      <div style={toolbarRowStyle}>
-        <span style={toolbarCategoryLabelStyle}>Pipeline</span>
-        <div style={{ position: "relative" }}>
-          <button
-            onClick={() => {
-              setShowAddMenu(!showAddMenu);
-              setShowTemplateMenu(false);
-            }}
-            style={addBtnStyle}
-            title="Add Node"
-          >
-            {IconPlus} Add Node
-          </button>
-          {showAddMenu && (
-            <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
-              {ADD_NODE_GROUPS.map((group) => (
-                <div key={group.category}>
-                  <div style={{ ...groupHeaderStyle, color: NODE_CATEGORY_COLORS[group.category] }}>
-                    {CATEGORY_ICONS[group.category]}
-                    <span style={{ color: "#94a3b8" }}>{group.label}</span>
-                  </div>
-                  {group.types.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => handleAddNode(type)}
-                      style={dropdownItemStyle}
-                      onMouseEnter={(e) => {
-                        (e.target as HTMLElement).style.background = "rgba(59,130,246,0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.target as HTMLElement).style.background = "none";
-                      }}
-                    >
-                      {NODE_TYPE_LABELS[type]}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <button
-          onClick={handleAutoLayout}
-          style={layoutBtnStyle}
-          title="Auto Layout"
-          aria-label="Auto Layout"
-        >
-          {IconLayout} Layout
-        </button>
-        <div style={{ position: "relative" }}>
-          <button
-            data-testid="pipeline-editor-templates"
-            onClick={() => {
-              setShowTemplateMenu(!showTemplateMenu);
-              setShowAddMenu(false);
-            }}
-            style={templateBtnStyle}
-            title="Templates"
-          >
-            {IconTemplates} Templates
-          </button>
-          {showTemplateMenu && (
-            <div style={{ ...dropdownStyle, right: "auto", left: 0 }}>
-              {PIPELINE_TEMPLATES.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => handleApplyTemplate(template.id)}
-                  style={{ ...dropdownItemStyle, padding: "8px 14px" }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.background = "rgba(139,92,246,0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.background = "none";
-                  }}
-                >
-                  <div style={{ fontWeight: 500 }}>{template.label}</div>
-                  <div style={templateItemDescStyle}>{template.description}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Row 2 — I/O: exchange and execute */}
+      {/* I/O: exchange and execute (visible from both tabs) */}
       <div style={toolbarRowStyle}>
         <span style={toolbarCategoryLabelStyle}>I/O</span>
         <button
@@ -824,7 +866,7 @@ function PipelineEditorInner({
           {IconRender} Render
         </button>
       </div>
-      {/* Row 3 — Others: help & appearance */}
+      {/* Others: help & appearance (visible from both tabs) */}
       <div style={toolbarRowStyle}>
         <span style={toolbarCategoryLabelStyle}>Others</span>
         <button
@@ -855,7 +897,35 @@ function PipelineEditorInner({
           {THEME_ICONS[theme]} {THEME_LABELS[theme]}
         </button>
       </div>
+      <div style={{ flexBasis: "100%", marginTop: 2 }}>
+        <TabSelector<PipelinePanelMode>
+          options={TAB_OPTIONS}
+          value={mode}
+          onChange={setMode}
+          ariaLabel="Pipeline panel mode"
+          tabIdFor={(v) => `pipeline-tab-${v}`}
+          panelIdFor={(v) => `pipeline-tabpanel-${v}`}
+          testIdFor={(v) => `pipeline-editor-tab-${v}`}
+        />
+      </div>
     </>
+  );
+
+  const appliedNoticeBanner = pendingNotice && mode === "editor" && (
+    <div
+      role="status"
+      data-testid="pipeline-editor-applied-notice"
+      style={{
+        padding: "4px 10px",
+        background: "rgba(16, 185, 129, 0.1)",
+        color: "#059669",
+        fontSize: 11,
+        fontWeight: 500,
+        borderBottom: "1px solid var(--megane-border)",
+      }}
+    >
+      Pipeline updated from chat
+    </div>
   );
 
   const resizeHandle = (
@@ -880,60 +950,82 @@ function PipelineEditorInner({
       headerExtra={headerExtra}
       containerExtra={resizeHandle}
     >
-      <div ref={flowContainerRef} style={{ flex: 1, position: "relative", minHeight: 0 }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={styledEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          isValidConnection={isValidConnection}
-          nodeTypes={memoizedNodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.1, maxZoom: 1.95 }}
-          minZoom={0.3}
-          maxZoom={2}
-          defaultEdgeOptions={{
-            type: "bezier",
-            animated: true,
-            style: { stroke: "#94a3b8", strokeWidth: 3 },
-          }}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background
-            variant={BackgroundVariant.Dots}
-            gap={16}
-            size={1}
-            color="var(--megane-border-solid)"
-          />
-          <MiniMap
-            style={{
-              background: "var(--megane-surface-solid)",
-              border: "1px solid var(--megane-border-solid)",
-              borderRadius: 6,
-              width: 100,
-              height: 70,
-            }}
-            nodeColor="var(--megane-primary)"
-            maskColor="rgba(59,130,246,0.05)"
-          />
-          <Controls
-            showInteractive={false}
-            style={{
-              border: "1px solid var(--megane-border-solid)",
-              borderRadius: 6,
-              boxShadow: "none",
-            }}
-          />
-        </ReactFlow>
-      </div>
-      <PipelineChatBox
-        onPipelineApplied={() => {
-          window.requestAnimationFrame(() => {
-            fitView({ padding: 0.1, maxZoom: 1.95, duration: 300 });
-          });
+      {appliedNoticeBanner}
+      <div
+        role="tabpanel"
+        id="pipeline-tabpanel-editor"
+        aria-labelledby="pipeline-tab-editor"
+        hidden={mode !== "editor"}
+        style={{
+          display: mode === "editor" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
         }}
-      />
+      >
+        {editorToolbar}
+        <div ref={flowContainerRef} style={{ flex: 1, position: "relative", minHeight: 0 }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={styledEdges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            nodeTypes={memoizedNodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.1, maxZoom: 1.95 }}
+            minZoom={0.3}
+            maxZoom={2}
+            defaultEdgeOptions={{
+              type: "bezier",
+              animated: true,
+              style: { stroke: "#94a3b8", strokeWidth: 3 },
+            }}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={16}
+              size={1}
+              color="var(--megane-border-solid)"
+            />
+            <MiniMap
+              style={{
+                background: "var(--megane-surface-solid)",
+                border: "1px solid var(--megane-border-solid)",
+                borderRadius: 6,
+                width: 100,
+                height: 70,
+              }}
+              nodeColor="var(--megane-primary)"
+              maskColor="rgba(59,130,246,0.05)"
+            />
+            <Controls
+              showInteractive={false}
+              style={{
+                border: "1px solid var(--megane-border-solid)",
+                borderRadius: 6,
+                boxShadow: "none",
+              }}
+            />
+          </ReactFlow>
+        </div>
+      </div>
+      <div
+        role="tabpanel"
+        id="pipeline-tabpanel-chat"
+        aria-labelledby="pipeline-tab-chat"
+        hidden={mode !== "chat"}
+        style={{
+          display: mode === "chat" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+        <PipelineChatBox />
+      </div>
       <input
         ref={importInputRef}
         type="file"
