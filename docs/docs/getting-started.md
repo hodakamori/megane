@@ -104,7 +104,9 @@ For multiple independent viewers per page (e.g. embedding in MDX docs), use
 | SDF | `.sdf` | MDL SDfile — uses the MOL V2000 parser |
 | MOL2 | `.mol2` | Tripos MOL2 |
 | CIF | `.cif` | Crystallographic Information File |
+| mmCIF | `.mmcif` | Macromolecular CIF (PDBx/mmCIF) — large structure databases |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
+| AMBER topology | `.prmtop` | AMBER parameter/topology file (no coordinates) |
 | XTC | `.xtc` | GROMACS compressed trajectory |
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
