@@ -26,6 +26,8 @@ import {
   downloadBlob,
   captureGltf,
   captureObj,
+  wrapInSVG,
+  captureSnapshot,
 } from "@/renderer/RenderCapture";
 import type { MoleculeRenderer } from "@/renderer/MoleculeRenderer";
 
@@ -162,6 +164,108 @@ describe("captureGltf", () => {
     const getScene = vi.spyOn(renderer, "getScene");
     await captureGltf(renderer);
     expect(getScene).toHaveBeenCalledOnce();
+  });
+});
+
+/** Helper to read a Blob as text via FileReader (works in jsdom). */
+function readBlobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  });
+}
+
+describe("wrapInSVG", () => {
+  it("returns a Blob with image/svg+xml MIME type", async () => {
+    const png = new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" });
+    const result = await wrapInSVG(png, 100, 80);
+    expect(result).toBeInstanceOf(Blob);
+    expect(result.type).toBe("image/svg+xml");
+  });
+
+  it("returns a non-empty Blob", async () => {
+    const png = new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" });
+    const result = await wrapInSVG(png, 100, 80);
+    expect(result.size).toBeGreaterThan(0);
+  });
+
+  it("embeds correct width and height in the SVG", async () => {
+    const png = new Blob([new Uint8Array([0, 1, 2])], { type: "image/png" });
+    const result = await wrapInSVG(png, 320, 240);
+    const text = await readBlobText(result);
+    expect(text).toContain('width="320"');
+    expect(text).toContain('height="240"');
+  });
+
+  it("contains an <image> element with a data URI", async () => {
+    const png = new Blob([new Uint8Array([0, 1, 2])], { type: "image/png" });
+    const result = await wrapInSVG(png, 10, 10);
+    const text = await readBlobText(result);
+    expect(text).toContain("data:");
+    expect(text).toContain("<image");
+  });
+
+  it("produces valid SVG XML with correct root element", async () => {
+    const png = new Blob([new Uint8Array([0])], { type: "image/png" });
+    const result = await wrapInSVG(png, 50, 50);
+    const text = await readBlobText(result);
+    expect(text).toContain('<svg xmlns="http://www.w3.org/2000/svg"');
+    expect(text).toContain("</svg>");
+  });
+
+  it("includes viewBox matching width and height", async () => {
+    const png = new Blob([new Uint8Array([0])], { type: "image/png" });
+    const result = await wrapInSVG(png, 400, 300);
+    const text = await readBlobText(result);
+    expect(text).toContain('viewBox="0 0 400 300"');
+  });
+});
+
+describe("captureSnapshot (svg format)", () => {
+  let restore2d: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    const ctx = {
+      drawImage: vi.fn(),
+      getImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray(16) }),
+    };
+    restore2d = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      ctx as unknown as CanvasRenderingContext2D,
+    ) as ReturnType<typeof vi.fn>;
+
+    // Mock toBlob to return a minimal PNG blob
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      this: HTMLCanvasElement,
+      callback: BlobCallback,
+    ) {
+      callback(new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }));
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns an SVG blob when format is svg", async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 8;
+    canvas.height = 8;
+    const renderer = {
+      ...makeMockRenderer(),
+      getCanvas: () => canvas,
+    } as unknown as MoleculeRenderer;
+
+    const blob = await captureSnapshot(renderer, {
+      width: 8,
+      height: 8,
+      transparent: false,
+      format: "svg",
+    });
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe("image/svg+xml");
   });
 });
 
