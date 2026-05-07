@@ -76,6 +76,17 @@ test.describe("pipeline-editor: webapp default graph", () => {
     expect(editorBox?.width ?? 0).toBeGreaterThan(100);
     expect(editorBox?.height ?? 0).toBeGreaterThan(100);
 
+    // Regression guard: the Pipeline toolbar row (Add Node / Layout /
+    // Templates) must take only its content height. A regression in the
+    // toolbar's flex basis previously made the row claim the entire pane
+    // height, leaving the buttons stranded inside an empty band. We assert
+    // the row height is well below the pane height so the canvas dominates.
+    const toolbarBox = await page
+      .locator('[data-testid="pipeline-editor-row"]')
+      .boundingBox();
+    expect(toolbarBox?.height ?? 0).toBeGreaterThan(0);
+    expect(toolbarBox?.height ?? 0).toBeLessThan((editorBox?.height ?? 0) / 3);
+
     await chatTab.click();
     await expect(chatTab).toHaveAttribute("aria-selected", "true");
     await expect(editorTab).toHaveAttribute("aria-selected", "false");

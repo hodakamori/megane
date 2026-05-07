@@ -745,8 +745,22 @@ function PipelineEditorInner({
 
   // Toolbar row that lives inside the Editor tab — its actions only make
   // sense while the user can see the graph. Hidden on the Chat tab.
+  // `toolbarRowStyle.flexBasis: "100%"` exists for the wrap-row parent in
+  // the panel header; here the parent is `flex-direction: column`, so a
+  // 100% basis would claim the entire column main axis (height) and leave
+  // a tall band of empty space around the buttons. Override to `auto` and
+  // pin `flexShrink: 0` so the toolbar takes only its content height and
+  // the ReactFlow canvas keeps the rest.
   const editorToolbar = (
-    <div style={{ ...toolbarRowStyle, padding: "5px 8px" }}>
+    <div
+      data-testid="pipeline-editor-row"
+      style={{
+        ...toolbarRowStyle,
+        padding: "5px 8px",
+        flexBasis: "auto",
+        flexShrink: 0,
+      }}
+    >
       <span style={toolbarCategoryLabelStyle}>Pipeline</span>
       <div style={{ position: "relative" }}>
         <button

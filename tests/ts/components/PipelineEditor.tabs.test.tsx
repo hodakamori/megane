@@ -102,6 +102,20 @@ describe("PipelineEditor — tab switching", () => {
     expect(screen.queryByTestId("pipeline-editor-theme")).toBeNull();
   });
 
+  it("editor toolbar overrides the wrap-row flex basis so it does not eat column height", () => {
+    render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
+
+    const row = screen.getByTestId("pipeline-editor-row");
+    // `toolbarRowStyle.flexBasis: 100%` is meant for the `flex-wrap: wrap`
+    // header parent. Inside the column-flex Editor tabpanel a 100% basis
+    // would claim the whole pane height and leave the buttons floating
+    // inside a tall empty band. We pin the basis to `auto` and prevent
+    // shrink so the toolbar takes its content height and ReactFlow gets
+    // the remaining space.
+    expect(row.style.flexBasis).toBe("auto");
+    expect(row.style.flexShrink).toBe("0");
+  });
+
   it("hides Pipeline-tab-only buttons (Templates) when the chat tab is active", () => {
     render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
 
