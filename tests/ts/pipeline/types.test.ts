@@ -217,10 +217,11 @@ describe("NODE_PORTS", () => {
     expect(ports.outputs).toHaveLength(3);
   });
 
-  it("viewport has 7 inputs and no outputs", () => {
+  it("viewport has 8 inputs (including plot) and no outputs", () => {
     const ports = NODE_PORTS["viewport"];
-    expect(ports.inputs).toHaveLength(7);
+    expect(ports.inputs).toHaveLength(8);
     expect(ports.outputs).toHaveLength(0);
+    expect(ports.inputs.some((p) => p.name === "plot")).toBe(true);
   });
 });
 

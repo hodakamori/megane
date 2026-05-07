@@ -16,7 +16,8 @@ export type PipelineDataType =
   | "label"
   | "mesh"
   | "trajectory"
-  | "vector";
+  | "vector"
+  | "plot";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -27,6 +28,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   mesh: "#6b7280", // gray
   trajectory: "#ec4899", // pink
   vector: "#ef4444", // red
+  plot: "#14b8a6", // teal
 };
 
 /** Particle data flowing through the pipeline. */
@@ -154,6 +156,27 @@ export interface VectorData {
   scale: number;
 }
 
+/** Analysis plot data output by contact map and Ramachandran nodes. */
+export interface PlotData {
+  type: "plot";
+  /** Discriminates heatmap (contact map) from scatter (Ramachandran). */
+  kind: "heatmap" | "scatter";
+  title: string;
+  // Heatmap fields (contact map):
+  matrix?: Float32Array; // row-major nResidues×nResidues distance matrix (Å)
+  nResidues?: number;
+  residueLabels?: string[];
+  threshold?: number; // contact threshold in Å
+  // Scatter fields (Ramachandran):
+  xValues?: Float32Array; // φ angles in degrees
+  yValues?: Float32Array; // ψ angles in degrees
+  pointLabels?: string[]; // per-point residue labels
+  xLabel?: string;
+  yLabel?: string;
+  xRange?: [number, number];
+  yRange?: [number, number];
+}
+
 /** Union of all pipeline data types. */
 export type PipelineData =
   | ParticleData
@@ -162,7 +185,8 @@ export type PipelineData =
   | LabelData
   | MeshData
   | TrajectoryData
-  | VectorData;
+  | VectorData
+  | PlotData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -193,7 +217,9 @@ export type PipelineNodeType =
   | "label_generator"
   | "polyhedron_generator"
   | "surface_mesh"
-  | "vector_overlay";
+  | "vector_overlay"
+  | "contact_map"
+  | "ramachandran";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -211,12 +237,21 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   polyhedron_generator: "Polyhedra",
   surface_mesh: "Surface Mesh",
   vector_overlay: "Vectors",
+  contact_map: "Contact Map",
+  ramachandran: "Ramachandran",
 };
 
 // ─── Node Categories ──────────────────────────────────────────────────
 
 /** Categories for visual grouping and color-coding. */
-export type NodeCategory = "data_load" | "bond" | "filter" | "modify" | "overlay" | "viewport";
+export type NodeCategory =
+  | "data_load"
+  | "bond"
+  | "filter"
+  | "modify"
+  | "overlay"
+  | "analysis"
+  | "viewport";
 
 export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   load_structure: "data_load",
@@ -232,6 +267,8 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   polyhedron_generator: "overlay",
   surface_mesh: "overlay",
   vector_overlay: "overlay",
+  contact_map: "analysis",
+  ramachandran: "analysis",
   viewport: "viewport",
 };
 
@@ -241,6 +278,7 @@ export const NODE_CATEGORY_COLORS: Record<NodeCategory, string> = {
   filter: "#10b981", // green
   modify: "#8b5cf6", // purple
   overlay: "#ec4899", // pink
+  analysis: "#14b8a6", // teal
   viewport: "#64748b", // slate
 };
 
@@ -291,6 +329,7 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
       { name: "label", dataType: "label", label: "Label" },
       { name: "mesh", dataType: "mesh", label: "Mesh" },
       { name: "vector", dataType: "vector", label: "Vector" },
+      { name: "plot", dataType: "plot", label: "Plot" },
     ],
     outputs: [],
   },
@@ -325,6 +364,20 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   vector_overlay: {
     inputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
     outputs: [{ name: "vector", dataType: "vector", label: "Vector" }],
+  },
+  contact_map: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+    outputs: [{ name: "plot", dataType: "plot", label: "Plot" }],
+  },
+  ramachandran: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+    outputs: [{ name: "plot", dataType: "plot", label: "Plot" }],
   },
 };
 
@@ -454,6 +507,22 @@ export interface SurfaceMeshParams {
   opacity: number;
 }
 
+/** Parameters for the residue–residue Cα contact map node. */
+export interface ContactMapParams {
+  type: "contact_map";
+  /** Cα–Cα distance cutoff in Å; pairs within this distance are marked as contacts. */
+  distanceCutoff: number;
+  /** Frame index to use (0-based). -1 = average over all frames. */
+  frameIndex: number;
+}
+
+/** Parameters for the Ramachandran φ/ψ plot node. */
+export interface RamachandranParams {
+  type: "ramachandran";
+  /** Frame index to use (0-based). */
+  frameIndex: number;
+}
+
 /** Discriminated union of all node parameter types. */
 export type PipelineNodeParams =
   | LoadStructureParams
@@ -469,7 +538,9 @@ export type PipelineNodeParams =
   | LabelGeneratorParams
   | PolyhedronGeneratorParams
   | SurfaceMeshParams
-  | VectorOverlayParams;
+  | VectorOverlayParams
+  | ContactMapParams
+  | RamachandranParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -532,6 +603,10 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       };
     case "vector_overlay":
       return { type, scale: 1.0 };
+    case "contact_map":
+      return { type, distanceCutoff: 8.0, frameIndex: 0 };
+    case "ramachandran":
+      return { type, frameIndex: 0 };
   }
 }
 
@@ -593,6 +668,7 @@ export interface ViewportState {
   labels: LabelData[];
   meshes: MeshData[];
   vectors: VectorData[];
+  plots: PlotData[];
   perspective: boolean;
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
@@ -607,6 +683,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   labels: [],
   meshes: [],
   vectors: [],
+  plots: [],
   perspective: false,
   cellAxesVisible: true,
   pivotMarkerVisible: true,

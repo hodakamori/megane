@@ -45,6 +45,8 @@ import { SurfaceMeshNode } from "./nodes/SurfaceMeshNode";
 import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
+import { ContactMapNode } from "./nodes/ContactMapNode";
+import { RamachandranNode } from "./nodes/RamachandranNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { RenderModal } from "./RenderModal";
 import { ShareDialog } from "./ShareDialog";
@@ -66,6 +68,8 @@ const nodeTypes = {
   polyhedron_generator: PolyhedronGeneratorNode,
   surface_mesh: SurfaceMeshNode,
   vector_overlay: VectorOverlayNode,
+  contact_map: ContactMapNode,
+  ramachandran: RamachandranNode,
 };
 
 const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineNodeType[] }[] = [
@@ -81,6 +85,11 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
     category: "overlay",
     label: "Overlay",
     types: ["label_generator", "polyhedron_generator", "vector_overlay"],
+  },
+  {
+    category: "analysis",
+    label: "Analysis",
+    types: ["contact_map", "ramachandran"],
   },
 ];
 
@@ -296,6 +305,25 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ReactNode> = {
       <polygon points="12 2 2 7 12 12 22 7 12 2" />
       <polyline points="2 17 12 22 22 17" />
       <polyline points="2 12 12 17 22 12" />
+    </svg>
+  ),
+  analysis: (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      style={{ flexShrink: 0 }}
+    >
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   ),
   viewport: (

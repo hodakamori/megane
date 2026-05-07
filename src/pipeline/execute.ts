@@ -23,6 +23,8 @@ import type {
   PolyhedronGeneratorParams,
   SurfaceMeshParams,
   VectorOverlayParams,
+  ContactMapParams,
+  RamachandranParams,
   PipelineNodeType,
   NodeError,
   ParticleData,
@@ -44,6 +46,8 @@ import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
 import { executeViewport } from "./executors/viewport";
+import { executeContactMap } from "./executors/contactMap";
+import { executeRamachandran } from "./executors/ramachandran";
 
 export interface PipelineNodeData {
   params: PipelineNodeParams;
@@ -259,6 +263,34 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "contact_map": {
+        const outputs = executeContactMap(data.params as ContactMapParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (!outputs.has("plot")) {
+          addError(id, {
+            message:
+              "No Cα backbone data found — contact map requires a structure with backbone atoms (PDB, GRO, mmCIF)",
+            severity: "warning",
+          });
+        }
+        break;
+      }
+      case "ramachandran": {
+        const outputs = executeRamachandran(data.params as RamachandranParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (!outputs.has("plot")) {
+          addError(id, {
+            message:
+              "No backbone N–Cα–C pattern found — Ramachandran requires a protein structure (PDB, GRO, mmCIF)",
+            severity: "warning",
+          });
         }
         break;
       }

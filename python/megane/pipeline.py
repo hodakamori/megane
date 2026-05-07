@@ -416,6 +416,58 @@ class VectorOverlay(PipelineNode):
         self.scale = scale
 
 
+class ContactMap(PipelineNode):
+    """Compute a residue–residue Cα contact map.
+
+    Produces a heatmap plot showing pairwise Cα–Cα distances. Residue pairs
+    within *distance_cutoff* Å are highlighted as contacts. Requires backbone
+    data (PDB, GRO, mmCIF structures).
+
+    Args:
+        distance_cutoff: Cα–Cα distance threshold in Å (default 8.0).
+        frame_index: Trajectory frame to analyse (0-based). Use ``-1`` to
+                     average the distance matrix over all frames.
+
+    Ports:
+        inp.particle   — structure with Cα backbone data
+        inp.trajectory — optional trajectory for multi-frame averaging
+        out.plot       — heatmap plot wired into the Viewport ``plot`` port
+    """
+
+    _node_type = "contact_map"
+    _out_ports = {"plot": "plot"}
+    _inp_ports = {"particle": "particle", "trajectory": "trajectory"}
+
+    def __init__(self, *, distance_cutoff: float = 8.0, frame_index: int = 0) -> None:
+        super().__init__()
+        self.distance_cutoff = distance_cutoff
+        self.frame_index = frame_index
+
+
+class Ramachandran(PipelineNode):
+    """Compute backbone φ/ψ dihedral angles (Ramachandran plot).
+
+    Produces a scatter plot of φ vs ψ angles for every residue with complete
+    N–Cα–C backbone context. Requires a protein structure (PDB, GRO, mmCIF).
+
+    Args:
+        frame_index: Trajectory frame to analyse (0-based, default 0).
+
+    Ports:
+        inp.particle   — protein structure with backbone atoms
+        inp.trajectory — optional trajectory for per-frame analysis
+        out.plot       — scatter plot wired into the Viewport ``plot`` port
+    """
+
+    _node_type = "ramachandran"
+    _out_ports = {"plot": "plot"}
+    _inp_ports = {"particle": "particle", "trajectory": "trajectory"}
+
+    def __init__(self, *, frame_index: int = 0) -> None:
+        super().__init__()
+        self.frame_index = frame_index
+
+
 class Viewport(PipelineNode):
     """3D rendering output node.
 
@@ -429,6 +481,7 @@ class Viewport(PipelineNode):
         inp.label    — text labels
         inp.mesh     — polyhedra mesh
         inp.vector   — vector field
+        inp.plot     — analysis plot (contact map, Ramachandran, …)
     """
 
     _node_type = "viewport"
@@ -441,6 +494,7 @@ class Viewport(PipelineNode):
         "label": "label",
         "mesh": "mesh",
         "vector": "vector",
+        "plot": "plot",
     }
 
     def __init__(
@@ -836,6 +890,11 @@ class Pipeline:
             base["fileName"] = node.path
         elif isinstance(node, VectorOverlay):
             base["scale"] = node.scale
+        elif isinstance(node, ContactMap):
+            base["distanceCutoff"] = node.distance_cutoff
+            base["frameIndex"] = node.frame_index
+        elif isinstance(node, Ramachandran):
+            base["frameIndex"] = node.frame_index
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible

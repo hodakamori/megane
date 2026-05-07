@@ -14,6 +14,7 @@ import { PipelineEditor } from "./PipelineEditor";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
+import { AnalysisPlotsPanel } from "./AnalysisPlotsPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -141,6 +142,7 @@ export function MeganeViewer({
   // tree because it changes identity only on file load (snapshots are
   // pinned to the LoadStructure's NodeSnapshotData).
   const snapshot = usePipelineStore((s) => s.viewportState.particles[0]?.source ?? null);
+  const plots = usePipelineStore((s) => s.viewportState.plots);
 
   // Wire up node load handlers (structure, trajectory, vector) and track primary node
   const primaryNodeIdRef = useNodeLoadHandlers({
@@ -478,6 +480,7 @@ export function MeganeViewer({
         elements={snapshot?.elements ?? null}
         onClear={handleClearSelection}
       />
+      <AnalysisPlotsPanel plots={plots} />
     </div>
   );
 }
