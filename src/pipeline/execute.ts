@@ -23,6 +23,8 @@ import type {
   PolyhedronGeneratorParams,
   SurfaceMeshParams,
   VectorOverlayParams,
+  LoadVolumetricParams,
+  IsosurfaceParams,
   PipelineNodeType,
   NodeError,
   ParticleData,
@@ -43,6 +45,8 @@ import { executePolyhedronGenerator } from "./executors/polyhedronGenerator";
 import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
+import { executeLoadVolumetric } from "./executors/loadVolumetric";
+import { executeIsosurface } from "./executors/isosurface";
 import { executeViewport } from "./executors/viewport";
 
 export interface PipelineNodeData {
@@ -259,6 +263,22 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "load_volumetric": {
+        const outputs = executeLoadVolumetric(data.params as LoadVolumetricParams);
+        edgeOutputs.set(id, outputs);
+        if (!outputs.has("volumetric")) {
+          addError(id, { message: "No volumetric data loaded", severity: "warning" });
+        }
+        break;
+      }
+      case "isosurface": {
+        const outputs = executeIsosurface(data.params as IsosurfaceParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("volumetric")?.length) {
+          addError(id, { message: "No volumetric input", severity: "warning" });
         }
         break;
       }
