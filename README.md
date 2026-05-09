@@ -160,6 +160,7 @@ function App() {
 | MOL2 | `.mol2` | Tripos MOL2 (multi-molecule, aromatic bonds) |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | CIF | `.cif` | Crystallographic Information File |
+| mmCIF | `.mmcif`, `.cif` | Macromolecular CIF (PDBx/mmCIF) |
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
 
 ### Trajectory formats (`LoadTrajectory` node)
@@ -170,6 +171,7 @@ function App() {
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj` | LAMMPS dump trajectory |
+| AMBER NetCDF | `.nc` | AMBER binary trajectory (NetCDF format) |
 
 ## Development
 
