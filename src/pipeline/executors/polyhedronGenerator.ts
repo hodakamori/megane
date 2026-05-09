@@ -1,10 +1,5 @@
 import type { PipelineData, ParticleData, MeshData, PolyhedronGeneratorParams } from "../types";
-import {
-  getColor,
-  getCovalentRadius,
-  isMetalLike,
-  isDefaultLigand,
-} from "../../constants";
+import { getColor, getCovalentRadius, isMetalLike, isDefaultLigand } from "../../constants";
 import { computeConvexHull } from "../../logic/convexHull";
 import { invert3x3 } from "./mathUtils";
 

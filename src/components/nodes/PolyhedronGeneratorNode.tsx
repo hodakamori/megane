@@ -15,11 +15,7 @@ import type { PipelineNodeData } from "../../pipeline/execute";
 import type { PolyhedronGeneratorParams } from "../../pipeline/types";
 import { usePipelineStore } from "../../pipeline/store";
 import { getElementsPresentInUpstream } from "../../pipeline/upstream";
-import {
-  ELEMENT_SYMBOLS,
-  isMetalLike,
-  isDefaultLigand,
-} from "../../constants";
+import { ELEMENT_SYMBOLS, isMetalLike, isDefaultLigand } from "../../constants";
 import { NodeShell } from "./NodeShell";
 
 const labelStyle: React.CSSProperties = {
@@ -271,9 +267,7 @@ export function PolyhedronGeneratorNode({ id, data }: NodeProps<Node<PipelineNod
                   max={10}
                   step={0.5}
                   value={params.edgeWidth}
-                  onChange={(e) =>
-                    updateNodeParams(id, { edgeWidth: parseFloat(e.target.value) })
-                  }
+                  onChange={(e) => updateNodeParams(id, { edgeWidth: parseFloat(e.target.value) })}
                   style={sliderStyle}
                 />
                 <span style={valueStyle}>{params.edgeWidth.toFixed(1)}</span>

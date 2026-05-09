@@ -411,25 +411,23 @@ export class AddPolyhedra extends PipelineNode {
   public edgeColor: string;
   public edgeWidth: number;
 
-  constructor(
-    {
-      excludedCenters = [],
-      excludedLigands = [],
-      cutoffTolerance = 1.15,
-      opacity = 0.5,
-      showEdges = false,
-      edgeColor = "#dddddd",
-      edgeWidth = 3.0,
-    }: {
-      excludedCenters?: number[];
-      excludedLigands?: number[];
-      cutoffTolerance?: number;
-      opacity?: number;
-      showEdges?: boolean;
-      edgeColor?: string;
-      edgeWidth?: number;
-    } = {},
-  ) {
+  constructor({
+    excludedCenters = [],
+    excludedLigands = [],
+    cutoffTolerance = 1.15,
+    opacity = 0.5,
+    showEdges = false,
+    edgeColor = "#dddddd",
+    edgeWidth = 3.0,
+  }: {
+    excludedCenters?: number[];
+    excludedLigands?: number[];
+    cutoffTolerance?: number;
+    opacity?: number;
+    showEdges?: boolean;
+    edgeColor?: string;
+    edgeWidth?: number;
+  } = {}) {
     super();
     this.excludedCenters = excludedCenters;
     this.excludedLigands = excludedLigands;
