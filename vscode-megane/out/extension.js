@@ -33,6 +33,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MeganeEditorProvider = void 0;
+exports.createFrameStatusBarItem = createFrameStatusBarItem;
+exports.createSelectionStatusBarItem = createSelectionStatusBarItem;
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
@@ -126,18 +129,32 @@ class MeganePipelineEditorProvider {
         webview.html = getHtmlForWebview(webview, mediaDir);
     }
 }
+function createFrameStatusBarItem() {
+    const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    item.tooltip = "Current trajectory frame";
+    return item;
+}
+function createSelectionStatusBarItem() {
+    const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+    item.tooltip = "Current atom selection or measurement";
+    return item;
+}
 class MeganeEditorProvider {
     context;
     static viewType = "megane.structureViewer";
+    activePanel = null;
     constructor(context) {
         this.context = context;
     }
-    static register(context) {
-        const provider = new MeganeEditorProvider(context);
-        return vscode.window.registerCustomEditorProvider(MeganeEditorProvider.viewType, provider, {
-            webviewOptions: { retainContextWhenHidden: true },
-            supportsMultipleEditorsPerDocument: false,
-        });
+    /**
+     * Programmatically seek the active megane viewer to a trajectory frame.
+     * Returns `true` if a panel was active and the message was posted, `false` otherwise.
+     */
+    seekFrame(frame) {
+        if (!this.activePanel)
+            return false;
+        this.activePanel.webview.postMessage({ type: "seekFrame", frame });
+        return true;
     }
     openCustomDocument(uri, _openContext, _token) {
         return { uri, dispose: () => { } };
@@ -171,14 +188,56 @@ class MeganeEditorProvider {
         catch (err) {
             payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
         }
+        const frameStatusBar = createFrameStatusBarItem();
+        const selectionStatusBar = createSelectionStatusBarItem();
+        this.activePanel = webviewPanel;
+        webviewPanel.onDidChangeViewState(({ webviewPanel: panel }) => {
+            if (panel.active)
+                this.activePanel = panel;
+        });
         webview.onDidReceiveMessage((message) => {
             if (message.type === "ready") {
                 webview.postMessage(payload);
+                return;
             }
+            if (message.type === "frameChange") {
+                const frame = message.frame;
+                frameStatusBar.text = `$(megane-frame) Frame ${frame}`;
+                frameStatusBar.show();
+                return;
+            }
+            if (message.type === "selectionChange") {
+                const atoms = message.selection.atoms;
+                if (atoms.length === 0) {
+                    selectionStatusBar.hide();
+                }
+                else {
+                    selectionStatusBar.text = `$(megane-atom) ${atoms.length} atom${atoms.length === 1 ? "" : "s"} selected`;
+                    selectionStatusBar.show();
+                }
+                return;
+            }
+            if (message.type === "measurementChange") {
+                const measurement = message.measurement;
+                if (!measurement) {
+                    selectionStatusBar.hide();
+                }
+                else {
+                    selectionStatusBar.text = `$(megane-atom) ${measurement.label}`;
+                    selectionStatusBar.show();
+                }
+            }
+        });
+        webviewPanel.onDidDispose(() => {
+            if (this.activePanel === webviewPanel)
+                this.activePanel = null;
+            frameStatusBar.dispose();
+            selectionStatusBar.dispose();
         });
         webview.html = getHtmlForWebview(webview, mediaDir);
     }
 }
+exports.MeganeEditorProvider = MeganeEditorProvider;
 function getHtmlForWebview(webview, mediaDir) {
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "webview.js"));
     const wasmUri = webview.asWebviewUri(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm"));
@@ -232,8 +291,15 @@ function getNonce() {
     return text;
 }
 function activate(context) {
-    context.subscriptions.push(MeganeEditorProvider.register(context));
+    const editorProvider = new MeganeEditorProvider(context);
+    context.subscriptions.push(vscode.window.registerCustomEditorProvider(MeganeEditorProvider.viewType, editorProvider, {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+    }));
     context.subscriptions.push(MeganePipelineEditorProvider.register(context));
+    context.subscriptions.push(vscode.commands.registerCommand("megane.seekFrame", (frame) => {
+        editorProvider.seekFrame(frame);
+    }));
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map
