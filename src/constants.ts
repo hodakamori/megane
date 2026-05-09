@@ -202,6 +202,89 @@ export const VDW_RADII: Record<number, number> = {
 
 export const DEFAULT_RADIUS = 1.5;
 
+/**
+ * Covalent radii in Angstroms (Cordero et al. 2008, "Covalent radii revisited",
+ * Dalton Trans., 2832-2838). Used for VESTA-style automatic polyhedra cutoff
+ * detection: per-pair cutoff = (r_cov[center] + r_cov[ligand]) × tolerance.
+ *
+ * Stays consistent with the smaller table in `crates/megane-core/src/atomic.rs`.
+ */
+export const COVALENT_RADII: Record<number, number> = {
+  1: 0.31, 2: 0.28,
+  3: 1.28, 4: 0.96, 5: 0.84, 6: 0.76, 7: 0.71, 8: 0.66, 9: 0.57, 10: 0.58,
+  11: 1.66, 12: 1.41, 13: 1.21, 14: 1.11, 15: 1.07, 16: 1.05, 17: 1.02, 18: 1.06,
+  19: 2.03, 20: 1.76, 21: 1.7, 22: 1.6, 23: 1.53, 24: 1.39, 25: 1.39, 26: 1.32,
+  27: 1.26, 28: 1.24, 29: 1.32, 30: 1.22, 31: 1.22, 32: 1.2, 33: 1.19, 34: 1.2,
+  35: 1.2, 36: 1.16,
+  37: 2.2, 38: 1.95, 39: 1.9, 40: 1.75, 41: 1.64, 42: 1.54, 43: 1.47, 44: 1.46,
+  45: 1.42, 46: 1.39, 47: 1.45, 48: 1.44, 49: 1.42, 50: 1.39, 51: 1.39, 52: 1.38,
+  53: 1.39, 54: 1.4,
+  55: 2.44, 56: 2.15,
+  57: 2.07, 58: 2.04, 59: 2.03, 60: 2.01, 61: 1.99, 62: 1.98, 63: 1.98, 64: 1.96,
+  65: 1.94, 66: 1.92, 67: 1.92, 68: 1.89, 69: 1.9, 70: 1.87, 71: 1.87,
+  72: 1.75, 73: 1.7, 74: 1.62, 75: 1.51, 76: 1.44, 77: 1.41, 78: 1.36, 79: 1.36,
+  80: 1.32, 81: 1.45, 82: 1.46, 83: 1.48, 84: 1.4, 85: 1.5, 86: 1.5,
+  87: 2.6, 88: 2.21,
+  89: 2.15, 90: 2.06, 91: 2.0, 92: 1.96, 93: 1.9, 94: 1.87, 95: 1.8, 96: 1.69,
+};
+
+/** Fallback covalent radius (carbon-like) for elements outside the table. */
+export const DEFAULT_COVALENT_RADIUS = 0.77;
+
+export function getCovalentRadius(atomicNum: number): number {
+  return COVALENT_RADII[atomicNum] ?? DEFAULT_COVALENT_RADIUS;
+}
+
+/**
+ * Atomic numbers treated as polyhedron-center candidates: alkali, alkaline-earth,
+ * transition, post-transition metals, lanthanides and actinides — plus the
+ * metalloids B, Si, Ge, As, Sb, Te (VESTA includes Si/Ge/As as centers; we
+ * extend to the canonical metalloid set so e.g. borate/silicate frameworks
+ * draw correctly out of the box).
+ */
+export const METAL_LIKE_Z: ReadonlySet<number> = new Set<number>([
+  3, 4, 5, // Li, Be, B
+  11, 12, 13, 14, // Na, Mg, Al, Si
+  19, 20, // K, Ca
+  21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, // Sc..As
+  37, 38, // Rb, Sr
+  39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, // Y..Te
+  55, 56, // Cs, Ba
+  57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, // La..Lu
+  72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, // Hf..Po
+  87, 88, // Fr, Ra
+  89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, // Ac..Lr
+]);
+
+/**
+ * Atomic numbers treated as default ligand candidates — the typical anion-
+ * forming non-metals. Carbon is deliberately excluded so generic small-molecule
+ * inputs don't sprout spurious organic polyhedra; users can re-include via
+ * exclusion (i.e. by removing C from `excludedLigands`) once we ever extend the
+ * candidate set, but for now the candidate set itself never contains C.
+ */
+export const DEFAULT_LIGAND_Z: ReadonlySet<number> = new Set<number>([
+  7, // N
+  8, // O
+  9, // F
+  15, // P
+  16, // S
+  17, // Cl
+  33, // As
+  34, // Se
+  35, // Br
+  52, // Te
+  53, // I
+]);
+
+export function isMetalLike(atomicNum: number): boolean {
+  return METAL_LIKE_Z.has(atomicNum);
+}
+
+export function isDefaultLigand(atomicNum: number): boolean {
+  return DEFAULT_LIGAND_Z.has(atomicNum);
+}
+
 /** Ball-and-stick atom radius scale factor (fraction of vdW radius). */
 export const BALL_STICK_ATOM_SCALE = 0.3;
 

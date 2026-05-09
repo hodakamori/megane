@@ -210,9 +210,9 @@ describe("AddLabels", () => {
 describe("AddPolyhedra", () => {
   it("serializes all parameters", () => {
     const node = new AddPolyhedra({
-      centerElements: [22],
-      ligandElements: [8],
-      maxDistance: 2.5,
+      excludedCenters: [22],
+      excludedLigands: [8],
+      cutoffTolerance: 1.3,
       opacity: 0.5,
       showEdges: true,
       edgeColor: "#ff0000",
@@ -220,9 +220,9 @@ describe("AddPolyhedra", () => {
     });
     expect(node._toSerializedParams()).toMatchObject({
       type: "polyhedron_generator",
-      centerElements: [22],
-      ligandElements: [8],
-      maxDistance: 2.5,
+      excludedCenters: [22],
+      excludedLigands: [8],
+      cutoffTolerance: 1.3,
       opacity: 0.5,
       showEdges: true,
       edgeColor: "#ff0000",
@@ -230,11 +230,12 @@ describe("AddPolyhedra", () => {
     });
   });
 
-  it("uses defaults for optional params", () => {
-    const node = new AddPolyhedra({ centerElements: [14] });
+  it("uses VESTA-style auto-detect defaults when no params given", () => {
+    const node = new AddPolyhedra();
     expect(node._toSerializedParams()).toMatchObject({
-      ligandElements: [8],
-      maxDistance: 2.5,
+      excludedCenters: [],
+      excludedLigands: [],
+      cutoffTolerance: 1.15,
       opacity: 0.5,
       showEdges: false,
       edgeColor: "#dddddd",

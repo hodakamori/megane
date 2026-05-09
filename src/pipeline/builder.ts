@@ -403,35 +403,37 @@ export class AddPolyhedra extends PipelineNode {
   protected readonly _outPorts = { mesh: "mesh" };
   protected readonly _inpPorts = { particle: "particle" };
 
-  public centerElements: number[];
-  public ligandElements: number[];
-  public maxDistance: number;
+  public excludedCenters: number[];
+  public excludedLigands: number[];
+  public cutoffTolerance: number;
   public opacity: number;
   public showEdges: boolean;
   public edgeColor: string;
   public edgeWidth: number;
 
-  constructor({
-    centerElements,
-    ligandElements = [8],
-    maxDistance = 2.5,
-    opacity = 0.5,
-    showEdges = false,
-    edgeColor = "#dddddd",
-    edgeWidth = 3.0,
-  }: {
-    centerElements: number[];
-    ligandElements?: number[];
-    maxDistance?: number;
-    opacity?: number;
-    showEdges?: boolean;
-    edgeColor?: string;
-    edgeWidth?: number;
-  }) {
+  constructor(
+    {
+      excludedCenters = [],
+      excludedLigands = [],
+      cutoffTolerance = 1.15,
+      opacity = 0.5,
+      showEdges = false,
+      edgeColor = "#dddddd",
+      edgeWidth = 3.0,
+    }: {
+      excludedCenters?: number[];
+      excludedLigands?: number[];
+      cutoffTolerance?: number;
+      opacity?: number;
+      showEdges?: boolean;
+      edgeColor?: string;
+      edgeWidth?: number;
+    } = {},
+  ) {
     super();
-    this.centerElements = centerElements;
-    this.ligandElements = ligandElements;
-    this.maxDistance = maxDistance;
+    this.excludedCenters = excludedCenters;
+    this.excludedLigands = excludedLigands;
+    this.cutoffTolerance = cutoffTolerance;
     this.opacity = opacity;
     this.showEdges = showEdges;
     this.edgeColor = edgeColor;
@@ -441,9 +443,9 @@ export class AddPolyhedra extends PipelineNode {
   _toSerializedParams() {
     return {
       type: this.nodeType,
-      centerElements: this.centerElements,
-      ligandElements: this.ligandElements,
-      maxDistance: this.maxDistance,
+      excludedCenters: this.excludedCenters,
+      excludedLigands: this.excludedLigands,
+      cutoffTolerance: this.cutoffTolerance,
       opacity: this.opacity,
       showEdges: this.showEdges,
       edgeColor: this.edgeColor,

@@ -14,7 +14,6 @@ import type {
   LoadTrajectoryParams,
   LoadVectorParams,
   StreamingParams,
-  PolyhedronGeneratorParams,
 } from "./types";
 import { NODE_PORTS } from "./types";
 import { topologicalSort } from "./graph";
@@ -163,22 +162,6 @@ export function validatePipeline(
               severity: "error",
             });
           }
-        }
-        break;
-      }
-      case "polyhedron_generator": {
-        const p = params as PolyhedronGeneratorParams;
-        if (p.centerElements.length === 0) {
-          addError(node.id, {
-            message: "No center elements selected",
-            severity: "error",
-          });
-        }
-        if (p.ligandElements.length === 0) {
-          addError(node.id, {
-            message: "No ligand elements selected",
-            severity: "error",
-          });
         }
         break;
       }
