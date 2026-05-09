@@ -20,7 +20,7 @@
 Required tools (install if missing):
 - `wasm-pack`: `cargo install wasm-pack`
 - `maturin`: `pip install maturin` or `uv pip install maturin`
-- Node.js 22+, Rust/Cargo, Python 3.11, uv
+- Node.js 22+, Rust/Cargo, Python 3.10+, uv
 
 Setup sequence:
 ```
