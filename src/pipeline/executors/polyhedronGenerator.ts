@@ -1,5 +1,5 @@
 import type { PipelineData, ParticleData, MeshData, PolyhedronGeneratorParams } from "../types";
-import { getColor } from "../../constants";
+import { getColor, getCovalentRadius, isMetalLike, isDefaultLigand } from "../../constants";
 import { computeConvexHull } from "../../logic/convexHull";
 import { invert3x3 } from "./mathUtils";
 
@@ -38,27 +38,52 @@ export function executePolyhedronGenerator(
 
   const snapshot = particleData.source;
   const { positions, elements, nAtoms } = snapshot;
-  const centerSet = new Set(params.centerElements);
-  const ligandSet = new Set(params.ligandElements);
+
+  // Auto-detect candidate centers and ligands from the elements actually
+  // present in the structure, then subtract user opt-outs.
+  const presentZ = new Set<number>();
+  for (let i = 0; i < nAtoms; i++) presentZ.add(elements[i]);
+
+  const excludedCenters = new Set(params.excludedCenters);
+  const excludedLigands = new Set(params.excludedLigands);
+
+  const centerSet = new Set<number>();
+  const ligandSet = new Set<number>();
+  for (const z of presentZ) {
+    if (isMetalLike(z) && !excludedCenters.has(z)) centerSet.add(z);
+    if (isDefaultLigand(z) && !excludedLigands.has(z)) ligandSet.add(z);
+  }
 
   if (centerSet.size === 0 || ligandSet.size === 0) return outputs;
 
   const centerIndices: number[] = [];
   const ligandIndices: number[] = [];
   for (let i = 0; i < nAtoms; i++) {
-    if (centerSet.has(elements[i])) centerIndices.push(i);
-    if (ligandSet.has(elements[i])) ligandIndices.push(i);
+    const z = elements[i];
+    if (centerSet.has(z)) centerIndices.push(i);
+    if (ligandSet.has(z)) ligandIndices.push(i);
   }
 
   if (centerIndices.length === 0 || ligandIndices.length === 0) return outputs;
+
+  // Per-pair squared cutoff = ((r_cov[c] + r_cov[l]) * tolerance)^2.
+  const tol = params.cutoffTolerance;
+  const cutoffSq = new Map<number, Map<number, number>>();
+  for (const cz of centerSet) {
+    const inner = new Map<number, number>();
+    const rc = getCovalentRadius(cz);
+    for (const lz of ligandSet) {
+      const d = (rc + getCovalentRadius(lz)) * tol;
+      inner.set(lz, d * d);
+    }
+    cutoffSq.set(cz, inner);
+  }
 
   const box = snapshot.box;
   let boxInv: Float32Array | null = null;
   if (box && box.some((v) => v !== 0)) {
     boxInv = invert3x3(box);
   }
-
-  const maxDistSq = params.maxDistance * params.maxDistance;
 
   const allPositions: number[] = [];
   const allIndices: number[] = [];
@@ -68,23 +93,28 @@ export function executePolyhedronGenerator(
   let vertexOffset = 0;
 
   for (const ci of centerIndices) {
+    const cz = elements[ci];
+    const cutoffsForCenter = cutoffSq.get(cz)!;
     const cx = positions[ci * 3];
     const cy = positions[ci * 3 + 1];
-    const cz = positions[ci * 3 + 2];
+    const czPos = positions[ci * 3 + 2];
 
     const ligandPoints: number[] = [];
     for (const li of ligandIndices) {
+      const lz = elements[li];
+      const cutoffSqVal = cutoffsForCenter.get(lz);
+      if (cutoffSqVal === undefined) continue;
       let dx = positions[li * 3] - cx;
       let dy = positions[li * 3 + 1] - cy;
-      let dz = positions[li * 3 + 2] - cz;
+      let dz = positions[li * 3 + 2] - czPos;
 
       if (boxInv && box) {
         [dx, dy, dz] = minimumImage(dx, dy, dz, box, boxInv);
       }
 
       const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq <= maxDistSq && distSq > 0.01) {
-        ligandPoints.push(cx + dx, cy + dy, cz + dz);
+      if (distSq <= cutoffSqVal && distSq > 0.01) {
+        ligandPoints.push(cx + dx, cy + dy, czPos + dz);
       }
     }
 
@@ -95,7 +125,7 @@ export function executePolyhedronGenerator(
     const hull = computeConvexHull(pts, nLigands);
     if (!hull) continue;
 
-    const [cr, cg, cb] = getColor(elements[ci]);
+    const [cr, cg, cb] = getColor(cz);
 
     const nVerts = hull.vertices.length / 3;
     for (let v = 0; v < nVerts; v++) {
