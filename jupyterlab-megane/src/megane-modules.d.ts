@@ -31,6 +31,17 @@ declare module "@megane/pipeline/storeSnapshot" {
   export function capturePipelineStore(state: any): PipelineStoreSnapshot;
 }
 
+declare module "@megane/stores/useThemeStore" {
+  export const useThemeStore: <T>(selector: (s: any) => T) => T;
+}
+
+declare module "@megane/stores/usePlaybackStore" {
+  export const usePlaybackStore: {
+    getState(): { seekFrame(index: number): void; [key: string]: any };
+    [key: string]: any;
+  };
+}
+
 declare module "@megane/styles/megane.css";
 
 declare module "@megane/tour/useTour" {

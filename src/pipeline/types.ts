@@ -471,9 +471,23 @@ export interface VectorOverlayParams {
 
 export interface PolyhedronGeneratorParams {
   type: "polyhedron_generator";
-  centerElements: number[]; // atomic numbers of center atoms
-  ligandElements: number[]; // atomic numbers of ligand atoms
-  maxDistance: number; // max bond distance in Angstroms
+  /**
+   * Atomic numbers excluded from the auto-detected center set. VESTA-style:
+   * by default every metal/metalloid present in the input is a polyhedron
+   * center; the user opts OUT specific ones via this list.
+   */
+  excludedCenters: number[];
+  /**
+   * Atomic numbers excluded from the auto-detected ligand set. Default ligand
+   * candidates are the typical anion-formers present in the input
+   * (O, N, F, S, Cl, Br, I, P, Se, Te, As — never H, noble gases, metals or C).
+   */
+  excludedLigands: number[];
+  /**
+   * Multiplier on (r_cov[center] + r_cov[ligand]) to obtain the per-pair bond
+   * cutoff. 1.0 ≈ ideal covalent contact. VESTA's default search range is ~1.15.
+   */
+  cutoffTolerance: number;
   opacity: number; // face opacity 0-1
   showEdges: boolean; // wireframe edges
   edgeColor: string; // edge color as hex string
@@ -575,9 +589,9 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
     case "polyhedron_generator":
       return {
         type,
-        centerElements: [],
-        ligandElements: [8], // oxygen by default
-        maxDistance: 2.5,
+        excludedCenters: [],
+        excludedLigands: [],
+        cutoffTolerance: 1.15,
         opacity: 0.5,
         showEdges: false,
         edgeColor: "#dddddd",

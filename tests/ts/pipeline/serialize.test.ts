@@ -103,6 +103,47 @@ describe("deserializePipeline", () => {
     expect(nodes[0].position).toEqual({ x: 0, y: 0 });
   });
 
+  it("drops legacy polyhedron_generator fields and applies new defaults", () => {
+    // Pre-VESTA pipelines pinned centerElements/ligandElements/maxDistance.
+    // The new opt-out shape replaces these with excludedCenters/excludedLigands/
+    // cutoffTolerance; loading a legacy file should silently discard the old
+    // fields and adopt the auto-detect defaults.
+    const json: SerializedPipeline = {
+      version: 3,
+      nodes: [
+        {
+          id: "poly",
+          type: "polyhedron_generator",
+          position: { x: 0, y: 0 },
+          centerElements: [22],
+          ligandElements: [8],
+          maxDistance: 2.5,
+          opacity: 0.7,
+          showEdges: true,
+          edgeColor: "#abcdef",
+          edgeWidth: 4,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
+      ],
+      edges: [],
+    };
+    const { nodes } = deserializePipeline(json);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const params = nodes[0].data.params as any;
+    expect(params.excludedCenters).toEqual([]);
+    expect(params.excludedLigands).toEqual([]);
+    expect(params.cutoffTolerance).toBe(1.15);
+    // Non-legacy fields the user set should still survive.
+    expect(params.opacity).toBe(0.7);
+    expect(params.showEdges).toBe(true);
+    expect(params.edgeColor).toBe("#abcdef");
+    expect(params.edgeWidth).toBe(4);
+    // Legacy fields are gone.
+    expect(params.centerElements).toBeUndefined();
+    expect(params.ligandElements).toBeUndefined();
+    expect(params.maxDistance).toBeUndefined();
+  });
+
   it("defaults enabled to true when not specified", () => {
     const json: SerializedPipeline = {
       version: 3,

@@ -169,9 +169,11 @@ function createSolidTemplate(): {
         data: {
           params: {
             type: "polyhedron_generator",
-            centerElements: [22], // Ti
-            ligandElements: [8], // O
-            maxDistance: 2.5,
+            // VESTA-style auto-detect: every metal × every anion-former in the
+            // structure. For the perovskite this resolves to Ti–O octahedra.
+            excludedCenters: [],
+            excludedLigands: [],
+            cutoffTolerance: 1.15,
             opacity: 0.5,
             showEdges: false,
             edgeColor: "#dddddd",

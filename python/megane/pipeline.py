@@ -368,7 +368,12 @@ class AddLabels(PipelineNode):
 
 
 class AddPolyhedra(PipelineNode):
-    """Generate coordination polyhedra mesh.
+    """Generate coordination polyhedra mesh (VESTA-style auto-detection).
+
+    By default a polyhedron is drawn for every metal/metalloid center
+    coordinated to every typical anion-former ligand present in the input
+    structure. Use ``excluded_centers`` / ``excluded_ligands`` to opt out
+    specific atomic numbers, mirroring VESTA's checkbox UI.
 
     Ports:
         inp.particle — atom data
@@ -382,18 +387,18 @@ class AddPolyhedra(PipelineNode):
     def __init__(
         self,
         *,
-        center_elements: list[int],
-        ligand_elements: list[int] | None = None,
-        max_distance: float = 2.5,
+        excluded_centers: list[int] | None = None,
+        excluded_ligands: list[int] | None = None,
+        cutoff_tolerance: float = 1.15,
         opacity: float = 0.5,
         show_edges: bool = False,
         edge_color: str = "#dddddd",
         edge_width: float = 3.0,
     ) -> None:
         super().__init__()
-        self.center_elements = center_elements
-        self.ligand_elements = ligand_elements if ligand_elements is not None else [8]
-        self.max_distance = max_distance
+        self.excluded_centers = list(excluded_centers) if excluded_centers else []
+        self.excluded_ligands = list(excluded_ligands) if excluded_ligands else []
+        self.cutoff_tolerance = cutoff_tolerance
         self.opacity = opacity
         self.show_edges = show_edges
         self.edge_color = edge_color
@@ -712,10 +717,13 @@ class Pipeline:
         elif ntype == "label_generator":
             return AddLabels(source=nd.get("source", "element"))
         elif ntype == "polyhedron_generator":
+            # Legacy keys (centerElements/ligandElements/maxDistance) from the
+            # pre-VESTA include-list shape are silently dropped — old pipelines
+            # adopt the new "all auto" defaults.
             return AddPolyhedra(
-                center_elements=nd.get("centerElements", []),
-                ligand_elements=nd.get("ligandElements", [8]),
-                max_distance=nd.get("maxDistance", 2.5),
+                excluded_centers=nd.get("excludedCenters", []),
+                excluded_ligands=nd.get("excludedLigands", []),
+                cutoff_tolerance=nd.get("cutoffTolerance", 1.15),
                 opacity=nd.get("opacity", 0.5),
                 show_edges=nd.get("showEdges", False),
                 edge_color=nd.get("edgeColor", "#dddddd"),
@@ -884,9 +892,9 @@ class Pipeline:
         elif isinstance(node, AddLabels):
             base["source"] = node.source
         elif isinstance(node, AddPolyhedra):
-            base["centerElements"] = node.center_elements
-            base["ligandElements"] = node.ligand_elements
-            base["maxDistance"] = node.max_distance
+            base["excludedCenters"] = node.excluded_centers
+            base["excludedLigands"] = node.excluded_ligands
+            base["cutoffTolerance"] = node.cutoff_tolerance
             base["opacity"] = node.opacity
             base["showEdges"] = node.show_edges
             base["edgeColor"] = node.edge_color

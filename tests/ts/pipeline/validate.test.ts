@@ -151,13 +151,16 @@ describe("validatePipeline", () => {
     expect(filterErrors.some((e) => e.message.includes("Query syntax error"))).toBe(true);
   });
 
-  it("reports error for polyhedron_generator with empty centerElements", () => {
+  it("does not raise config errors for polyhedron_generator (auto-detected)", () => {
+    // The VESTA-style auto-detect node has no user-misconfigurable input
+    // surface; centers and ligands are derived from the upstream structure
+    // at execute time, so empty exclude lists are always valid.
     const nodes = [
       makeNode("ls", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: false }),
       makeNode("pg", "polyhedron_generator", {
-        centerElements: [],
-        ligandElements: [8],
-        maxDistance: 2.5,
+        excludedCenters: [],
+        excludedLigands: [],
+        cutoffTolerance: 1.15,
         opacity: 0.5,
         showEdges: false,
         edgeColor: "#dddddd",
@@ -170,26 +173,8 @@ describe("validatePipeline", () => {
       makeEdge("pg", "mesh", "vp", "mesh"),
     ];
     const errors = validatePipeline(nodes, edges);
-    expect(errors.has("pg")).toBe(true);
-    const pgErrors = errors.get("pg")!;
-    expect(pgErrors.some((e) => e.message === "No center elements selected")).toBe(true);
-  });
-
-  it("reports error for polyhedron_generator with empty ligandElements", () => {
-    const nodes = [
-      makeNode("pg", "polyhedron_generator", {
-        centerElements: [14],
-        ligandElements: [],
-        maxDistance: 2.5,
-        opacity: 0.5,
-        showEdges: false,
-        edgeColor: "#dddddd",
-        edgeWidth: 3,
-      }),
-    ];
-    const errors = validatePipeline(nodes, []);
     const pgErrors = errors.get("pg") ?? [];
-    expect(pgErrors.some((e) => e.message === "No ligand elements selected")).toBe(true);
+    expect(pgErrors.some((e) => e.severity === "error")).toBe(false);
   });
 
   it("skips config validation for disabled nodes", () => {

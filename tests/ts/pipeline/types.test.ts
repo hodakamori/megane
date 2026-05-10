@@ -143,9 +143,9 @@ describe("defaultParams", () => {
     const params = defaultParams("polyhedron_generator");
     expect(params).toEqual({
       type: "polyhedron_generator",
-      centerElements: [],
-      ligandElements: [8],
-      maxDistance: 2.5,
+      excludedCenters: [],
+      excludedLigands: [],
+      cutoffTolerance: 1.15,
       opacity: 0.5,
       showEdges: false,
       edgeColor: "#dddddd",
