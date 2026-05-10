@@ -24,7 +24,7 @@ viewer = megane.view("protein.pdb")
 viewer = megane.view_traj("protein.pdb", xtc="trajectory.xtc")
 ```
 
-[Python API Reference →](/api/python/)
+See the [Python Pipeline API guide](/guide/pipeline/python) for full documentation of the Pipeline class and all node types.
 
 ## TypeScript / JavaScript
 
@@ -38,4 +38,4 @@ The TypeScript API is used for:
 import { MeganeViewer, MoleculeRenderer } from "megane-viewer/lib";
 ```
 
-[TypeScript API Reference →](/api/typescript/)
+See the [TypeScript Pipeline guide](/guide/pipeline/typescript) for full documentation of the TypeScript pipeline API and React component props.
