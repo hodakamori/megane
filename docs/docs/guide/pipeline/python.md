@@ -93,18 +93,24 @@ Load an external trajectory file. Requires connection from a `LoadStructure` nod
 LoadTrajectory(
     *,
     xtc: str | None = None,
+    dcd: str | None = None,
+    nc: str | None = None,
     traj: str | None = None,
     xyz: str | None = None,
+    lammpstrj: str | None = None,
 )
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
+| `dcd` | `str \| None` | `None` | Path to DCD trajectory file (CHARMM/NAMD/X-PLOR) |
+| `nc` | `str \| None` | `None` | Path to AMBER NetCDF trajectory file |
 | `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
 | `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
+| `lammpstrj` | `str \| None` | `None` | Path to LAMMPS dump trajectory (`.lammpstrj` / `.dump`) |
 
-Pass exactly one of the three. **Ports:** `inp.particle`, `out.traj`
+Pass exactly one of the six. **Ports:** `inp.particle`, `out.traj`
 
 ### Streaming
 
