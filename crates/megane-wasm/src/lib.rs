@@ -1,9 +1,9 @@
-use js_sys::{Float32Array, Uint32Array, Uint8Array};
+use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    bonds, cif, dcd, gro, lammps_data, lammpstrj, mol, mol2, netcdf, parser, psf, top, traj, xtc,
-    xyz,
+    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser, psf,
+    top, traj, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -395,9 +395,24 @@ pub fn parse_mol2(text: &str) -> Result<ParseResult, JsError> {
 }
 
 /// Parse a CIF file text and return structured data.
+///
+/// Auto-detects mmCIF (PDBx/macromolecular) vs small-molecule CIF and routes
+/// to the appropriate parser.
 #[wasm_bindgen]
 pub fn parse_cif(text: &str) -> Result<ParseResult, JsError> {
-    let data = cif::parse(text).map_err(|e| JsError::new(&e))?;
+    let data = if mmcif::is_mmcif(text) {
+        mmcif::parse(text)
+    } else {
+        cif::parse(text)
+    }
+    .map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse an mmCIF (PDBx) file text and return structured data.
+#[wasm_bindgen]
+pub fn parse_mmcif(text: &str) -> Result<ParseResult, JsError> {
+    let data = mmcif::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 
@@ -405,6 +420,13 @@ pub fn parse_cif(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_lammps_data(text: &str) -> Result<ParseResult, JsError> {
     let data = lammps_data::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse an AMBER prmtop topology file (topology only, positions at origin).
+#[wasm_bindgen]
+pub fn parse_prmtop(text: &str) -> Result<ParseResult, JsError> {
+    let data = amber::parse_prmtop(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 
@@ -432,6 +454,46 @@ pub fn parse_top_bonds(text: &str, n_atoms: u32) -> Uint32Array {
         flat.push(*b);
     }
     Uint32Array::from(&flat[..])
+}
+
+/// Parse a GROMACS `.top` text with `#include` resolution.
+///
+/// `include_files` is a plain JS object mapping include path (string) to file
+/// content (string).  Missing keys are silently skipped (matches how system
+/// forcefield includes behave in practice).
+///
+/// Returns a flat `Uint32Array` `[a0, b0, a1, b1, ...]` of 0-indexed bond
+/// pairs, or throws if a circular include is detected.
+#[wasm_bindgen]
+pub fn parse_top_bonds_with_includes(
+    text: &str,
+    include_files: &Object,
+    n_atoms: u32,
+) -> Result<Uint32Array, JsError> {
+    use std::collections::HashMap;
+
+    let mut files: HashMap<String, String> = HashMap::new();
+    let keys = Object::keys(include_files);
+    for i in 0..keys.length() {
+        let key = keys.get(i);
+        let key_str = key.as_string().unwrap_or_default();
+        if let Ok(val) = Reflect::get(include_files, &key) {
+            if let Some(s) = val.as_string() {
+                files.insert(key_str, s);
+            }
+        }
+    }
+
+    let vfs = top::VirtualTopFileSystem::new(files);
+    let result =
+        top::parse_top_bonds_with_fs(text, &vfs, n_atoms as usize).map_err(|e| JsError::new(&e))?;
+
+    let mut flat: Vec<u32> = Vec::with_capacity(result.len() * 2);
+    for (a, b) in &result {
+        flat.push(*a);
+        flat.push(*b);
+    }
+    Ok(Uint32Array::from(&flat[..]))
 }
 
 /// Extract atom labels from a structure file text.

@@ -4,6 +4,7 @@
 
 import type { SelectionState, Measurement } from "../types";
 import { getElementSymbol } from "../constants";
+import { useMeasurementStore } from "../stores/useMeasurementStore";
 
 interface MeasurementPanelProps {
   selection: SelectionState;
@@ -24,7 +25,13 @@ export function MeasurementPanel({
   elements,
   onClear,
 }: MeasurementPanelProps) {
+  const addMeasurement = useMeasurementStore((s) => s.addMeasurement);
+
   if (selection.atoms.length === 0) return null;
+
+  const handlePin = () => {
+    if (measurement) addMeasurement(measurement);
+  };
 
   return (
     <div
@@ -56,26 +63,46 @@ export function MeasurementPanel({
         }}
       >
         <strong style={{ letterSpacing: "-0.01em" }}>Selection</strong>
-        <button
-          onClick={onClear}
-          data-testid="measurement-clear"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "#3b82f6",
-            fontSize: 12,
-            fontWeight: 500,
-            padding: "2px 4px",
-          }}
-        >
-          Clear
-        </button>
+        <div style={{ display: "flex", gap: 4 }}>
+          {measurement && (
+            <button
+              onClick={handlePin}
+              data-testid="measurement-pin"
+              title="Add to list"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#10b981",
+                fontSize: 12,
+                fontWeight: 500,
+                padding: "2px 4px",
+              }}
+            >
+              Pin
+            </button>
+          )}
+          <button
+            onClick={onClear}
+            data-testid="measurement-clear"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#3b82f6",
+              fontSize: 12,
+              fontWeight: 500,
+              padding: "2px 4px",
+            }}
+          >
+            Clear
+          </button>
+        </div>
       </div>
       <div style={{ marginBottom: 6, fontSize: 12, color: "#64748b" }}>
         {selection.atoms.map((idx, i) => (
           <span key={idx}>
-            {i > 0 && " \u2014 "}
+            {i > 0 && " — "}
             <strong>{elements ? getElementSymbol(elements[idx]) : "?"}</strong>
             {idx}
           </span>

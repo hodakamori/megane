@@ -22,6 +22,7 @@ import { MemoryFrameProvider } from "./pipeline/types";
 import defaultPDB from "../tests/fixtures/caffeine_water.pdb?raw";
 import defaultXtcUrl from "../tests/fixtures/caffeine_water_vibration.xtc?url";
 import perovskiteXYZ from "../tests/fixtures/perovskite_srtio3_3x3x3.xyz?raw";
+import quartzXYZ from "../tests/fixtures/quartz_sio2_2x2x2.xyz?raw";
 import ubiquitinPDB from "../tests/fixtures/1ubq.pdb?raw";
 import "./styles/megane.css";
 import { useThemeStore } from "./stores/useThemeStore";
@@ -90,6 +91,8 @@ function App() {
         await ds.local.loadXtc(xtcFile);
       } else if (pendingTemplateId === "solid") {
         await ds.local.loadText(perovskiteXYZ, "perovskite_srtio3_3x3x3.xyz");
+      } else if (pendingTemplateId === "surface_mesh") {
+        await ds.local.loadText(quartzXYZ, "quartz_sio2_2x2x2.xyz");
       } else if (pendingTemplateId === "protein") {
         await ds.local.loadText(ubiquitinPDB, "1ubq.pdb");
       } else if (pendingTemplateId === "streaming") {

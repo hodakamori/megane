@@ -58,6 +58,7 @@ from megane import (
     LoadTrajectory,
     Streaming,
     LoadVector,
+    LoadVolumetric,
     Filter,
     Modify,
     Color,
@@ -65,6 +66,7 @@ from megane import (
     AddBonds,
     AddLabels,
     AddPolyhedra,
+    Isosurface,
     VectorOverlay,
     Viewport,
     Pipeline,
@@ -81,7 +83,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). |
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop`, `.traj` (ASE binary). |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -110,7 +112,7 @@ LoadTrajectory(
 | `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
 | `lammpstrj` | `str \| None` | `None` | Path to LAMMPS dump trajectory (`.lammpstrj` / `.dump`) |
 
-Pass exactly one of the six. **Ports:** `inp.particle`, `out.traj`
+Pass exactly one. **Ports:** `inp.particle`, `out.traj`
 
 ### Streaming
 
@@ -135,6 +137,45 @@ LoadVector(path: str)
 | `path` | `str` | Path to vector data file |
 
 **Ports:** `out.vector`
+
+### LoadVolumetric
+
+Load a Gaussian CUBE file and output volumetric data for isosurface rendering.
+
+```python
+LoadVolumetric(path: str = "")
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `str` | File path to a Gaussian CUBE file (`.cube`). Parsed in the browser; the Python object only tracks the filename. |
+
+**Ports:** `out.volumetric`
+
+### Isosurface
+
+Extract an isosurface from volumetric data using marching cubes.
+
+```python
+Isosurface(
+    *,
+    iso_level: float = 0.05,
+    color: str = "#4488ff",
+    opacity: float = 0.7,
+    show_negative: bool = False,
+    negative_color: str = "#ff4444",
+)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `iso_level` | `float` | `0.05` | Contour value for the positive isosurface |
+| `color` | `str` | `"#4488ff"` | Hex color for the positive isosurface |
+| `opacity` | `float` | `0.7` | Surface transparency (0–1) |
+| `show_negative` | `bool` | `False` | Show a second isosurface at −iso_level (dual-contour for ESP maps) |
+| `negative_color` | `str` | `"#ff4444"` | Hex color for the negative isosurface |
+
+**Ports:** `inp.volumetric`, `out.mesh`
 
 ### Filter
 
@@ -212,12 +253,13 @@ Representation(*, mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms"
 Compute and display bonds.
 
 ```python
-AddBonds(*, source: Literal["distance", "structure"] = "distance")
+AddBonds(*, source: Literal["distance", "structure"] = "distance", top: str | None = None)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `source` | `str` | `"distance"` | `"distance"` for VDW-based inference, `"structure"` for file-based bonds |
+| `top` | `str \| None` | `None` | Path to a GROMACS `.top` topology file. When provided, `source` is ignored and bonds are read from the topology file. |
 
 **Ports:** `inp.particle`, `out.bond`
 

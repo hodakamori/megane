@@ -5,10 +5,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MoleculeRenderer } from "../renderer/MoleculeRenderer";
-import { captureSnapshot, captureGif, captureVideo, downloadBlob } from "../renderer/RenderCapture";
+import {
+  captureSnapshot,
+  captureGif,
+  captureVideo,
+  captureGltf,
+  captureObj,
+  downloadBlob,
+} from "../renderer/RenderCapture";
 
 type Mode = "snapshot" | "animation";
-type SnapshotFormat = "png" | "eps";
+type SnapshotFormat = "png" | "eps" | "svg" | "gltf" | "obj";
 type AnimationFormat = "gif" | "mp4";
 
 interface RenderModalProps {
@@ -184,14 +191,22 @@ export function RenderModal({
       const finalH = height * scaleFactor;
 
       if (mode === "snapshot") {
-        const blob = await captureSnapshot(renderer, {
-          width: finalW,
-          height: finalH,
-          transparent: transparent && snapshotFormat === "png",
-          format: snapshotFormat,
-        });
-        const ext = snapshotFormat === "eps" ? "eps" : "png";
-        downloadBlob(blob, `megane-render.${ext}`);
+        if (snapshotFormat === "gltf") {
+          const blob = await captureGltf(renderer);
+          downloadBlob(blob, "megane-render.glb");
+        } else if (snapshotFormat === "obj") {
+          const blob = captureObj(renderer);
+          downloadBlob(blob, "megane-render.obj");
+        } else {
+          const blob = await captureSnapshot(renderer, {
+            width: finalW,
+            height: finalH,
+            transparent: transparent && snapshotFormat === "png",
+            format: snapshotFormat as "png" | "eps" | "svg",
+          });
+          const ext = snapshotFormat === "eps" ? "eps" : snapshotFormat === "svg" ? "svg" : "png";
+          downloadBlob(blob, `megane-render.${ext}`);
+        }
       } else {
         if (animationFormat === "gif") {
           const blob = await captureGif(renderer, {
@@ -247,6 +262,7 @@ export function RenderModal({
   if (!open) return null;
 
   const hasAnimation = totalFrames > 1;
+  const is3DFormat = mode === "snapshot" && (snapshotFormat === "gltf" || snapshotFormat === "obj");
 
   return createPortal(
     <div
@@ -322,6 +338,21 @@ export function RenderModal({
                 active={snapshotFormat === "eps"}
                 onClick={() => setSnapshotFormat("eps")}
               />
+              <TabButton
+                label="SVG"
+                active={snapshotFormat === "svg"}
+                onClick={() => setSnapshotFormat("svg")}
+              />
+              <TabButton
+                label="glTF"
+                active={snapshotFormat === "gltf"}
+                onClick={() => setSnapshotFormat("gltf")}
+              />
+              <TabButton
+                label="OBJ"
+                active={snapshotFormat === "obj"}
+                onClick={() => setSnapshotFormat("obj")}
+              />
             </>
           ) : (
             <>
@@ -339,78 +370,82 @@ export function RenderModal({
           )}
         </div>
 
-        {/* Resolution */}
-        <div style={labelStyle}>Resolution</div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="number"
-            value={width}
-            onChange={(e) => handleWidthChange(parseInt(e.target.value) || 1)}
-            style={{ ...inputStyle, width: "auto", flex: 1 }}
-            min={1}
-            max={7680}
-            disabled={exporting}
-          />
-          <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600 }}>×</span>
-          <input
-            type="number"
-            value={height}
-            onChange={(e) => handleHeightChange(parseInt(e.target.value) || 1)}
-            style={{ ...inputStyle, width: "auto", flex: 1 }}
-            min={1}
-            max={4320}
-            disabled={exporting}
-          />
-        </div>
+        {/* Resolution (not applicable for 3D exports) */}
+        {!is3DFormat && (
+          <>
+            <div style={labelStyle}>Resolution</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="number"
+                value={width}
+                onChange={(e) => handleWidthChange(parseInt(e.target.value) || 1)}
+                style={{ ...inputStyle, width: "auto", flex: 1 }}
+                min={1}
+                max={7680}
+                disabled={exporting}
+              />
+              <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600 }}>×</span>
+              <input
+                type="number"
+                value={height}
+                onChange={(e) => handleHeightChange(parseInt(e.target.value) || 1)}
+                style={{ ...inputStyle, width: "auto", flex: 1 }}
+                min={1}
+                max={4320}
+                disabled={exporting}
+              />
+            </div>
 
-        {/* Scale factor + aspect lock */}
-        <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ ...labelStyle, marginTop: 0, marginBottom: 4 }}>Scale</div>
-            <select
-              value={scaleFactor}
-              onChange={(e) => setScaleFactor(parseInt(e.target.value))}
-              style={selectStyle}
-              disabled={exporting}
+            {/* Scale factor + aspect lock */}
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ ...labelStyle, marginTop: 0, marginBottom: 4 }}>Scale</div>
+                <select
+                  value={scaleFactor}
+                  onChange={(e) => setScaleFactor(parseInt(e.target.value))}
+                  style={selectStyle}
+                  disabled={exporting}
+                >
+                  <option value={1}>1×</option>
+                  <option value={2}>2×</option>
+                  <option value={4}>4×</option>
+                </select>
+              </div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  color: "#64748b",
+                  cursor: "pointer",
+                  paddingTop: 16,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={lockAspect}
+                  onChange={(e) => setLockAspect(e.target.checked)}
+                  disabled={exporting}
+                />
+                Lock aspect
+              </label>
+            </div>
+
+            {/* Output resolution preview */}
+            <div
+              style={{
+                fontSize: 11,
+                color: "#94a3b8",
+                marginTop: 6,
+              }}
             >
-              <option value={1}>1×</option>
-              <option value={2}>2×</option>
-              <option value={4}>4×</option>
-            </select>
-          </div>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 12,
-              color: "#64748b",
-              cursor: "pointer",
-              paddingTop: 16,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={lockAspect}
-              onChange={(e) => setLockAspect(e.target.checked)}
-              disabled={exporting}
-            />
-            Lock aspect
-          </label>
-        </div>
+              Output: {width * scaleFactor} × {height * scaleFactor} px
+            </div>
+          </>
+        )}
 
-        {/* Output resolution preview */}
-        <div
-          style={{
-            fontSize: 11,
-            color: "#94a3b8",
-            marginTop: 6,
-          }}
-        >
-          Output: {width * scaleFactor} × {height * scaleFactor} px
-        </div>
-
-        {/* Transparent background (PNG only for snapshot) */}
+        {/* Transparent background (PNG only for snapshot; hidden for 3D formats) */}
         {(mode === "snapshot" ? snapshotFormat === "png" : true) && (
           <>
             <div style={labelStyle}>Options</div>
@@ -533,7 +568,11 @@ export function RenderModal({
           {exporting
             ? "Exporting..."
             : mode === "snapshot"
-              ? `Export ${snapshotFormat.toUpperCase()}`
+              ? snapshotFormat === "gltf"
+                ? "Export glTF (.glb)"
+                : snapshotFormat === "obj"
+                  ? "Export OBJ"
+                  : `Export ${snapshotFormat.toUpperCase()}`
               : `Export ${animationFormat.toUpperCase()}`}
         </button>
       </div>

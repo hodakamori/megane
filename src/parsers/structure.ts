@@ -1,8 +1,8 @@
 /**
  * WASM-based structure parser wrapper.
  * Loads the Rust WASM module and converts results to megane Snapshot/Frame types.
- * Supports PDB, GRO, XYZ (single- or multi-frame), MOL/SDF, CIF,
- * LAMMPS data, and ASE .traj (binary, multi-frame) formats.
+ * Supports PDB, GRO, XYZ (single- or multi-frame), MOL/SDF, MOL2, CIF,
+ * mmCIF, LAMMPS data, AMBER topology (.prmtop), and ASE .traj (binary, multi-frame) formats.
  */
 
 import type { Snapshot, Frame, TrajectoryMeta, VectorChannel } from "../types";
@@ -60,10 +60,17 @@ interface WasmModule {
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
+  parse_mmcif: ParseFn;
   parse_lammps_data: ParseFn;
+  parse_prmtop: ParseFn;
   parse_traj: BinaryParseFn;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
+  parse_top_bonds_with_includes: (
+    text: string,
+    include_files: Record<string, string>,
+    n_atoms: number,
+  ) => Uint32Array;
   parse_psf_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_pdb_bonds: (text: string, n_atoms: number) => Uint32Array;
   extract_labels: (text: string, format: string) => string;
@@ -88,10 +95,13 @@ async function ensureInit(): Promise<void> {
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
+        parse_mmcif: wasm.parse_mmcif,
         parse_lammps_data: wasm.parse_lammps_data,
+        parse_prmtop: wasm.parse_prmtop,
         parse_traj: wasm.parse_traj,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
+        parse_top_bonds_with_includes: wasm.parse_top_bonds_with_includes,
         parse_psf_bonds: wasm.parse_psf_bonds,
         parse_pdb_bonds: wasm.parse_pdb_bonds,
         extract_labels: wasm.extract_labels,
@@ -115,9 +125,13 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_mol2;
     case ".cif":
       return wasmModule!.parse_cif;
+    case ".mmcif":
+      return wasmModule!.parse_mmcif;
     case ".data":
     case ".lammps":
       return wasmModule!.parse_lammps_data;
+    case ".prmtop":
+      return wasmModule!.parse_prmtop;
     default:
       return wasmModule!.parse_pdb;
   }
@@ -140,8 +154,9 @@ export async function parseStructureText(
 /**
  * Parse a structure File object using the WASM parser.
  * Auto-detects format from file extension (.pdb, .gro, .xyz, .mol, .sdf,
- * .cif, .data/.lammps, .traj). Returns a Snapshot (first model) and optional
- * trajectory Frames (multi-frame XYZ, multi-model PDB, ASE .traj).
+ * .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj). Returns a Snapshot
+ * (first model) and optional trajectory Frames (multi-frame XYZ, multi-model
+ * PDB, ASE .traj).
  */
 export async function parseStructureFile(file: File): Promise<StructureParseResult> {
   await ensureInit();
@@ -234,6 +249,23 @@ export async function inferBondsVdw(
 export async function parseTopBonds(text: string, nAtoms: number): Promise<Uint32Array> {
   await ensureInit();
   return wasmModule!.parse_top_bonds(text, nAtoms);
+}
+
+/**
+ * Parse a GROMACS `.top` text with `#include` resolution.
+ *
+ * `includeFiles` maps include path → file content for all `.itp` files that
+ * the topology references.  Missing keys are silently skipped (system
+ * forcefield files are typically unavailable in browser contexts).
+ * Throws if a circular include is detected.
+ */
+export async function parseTopBondsWithIncludes(
+  text: string,
+  includeFiles: Record<string, string>,
+  nAtoms: number,
+): Promise<Uint32Array> {
+  await ensureInit();
+  return wasmModule!.parse_top_bonds_with_includes(text, includeFiles, nAtoms);
 }
 
 /** Parse CHARMM/NAMD PSF topology file and extract bond pairs. */

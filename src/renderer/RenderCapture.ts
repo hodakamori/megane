@@ -3,6 +3,8 @@
  */
 
 import type { MoleculeRenderer } from "./MoleculeRenderer";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 
 /** Composite WebGL canvas and label overlay onto an offscreen canvas. */
 export function compositeCanvases(
@@ -97,6 +99,27 @@ showpage
   return new Blob([eps], { type: "application/postscript" });
 }
 
+/** Read a Blob as a base64-encoded data URL. */
+function blobToDataURL(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Wrap a PNG image as an SVG file with an embedded raster image element. */
+export async function wrapInSVG(pngBlob: Blob, width: number, height: number): Promise<Blob> {
+  const dataURL = await blobToDataURL(pngBlob);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <title>megane export</title>
+  <image x="0" y="0" width="${width}" height="${height}" xlink:href="${dataURL}"/>
+</svg>`;
+  return new Blob([svg], { type: "image/svg+xml" });
+}
+
 /** Capture a single snapshot from the renderer. */
 export async function captureSnapshot(
   renderer: MoleculeRenderer,
@@ -104,7 +127,7 @@ export async function captureSnapshot(
     width: number;
     height: number;
     transparent: boolean;
-    format: "png" | "eps";
+    format: "png" | "eps" | "svg";
   },
 ): Promise<Blob> {
   const { width, height, transparent, format } = options;
@@ -143,6 +166,9 @@ export async function captureSnapshot(
   const pngBlob = await canvasToBlob(composited, "image/png");
   if (format === "eps") {
     return wrapInEPS(pngBlob, width, height);
+  }
+  if (format === "svg") {
+    return wrapInSVG(pngBlob, width, height);
   }
   return pngBlob;
 }
@@ -227,6 +253,22 @@ export async function captureGif(
     });
     gif.render();
   });
+}
+
+/** Export the current scene as a binary glTF (.glb) file. */
+export async function captureGltf(renderer: MoleculeRenderer): Promise<Blob> {
+  const scene = renderer.getScene();
+  const exporter = new GLTFExporter();
+  const result = await exporter.parseAsync(scene, { binary: true });
+  return new Blob([result as ArrayBuffer], { type: "model/gltf-binary" });
+}
+
+/** Export the current scene as an OBJ text file (geometry only, no materials). */
+export function captureObj(renderer: MoleculeRenderer): Blob {
+  const scene = renderer.getScene();
+  const exporter = new OBJExporter();
+  const objString = exporter.parse(scene);
+  return new Blob([objString], { type: "text/plain" });
 }
 
 /** Capture animation frames as MP4/WebM using MediaRecorder. */

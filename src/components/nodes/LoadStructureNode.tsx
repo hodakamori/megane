@@ -13,8 +13,8 @@ import { NodeShell } from "./NodeShell";
 import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
-const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.data,.lammps,.traj";
-const STRUCTURE_EXTS = [
+const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj";
+export const STRUCTURE_EXTS = [
   ".pdb",
   ".gro",
   ".xyz",
@@ -22,8 +22,10 @@ const STRUCTURE_EXTS = [
   ".sdf",
   ".mol2",
   ".cif",
+  ".mmcif",
   ".data",
   ".lammps",
+  ".prmtop",
   ".traj",
 ];
 

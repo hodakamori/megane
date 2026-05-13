@@ -10,7 +10,16 @@ The megane viewer ships through 5 distribution targets. Each one renders the sam
 
 All E2E uses `@playwright/test`. `puppeteer` is **not** in `package.json`; only `playwright` 1.56 is installed. Never add or invoke Puppeteer.
 
-E2E is **local-only by policy** — see `.claude/skills/testing/SKILL.md`. CI does not run any E2E project (port-bind races + font-fontconfig pixel drift on hosted runners). Run locally before merging UI-touching PRs.
+E2E is **local-only by policy** — see `.claude/skills/testing/SKILL.md`. CI does not run any E2E project (port-bind races + font-fontconfig pixel drift on hosted runners).
+
+## When E2E MUST run (CRITICAL RULE #9)
+
+Any change touching the UI — `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs (`vite.config.ts`, `vite.widget.config.ts`, `vite.lib.config.ts`, `vscode-megane/vite.webview.config.ts`), or `crates/megane-core/src/` output the renderer consumes — requires running this suite **locally before opening the PR**. CI does not run E2E, so this is the only safety net for visual / behavioral regressions. The verification has two parts and **both are required**:
+
+1. **Intended change check** — run the projects that target the host(s) you modified and the feature spec closest to the change (use the tables below). Confirm the new behavior is asserted in the DOM contract / pixel baselines. Re-baseline only when the diff is intended, and visually inspect the new PNG before committing it.
+2. **Side-effect sweep** — also run the rest of the host projects plus neighboring feature projects (`format-loading`, `playback`, `sidebar`, `pipeline-editor`, `pipeline-file`, `render-modal`, `widget-api`, `camera`, `measurement`, `subsystems`, `trajectory-bonds`, `modify-node`, `phase2`). Unexpected pixel diffs, timeouts, or runtime errors are regressions; fix the root cause instead of re-baselining. Timeouts and runtime errors are **always** real regressions — never re-baseline through them.
+
+In the PR description, list the projects you ran and the baselines you updated.
 
 ## Architecture Recap
 

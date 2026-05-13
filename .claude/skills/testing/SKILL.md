@@ -213,11 +213,14 @@ for:
     between the dev-container Chromium and the CI Chromium
     fonts/fontconfig (small but enough to exceed our 2 % tolerance).
 
-The expected pre-merge workflow is:
+The expected pre-PR workflow (CRITICAL RULE #9 in `CLAUDE.md`) is:
 
-1. Run the relevant Playwright projects locally as part of any UI-touching change.
-2. Commit any updated baselines under `tests/e2e/baselines/<project>/`.
-3. CI does NOT re-run E2E. Reviewers verify locally if needed.
+1. Identify which Playwright projects the change can reach (host projects + per-feature projects). The table in `.claude/skills/e2e-coverage/SKILL.md` is the source of truth. "UI-touching" includes any edit under `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs, or `crates/megane-core/src/` output the renderer consumes.
+2. Run them locally and confirm the **intended** UI change is reflected. Re-baseline only when the diff is intended, and visually inspect the new PNG before committing it.
+3. Sweep neighboring projects for **side effects**. Unexpected pixel diffs, timeouts, or runtime errors are regressions — fix the root cause, do not silently re-baseline. Timeouts and runtime errors are always real regressions.
+4. Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR.
+5. Note in the PR description which projects you ran and which baselines moved.
+6. CI does NOT re-run E2E. Reviewers verify locally if needed.
 
 ### Updating baselines
 

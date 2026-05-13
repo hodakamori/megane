@@ -94,7 +94,8 @@ class PipelineNode:
 class LoadStructure(PipelineNode):
     """Load a molecular structure from a file.
 
-    Supported formats: PDB, GRO, XYZ, MOL, LAMMPS data.
+    Supported formats: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data
+    (.data / .lammps), and ASE .traj.
 
     Ports:
         out.particle — atom data
@@ -367,7 +368,12 @@ class AddLabels(PipelineNode):
 
 
 class AddPolyhedra(PipelineNode):
-    """Generate coordination polyhedra mesh.
+    """Generate coordination polyhedra mesh (VESTA-style auto-detection).
+
+    By default a polyhedron is drawn for every metal/metalloid center
+    coordinated to every typical anion-former ligand present in the input
+    structure. Use ``excluded_centers`` / ``excluded_ligands`` to opt out
+    specific atomic numbers, mirroring VESTA's checkbox UI.
 
     Ports:
         inp.particle — atom data
@@ -381,18 +387,18 @@ class AddPolyhedra(PipelineNode):
     def __init__(
         self,
         *,
-        center_elements: list[int],
-        ligand_elements: list[int] | None = None,
-        max_distance: float = 2.5,
+        excluded_centers: list[int] | None = None,
+        excluded_ligands: list[int] | None = None,
+        cutoff_tolerance: float = 1.15,
         opacity: float = 0.5,
         show_edges: bool = False,
         edge_color: str = "#dddddd",
         edge_width: float = 3.0,
     ) -> None:
         super().__init__()
-        self.center_elements = center_elements
-        self.ligand_elements = ligand_elements if ligand_elements is not None else [8]
-        self.max_distance = max_distance
+        self.excluded_centers = list(excluded_centers) if excluded_centers else []
+        self.excluded_ligands = list(excluded_ligands) if excluded_ligands else []
+        self.cutoff_tolerance = cutoff_tolerance
         self.opacity = opacity
         self.show_edges = show_edges
         self.edge_color = edge_color
@@ -414,6 +420,54 @@ class VectorOverlay(PipelineNode):
     def __init__(self, *, scale: float = 1.0) -> None:
         super().__init__()
         self.scale = scale
+
+
+class LoadVolumetric(PipelineNode):
+    """Load a Gaussian CUBE file and output volumetric data.
+
+    The file is parsed in the browser; this node only tracks the filename.
+    Volumetric data flows to :class:`Isosurface` nodes.
+
+    Ports:
+        out.volumetric — volumetric data
+    """
+
+    _node_type = "load_volumetric"
+    _out_ports = {"volumetric": "volumetric"}
+    _inp_ports: dict[str, str] = {}
+
+    def __init__(self, path: str = "") -> None:
+        super().__init__()
+        self.path = path
+
+
+class Isosurface(PipelineNode):
+    """Extract an isosurface from volumetric data using marching cubes.
+
+    Ports:
+        inp.volumetric — volumetric data (from :class:`LoadVolumetric`)
+        out.mesh       — isosurface mesh
+    """
+
+    _node_type = "isosurface"
+    _out_ports = {"mesh": "mesh"}
+    _inp_ports = {"volumetric": "volumetric"}
+
+    def __init__(
+        self,
+        *,
+        iso_level: float = 0.05,
+        color: str = "#4488ff",
+        opacity: float = 0.7,
+        show_negative: bool = False,
+        negative_color: str = "#ff4444",
+    ) -> None:
+        super().__init__()
+        self.iso_level = iso_level
+        self.color = color
+        self.opacity = opacity
+        self.show_negative = show_negative
+        self.negative_color = negative_color
 
 
 class Viewport(PipelineNode):
@@ -663,10 +717,13 @@ class Pipeline:
         elif ntype == "label_generator":
             return AddLabels(source=nd.get("source", "element"))
         elif ntype == "polyhedron_generator":
+            # Legacy keys (centerElements/ligandElements/maxDistance) from the
+            # pre-VESTA include-list shape are silently dropped — old pipelines
+            # adopt the new "all auto" defaults.
             return AddPolyhedra(
-                center_elements=nd.get("centerElements", []),
-                ligand_elements=nd.get("ligandElements", [8]),
-                max_distance=nd.get("maxDistance", 2.5),
+                excluded_centers=nd.get("excludedCenters", []),
+                excluded_ligands=nd.get("excludedLigands", []),
+                cutoff_tolerance=nd.get("cutoffTolerance", 1.15),
                 opacity=nd.get("opacity", 0.5),
                 show_edges=nd.get("showEdges", False),
                 edge_color=nd.get("edgeColor", "#dddddd"),
@@ -684,6 +741,16 @@ class Pipeline:
             return Streaming()
         elif ntype == "load_vector":
             return LoadVector(nd.get("fileName") or "")
+        elif ntype == "load_volumetric":
+            return LoadVolumetric(nd.get("fileName") or "")
+        elif ntype == "isosurface":
+            return Isosurface(
+                iso_level=nd.get("isoLevel", 0.05),
+                color=nd.get("color", "#4488ff"),
+                opacity=nd.get("opacity", 0.7),
+                show_negative=nd.get("showNegative", False),
+                negative_color=nd.get("negativeColor", "#ff4444"),
+            )
         else:
             raise ValueError(f"Unknown node type {ntype!r}")
 
@@ -825,9 +892,9 @@ class Pipeline:
         elif isinstance(node, AddLabels):
             base["source"] = node.source
         elif isinstance(node, AddPolyhedra):
-            base["centerElements"] = node.center_elements
-            base["ligandElements"] = node.ligand_elements
-            base["maxDistance"] = node.max_distance
+            base["excludedCenters"] = node.excluded_centers
+            base["excludedLigands"] = node.excluded_ligands
+            base["cutoffTolerance"] = node.cutoff_tolerance
             base["opacity"] = node.opacity
             base["showEdges"] = node.show_edges
             base["edgeColor"] = node.edge_color
@@ -836,6 +903,14 @@ class Pipeline:
             base["fileName"] = node.path
         elif isinstance(node, VectorOverlay):
             base["scale"] = node.scale
+        elif isinstance(node, LoadVolumetric):
+            base["fileName"] = node.path
+        elif isinstance(node, Isosurface):
+            base["isoLevel"] = node.iso_level
+            base["color"] = node.color
+            base["opacity"] = node.opacity
+            base["showNegative"] = node.show_negative
+            base["negativeColor"] = node.negative_color
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible
@@ -931,7 +1006,8 @@ def view(
     returns a :class:`~megane.widget.MolecularViewer` widget.
 
     Args:
-        path: Path to a structure file (PDB, GRO, XYZ, MOL, LAMMPS data).
+        path: Path to a structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF,
+            LAMMPS data, ASE .traj).
         bonds: Bond detection method. ``"distance"`` (default) uses VDW radii,
             ``"structure"`` (alias ``"file"``) reads bonds from the loaded
             structure file, ``None`` disables bonds.
@@ -987,7 +1063,7 @@ def view_traj(
 
     Args:
         path: Path to a structure or self-contained trajectory file (PDB,
-            GRO, XYZ, MOL, LAMMPS data, ASE .traj).
+            GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE .traj).
         xtc: Path to an XTC trajectory file.
         traj: Path to an ASE ``.traj`` file.
         xyz: Path to a multi-frame XYZ trajectory file.

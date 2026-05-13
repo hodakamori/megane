@@ -29,9 +29,15 @@ Keep the first line under 72 characters. Add details in the body if needed.
    - Python changes: `python -m pytest` (coverage is auto-enabled via `pyproject.toml` addopts; use `--cov-report=xml:coverage.xml` to mirror CI)
    If you added new source code, you MUST also add unit tests for it in the same commit. Relying on E2E does not satisfy Codecov — E2E is local-only and unmeasured.
 2. Ensure the build succeeds for frontend changes: `npm run build`
-3. Do NOT commit generated files: `crates/megane-wasm/pkg/`, `dist/`, `target/`, `node_modules/`, `dev-preview/`
+3. **If the change touches the UI, run the relevant E2E projects locally before opening the PR (CRITICAL RULE #9 in `CLAUDE.md`).** "UI-affecting" includes any edit under `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs (`vite.config.ts`, `vite.widget.config.ts`, `vite.lib.config.ts`, `vscode-megane/vite.webview.config.ts`), or `crates/megane-core/src/` paths whose output the renderer consumes. Required:
+   - Run every Playwright host project the change can reach (`webapp`, `widget-jupyterlab`, `widget-vscode`, `jupyterlab-doc`, `vscode`) plus the per-feature projects from the neighborhood (`format-loading`, `playback`, `sidebar`, `pipeline-editor`, `pipeline-file`, `render-modal`, `widget-api`, `camera`, `measurement`, `subsystems`, `trajectory-bonds`, `modify-node`, `phase2`). Use the table in the `e2e-coverage` skill to pick. Set `MEGANE_E2E_MODE=1` for the `:vscode` and `:widget-vscode` projects.
+   - Confirm the **intended** change is reflected (extend specs / re-baseline only for intended diffs; visually inspect any new baseline PNG before committing it).
+   - Sweep the rest of the matrix for **side effects**: treat unexpected pixel diffs, timeouts, or runtime errors in *other* projects as regressions and fix the root cause — do not silently re-baseline through them.
+   - Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR.
+   - In the PR description, list which Playwright projects you ran and which baselines you updated.
+4. Do NOT commit generated files: `crates/megane-wasm/pkg/`, `dist/`, `target/`, `node_modules/`, `dev-preview/`
    Do NOT commit plan files: any file named `plan.md` or matching `*.plan.md` (these are local planning artifacts, not part of the codebase)
-4. Check if your changes require documentation updates:
+5. Check if your changes require documentation updates:
    - Review `README.md`, `CLAUDE.md`, and files under `docs/` for any descriptions affected by your changes
    - If you added/changed/removed features, CLI options, API, commands, configuration, or architecture, update the corresponding documentation
    - Key docs to check:
@@ -40,7 +46,7 @@ Keep the first line under 72 characters. Add details in the body if needed.
      - `CHANGELOG.md` — notable changes
      - `docs/` — user-facing guides and API reference
    - Include doc updates in the same commit (or a separate `docs:` commit if the changes are substantial)
-5. If you changed pipeline nodes (`src/pipeline/`), ensure the Python API is also updated:
+6. If you changed pipeline nodes (`src/pipeline/`), ensure the Python API is also updated:
    - Node classes in `python/megane/pipeline.py` (add/update corresponding `PipelineNode` subclass)
    - Port mappings in `_SOURCE_OUTPUT_MAP` / `_TARGET_PORT_MAP`
    - Public exports in `python/megane/__init__.py`

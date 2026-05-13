@@ -33,9 +33,9 @@ describe("LabelGeneratorNode", () => {
       <LabelGeneratorNode {...nodeProps("lg1", seeded.data.params as LabelGeneratorParams)} />,
     );
 
-    expect(screen.getByRole("button", { name: "Element" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Resname" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Index" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Element" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Resname" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Index" })).toBeInTheDocument();
   });
 
   it("renders inside a NodeShell with the Labels title", () => {
@@ -57,10 +57,10 @@ describe("LabelGeneratorNode", () => {
       <LabelGeneratorNode {...nodeProps("lg1", seeded.data.params as LabelGeneratorParams)} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Resname" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Resname" }));
     expect(updateNodeParams).toHaveBeenCalledWith("lg1", { source: "resname" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Index" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Index" }));
     expect(updateNodeParams).toHaveBeenCalledWith("lg1", { source: "index" });
   });
 
@@ -75,7 +75,7 @@ describe("LabelGeneratorNode", () => {
       <LabelGeneratorNode {...nodeProps("lg1", seeded.data.params as LabelGeneratorParams)} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Element" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Element" }));
     expect(updateNodeParams).not.toHaveBeenCalled();
   });
 
@@ -88,8 +88,8 @@ describe("LabelGeneratorNode", () => {
       <LabelGeneratorNode {...nodeProps("lg1", seeded.data.params as LabelGeneratorParams)} />,
     );
 
-    const active = screen.getByRole("button", { name: "Resname" });
-    const inactive = screen.getByRole("button", { name: "Element" });
+    const active = screen.getByRole("tab", { name: "Resname" });
+    const inactive = screen.getByRole("tab", { name: "Element" });
     // Active tab uses the primary CSS variable; inactive uses the muted variable
     expect(active.style.color).toBe("var(--megane-primary)");
     expect(inactive.style.color).toBe("var(--megane-text-muted)");
