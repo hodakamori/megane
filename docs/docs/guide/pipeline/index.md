@@ -58,7 +58,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, ASE `.traj`) | — | particle, trajectory, cell |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology `.prmtop`, ASE `.traj`) | — | particle, trajectory, cell |
 | **Load Trajectory** | Load a separate trajectory file (XTC, DCD, LAMMPS `.lammpstrj` / `.dump`, AMBER NetCDF `.nc`) | particle | trajectory |
 | **Streaming** | WebSocket-based real-time data delivery (only available on the standalone `megane serve` host) | — | particle, bond, trajectory, cell |
 | **Load Vector** | Load per-atom vector data from a file | — | vector |
