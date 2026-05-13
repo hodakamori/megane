@@ -54,7 +54,7 @@ npm run dev
 ```
 megane/
 ├── crates/                    # Rust workspace
-│   ├── megane-core/           # Core parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology (.prmtop), XTC, DCD, AMBER NetCDF (.nc), ASE .traj, .lammpstrj/.dump)
+│   ├── megane-core/           # Core parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology (.prmtop), GROMACS topology (.top), PSF topology (.psf), XTC, DCD, AMBER NetCDF (.nc), ASE .traj, .lammpstrj/.dump)
 │   ├── megane-python/         # PyO3 bindings
 │   └── megane-wasm/           # WASM bindings
 ├── python/megane/             # Python package
