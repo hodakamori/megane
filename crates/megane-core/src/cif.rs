@@ -519,10 +519,8 @@ Cl1 Cl 0.5 0.5 0.5
         assert!(result.elements.contains(&6)); // C
         assert!(result.elements.contains(&7)); // N
         assert!(result.elements.contains(&8)); // O
-        // Cell from CIF: a=5.0999, b=11.9516, c=5.4594, alpha=90, beta=111.781, gamma=90
         let bm = result.box_matrix.expect("box matrix");
         assert!((bm[0] - 5.0999).abs() < 0.01);
-        // Two oxygens, two carbons, one nitrogen, five hydrogens
         let n_o = result.elements.iter().filter(|&&e| e == 8).count();
         let n_c = result.elements.iter().filter(|&&e| e == 6).count();
         let n_n = result.elements.iter().filter(|&&e| e == 7).count();
@@ -533,7 +531,6 @@ Cl1 Cl 0.5 0.5 0.5
         assert_eq!(n_h, 5);
         // First atom O1 fract=(0.30478, 0.09443, 0.23515) → Cartesian non-zero
         assert!(result.positions[0].abs() > 0.1);
-        // Labels should be preserved
         let labels = result.atom_labels.as_ref().expect("labels");
         assert_eq!(labels[0], "O1");
         assert_eq!(labels[9], "H10");
