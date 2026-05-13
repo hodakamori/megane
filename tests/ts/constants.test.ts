@@ -3,11 +3,16 @@ import {
   getColor,
   getRadius,
   getElementSymbol,
+  getCovalentRadius,
+  isMetalLike,
+  isDefaultLigand,
   ELEMENT_COLORS,
   ELEMENT_SYMBOLS,
   VDW_RADII,
+  COVALENT_RADII,
   DEFAULT_COLOR,
   DEFAULT_RADIUS,
+  DEFAULT_COVALENT_RADIUS,
 } from "@/constants";
 
 describe("getColor", () => {
@@ -97,5 +102,73 @@ describe("getElementSymbol", () => {
     expect(getElementSymbol(38)).toBe("Sr");
     expect(getElementSymbol(79)).toBe("Au");
     expect(getElementSymbol(92)).toBe("U");
+  });
+});
+
+describe("getCovalentRadius", () => {
+  it("returns Cordero values for representative elements", () => {
+    expect(getCovalentRadius(1)).toBeCloseTo(0.31, 2); // H
+    expect(getCovalentRadius(6)).toBeCloseTo(0.76, 2); // C
+    expect(getCovalentRadius(8)).toBeCloseTo(0.66, 2); // O
+    expect(getCovalentRadius(22)).toBeCloseTo(1.6, 2); // Ti
+  });
+
+  it("falls back to DEFAULT_COVALENT_RADIUS for unknown elements", () => {
+    expect(getCovalentRadius(200)).toBe(DEFAULT_COVALENT_RADIUS);
+  });
+
+  it("has entries up to Cm (Z=96)", () => {
+    expect(COVALENT_RADII[96]).toBeDefined();
+  });
+});
+
+describe("isMetalLike", () => {
+  it("returns true for typical center elements", () => {
+    expect(isMetalLike(13)).toBe(true); // Al
+    expect(isMetalLike(22)).toBe(true); // Ti
+    expect(isMetalLike(26)).toBe(true); // Fe
+    expect(isMetalLike(40)).toBe(true); // Zr
+  });
+
+  it("classifies metalloids B, Si, Ge, As, Sb, Te as centers (VESTA convention)", () => {
+    expect(isMetalLike(5)).toBe(true); // B
+    expect(isMetalLike(14)).toBe(true); // Si
+    expect(isMetalLike(32)).toBe(true); // Ge
+    expect(isMetalLike(33)).toBe(true); // As
+    expect(isMetalLike(51)).toBe(true); // Sb
+    expect(isMetalLike(52)).toBe(true); // Te
+  });
+
+  it("returns false for non-metals and noble gases", () => {
+    expect(isMetalLike(1)).toBe(false); // H
+    expect(isMetalLike(6)).toBe(false); // C
+    expect(isMetalLike(7)).toBe(false); // N
+    expect(isMetalLike(8)).toBe(false); // O
+    expect(isMetalLike(17)).toBe(false); // Cl
+    expect(isMetalLike(18)).toBe(false); // Ar
+  });
+});
+
+describe("isDefaultLigand", () => {
+  it("returns true for the canonical anion-formers", () => {
+    expect(isDefaultLigand(7)).toBe(true); // N
+    expect(isDefaultLigand(8)).toBe(true); // O
+    expect(isDefaultLigand(9)).toBe(true); // F
+    expect(isDefaultLigand(15)).toBe(true); // P
+    expect(isDefaultLigand(16)).toBe(true); // S
+    expect(isDefaultLigand(17)).toBe(true); // Cl
+    expect(isDefaultLigand(35)).toBe(true); // Br
+    expect(isDefaultLigand(53)).toBe(true); // I
+  });
+
+  it("excludes carbon by default to avoid spurious organic polyhedra", () => {
+    expect(isDefaultLigand(6)).toBe(false);
+  });
+
+  it("excludes H, noble gases, and metals", () => {
+    expect(isDefaultLigand(1)).toBe(false); // H
+    expect(isDefaultLigand(2)).toBe(false); // He
+    expect(isDefaultLigand(18)).toBe(false); // Ar
+    expect(isDefaultLigand(22)).toBe(false); // Ti
   });
 });

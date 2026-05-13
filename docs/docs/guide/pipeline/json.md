@@ -161,6 +161,30 @@ handle and emits the tagged particle stream on `out`.
 | `edgeColor` | `string` | Wireframe edge color (hex) |
 | `edgeWidth` | `number` | Wireframe edge width (px) |
 
+#### `surface_mesh`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `alphaRadius` | `number` | Probe sphere radius in Å (alpha value). Larger = smoother surface, smaller = more detail. |
+| `color` | `string` | Surface color (hex, e.g. `"#4488ff"`) |
+| `opacity` | `number` | Surface transparency (0–1) |
+
+#### `load_volumetric`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fileName` | `string \| null` | Display name of the CUBE file. Volumetric data (`volumetricData`) is ephemeral and not serialized. |
+
+#### `isosurface`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `isoLevel` | `number` | Contour value for the positive isosurface |
+| `color` | `string` | Hex color for the positive isosurface |
+| `opacity` | `number` | Surface transparency (0–1) |
+| `showNegative` | `boolean` | Show a second isosurface at −isoLevel (dual-contour for ESP maps) |
+| `negativeColor` | `string` | Hex color for the negative isosurface |
+
 #### `vector_overlay`
 
 | Field | Type | Description |

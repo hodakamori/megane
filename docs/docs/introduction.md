@@ -9,7 +9,7 @@ sidebar_position: 1
 ## What can megane do?
 
 - **Render 1M+ atoms at 60 fps** in the browser using billboard impostor rendering
-- **Load 13 file formats**: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, XTC, DCD, ASE `.traj`, LAMMPS dump, AMBER NetCDF
+- **Load 15 file formats**: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE `.traj`, LAMMPS dump, AMBER NetCDF
 - **Stream XTC trajectories from the `megane serve` CLI** over WebSocket — scrub multi-GB files without loading every frame into memory (browser/Jupyter without the CLI load full trajectories)
 - **Build visual pipelines** with a drag-and-drop node editor, or write them as Python/TypeScript code
 - **Integrate with Plotly**, MDX/Next.js, ipywidgets, and any framework via the framework-agnostic renderer
@@ -37,7 +37,9 @@ For a side-by-side comparison of which formats and UI features each environment 
 | MDL SDfile (parsed via the V2000 Molfile reader) | `.sdf` |
 | Tripos MOL2 | `.mol2` |
 | Crystallographic Information File | `.cif` |
+| Macromolecular CIF (mmCIF/PDBx) | `.mmcif` |
 | LAMMPS data | `.data`, `.lammps` |
+| AMBER topology | `.prmtop` |
 | GROMACS trajectory | `.xtc` |
 | CHARMM/NAMD DCD trajectory | `.dcd` |
 | ASE trajectory | `.traj` |

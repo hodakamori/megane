@@ -88,14 +88,17 @@ Generates text labels for atoms.
 - Outputs: \`label\` (label data type)
 
 ### polyhedron_generator
-Generates coordination polyhedra around specified atoms.
+Generates coordination polyhedra automatically (VESTA-style). By default a
+polyhedron is drawn for every metal/metalloid center coordinated to every
+anion-former ligand present in the structure; the user opts OUT specific
+elements via \`excludedCenters\` / \`excludedLigands\`.
 - Parameters:
   \`\`\`
   {
     type: "polyhedron_generator",
-    centerElements: number[],    // atomic numbers of center atoms (e.g. [22] for Ti)
-    ligandElements: number[],    // atomic numbers of ligand atoms (e.g. [8] for O)
-    maxDistance: number,          // max bond distance in Angstroms
+    excludedCenters: number[],   // Z numbers to exclude from auto-detected centers (e.g. [22] to skip Ti)
+    excludedLigands: number[],   // Z numbers to exclude from auto-detected ligands
+    cutoffTolerance: number,     // multiplier on (r_cov[c]+r_cov[l]); ~1.15 default
     opacity: number,             // face opacity 0-1
     showEdges: boolean,
     edgeColor: string,           // hex color e.g. "#dddddd"

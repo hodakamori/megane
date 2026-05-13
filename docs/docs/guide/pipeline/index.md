@@ -29,7 +29,7 @@ The generator creates the appropriate LoadStructure, AddBond, Filter, Modify, an
 
 ## VSCode Extension Auto-Setup
 
-When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.data`, `.lammps`, `.traj`, `.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
+When you open a supported molecular file (`.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop`, `.traj`, `.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc`) in the megane VSCode extension, it automatically creates a default pipeline consisting of `LoadStructure → AddBond → Viewport`. This gives you an immediate 3D view of the structure with bonds, without needing to build a pipeline manually. You can then modify the auto-generated pipeline in the editor as needed.
 
 ## Getting Started
 
@@ -58,10 +58,11 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Node | Description | Inputs | Outputs |
 |------|-------------|--------|---------|
-| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data, ASE `.traj`) | — | particle, trajectory, cell |
+| **Load Structure** | Load a molecular structure file (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, ASE `.traj`) | — | particle, trajectory, cell |
 | **Load Trajectory** | Load a separate trajectory file (XTC, DCD, LAMMPS `.lammpstrj` / `.dump`, AMBER NetCDF `.nc`) | particle | trajectory |
 | **Streaming** | WebSocket-based real-time data delivery (only available on the standalone `megane serve` host) | — | particle, bond, trajectory, cell |
 | **Load Vector** | Load per-atom vector data from a file | — | vector |
+| **Load Volumetric** | Load a Gaussian CUBE file for volumetric (isosurface) rendering | — | volumetric |
 
 ### Processing
 
@@ -69,6 +70,8 @@ Use the **Templates** dropdown to load pre-built pipelines:
 |------|-------------|--------|---------|
 | **Filter** | Select atoms using a query expression | particle (in) | particle (out) |
 | **Modify** | Override scale and opacity for a group of atoms | particle (in) | particle (out) |
+| **Color** | Recolor the upstream particle stream by a chosen scheme | particle (in) | particle (out) |
+| **Representation** | Tag the particle stream with a visual representation override for the Viewport | particle (in) | particle (out) |
 
 ### Overlay
 
@@ -78,6 +81,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 | **Label Generator** | Generate text labels at atom positions | particle | label |
 | **Polyhedron Generator** | Render coordination polyhedra (convex hulls) | particle | mesh |
 | **Surface Mesh** | Generate an alpha-shape surface envelope around atoms | particle | mesh |
+| **Isosurface** | Extract an isosurface from volumetric data using marching cubes | volumetric | mesh |
 | **Vector Overlay** | Configure per-atom vector visualization (e.g. forces) | vector | vector |
 
 ### Output
@@ -92,7 +96,7 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.data` / `.lammps`, `.traj` (ASE) |
+| File path | string | Path to molecular structure file. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.mmcif`, `.data` / `.lammps`, `.prmtop`, `.traj` (ASE) |
 
 ### Load Trajectory
 
@@ -107,6 +111,46 @@ Requires a connection from a LoadStructure node. Frames are loaded lazily when `
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | File path | string | Path to vector data file (JSON with per-atom 3D vectors) |
+
+### Load Volumetric
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| File path | string | Path to a Gaussian CUBE file (`.cube`). The file is parsed in the browser; frames are not streamed. |
+
+**Outputs:** `volumetric` — connects to an Isosurface node.
+
+### Isosurface
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| Iso level | number | 0.05 | Contour value for the positive isosurface |
+| Color (+) | string | `#4488ff` | Hex color for the positive isosurface |
+| Opacity | number | 0.7 | Surface transparency (0–1) |
+| Show negative lobe | boolean | off | Show a second isosurface at −isoLevel (dual-contour for ESP maps) |
+| Color (−) | string | `#ff4444` | Hex color for the negative isosurface (visible when "Show negative lobe" is on) |
+
+### Color
+
+| Parameter | Values | Default | Description |
+|-----------|--------|---------|-------------|
+| Mode | `uniform` | ✓ | Single solid color |
+| | `byElement` | — | CPK element coloring |
+| | `byResidue` | — | Color by residue name |
+| | `byChain` | — | Color by chain ID |
+| | `byBFactor` | — | Color by B-factor (temperature factor) |
+| | `byProperty` | — | Color by a numeric atom property |
+| Color | string | `#ff8800` | Hex color used when mode is `uniform` |
+| Range | [number, number]? | — | Optional explicit [min, max] for `byBFactor` / `byProperty` |
+
+### Representation
+
+| Parameter | Values | Default | Description |
+|-----------|--------|---------|-------------|
+| Mode | `atoms` | ✓ | Space-filling atom spheres |
+| | `cartoon` | — | Cartoon ribbon for proteins/nucleic acids |
+| | `both` | — | Atoms + cartoon simultaneously |
+| | `surface` | — | Solvent-accessible surface |
 
 ### Add Bond
 

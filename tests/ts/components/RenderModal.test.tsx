@@ -84,7 +84,7 @@ describe("RenderModal", () => {
     expect(screen.getByTestId("render-modal")).toBeTruthy();
   });
 
-  it("shows PNG and EPS format buttons in snapshot mode", () => {
+  it("shows PNG, EPS and SVG format buttons in snapshot mode", () => {
     render(
       <RenderModal
         open
@@ -97,6 +97,7 @@ describe("RenderModal", () => {
     );
     expect(screen.getByText("PNG")).toBeTruthy();
     expect(screen.getByText("EPS")).toBeTruthy();
+    expect(screen.getByText("SVG")).toBeTruthy();
   });
 
   it("shows glTF and OBJ format buttons in snapshot mode", () => {
@@ -186,6 +187,36 @@ describe("RenderModal", () => {
     );
     fireEvent.click(screen.getByText("OBJ"));
     expect(screen.getByText("Export OBJ")).toBeTruthy();
+  });
+
+  it("shows resolution controls for SVG format", () => {
+    render(
+      <RenderModal
+        open
+        onClose={() => {}}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("SVG"));
+    expect(screen.getByText("Resolution")).toBeTruthy();
+  });
+
+  it("shows 'Export SVG' on the button when SVG is selected", () => {
+    render(
+      <RenderModal
+        open
+        onClose={() => {}}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("SVG"));
+    expect(screen.getByText("Export SVG")).toBeTruthy();
   });
 
   it("calls onClose when the backdrop is clicked", () => {

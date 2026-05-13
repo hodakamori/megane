@@ -32,7 +32,7 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based PDB, GRO, XYZ, MOL, CIF, XTC, DCD, LAMMPS, and ASE .traj parsers shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based parsers for 15 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
 - **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 11 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
@@ -56,7 +56,7 @@ One codebase, every environment.
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
-The secret: PDB, GRO, XYZ, MOL, CIF, XTC, DCD, LAMMPS, and ASE .traj parsers are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: parsers for 15 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
 
@@ -133,17 +133,21 @@ docker run --rm -p 8080:8080 -v ./mydata:/data megane \
 ### React
 
 ```tsx
-import { MeganeViewer, parseStructureFile } from "megane-viewer/lib";
+import { useCallback } from "react";
+import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
 
 function App() {
-  const [snapshot, setSnapshot] = useState(null);
+  const handleUpload = useCallback((file: File) => {
+    usePipelineStore.getState().openFile(file);
+  }, []);
 
-  const handleUpload = async (file: File) => {
-    const result = await parseStructureFile(file);
-    setSnapshot(result.snapshot);
-  };
-
-  return <MeganeViewer snapshot={snapshot} mode="local" /* ... */ />;
+  return (
+    <MeganeViewer
+      onUploadStructure={handleUpload}
+      width="100%"
+      height="600px"
+    />
+  );
 }
 ```
 
@@ -160,6 +164,7 @@ function App() {
 | MOL2 | `.mol2` | Tripos MOL2 (multi-molecule, aromatic bonds) |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | CIF | `.cif` | Crystallographic Information File |
+| mmCIF | `.mmcif` | Macromolecular CIF (PDBx/mmCIF) |
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
 
 ### Trajectory formats (`LoadTrajectory` node)
@@ -169,7 +174,8 @@ function App() {
 | XTC | `.xtc` | GROMACS compressed trajectory |
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
-| LAMMPS dump | `.lammpstrj` | LAMMPS dump trajectory |
+| LAMMPS dump | `.lammpstrj`, `.dump` | LAMMPS dump trajectory |
+| AMBER NetCDF | `.nc` | AMBER binary trajectory (NetCDF format) |
 
 ## Development
 
@@ -232,7 +238,7 @@ make test-all              # All tests
 src/                     TypeScript frontend
   renderer/              Three.js rendering (impostor, mesh, shaders)
   protocol/              Binary protocol decoder + web workers
-  parsers/               WASM-based file parsers (PDB, GRO, XYZ, MOL, CIF, XTC, LAMMPS, .traj)
+  parsers/               WASM-based file parsers (15 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data/dump, AMBER topology/NetCDF, XTC, DCD, ASE .traj)
   logic/                 Bond / label / vector source logic
   components/            React UI components
   hooks/                 Custom React hooks
@@ -242,7 +248,7 @@ crates/                  Rust workspace
   megane-python/         PyO3 Python extension
   megane-wasm/           WASM bindings (wasm-bindgen)
 python/megane/           Python backend
-  parsers/               PDB / XTC parsers
+  parsers/               Python wrappers for all 15 supported formats
   pipeline.py            Pipeline builder (NetworkX-style DAG)
   protocol.py            Binary protocol encoder
   server.py              FastAPI WebSocket server

@@ -107,6 +107,21 @@ export function deserializePipeline(json: SerializedPipeline): {
       delete legacy.uniformColor;
       delete legacy.colorRange;
     }
+    // Polyhedron generator: include-list (centerElements/ligandElements/
+    // maxDistance) replaced by VESTA-style opt-out (excludedCenters/
+    // excludedLigands/cutoffTolerance). Legacy field values are dropped; the
+    // node falls back to the new "all metals × all anion-formers, tol=1.15"
+    // defaults. Users must redo any custom selections.
+    if (nodeType === "polyhedron_generator") {
+      const legacy = paramFields as {
+        centerElements?: unknown;
+        ligandElements?: unknown;
+        maxDistance?: unknown;
+      };
+      delete legacy.centerElements;
+      delete legacy.ligandElements;
+      delete legacy.maxDistance;
+    }
     const params = { ...defaults, ...paramFields, type: nodeType } as typeof defaults;
 
     return {

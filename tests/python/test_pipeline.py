@@ -10,9 +10,11 @@ from megane.pipeline import (
     AddPolyhedra,
     Color,
     Filter,
+    Isosurface,
     LoadStructure,
     LoadTrajectory,
     LoadVector,
+    LoadVolumetric,
     Modify,
     NodePort,
     Pipeline,
@@ -93,15 +95,17 @@ class TestNodeClasses:
         assert n._node_type == "label_generator"
 
     def test_add_polyhedra(self):
-        n = AddPolyhedra(center_elements=[26], ligand_elements=[8, 7])
-        assert n.center_elements == [26]
-        assert n.ligand_elements == [8, 7]
-        assert n.max_distance == 2.5
+        n = AddPolyhedra(excluded_centers=[26], excluded_ligands=[8, 7], cutoff_tolerance=1.3)
+        assert n.excluded_centers == [26]
+        assert n.excluded_ligands == [8, 7]
+        assert n.cutoff_tolerance == 1.3
         assert n._node_type == "polyhedron_generator"
 
     def test_add_polyhedra_defaults(self):
-        n = AddPolyhedra(center_elements=[26])
-        assert n.ligand_elements == [8]
+        n = AddPolyhedra()
+        assert n.excluded_centers == []
+        assert n.excluded_ligands == []
+        assert n.cutoff_tolerance == 1.15
         assert n.opacity == 0.5
         assert n.show_edges is False
 
@@ -114,6 +118,34 @@ class TestNodeClasses:
         n = VectorOverlay(scale=2.0)
         assert n.scale == 2.0
         assert n._node_type == "vector_overlay"
+
+    def test_load_volumetric(self):
+        n = LoadVolumetric("density.cube")
+        assert n.path == "density.cube"
+        assert n._node_type == "load_volumetric"
+
+    def test_load_volumetric_defaults(self):
+        n = LoadVolumetric()
+        assert n.path == ""
+        assert set(n._out_ports) == {"volumetric"}
+        assert n._inp_ports == {}
+
+    def test_isosurface(self):
+        n = Isosurface(iso_level=0.02, color="#ff0000", opacity=0.5)
+        assert n.iso_level == 0.02
+        assert n.color == "#ff0000"
+        assert n.opacity == 0.5
+        assert n._node_type == "isosurface"
+
+    def test_isosurface_defaults(self):
+        n = Isosurface()
+        assert n.iso_level == 0.05
+        assert n.color == "#4488ff"
+        assert n.opacity == 0.7
+        assert n.show_negative is False
+        assert n.negative_color == "#ff4444"
+        assert set(n._inp_ports) == {"volumetric"}
+        assert set(n._out_ports) == {"mesh"}
 
     def test_load_trajectory(self):
         n = LoadTrajectory(xtc="traj.xtc")
@@ -499,9 +531,9 @@ class TestPipelineSerialization:
         s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
         p = pipe.add_node(
             AddPolyhedra(
-                center_elements=[26],
-                ligand_elements=[8],
-                max_distance=3.0,
+                excluded_centers=[26],
+                excluded_ligands=[8],
+                cutoff_tolerance=1.3,
                 opacity=0.7,
             )
         )
@@ -509,8 +541,9 @@ class TestPipelineSerialization:
         result = pipe.to_dict()
 
         poly_node = next(n for n in result["nodes"] if n["type"] == "polyhedron_generator")
-        assert poly_node["centerElements"] == [26]
-        assert poly_node["maxDistance"] == 3.0
+        assert poly_node["excludedCenters"] == [26]
+        assert poly_node["excludedLigands"] == [8]
+        assert poly_node["cutoffTolerance"] == 1.3
         assert poly_node["opacity"] == 0.7
 
 
