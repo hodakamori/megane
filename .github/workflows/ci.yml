@@ -187,6 +187,45 @@ jobs:
       - name: Build image
         run: docker build -t megane:ci .
 
+  test-sdist:
+    name: sdist self-contained build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: |
+          # Retry transient network failures from rustwasm.github.io.
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: pip install jupyterlab maturin
+      - run: npm ci
+      - run: npm run build
+      - run: maturin sdist --out dist
+      - name: Verify wheel-share present in sdist
+        run: |
+          tar -tzf dist/*.tar.gz | grep -q 'wheel-share/data/share/jupyter/labextensions/' \
+            || { echo "::error::sdist missing labextension data"; exit 1; }
+      - name: Build wheel from extracted sdist
+        run: |
+          mkdir _sdist_check && cd _sdist_check
+          tar -xzf ../dist/*.tar.gz
+          cd megane-*
+          pip wheel --no-deps . -w ../out
+          python -c "import zipfile, glob; z = zipfile.ZipFile(glob.glob('../out/*.whl')[0]); assert any('share/jupyter/labextensions/megane-jupyterlab' in n for n in z.namelist()), 'labextension missing from wheel'; print('OK')"
+
   # Cross-platform 3-layer E2E (`tests/e2e/*.spec.ts`) is **local-only**.
   #
   # We attempted to run the suite on GH-hosted ubuntu-latest runners but
