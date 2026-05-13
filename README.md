@@ -33,7 +33,7 @@
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
 - **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based parsers for 15 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
-- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 11 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
+- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 16 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
 ### Scale
@@ -62,7 +62,7 @@ The secret: parsers for 15 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LA
 
 Wire nodes to build visualization workflows — no code required.
 
-**11 node types** across 5 categories: load data (structure, trajectory, streaming, vector), process (filter, modify), overlay (bonds, labels, polyhedra, vectors), and display in a 3D viewport.
+**16 node types** across 5 categories: load data (structure, trajectory, streaming, vector, volumetric), bonds, process (filter, modify, color, representation), overlay (labels, polyhedra, surface meshes, isosurfaces, vectors), and display in a 3D viewport.
 
 **7 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector — flow through color-coded edges. Only matching types can connect.
 
