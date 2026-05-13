@@ -157,9 +157,14 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
             let mut col_count = 0;
             let mut is_atom_site_loop = false;
 
-            // Read loop header tags
+            // Read loop header tags. Tolerate blank lines and `#` comment
+            // lines between `loop_` and the first tag, and between tags.
             while i < lines.len() {
                 let t = lines[i].trim();
+                if t.is_empty() || t.starts_with('#') {
+                    i += 1;
+                    continue;
+                }
                 if t.starts_with('_') {
                     if t.to_ascii_lowercase().starts_with("_atom_site") {
                         is_atom_site_loop = true;
@@ -184,19 +189,24 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 continue;
             }
 
-            // Read data rows
+            // Read data rows. Per CIF semantics a loop's data is only
+            // terminated by EOF or the next reserved word (`loop_`,
+            // `data_`, `save_`, `global_`, `_tag`). Blank lines and `#`
+            // comment lines must be tolerated inside the loop body — many
+            // CCDC/COD CIFs put a blank line between the header and the
+            // first data row (see Issue #458).
             while i < lines.len() {
                 let t = lines[i].trim();
-                // Stop at empty line, another loop_, data_ block, or tag
-                if t.is_empty()
-                    || t.starts_with("loop_")
-                    || t.starts_with("data_")
-                    || t.starts_with('#')
-                {
-                    break;
+                if t.is_empty() || t.starts_with('#') {
+                    i += 1;
+                    continue;
                 }
-                // Also stop if line starts with _ (new tag outside loop)
-                if t.starts_with('_') {
+                if t.starts_with("loop_")
+                    || t.starts_with("data_")
+                    || t.starts_with("save_")
+                    || t.starts_with("global_")
+                    || t.starts_with('_')
+                {
                     break;
                 }
 
@@ -436,5 +446,93 @@ H1 H 1.5 2.5 3.5
         assert!(result.elements.contains(&11)); // Na
         assert!(result.elements.contains(&17)); // Cl
         assert!(result.box_matrix.is_some());
+    }
+
+    /// Regression test for Issue #458: CCDC-style CIFs put a blank line
+    /// between the `_atom_site_*` loop header and the first data row.
+    /// The parser used to break on that blank line and report no atoms.
+    #[test]
+    fn test_parse_cif_blank_line_before_data() {
+        let cif = r#"data_blanks
+_cell_length_a   5.6402
+_cell_length_b   5.6402
+_cell_length_c   5.6402
+_cell_angle_alpha   90.000
+_cell_angle_beta    90.000
+_cell_angle_gamma   90.000
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+
+Na1 Na 0.0 0.0 0.0
+Cl1 Cl 0.5 0.5 0.5
+"#;
+        let result = parse(cif).expect("parse failed");
+        assert_eq!(result.n_atoms, 2);
+        assert_eq!(result.elements[0], 11);
+        assert_eq!(result.elements[1], 17);
+    }
+
+    /// Blank lines and comment lines should be tolerated *between* data rows too.
+    #[test]
+    fn test_parse_cif_blank_and_comment_lines_inside_loop() {
+        let cif = r#"data_blanks_mid
+_cell_length_a   5.6402
+_cell_length_b   5.6402
+_cell_length_c   5.6402
+_cell_angle_alpha   90.000
+_cell_angle_beta    90.000
+_cell_angle_gamma   90.000
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Na1 Na 0.0 0.0 0.0
+
+# spacer comment between data rows
+Cl1 Cl 0.5 0.5 0.5
+"#;
+        let result = parse(cif).expect("parse failed");
+        assert_eq!(result.n_atoms, 2);
+        assert_eq!(result.elements[0], 11);
+        assert_eq!(result.elements[1], 17);
+    }
+
+    /// Regression test for Issue #458 against the exact CCDC glycine fixture.
+    #[test]
+    fn test_parse_glycine_csd_fixture() {
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/glycine_csd.cif"
+        ))
+        .expect("read fixture");
+        let result = parse(&text).expect("parse failed");
+        assert_eq!(result.n_atoms, 10);
+        assert!(result.elements.contains(&1)); // H
+        assert!(result.elements.contains(&6)); // C
+        assert!(result.elements.contains(&7)); // N
+        assert!(result.elements.contains(&8)); // O
+        let bm = result.box_matrix.expect("box matrix");
+        assert!((bm[0] - 5.0999).abs() < 0.01);
+        let n_o = result.elements.iter().filter(|&&e| e == 8).count();
+        let n_c = result.elements.iter().filter(|&&e| e == 6).count();
+        let n_n = result.elements.iter().filter(|&&e| e == 7).count();
+        let n_h = result.elements.iter().filter(|&&e| e == 1).count();
+        assert_eq!(n_o, 2);
+        assert_eq!(n_c, 2);
+        assert_eq!(n_n, 1);
+        assert_eq!(n_h, 5);
+        // First atom O1 fract=(0.30478, 0.09443, 0.23515) → Cartesian non-zero
+        assert!(result.positions[0].abs() > 0.1);
+        let labels = result.atom_labels.as_ref().expect("labels");
+        assert_eq!(labels[0], "O1");
+        assert_eq!(labels[9], "H10");
     }
 }
