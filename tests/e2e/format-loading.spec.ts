@@ -45,6 +45,12 @@ const STRUCTURE_CASES: StructureCase[] = [
   { name: "mol-methane", file: "methane.mol", mime: "chemical/x-mdl-molfile" },
   { name: "sdf-ethanol", file: "ethanol.sdf", mime: "chemical/x-mdl-sdfile" },
   { name: "cif-nacl", file: "nacl.cif", mime: "chemical/x-cif" },
+  {
+    name: "cif-glycine-csd",
+    file: "glycine_csd.cif",
+    mime: "chemical/x-cif",
+    expectedAtoms: 10,
+  },
   { name: "lammps-water", file: "water.lammps", mime: "text/plain" },
   // .lammpstrj is a *trajectory* format, not a structure — the LoadStructure
   // node's file input rejects it by extension, so dropping it here was
