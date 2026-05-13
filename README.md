@@ -52,7 +52,7 @@ One codebase, every environment.
 | **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .cif from the file browser | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf | Extension |
+| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .data/.lammps, .traj, .xtc, .lammpstrj, .dcd, .nc, .megane.json | Extension |
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
@@ -173,9 +173,9 @@ function App() {
 |--------|-----------|-------------|
 | XTC | `.xtc` | GROMACS compressed trajectory |
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
+| AMBER NetCDF | `.nc` | AMBER NetCDF trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj`, `.dump` | LAMMPS dump trajectory |
-| AMBER NetCDF | `.nc` | AMBER binary trajectory (NetCDF format) |
 
 ## Development
 
