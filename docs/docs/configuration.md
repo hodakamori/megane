@@ -44,7 +44,7 @@ npm run dev
 |---------|-------------|
 | `make build` | Full build (frontend + Python wheel) |
 | `make dev` | Development install |
-| `make test-all` | Run all tests (Python + TypeScript + E2E) |
+| `make test-all` | Run all tests (Python + TypeScript + Rust + E2E + notebooks + integration) |
 | `npm run build` | Build frontend (WASM + Vite) |
 | `npm run test` | Run TypeScript tests |
 | `npm run build:wasm` | Build WASM module only |
