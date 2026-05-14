@@ -62,7 +62,7 @@ megane serve [PDB_FILE] [OPTIONS]
 
 | Argument | Description |
 |----------|-------------|
-| `PDB_FILE` | Path to a PDB file (optional; can upload from the browser). The CLI server only loads `.pdb` from this positional argument — to start with an ASE trajectory, use `--traj` instead. Once the browser is open, drag-and-drop in the standalone UI accepts every supported structure format (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, …). |
+| `PDB_FILE` | Path to a PDB file (optional; can upload from the browser). The CLI server only loads `.pdb` from this positional argument — to start with an ASE trajectory, use `--traj` instead. Once the browser is open, drag-and-drop in the standalone UI accepts every supported structure format (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE `.traj`, …). |
 
 ## Options
 

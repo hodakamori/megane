@@ -248,7 +248,7 @@ crates/                  Rust workspace
   megane-python/         PyO3 Python extension
   megane-wasm/           WASM bindings (wasm-bindgen)
 python/megane/           Python backend
-  parsers/               Python wrappers for all 15 supported formats
+  parsers/               Python wrappers for 13 of the 15 supported formats (mmCIF and AMBER prmtop are accessible via the raw megane_parser PyO3 extension)
   pipeline.py            Pipeline builder (NetworkX-style DAG)
   protocol.py            Binary protocol encoder
   server.py              FastAPI WebSocket server
