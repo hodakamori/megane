@@ -35,9 +35,9 @@ Legend:
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ |
 | MOL2 | `.mol2` | ✓ | API | ✓ | ✓ | ✓ |
 | CIF | `.cif` | ✓ | API | ✓ | ✓ | ✓ |
-| mmCIF | `.mmcif` | ✓ | API | ✓ | ✓ | ✓ |
+| mmCIF | `.mmcif` | ✓ | API | ✓ | ✓ | API |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
-| AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | ✓ |
+| AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | API |
 
 ### Trajectory formats
 
@@ -107,7 +107,7 @@ How data gets into the viewer on each platform:
 | **Jupyter widget** | Python only — no in-cell file picker | `MolecularViewer.load(pdb_path, xtc=, traj=)` (deprecated) or `MolecularViewer.set_pipeline(Pipeline)` (recommended) |
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VSCode** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, and the raw `parse_*` PyO3 functions. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 
