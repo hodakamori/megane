@@ -83,7 +83,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). |
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop` (AMBER topology), `.traj` (ASE binary). |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
