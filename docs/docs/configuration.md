@@ -19,13 +19,13 @@ sidebar_position: 2
 git clone https://github.com/hodakamori/megane.git
 cd megane
 
-# Install Node.js dependencies (must come first — make dev depends on them)
+# Install Node.js dependencies first (required by make dev)
 npm install
 
 # Install Python dependencies (test tools, notebook support, etc.)
 uv sync --extra dev
 
-# Build frontend assets and install the megane Python extension
+# Build frontend and install Python extension (editable)
 make dev
 ```
 
