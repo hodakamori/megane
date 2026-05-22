@@ -11,6 +11,7 @@ sidebar_position: 2
 - Python 3.10+
 - Node.js 22+
 - Rust (for building the parser)
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) (`cargo install wasm-pack`)
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 
 ### Clone and Install
