@@ -320,8 +320,9 @@ class AddBonds(PipelineNode):
         source: ``"distance"`` for VDW-based inference,
                 ``"structure"`` (alias ``"file"``) to use bonds from the
                 loaded structure file.
-        top: Path to a GROMACS ``.top`` topology file.  When provided,
-             *source* is ignored and bonds are read from the topology.
+        top: Path to a topology file (GROMACS ``.top`` or CHARMM/NAMD ``.psf``).
+             When provided, *source* is ignored and bonds are read from the
+             topology.
 
     Ports:
         inp.particle — atom data
@@ -920,11 +921,19 @@ class Pipeline:
 
     @staticmethod
     def _parse_top_bonds(node: AddBonds) -> list[int]:
-        """Read a .top file and return flat bond pairs [a0, b0, a1, b1, ...]."""
-        from megane.parsers.top import parse_top_bonds
+        """Read a .top or .psf file and return flat bond pairs [a0, b0, a1, b1, ...]."""
+        import pathlib
 
         assert node.top is not None
-        bonds = parse_top_bonds(node.top)
+        ext = pathlib.Path(node.top).suffix.lower()
+        if ext == ".psf":
+            from megane.parsers.psf import parse_psf_bonds
+
+            bonds = parse_psf_bonds(node.top)
+        else:
+            from megane.parsers.top import parse_top_bonds
+
+            bonds = parse_top_bonds(node.top)
         return bonds.flatten().tolist()
 
     def _load_structure_data(self, node: LoadStructure) -> None:
@@ -1164,8 +1173,8 @@ def build_pipeline(
             ``"structure"`` (alias ``"file"``) reads bonds from the loaded
             structure file, ``None`` disables bonds. Ignored when *top* is
             provided.
-        top: Path to a GROMACS ``.top`` topology file for bond definitions.
-            When provided, overrides *bonds*.
+        top: Path to a topology file (GROMACS ``.top`` or CHARMM/NAMD ``.psf``)
+            for bond definitions.  When provided, overrides *bonds*.
         perspective: Use perspective projection instead of orthographic.
         cell_axes_visible: Show unit cell axes.
         pivot_marker_visible: Show pivot marker in viewport.
