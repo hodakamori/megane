@@ -151,11 +151,14 @@ handle and emits the tagged particle stream on `out`.
 
 #### `polyhedron_generator`
 
+Centers and ligands are auto-detected using VESTA-style heuristics. Use
+`excludedCenters` / `excludedLigands` to opt out specific atomic numbers.
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `centerElements` | `number[]` | Atomic numbers of center atoms |
-| `ligandElements` | `number[]` | Atomic numbers of ligand atoms |
-| `maxDistance` | `number` | Maximum center–ligand distance (Å) |
+| `excludedCenters` | `number[]` | Atomic numbers excluded from center detection (default `[]`) |
+| `excludedLigands` | `number[]` | Atomic numbers excluded from ligand detection (default `[]`) |
+| `cutoffTolerance` | `number` | Bond-length tolerance multiplier applied to VDW radii sum (default `1.15`) |
 | `opacity` | `number` | Face transparency (0–1) |
 | `showEdges` | `boolean` | Display wireframe edges |
 | `edgeColor` | `string` | Wireframe edge color (hex) |
@@ -233,9 +236,9 @@ handle and emits the tagged particle stream on `out`.
       "id": "poly1",
       "type": "polyhedron_generator",
       "position": { "x": 170, "y": 310 },
-      "centerElements": [22],
-      "ligandElements": [8],
-      "maxDistance": 2.5,
+      "excludedCenters": [38],
+      "excludedLigands": [],
+      "cutoffTolerance": 1.15,
       "opacity": 0.5,
       "showEdges": true,
       "edgeColor": "#dddddd",
