@@ -38,6 +38,7 @@ Legend:
 | mmCIF | `.mmcif` | ✓ | API | ✓ | ✓ | API |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | API |
+| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 
 ### Trajectory formats
 
@@ -45,7 +46,6 @@ Legend:
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓ |
-| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | AMBER NetCDF | `.nc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 

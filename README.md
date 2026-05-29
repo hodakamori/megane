@@ -49,10 +49,10 @@ One codebase, every environment.
 | Environment | How | Install |
 |---|---|---|
 | **Jupyter** | anywidget inline viewer | `pip install megane` |
-| **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .cif from the file browser | `pip install megane` |
+| **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .dcd, .nc, .lammpstrj/.dump from the file browser | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .data/.lammps, .traj, .xtc, .lammpstrj, .dcd, .nc, .megane.json | Extension |
+| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .lammpstrj, .dump, .dcd, .nc, .megane.json | Extension |
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
@@ -64,7 +64,7 @@ Wire nodes to build visualization workflows — no code required.
 
 **16 node types** across 5 categories: load data (structure, trajectory, streaming, vector, volumetric), bonds, process (filter, modify, color, representation), overlay (labels, polyhedra, surface meshes, isosurfaces, vectors), and display in a 3D viewport.
 
-**7 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector — flow through color-coded edges. Only matching types can connect.
+**8 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector, volumetric — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
 
@@ -166,6 +166,7 @@ function App() {
 | CIF | `.cif` | Crystallographic Information File |
 | mmCIF | `.mmcif` | Macromolecular CIF (PDBx/mmCIF) |
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
+| ASE .traj | `.traj` | ASE trajectory (ULM binary format; contains atoms + frames) |
 
 ### Trajectory formats (`LoadTrajectory` node)
 
@@ -174,7 +175,6 @@ function App() {
 | XTC | `.xtc` | GROMACS compressed trajectory |
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | AMBER NetCDF | `.nc` | AMBER NetCDF trajectory |
-| ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
 | LAMMPS dump | `.lammpstrj`, `.dump` | LAMMPS dump trajectory |
 
 ## Development
