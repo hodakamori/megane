@@ -15,7 +15,7 @@ For real-world examples, see the [Gallery](/gallery).
 
 A pipeline is a directed graph of **nodes** connected by **edges**. Data flows from source nodes (like Load Structure) through processing nodes (like Filter or Modify) and into a Viewport node for rendering.
 
-Each edge carries a specific **data type** — particle, bond, cell, label, mesh, trajectory, or vector — and only matching types can connect.
+Each edge carries a specific **data type** — particle, bond, cell, label, mesh, trajectory, vector, or volumetric — and only matching types can connect.
 
 When a node encounters an error — for example, a parse failure in LoadStructure — an error icon appears on the node with a tooltip showing the details.
 
