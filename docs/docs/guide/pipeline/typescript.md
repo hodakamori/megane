@@ -88,7 +88,7 @@ Constructor parameters mirror the Python API (using an options object instead of
 | `Representation(mode="cartoon")` | `new Representation({ mode: "cartoon" })` |
 | `AddBonds(source="distance")` | `new AddBonds({ source: 'distance' })` |
 | `AddLabels(source="element")` | `new AddLabels({ source: 'element' })` |
-| `AddPolyhedra(center_elements=[22])` | `new AddPolyhedra({ centerElements: [22] })` |
+| `AddPolyhedra(excluded_centers=[38])` | `new AddPolyhedra({ excludedCenters: [38] })` |
 | `VectorOverlay(scale=2.0)` | `new VectorOverlay({ scale: 2.0 })` |
 | `LoadTrajectory(xtc="traj.xtc")` | `new LoadTrajectory({ xtc: 'traj.xtc' })` |
 | `Viewport(perspective=True)` | `new ViewportNode({ perspective: true })` |
@@ -202,11 +202,11 @@ import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewpo
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("SrTiO3_supercell.pdb"));
 const bonds = pipe.addNode(new AddBonds());
+// All metal centers and anion-forming ligands are included by default (VESTA-style).
+// Exclude Sr (38) so only TiO6 polyhedra are drawn.
 const polyhedra = pipe.addNode(
   new AddPolyhedra({
-    centerElements: [22], // Ti
-    ligandElements: [8], // O
-    maxDistance: 2.5,
+    excludedCenters: [38], // exclude Sr; Ti (22) is kept
     opacity: 0.5,
     showEdges: true,
   })

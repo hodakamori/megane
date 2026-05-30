@@ -83,7 +83,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). |
+| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop` (AMBER topology), `.traj` (ASE binary). |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -279,14 +279,19 @@ AddLabels(*, source: Literal["element", "resname", "index"] = "element")
 
 ### AddPolyhedra
 
-Generate coordination polyhedra mesh.
+Generate coordination polyhedra mesh (VESTA-style auto-detection).
+
+By default, a polyhedron is drawn for every metal/metalloid center coordinated
+to every typical anion-forming ligand present in the structure. Use
+`excluded_centers` / `excluded_ligands` to opt out specific elements, mirroring
+VESTA's checkbox UI.
 
 ```python
 AddPolyhedra(
     *,
-    center_elements: list[int],
-    ligand_elements: list[int] | None = None,  # defaults to [8] (oxygen)
-    max_distance: float = 2.5,
+    excluded_centers: list[int] | None = None,
+    excluded_ligands: list[int] | None = None,
+    cutoff_tolerance: float = 1.15,
     opacity: float = 0.5,
     show_edges: bool = False,
     edge_color: str = "#dddddd",
@@ -296,9 +301,9 @@ AddPolyhedra(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `center_elements` | `list[int]` | *(required)* | Atomic numbers of center atoms (e.g., Ti=22) |
-| `ligand_elements` | `list[int] \| None` | `[8]` (oxygen) | Atomic numbers of ligand atoms |
-| `max_distance` | `float` | `2.5` | Maximum center–ligand distance (Å) |
+| `excluded_centers` | `list[int] \| None` | `[]` | Atomic numbers to exclude from center detection (e.g., `[38]` to skip Sr) |
+| `excluded_ligands` | `list[int] \| None` | `[]` | Atomic numbers to exclude from ligand detection |
+| `cutoff_tolerance` | `float` | `1.15` | Bond-length tolerance multiplier applied to VDW radii sum for center–ligand detection |
 | `opacity` | `float` | `0.5` | Face transparency (0–1) |
 | `show_edges` | `bool` | `False` | Display wireframe edges |
 | `edge_color` | `str` | `"#dddddd"` | Wireframe edge color (hex) |
@@ -444,10 +449,10 @@ from megane import Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewport, Mo
 pipe = Pipeline()
 s = pipe.add_node(LoadStructure("SrTiO3_supercell.pdb"))
 bonds = pipe.add_node(AddBonds(source="distance"))
+# All metal centers and anion-forming ligands are included by default (VESTA-style).
+# Exclude Sr (38) so only TiO6 polyhedra are drawn.
 polyhedra = pipe.add_node(AddPolyhedra(
-    center_elements=[22],     # Ti
-    ligand_elements=[8],      # O
-    max_distance=2.5,
+    excluded_centers=[38],    # exclude Sr; Ti (22) is kept
     opacity=0.5,
     show_edges=True,
 ))

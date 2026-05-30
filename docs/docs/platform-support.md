@@ -38,6 +38,7 @@ Legend:
 | mmCIF | `.mmcif` | ✓ | API | ✓ | ✓ | API |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | API |
+| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 
 ### Trajectory formats
 
@@ -45,7 +46,6 @@ Legend:
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓ |
-| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | AMBER NetCDF | `.nc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 
@@ -64,7 +64,9 @@ with a GROMACS `.top`).
 | Format | Extensions | Standalone (Add Bond node) | Python |
 |---|---|:---:|:---:|
 | GROMACS topology | `.top` | ✓ | ✓ |
-| CHARMM/NAMD PSF | `.psf` | ✓ | ✓ |
+| CHARMM/NAMD PSF | `.psf` | ✓ | API² |
+
+² Python `AddBonds` only wires GROMACS `.top` topology via the `top=` parameter. PSF bonds are accessible programmatically via `megane.parsers.psf.parse_psf_bonds(path)` or `megane_parser.parse_psf_bonds(text)`, but cannot be passed directly to an `AddBonds` pipeline node.
 
 Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VSCode `customEditors`).
 
