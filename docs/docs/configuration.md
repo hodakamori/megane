@@ -19,11 +19,14 @@ sidebar_position: 2
 git clone https://github.com/hodakamori/megane.git
 cd megane
 
-# Install Python dependencies and build Rust extension
-make dev
-
-# Install Node.js dependencies
+# Install Node.js dependencies (must come first — make dev depends on them)
 npm install
+
+# Install Python dependencies (test tools, notebook support, etc.)
+uv sync --extra dev
+
+# Build frontend assets and install the megane Python extension
+make dev
 ```
 
 ### Development Mode
