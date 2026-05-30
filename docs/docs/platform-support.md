@@ -40,6 +40,8 @@ Legend:
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | API |
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 
+Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
+
 ### Trajectory formats
 
 | Format | Extensions | Standalone | Jupyter widget | JupyterLab | VSCode | Python |

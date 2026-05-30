@@ -49,7 +49,7 @@ One codebase, every environment.
 | Environment | How | Install |
 |---|---|---|
 | **Jupyter** | anywidget inline viewer | `pip install megane` |
-| **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .dcd, .nc, .lammpstrj/.dump from the file browser | `pip install megane` |
+| **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .dcd, .nc, .lammpstrj/.dump, .megane.json from the file browser | `pip install megane` |
 | **Browser** | `megane serve` local server | `pip install megane` |
 | **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
 | **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .lammpstrj, .dump, .dcd, .nc, .megane.json | Extension |
@@ -166,7 +166,7 @@ function App() {
 | CIF | `.cif` | Crystallographic Information File |
 | mmCIF | `.mmcif` | Macromolecular CIF (PDBx/mmCIF) |
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
-| ASE .traj | `.traj` | ASE trajectory (ULM binary format; contains atoms + frames) |
+| ASE .traj | `.traj` | ASE trajectory (ULM binary format) — self-contained with elements, bonds, and frames |
 
 ### Trajectory formats (`LoadTrajectory` node)
 
