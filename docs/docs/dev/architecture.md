@@ -281,8 +281,8 @@ the same PR. The full per-host registration checklist lives in the
    (VSCode `customEditors`)
 6. Wire the Python `LoadStructure` / `LoadTrajectory` dispatch in
    `python/megane/pipeline.py` (`_load_structure_file` / `_load_trajectory_data`)
-7. Update `docs/docs/platform-support.md`, `docs/docs/introduction.md`, and
-   `docs/docs/getting-started.md`
+7. Update `docs/docs/platform-support.md`, `docs/docs/introduction.md`,
+   `docs/docs/getting-started.md`, and `README.md`
 
 ## Key File Index
 
