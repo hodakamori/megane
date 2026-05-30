@@ -50,7 +50,7 @@ LoadStructure → AddBond → Viewport
 Use the **Templates** dropdown to load pre-built pipelines:
 
 - **Molecule** — Caffeine (`caffeine_water.pdb`) with structure-based bonds and a vibration trajectory (`caffeine_water_vibration.xtc`). Nodes: `LoadStructure → AddBond → Viewport`, `LoadTrajectory → Viewport`.
-- **Solid** — Perovskite SrTiO₃ 3×3×3 supercell with distance-based bonds and TiO₆ coordination polyhedra. Nodes: `LoadStructure → AddBond → Viewport`, `PolyhedronGenerator → Viewport`. Center = Ti (22), Ligand = O (8), max distance = 2.5 Å.
+- **Solid** — Perovskite SrTiO₃ 3×3×3 supercell with distance-based bonds and TiO₆ coordination polyhedra. Nodes: `LoadStructure → AddBond → Viewport`, `PolyhedronGenerator → Viewport`. Auto-detects metal centers and anion-former ligands (VESTA-style); Sr is excluded from centers so only TiO₆ polyhedra are shown.
 
 ## Node Reference
 
@@ -188,11 +188,13 @@ The **Query** field filters which atoms pass through when the Filter node is con
 
 ### Polyhedron Generator
 
+Polyhedra are auto-detected using VESTA-style heuristics: a polyhedron is drawn for every metal/metalloid center coordinated to every typical anion-former ligand present in the structure. Use the exclusion lists to opt out specific elements.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| Center elements | number[] | — | Atomic numbers of center atoms (e.g., Ti=22, Si=14) |
-| Ligand elements | number[] | O (8) | Atomic numbers of ligand atoms |
-| Max distance | number | 2.5 Å | Maximum center–ligand distance |
+| Excluded centers | number[] | `[]` | Atomic numbers to exclude from the auto-detected center set (e.g., 38 to skip Sr) |
+| Excluded ligands | number[] | `[]` | Atomic numbers to exclude from the auto-detected ligand set |
+| Cutoff tolerance | number | 1.15 | Multiplier on `r_cov[center] + r_cov[ligand]` used to determine contacts (~1.0 = ideal contact, VESTA default ~1.15) |
 | Opacity | number | 0.5 | Face transparency (0–1) |
 | Show edges | boolean | off | Display wireframe edges |
 | Edge color | string | `#dddddd` | Wireframe edge color (hex) |
@@ -322,7 +324,7 @@ The bond query selects which bonds a downstream **Modify** node applies opacity 
 
 1. Load a perovskite structure (`LoadStructure`)
 2. Add a `PolyhedronGenerator` node
-3. Set center = Ti (22), ligand = O (8), max distance = 2.5 Å
+3. In "Excluded centers", add Sr (38) so only TiO₆ polyhedra are shown (Ti and O are auto-detected)
 4. Connect `LoadStructure.particle → PolyhedronGenerator.particle`
 5. Connect `PolyhedronGenerator.mesh → Viewport.mesh`
 
