@@ -57,7 +57,7 @@ function App() {
 | `onFpsChange` | `(fps: number) => void` | | FPS change handler |
 | `width` / `height` | `string \| number` | | Viewer dimensions (default: `"100%"`) |
 
-See the [TypeScript API Reference](/api/typescript/) for the complete interface.
+See the [TypeScript Pipeline API](/guide/pipeline/typescript) for the complete interface.
 
 ---
 

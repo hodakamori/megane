@@ -26,8 +26,8 @@ npm install
 # Install Python dependencies (test tools, notebook support, etc.)
 uv sync --extra dev
 
-# Build frontend and install Python extension (editable)
-make dev
+# Build Rust extension (editable install)
+maturin develop --release
 ```
 
 ### Development Mode

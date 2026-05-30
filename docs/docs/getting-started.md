@@ -121,5 +121,5 @@ Not every host opens every extension from its native file picker — see
 - [Jupyter Widget Guide](/guide/jupyter) — Detailed widget usage, event handling, and Plotly integration
 - [CLI Guide](/guide/cli) — All CLI options and development mode
 - [Web / React Guide](/guide/web) — Embedding in React applications, imperative renderer API
-- [Python API Reference](/api/python/) — Full Python API documentation
-- [TypeScript API Reference](/api/typescript/) — Full TypeScript API documentation
+- [Python Pipeline API](/guide/pipeline/python) — Full Python API documentation
+- [TypeScript Pipeline API](/guide/pipeline/typescript) — Full TypeScript API documentation
