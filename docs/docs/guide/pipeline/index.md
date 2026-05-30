@@ -158,6 +158,7 @@ Requires a connection from a LoadStructure node. Frames are loaded lazily when `
 |-----------|--------|---------|-------------|
 | Bond source | `structure` | — | Read bonds from the structure file (CONECT records in PDB, etc.) |
 | | `distance` | ✓ | Infer bonds from van der Waals radii |
+| | `file` | — | Read bonds from a topology file (GROMACS `.top` or CHARMM/NAMD `.psf`). Click **Load .top / .psf…** to select the file. |
 
 ### Filter
 
@@ -198,6 +199,10 @@ The **Query** field filters which atoms pass through when the Filter node is con
 | Edge width | number | 3.0 | Wireframe edge width (px) |
 
 ### Surface Mesh
+
+:::note
+Surface Mesh is available in the visual pipeline editor (standalone app, JupyterLab, VSCode) but does not have a corresponding Python class in the `megane` package. Build pipelines that use this node as JSON files or by editing them in the visual editor.
+:::
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
