@@ -22,8 +22,9 @@ export interface Snapshot {
   /**
    * Crystallographic symmetry operations as raw `x,y,z`-style strings, captured
    * from a CIF `_symmetry_equiv_pos_as_xyz` loop. Undefined for formats without
-   * space-group information. Not applied at parse time — the Supercell node
-   * expands them on demand.
+   * space-group information. Informational only: the CIF parser already applies
+   * these to expand the asymmetric unit into the full unit cell, so `positions`
+   * holds the expanded structure (not the raw asymmetric unit).
    */
   symmetryOps?: string[];
 }

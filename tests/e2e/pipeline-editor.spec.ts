@@ -62,17 +62,12 @@ test.describe("pipeline-editor: webapp default graph", () => {
     await page.getByTitle("Add Node").click();
     await page.getByRole("button", { name: "Supercell", exact: true }).click();
 
-    // The node mounts with its repeat inputs and symmetry toggle.
+    // The node mounts with its na/nb/nc repeat inputs.
     const node = page.locator('[data-testid="pipeline-node-supercell"]').first();
     await expect(node).toBeVisible();
     await expect(page.locator('[data-testid="supercell-node-na"]').first()).toBeVisible();
     await expect(page.locator('[data-testid="supercell-node-nb"]').first()).toBeVisible();
     await expect(page.locator('[data-testid="supercell-node-nc"]').first()).toBeVisible();
-
-    const symmetry = page.locator('[data-testid="supercell-node-symmetry"]').first();
-    await expect(symmetry).not.toBeChecked();
-    await symmetry.check();
-    await expect(symmetry).toBeChecked();
 
     // Repeat count edits are accepted.
     const na = page.locator('[data-testid="supercell-node-na"]').first();

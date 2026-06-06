@@ -41,7 +41,6 @@ const params = (over: Partial<SupercellParams> = {}): SupercellParams => ({
   na: 1,
   nb: 1,
   nc: 1,
-  applySymmetry: false,
   ...over,
 });
 

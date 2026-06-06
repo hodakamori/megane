@@ -1,10 +1,11 @@
 /**
- * Supercell node — replicate the unit cell across an na×nb×nc grid and/or apply
- * the crystallographic symmetry operations to fill each cell (VESTA-style
- * packing for molecular crystals). Particle in → particle out.
+ * Supercell node — replicate the unit cell across an na×nb×nc grid (a true
+ * supercell). Particle in → particle out.
  *
- * Place this early in the stack (right after Load Structure): it rebuilds the
- * particle set, so per-atom overrides from upstream nodes are dropped.
+ * Symmetry expansion (asymmetric unit → full cell) happens automatically when a
+ * CIF is loaded, so this node only does translational replication. Place it
+ * early in the stack (right after Load Structure): it rebuilds the particle
+ * set, so per-atom overrides from upstream nodes are dropped.
  */
 
 import type { NodeProps, Node } from "@xyflow/react";
@@ -67,18 +68,6 @@ export function SupercellNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
             ))}
           </div>
         </div>
-        <label
-          style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 17 }}
-        >
-          <input
-            data-testid="supercell-node-symmetry"
-            className="nodrag"
-            type="checkbox"
-            checked={params.applySymmetry}
-            onChange={(e) => updateNodeParams(id, { applySymmetry: e.target.checked })}
-          />
-          <span style={{ color: "#64748b", fontWeight: 500 }}>Apply symmetry ops</span>
-        </label>
       </div>
     </NodeShell>
   );

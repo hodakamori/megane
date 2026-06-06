@@ -253,23 +253,18 @@ class Modify(PipelineNode):
 
 
 class Supercell(PipelineNode):
-    """Replicate the unit cell and/or apply crystallographic symmetry.
+    """Replicate the unit cell across an ``na × nb × nc`` grid (a true supercell).
 
-    Tiles the (optionally symmetry-expanded) unit cell across an
-    ``na × nb × nc`` grid. When ``apply_symmetry=True`` and the source CIF
-    carried a ``_symmetry_equiv_pos_as_xyz`` loop, the space-group operations
-    are applied first to fill each cell with its symmetry-equivalent molecules
-    (VESTA-style packing). Translational replication alone is enough to
-    "display multiple unit cells"; symmetry expansion additionally matches
-    VESTA for molecular crystals.
+    Crystallographic symmetry expansion (asymmetric unit → full unit cell)
+    happens automatically when a CIF is loaded, so this node only performs
+    translational replication.
 
     Args:
         na, nb, nc: Unit-cell repeats along the a, b, c cell axes (each ≥ 1).
-        apply_symmetry: Apply the CIF symmetry operations before tiling.
 
     Ports:
         inp.particle — atom data in
-        out.particle — expanded atom data
+        out.particle — replicated atom data
     """
 
     _node_type = "supercell"
@@ -282,13 +277,11 @@ class Supercell(PipelineNode):
         na: int = 1,
         nb: int = 1,
         nc: int = 1,
-        apply_symmetry: bool = False,
     ) -> None:
         super().__init__()
         self.na = na
         self.nb = nb
         self.nc = nc
-        self.apply_symmetry = apply_symmetry
 
 
 class Color(PipelineNode):
@@ -745,7 +738,6 @@ class Pipeline:
                 na=nd.get("na", 1),
                 nb=nd.get("nb", 1),
                 nc=nd.get("nc", 1),
-                apply_symmetry=nd.get("applySymmetry", False),
             )
         elif ntype == "color":
             range_val = nd.get("range")
@@ -926,7 +918,6 @@ class Pipeline:
             base["na"] = node.na
             base["nb"] = node.nb
             base["nc"] = node.nc
-            base["applySymmetry"] = node.apply_symmetry
         elif isinstance(node, Color):
             base["mode"] = node.mode
             base["uniformColor"] = node.uniform_color

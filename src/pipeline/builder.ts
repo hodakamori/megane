@@ -268,12 +268,14 @@ export class Modify extends PipelineNode {
 }
 
 /**
- * Replicate the unit cell across an na×nb×nc grid and/or apply the CIF
- * crystallographic symmetry operations to fill each cell (VESTA-style packing).
+ * Replicate the unit cell across an na×nb×nc grid (a true supercell).
+ *
+ * Crystallographic symmetry expansion happens automatically when a CIF is
+ * loaded, so this node only does translational replication.
  *
  * Ports:
  *   inp.particle — atom data in
- *   out.particle — expanded atom data
+ *   out.particle — replicated atom data
  */
 export class Supercell extends PipelineNode {
   readonly nodeType = "supercell";
@@ -283,19 +285,12 @@ export class Supercell extends PipelineNode {
   public na: number;
   public nb: number;
   public nc: number;
-  public applySymmetry: boolean;
 
-  constructor({
-    na = 1,
-    nb = 1,
-    nc = 1,
-    applySymmetry = false,
-  }: { na?: number; nb?: number; nc?: number; applySymmetry?: boolean } = {}) {
+  constructor({ na = 1, nb = 1, nc = 1 }: { na?: number; nb?: number; nc?: number } = {}) {
     super();
     this.na = na;
     this.nb = nb;
     this.nc = nc;
-    this.applySymmetry = applySymmetry;
   }
 
   _toSerializedParams() {
@@ -304,7 +299,6 @@ export class Supercell extends PipelineNode {
       na: this.na,
       nb: this.nb,
       nc: this.nc,
-      applySymmetry: this.applySymmetry,
     };
   }
 }

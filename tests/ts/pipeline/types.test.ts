@@ -111,7 +111,6 @@ describe("defaultParams", () => {
       na: 1,
       nb: 1,
       nc: 1,
-      applySymmetry: false,
     });
   });
 

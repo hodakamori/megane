@@ -450,17 +450,16 @@ export interface ModifyParams {
 
 export interface SupercellParams {
   type: "supercell";
-  /** Number of unit-cell repeats along the a, b, c cell axes (each ≥ 1). */
+  /**
+   * Number of unit-cell repeats along the a, b, c cell axes (each ≥ 1).
+   *
+   * This is pure translational replication. Crystallographic symmetry
+   * expansion (asymmetric unit → full cell) happens automatically when the CIF
+   * is parsed, so the incoming snapshot already holds the full unit cell.
+   */
   na: number;
   nb: number;
   nc: number;
-  /**
-   * Apply the crystallographic symmetry operations from the CIF
-   * `_symmetry_equiv_pos_as_xyz` loop to fill each unit cell with its
-   * symmetry-equivalent molecules (VESTA-style packing). No-op when the
-   * structure carries no symmetry operations.
-   */
-  applySymmetry: boolean;
 }
 
 export interface ColorParams {
@@ -603,7 +602,6 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         na: 1,
         nb: 1,
         nc: 1,
-        applySymmetry: false,
       };
     case "color":
       return {

@@ -178,24 +178,22 @@ describe("Modify", () => {
 });
 
 describe("Supercell", () => {
-  it("uses default 1×1×1 repeat with symmetry off", () => {
+  it("uses default 1×1×1 repeat", () => {
     const node = new Supercell();
     expect(node._toSerializedParams()).toMatchObject({
       type: "supercell",
       na: 1,
       nb: 1,
       nc: 1,
-      applySymmetry: false,
     });
   });
 
-  it("accepts custom repeat counts and symmetry flag", () => {
-    const node = new Supercell({ na: 2, nb: 3, nc: 1, applySymmetry: true });
+  it("accepts custom repeat counts", () => {
+    const node = new Supercell({ na: 2, nb: 3, nc: 1 });
     expect(node._toSerializedParams()).toMatchObject({
       na: 2,
       nb: 3,
       nc: 1,
-      applySymmetry: true,
     });
   });
 });

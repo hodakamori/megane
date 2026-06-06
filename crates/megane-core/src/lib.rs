@@ -2,6 +2,7 @@ pub mod amber;
 pub mod atomic;
 pub mod bonds;
 pub mod cif;
+pub mod crystal;
 pub mod dcd;
 pub mod gro;
 pub mod lammps_data;

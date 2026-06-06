@@ -259,7 +259,7 @@ describe("executePipeline", () => {
     it("replicates the cell across an na×nb×nc grid", () => {
       const nodes = [
         makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
-        makeNode("sc", "supercell", { na: 2, nb: 2, nc: 1, applySymmetry: false }),
+        makeNode("sc", "supercell", { na: 2, nb: 2, nc: 1 }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
       const edges = [
@@ -281,7 +281,7 @@ describe("executePipeline", () => {
       });
       const nodes = [
         makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
-        makeNode("sc", "supercell", { na: 2, nb: 2, nc: 2, applySymmetry: false }),
+        makeNode("sc", "supercell", { na: 2, nb: 2, nc: 2 }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
       const edges = [

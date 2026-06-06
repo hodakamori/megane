@@ -30,17 +30,20 @@ def test_load_nacl_cif():
 
 def test_load_glycine_csd_cif():
     """Regression for Issue #458: CCDC-style CIF with a blank line between the
-    atom_site loop header and the first data row must load successfully."""
+    atom_site loop header and the first data row must load successfully.
+
+    The 10-atom asymmetric unit is symmetry-expanded into a full unit cell of
+    4 glycine molecules (40 atoms) on load (Issue #460)."""
     s = load_cif(str(FIXTURES / "glycine_csd.cif"))
 
-    assert s.n_atoms == 10
-    # Glycine zwitterion: 2 O, 2 C, 1 N, 5 H
-    assert int(np.sum(s.elements == 8)) == 2
-    assert int(np.sum(s.elements == 6)) == 2
-    assert int(np.sum(s.elements == 7)) == 1
-    assert int(np.sum(s.elements == 1)) == 5
+    assert s.n_atoms == 40
+    # Glycine zwitterion ×4 symmetry images: (2 O, 2 C, 1 N, 5 H) × 4
+    assert int(np.sum(s.elements == 8)) == 2 * 4
+    assert int(np.sum(s.elements == 6)) == 2 * 4
+    assert int(np.sum(s.elements == 7)) == 1 * 4
+    assert int(np.sum(s.elements == 1)) == 5 * 4
 
-    assert s.positions.shape == (10, 3)
+    assert s.positions.shape == (40, 3)
     assert s.positions.dtype == np.float32
     # Fractional coords were converted to Cartesian via the cell matrix
     assert np.any(s.positions != 0)
@@ -66,11 +69,11 @@ def test_cif_without_symmetry_has_empty_ops():
 
 
 def test_delta_glycine_issue_460():
-    """Issue #460: the delta-glycine (P2_1/a) CIF loads its asymmetric unit
-    (one glycine molecule) and carries the four space-group operations that the
-    Supercell node expands to pack the cell."""
+    """Issue #460: the delta-glycine (P2_1/a) CIF is symmetry-expanded on load
+    from its 10-atom asymmetric unit (one glycine molecule) into the full unit
+    cell of 4 molecules (40 atoms), using the four space-group operations."""
     s = load_cif(str(FIXTURES / "delta_glycine.cif"))
-    assert s.n_atoms == 10  # one glycine zwitterion (asymmetric unit)
+    assert s.n_atoms == 40  # 10-atom asymmetric unit × 4 symmetry images
     assert len(s.symmetry_ops) == 4  # P2_1/a: 4 equivalent positions
     normalized = {op.replace(" ", "") for op in s.symmetry_ops}
     assert "x,y,z" in normalized

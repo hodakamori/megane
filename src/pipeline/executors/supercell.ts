@@ -2,9 +2,10 @@ import type { PipelineData, ParticleData, SupercellParams } from "../types";
 import { expandCrystal } from "../crystal";
 
 /**
- * Supercell node — replicate the unit cell across an na×nb×nc grid and/or apply
- * the crystallographic symmetry operations to fill each cell (VESTA-style
- * packing for molecular crystals).
+ * Supercell node — replicate the unit cell across an na×nb×nc grid (a true
+ * supercell, translational replication only). Crystallographic symmetry
+ * expansion happens earlier, when the CIF is parsed, so the incoming snapshot
+ * already holds the full unit cell.
  *
  * Produces a brand-new particle stream backed by an expanded {@link Snapshot}
  * (more atoms, replicated bonds, an enlarged cell box). Per-atom overrides from
@@ -24,7 +25,6 @@ export function executeSupercell(
     na: params.na,
     nb: params.nb,
     nc: params.nc,
-    applySymmetry: params.applySymmetry,
   });
 
   // No change (no cell, or na=nb=nc=1 with symmetry off/absent) — pass through.
