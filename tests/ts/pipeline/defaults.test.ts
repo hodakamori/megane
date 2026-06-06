@@ -47,12 +47,13 @@ describe("createDefaultPipeline", () => {
 });
 
 describe("createEmptyPipeline", () => {
-  it("returns 3 nodes: LoadStructure, AddBond, Viewport", () => {
+  it("returns 4 nodes: LoadStructure, Replicate, AddBond, Viewport", () => {
     const { nodes } = createEmptyPipeline();
-    expect(nodes.length).toBe(3);
+    expect(nodes.length).toBe(4);
     expect(nodes[0].type).toBe("load_structure");
-    expect(nodes[1].type).toBe("add_bond");
-    expect(nodes[2].type).toBe("viewport");
+    expect(nodes[1].type).toBe("replicate");
+    expect(nodes[2].type).toBe("add_bond");
+    expect(nodes[3].type).toBe("viewport");
   });
 
   it("all edges reference valid node IDs", () => {
