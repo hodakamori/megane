@@ -16,7 +16,7 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer, type MeganeCameraState } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
-import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { createPipelineStore, type PipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
@@ -236,7 +236,7 @@ export function WidgetViewer({
       frame.positions,
       effectiveSnapshot.elements,
       effectiveSnapshot.nAtoms,
-      0.6,
+      (params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
       effectiveSnapshot.box,
     );
 

@@ -1,5 +1,5 @@
 import type { PipelineData, ParticleData, BondData, AddBondParams } from "../types";
-import { inferBondsVdwJS } from "../../parsers/inferBondsJS";
+import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../../parsers/inferBondsJS";
 import { invert3x3 } from "./mathUtils";
 
 /**
@@ -294,7 +294,7 @@ export function executeAddBond(
       snapshot.positions,
       snapshot.elements,
       snapshot.nAtoms,
-      0.6,
+      params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
       snapshot.box,
     );
 
