@@ -11,6 +11,7 @@ import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
 import { TabSelector, smallBtnStyle, fileNameStyle } from "../ui";
 import { parseTopBonds, parsePsfBonds } from "../../parsers/structure";
+import { DEFAULT_VDW_BOND_FACTOR } from "../../parsers/inferBondsJS";
 import type { BondSource } from "../../types";
 import { useRef, useCallback } from "react";
 
@@ -26,6 +27,38 @@ const sectionLabelStyle: React.CSSProperties = {
 
 const TOPOLOGY_ACCEPT = ".top,.psf";
 const TOPOLOGY_EXTS = [".top", ".psf"];
+
+// Allowed range for the VDW distance threshold scale. Lower tightens (fewer
+// bonds), higher loosens (more bonds). 0.6 is the default used elsewhere.
+const VDW_SCALE_MIN = 0.3;
+const VDW_SCALE_MAX = 1.2;
+const VDW_SCALE_STEP = 0.05;
+
+const thresholdRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  marginTop: 8,
+};
+
+const thresholdLabelStyle: React.CSSProperties = {
+  fontSize: 16,
+  fontWeight: 500,
+  color: "#64748b",
+  flex: 1,
+};
+
+const thresholdSliderStyle: React.CSSProperties = {
+  width: 110,
+  accentColor: "#06b6d4",
+};
+
+const thresholdValueStyle: React.CSSProperties = {
+  fontSize: 15,
+  color: "#64748b",
+  minWidth: 30,
+  textAlign: "right",
+};
 
 export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
   const updateNodeParams = usePipelineStore((s) => s.updateNodeParams);
@@ -62,6 +95,25 @@ export function AddBondNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         value={params.bondSource}
         onChange={(v) => updateNodeParams(id, { bondSource: v })}
       />
+      {params.bondSource === "distance" && (
+        <div style={thresholdRowStyle}>
+          <span style={thresholdLabelStyle}>Threshold</span>
+          <input
+            type="range"
+            className="nodrag"
+            data-testid="add-bond-vdw-scale"
+            min={VDW_SCALE_MIN}
+            max={VDW_SCALE_MAX}
+            step={VDW_SCALE_STEP}
+            value={params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR}
+            style={thresholdSliderStyle}
+            onChange={(e) => updateNodeParams(id, { vdwScale: parseFloat(e.target.value) })}
+          />
+          <span style={thresholdValueStyle}>
+            {(params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR).toFixed(2)}
+          </span>
+        </div>
+      )}
       {params.bondSource === "file" && (
         <div style={{ marginTop: 4 }}>
           {params.bondFileName ? (

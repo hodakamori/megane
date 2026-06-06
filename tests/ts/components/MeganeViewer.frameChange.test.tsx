@@ -8,6 +8,7 @@ vi.mock("@/components/Timeline", () => ({ Timeline: vi.fn(() => null) }));
 vi.mock("@/components/PipelineEditor", () => ({ PipelineEditor: vi.fn(() => null) }));
 vi.mock("@/parsers/inferBondsJS", () => ({
   inferBondsVdwJS: vi.fn(() => new Uint32Array(0)),
+  DEFAULT_VDW_BOND_FACTOR: 0.6,
 }));
 vi.mock("@/pipeline/executors/addBond", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/pipeline/executors/addBond")>();

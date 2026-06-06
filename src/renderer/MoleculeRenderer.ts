@@ -201,6 +201,19 @@ export class MoleculeRenderer {
   private snapshot: Snapshot | null = null;
   private lastExtent: ViewExtent = { maxExtent: 1, extentX: 1, extentY: 1 };
   private currentPositions: Float32Array | null = null;
+  /**
+   * Bonds pushed via updateBondsExt before a snapshot/bondRenderer existed.
+   * Replayed inside loadSnapshot. Guards against PipelineViewer's
+   * parent-before-child effect ordering, where applyViewportState calls
+   * updateBondsExt before Viewport calls loadSnapshot.
+   */
+  private pendingBonds: {
+    bonds: Uint32Array;
+    bondOrders: Uint8Array | null;
+    positions: Float32Array | null;
+    elements: Uint8Array | null;
+    nAtoms: number;
+  } | null = null;
   /** Axes-inset drag state */
   private axesDragging = false;
   private axesDragLastX = 0;
@@ -412,6 +425,10 @@ export class MoleculeRenderer {
     // Bond loading is handled exclusively by the pipeline via updateBondsExt/updateBonds
     // (called from applyViewportState). This avoids race conditions between
     // Viewport's loadSnapshot and MeganeViewer's applyViewportState effects.
+    // If updateBondsExt ran before this snapshot existed (PipelineViewer's
+    // parent-before-child effect ordering), the bonds were stashed — replay
+    // them now that this.snapshot and this.bondRenderer are ready.
+    this.flushPendingBonds();
 
     // Re-apply stored scale after loading snapshot data
     if (this.atomScale !== 1.0 && this.atomRenderer!.setScale) {
@@ -542,7 +559,16 @@ export class MoleculeRenderer {
     elements: Uint8Array | null,
     nAtoms: number,
   ): void {
-    if (!this.snapshot || !this.bondRenderer) return;
+    if (!this.snapshot || !this.bondRenderer) {
+      // Called before the snapshot/bondRenderer exist (PipelineViewer's
+      // parent-before-child effect ordering). Stash the args and replay them
+      // in loadSnapshot, since applyViewportState may never call us again
+      // (its bondIndices memo guard skips identical references).
+      this.pendingBonds = { bonds, bondOrders, positions, elements, nAtoms };
+      return;
+    }
+    // Reached the live path — any earlier stash is now superseded.
+    this.pendingBonds = null;
     const pos = positions ?? this.currentPositions ?? this.snapshot.positions;
     const elems = elements ?? this.snapshot.elements;
     const atomCount = nAtoms || this.snapshot.nAtoms;
@@ -560,6 +586,18 @@ export class MoleculeRenderer {
       this.bondRenderer.setScale(this.bondScale, this.snapshot);
     }
     this.syncBondColorsToAtoms(extSnap);
+  }
+
+  /**
+   * Replay bonds that updateBondsExt stashed because it ran before a snapshot
+   * existed. Called from loadSnapshot once this.snapshot and this.bondRenderer
+   * are ready, so the replayed updateBondsExt passes its guard.
+   */
+  private flushPendingBonds(): void {
+    if (!this.pendingBonds) return;
+    const p = this.pendingBonds;
+    this.pendingBonds = null;
+    this.updateBondsExt(p.bonds, p.bondOrders, p.positions, p.elements, p.nAtoms);
   }
 
   /** Set per-atom labels for overlay display. */

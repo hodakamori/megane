@@ -252,6 +252,38 @@ class Modify(PipelineNode):
         self.opacity = opacity
 
 
+class Replicate(PipelineNode):
+    """Replicate the structure into an ``nx × ny × nz`` supercell.
+
+    OVITO/VESTA-style supercell builder: copies every atom (and its bonds)
+    into a grid of cell images placed in the +a/+b/+c directions (the
+    original cell included) and enlarges the simulation cell to
+    ``nx·a, ny·b, nz·c``. Requires the upstream structure to carry a unit
+    cell; without one the input is passed through unchanged.
+
+    Args:
+        nx: Number of cell images along the a (x) lattice vector (>= 1).
+        ny: Number of cell images along the b (y) lattice vector (>= 1).
+        nz: Number of cell images along the c (z) lattice vector (>= 1).
+
+    Ports:
+        inp.particle — atom data in
+        inp.cell     — simulation cell in
+        out.particle — replicated atom data
+        out.cell     — enlarged simulation cell
+    """
+
+    _node_type = "replicate"
+    _out_ports = {"particle": "particle", "cell": "cell"}
+    _inp_ports = {"particle": "particle", "cell": "cell"}
+
+    def __init__(self, *, nx: int = 1, ny: int = 1, nz: int = 1) -> None:
+        super().__init__()
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+
+
 class Color(PipelineNode):
     """Recolor the upstream particle stream by a chosen scheme.
 
@@ -710,6 +742,8 @@ class Pipeline:
             )
         elif ntype == "representation":
             return Representation(mode=nd.get("mode", "atoms"))
+        elif ntype == "replicate":
+            return Replicate(nx=nd.get("nx", 1), ny=nd.get("ny", 1), nz=nd.get("nz", 1))
         elif ntype == "add_bond":
             bond_source = nd.get("bondSource", "distance")
             if bond_source == "file":
@@ -883,6 +917,10 @@ class Pipeline:
                 base["range"] = list(node.range)
         elif isinstance(node, Representation):
             base["mode"] = node.mode
+        elif isinstance(node, Replicate):
+            base["nx"] = node.nx
+            base["ny"] = node.ny
+            base["nz"] = node.nz
         elif isinstance(node, AddBonds):
             if node.top is not None:
                 base["bondSource"] = "file"

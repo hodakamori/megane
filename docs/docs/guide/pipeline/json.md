@@ -142,6 +142,7 @@ handle and emits the tagged particle stream on `out`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `bondSource` | `string` | `"distance"` or `"structure"` |
+| `vdwScale` | `number` | Optional. Threshold scale for `"distance"` mode: atoms bond when their separation is `≤ (vdw_i + vdw_j) * vdwScale`. Higher loosens (more bonds), lower tightens. Defaults to `0.6`. |
 
 #### `label_generator`
 

@@ -147,12 +147,28 @@ describe("usePipelineStore.openFile — single structure file", () => {
 describe("usePipelineStore.openFile — AddBond default by file format", () => {
   function bondSourceFor(loaderId: string): string | undefined {
     const state = usePipelineStore.getState();
-    const addBondId = state.edges.find(
-      (e) => e.source === loaderId && (e.sourceHandle ?? "particle") === "particle",
-    )?.target;
-    if (!addBondId) return undefined;
-    const node = state.nodes.find((n) => n.id === addBondId && n.type === "add_bond");
-    return node ? (node.data.params as { bondSource: string }).bondSource : undefined;
+    // The default pipeline routes loader.particle through a replicate node
+    // before reaching AddBond, so follow particle-carrying edges forward.
+    const passThrough = new Set(["replicate", "filter", "modify", "color", "representation"]);
+    const visited = new Set<string>([loaderId]);
+    const stack: string[] = [loaderId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      for (const e of state.edges) {
+        if (e.source !== id) continue;
+        const sh = e.sourceHandle ?? "particle";
+        if (sh !== "particle" && sh !== "out") continue;
+        const node = state.nodes.find((n) => n.id === e.target);
+        if (node?.type === "add_bond") {
+          return (node.data.params as { bondSource: string }).bondSource;
+        }
+        if (node && passThrough.has(node.type ?? "") && !visited.has(node.id)) {
+          visited.add(node.id);
+          stack.push(node.id);
+        }
+      }
+    }
+    return undefined;
   }
 
   const formatsWithBonds: Array<[string, string]> = [
