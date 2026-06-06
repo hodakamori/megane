@@ -118,7 +118,28 @@ function DocBody({
             );
           }
         } else {
-          await local.loadFile(file);
+          // For .gro files, probe for a sibling .top file with the same stem.
+          let topFile: File | undefined;
+          if (ext === ".gro") {
+            const stem = filename.slice(0, filename.lastIndexOf("."));
+            const topName = stem + ".top";
+            const dir = context.path.includes("/")
+              ? context.path.slice(0, context.path.lastIndexOf("/"))
+              : "";
+            const topPath = dir ? `${dir}/${topName}` : topName;
+            try {
+              const model = await context.manager.services.contents.get(topPath, {
+                content: true,
+                format: "text",
+              });
+              if (model.content) {
+                topFile = new File([String(model.content)], topName);
+              }
+            } catch {
+              // .top file not present — proceed without topology bonds
+            }
+          }
+          await local.loadFile(file, topFile);
         }
         if (token.cancelled) return;
         cachedRef.current = capturePipelineStore(usePipelineStore.getState());

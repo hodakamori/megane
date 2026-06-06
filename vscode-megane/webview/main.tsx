@@ -77,10 +77,14 @@ function App() {
       const message = event.data;
 
       if (message.type === "loadFile") {
-        const { contentBytes, filename, wasmBytes } = message;
+        const { contentBytes, filename, wasmBytes, topBytes, topFilename } = message;
         setWasmUrlFromBytes(wasmBytes);
         const bytes = new Uint8Array(contentBytes);
         const file = new File([bytes], filename);
+        const topFile: File | undefined =
+          topBytes && topFilename
+            ? new File([new Uint8Array(topBytes as number[])], topFilename as string)
+            : undefined;
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
           lower.endsWith(".xtc") ||
@@ -92,7 +96,7 @@ function App() {
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by
         // adding a Load Structure node and re-pointing the trajectory file.
-        const loadPromise = isTrajectoryOnly ? local.loadXtc(file) : local.loadFile(file);
+        const loadPromise = isTrajectoryOnly ? local.loadXtc(file) : local.loadFile(file, topFile);
         loadPromise
           .then(() => setLoaded(true))
           .catch((err) => {
