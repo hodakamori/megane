@@ -484,6 +484,31 @@ _space_group_symop_operation_xyz
     }
 
     #[test]
+    fn test_extract_symmetry_ops_double_quoted() {
+        // Single-column loop with a double-quoted operation.
+        let cif = "data_x\nloop_\n_symmetry_equiv_pos_as_xyz\n\"x,y,z\"\n\"-x,-y,-z\"\n";
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_fewer_fields_than_columns() {
+        // A multi-column symmetry loop whose data row collapses to a single
+        // quoted token (fewer whitespace fields than header tags) exercises the
+        // comma-token fallback in extract_symop_field.
+        let cif = r#"data_x
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+_symmetry_extra_flag
+'x,y,z'
+'-x,-y,-z'
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
     fn test_extract_symmetry_ops_absent() {
         let cif = "data_x\n_cell_length_a 5.0\n";
         assert!(extract_symmetry_ops(cif).is_empty());

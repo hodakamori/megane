@@ -79,6 +79,15 @@ describe("expandCrystal", () => {
     expect(out).toBe(snap);
   });
 
+  it("returns the original when the cell matrix is singular", () => {
+    // A degenerate (zero-volume) cell cannot be inverted to fractional space.
+    const snap = makeCubicSnapshot({
+      box: new Float32Array([10, 0, 0, 0, 10, 0, 0, 0, 0]),
+    });
+    const out = expandCrystal(snap, { na: 2, nb: 1, nc: 1, applySymmetry: false });
+    expect(out).toBe(snap);
+  });
+
   it("replicates atoms and bonds across an na×nb×nc grid", () => {
     const snap = makeCubicSnapshot();
     const out = expandCrystal(snap, { na: 2, nb: 1, nc: 1, applySymmetry: false });
