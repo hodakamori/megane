@@ -478,6 +478,19 @@ class TestPipelineSerialization:
         assert isinstance(bond_node["bondFileData"], list)
         assert len(bond_node["bondFileData"]) > 0
 
+    def test_add_bonds_psf_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        b = pipe.add_node(AddBonds(top=str(FIXTURES / "water.psf")))
+        pipe.add_edge(s.out.particle, b.inp.particle)
+        result = pipe.to_dict()
+
+        bond_node = next(n for n in result["nodes"] if n["type"] == "add_bond")
+        assert bond_node["bondSource"] == "file"
+        assert bond_node["bondFileName"] == str(FIXTURES / "water.psf")
+        assert isinstance(bond_node["bondFileData"], list)
+        assert len(bond_node["bondFileData"]) > 0
+
     def test_color_serialization(self):
         pipe = Pipeline()
         s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))

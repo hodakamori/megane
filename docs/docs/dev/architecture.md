@@ -11,7 +11,7 @@ megane's visual pipeline is built on three core principles:
 
 ### Typed Data Flow
 
-The pipeline is a directed acyclic graph where edges carry one of **7 typed data channels**: `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, and `vector`. Nodes declare typed input/output ports via `NODE_PORTS` in `src/pipeline/types.ts`. The UI prevents connections between incompatible port types at the graph level (see `canConnect()`), so executors can trust that incoming data has the expected shape.
+The pipeline is a directed acyclic graph where edges carry one of **8 typed data channels**: `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, `vector`, and `volumetric`. Nodes declare typed input/output ports via `NODE_PORTS` in `src/pipeline/types.ts`. The UI prevents connections between incompatible port types at the graph level (see `canConnect()`), so executors can trust that incoming data has the expected shape.
 
 ### Separation of Computation and Rendering
 
@@ -28,7 +28,7 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Rust / WASM Parsers  (crates/megane-wasm/)                 │
+│  Rust / WASM Parsers  (crates/megane-core/ → megane-wasm/)  │
 │  PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data,    │
 │  AMBER prmtop, XTC, DCD, AMBER NetCDF, ASE .traj,           │
 │  .lammpstrj/.dump                                           │
@@ -61,7 +61,7 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 
 ## Pipeline Data Types
 
-Seven typed channels flow through pipeline edges. Defined in `src/pipeline/types.ts`.
+Eight typed channels flow through pipeline edges. Defined in `src/pipeline/types.ts`.
 
 | Channel | Interface | Key Fields | Produced By | Consumed By |
 |---------|-----------|------------|-------------|-------------|
@@ -70,8 +70,9 @@ Seven typed channels flow through pipeline edges. Defined in `src/pipeline/types
 | `cell` | `CellData` | `box` (3x3 Float32Array), `visible`, `axesVisible` | LoadStructure, Streaming | Viewport |
 | `trajectory` | `TrajectoryData` | `provider` (FrameProvider), `meta` | LoadStructure, LoadTrajectory, Streaming | Viewport |
 | `label` | `LabelData` | `labels[]`, `particleRef` | LabelGenerator | Viewport |
-| `mesh` | `MeshData` | `positions`, `indices`, `normals`, `colors` | PolyhedronGenerator | Viewport |
+| `mesh` | `MeshData` | `positions`, `indices`, `normals`, `colors` | PolyhedronGenerator, SurfaceMesh, Isosurface | Viewport |
 | `vector` | `VectorData` | `frames` (VectorFrame[]), `scale` | LoadVector, VectorOverlay | VectorOverlay, Viewport |
+| `volumetric` | `VolumetricData` | `nx`, `ny`, `nz`, `origin`, `step`, `data` | LoadVolumetric | Isosurface |
 
 Each edge in the UI is color-coded by data type (`DATA_TYPE_COLORS`). Filter and Modify nodes are generic — they accept both `particle` and `bond` inputs via `GENERIC_NODE_ACCEPTS`. The Color and Representation nodes are particle-only modifiers that share the same Modify category in the toolbar (Ovito-style stack: each modifier owns one visual property — Modify = scale & opacity, Color = per-atom palette, Representation = atoms/cartoon/both/surface).
 
@@ -242,7 +243,7 @@ Wire it into `MoleculeRenderer` by replacing the renderer construction. See `Imp
 
 ### Adding a New Data Channel Type
 
-If the existing 7 channels don't cover your needs:
+If the existing 8 channels don't cover your needs:
 
 1. Add to `PipelineDataType` union and `DATA_TYPE_COLORS` in `src/pipeline/types.ts`
 2. Create the data interface (e.g., `SurfaceData`)
@@ -280,8 +281,8 @@ the same PR. The full per-host registration checklist lives in the
    (VSCode `customEditors`)
 6. Wire the Python `LoadStructure` / `LoadTrajectory` dispatch in
    `python/megane/pipeline.py` (`_load_structure_file` / `_load_trajectory_data`)
-7. Update `docs/docs/platform-support.md`, `docs/docs/introduction.md`, and
-   `docs/docs/getting-started.md`
+7. Update `docs/docs/platform-support.md`, `docs/docs/introduction.md`,
+   `docs/docs/getting-started.md`, and `README.md`
 
 ## Key File Index
 

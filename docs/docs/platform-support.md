@@ -38,6 +38,9 @@ Legend:
 | mmCIF | `.mmcif` | ✓ | API | ✓ | ✓ | API |
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ |
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | API |
+| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
+
+Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
 
 ### Trajectory formats
 
@@ -45,7 +48,6 @@ Legend:
 |---|---|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓ |
-| ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 | AMBER NetCDF | `.nc` | ✓ | API | ✓¹ | ✓¹ | ✓ |
 

@@ -46,3 +46,4 @@ dev-preview/
 coverage/
 .coverage
 lcov.info
+coverage.xml

@@ -11,6 +11,7 @@ sidebar_position: 2
 - Python 3.10+
 - Node.js 22+
 - Rust (for building the parser)
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) (`cargo install wasm-pack`)
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 
 ### Clone and Install
@@ -19,14 +20,14 @@ sidebar_position: 2
 git clone https://github.com/hodakamori/megane.git
 cd megane
 
-# Install Node.js dependencies (must come first — make dev depends on them)
+# Install Node.js dependencies first (required by make dev)
 npm install
 
 # Install Python dependencies (test tools, notebook support, etc.)
 uv sync --extra dev
 
-# Build frontend assets and install the megane Python extension
-make dev
+# Build Rust extension (editable install)
+maturin develop --release
 ```
 
 ### Development Mode

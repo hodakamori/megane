@@ -73,6 +73,10 @@ from megane import (
 )
 ```
 
+:::note
+The **Surface Mesh** node (alpha-shape envelope) is available in the visual pipeline editor but does not have a Python class. Use the standalone app, JupyterLab, or VSCode to add it interactively, or author the pipeline JSON directly.
+:::
+
 ### LoadStructure
 
 Load a molecular structure file.
@@ -83,7 +87,7 @@ LoadStructure(path: str)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop` (AMBER topology), `.traj` (ASE binary). |
+| `path` | `str` | File path. Auto-detected by extension. Supported by the Python-side parser: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). The browser-side (WASM) parser additionally accepts `.mmcif` and `.prmtop` (AMBER topology) when the pipeline runs inside `MolecularViewer`. |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -253,13 +257,13 @@ Representation(*, mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms"
 Compute and display bonds.
 
 ```python
-AddBonds(*, source: Literal["distance", "structure"] = "distance", top: str | None = None)
+AddBonds(*, source: Literal["distance", "structure", "file"] = "distance", top: str | None = None)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `source` | `str` | `"distance"` | `"distance"` for VDW-based inference, `"structure"` for file-based bonds |
-| `top` | `str \| None` | `None` | Path to a GROMACS `.top` topology file. When provided, `source` is ignored and bonds are read from the topology file. |
+| `source` | `str` | `"distance"` | `"distance"` for VDW-based inference; `"structure"` (alias `"file"`) to read bonds from the structure file (e.g. CONECT records in PDB) |
+| `top` | `str \| None` | `None` | Path to a topology file (GROMACS `.top` or CHARMM/NAMD `.psf`). When provided, `source` is ignored and bonds are read from the topology file. |
 
 **Ports:** `inp.particle`, `out.bond`
 

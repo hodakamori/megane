@@ -33,9 +33,9 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
       "id": "polyhedron-1",
       "type": "polyhedron_generator",
       "position": { "x": 680, "y": 310 },
-      "centerElements": [22],
-      "ligandElements": [8],
-      "maxDistance": 2.5,
+      "excludedCenters": [],
+      "excludedLigands": [],
+      "cutoffTolerance": 1.15,
       "opacity": 0.5,
       "showEdges": false,
       "edgeColor": "#dddddd",
@@ -94,8 +94,8 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
 
 ## Customization Notes
 
-- Adjust `centerElements` and `ligandElements` to match the target material.
+- The polyhedron generator auto-detects metal/metalloid centers and typical anion-former ligands (VESTA-style). Use `excludedCenters` / `excludedLigands` to opt out specific atomic numbers.
 - Common atomic numbers: Ti=22, O=8, Sr=38, Fe=26, Al=13, Si=14, Mg=12, Ca=20, Zn=30.
-- Adjust `maxDistance` based on the expected bond length for the center-ligand pair.
+- Adjust `cutoffTolerance` to widen or narrow the center–ligand contact criterion (multiplier on `r_cov[c] + r_cov[l]`; VESTA default is ~1.15).
 - Use `bondSource: "distance"` for crystal structures (XYZ, GRO) that lack explicit bond info.
 - Set `hasCell: true` and `cellAxesVisible: true` to show the unit cell.
