@@ -2,20 +2,20 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Contents } from "@jupyterlab/services";
 
 vi.mock("../../../jupyterlab-megane/src/MeganeDocWidget", () => ({
-  MeganeReactView: vi.fn().mockImplementation((context: unknown) => ({
-    kind: "structure",
-    context,
-  })),
+  // Use a regular function (not an arrow) so the mock can be invoked with `new`.
+  // vitest 4 calls a mock's implementation as a constructor under `new`, and
+  // arrow functions are not constructable.
+  MeganeReactView: vi.fn().mockImplementation(function (context: unknown) {
+    return { kind: "structure", context };
+  }),
 }));
 
 vi.mock("../../../jupyterlab-megane/src/MeganePipelineDocWidget", () => ({
   MeganePipelineReactView: vi
     .fn()
-    .mockImplementation((context: unknown, contents: unknown) => ({
-      kind: "pipeline",
-      context,
-      contents,
-    })),
+    .mockImplementation(function (context: unknown, contents: unknown) {
+      return { kind: "pipeline", context, contents };
+    }),
 }));
 
 vi.mock("@jupyterlab/docregistry", () => {
@@ -27,11 +27,13 @@ vi.mock("@jupyterlab/docregistry", () => {
   }
   const DocumentWidget = vi
     .fn()
-    .mockImplementation((opts: { content: unknown; context: unknown }) => ({
-      content: opts.content,
-      context: opts.context,
-      title: { iconClass: "" },
-    }));
+    .mockImplementation(function (opts: { content: unknown; context: unknown }) {
+      return {
+        content: opts.content,
+        context: opts.context,
+        title: { iconClass: "" },
+      };
+    });
   return { ABCWidgetFactory, DocumentWidget };
 });
 
