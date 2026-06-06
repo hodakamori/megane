@@ -144,6 +144,53 @@ describe("AddBondNode", () => {
     expect(Array.from(dispatchedData)).toEqual([0, 1, 2, 3]);
   });
 
+  it("shows the VDW threshold slider only when bondSource='distance'", () => {
+    const distance = seedPipelineStore("add_bond", {
+      id: "ab1",
+      params: { bondSource: "distance" },
+    });
+    const { rerender } = render(
+      <AddBondNode {...nodeProps("ab1", distance.data.params as AddBondParams)} />,
+    );
+    expect(screen.getByTestId("add-bond-vdw-scale")).toBeInTheDocument();
+
+    const file = seedPipelineStore("add_bond", {
+      id: "ab2",
+      params: { bondSource: "file" },
+    });
+    rerender(<AddBondNode {...nodeProps("ab2", file.data.params as AddBondParams)} />);
+    expect(screen.queryByTestId("add-bond-vdw-scale")).toBeNull();
+  });
+
+  it("defaults the threshold slider to 0.6 and displays the value", () => {
+    const seeded = seedPipelineStore("add_bond", {
+      id: "ab1",
+      params: { bondSource: "distance" },
+    });
+    render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
+
+    const slider = screen.getByTestId("add-bond-vdw-scale") as HTMLInputElement;
+    expect(slider.value).toBe("0.6");
+    expect(screen.getByText("0.60")).toBeInTheDocument();
+  });
+
+  it("reflects an explicit vdwScale and dispatches changes via updateNodeParams", () => {
+    const updateNodeParams = vi.fn();
+    const seeded = seedPipelineStore("add_bond", {
+      id: "ab1",
+      params: { bondSource: "distance", vdwScale: 0.9 },
+    });
+    usePipelineStore.setState({ updateNodeParams });
+    render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
+
+    const slider = screen.getByTestId("add-bond-vdw-scale") as HTMLInputElement;
+    expect(slider.value).toBe("0.9");
+    expect(screen.getByText("0.90")).toBeInTheDocument();
+
+    fireEvent.change(slider, { target: { value: "0.75" } });
+    expect(updateNodeParams).toHaveBeenCalledWith("ab1", { vdwScale: 0.75 });
+  });
+
   it("uploading a non-.top file does not call the parser or dispatch", async () => {
     const updateNodeParams = vi.fn();
     const seeded = seedPipelineStore("add_bond", {

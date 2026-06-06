@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inferBondsVdwJS } from "@/parsers/inferBondsJS";
+import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "@/parsers/inferBondsJS";
 
 describe("inferBondsVdwJS", () => {
   it("returns empty array for 0 atoms", () => {
@@ -90,6 +90,30 @@ describe("inferBondsVdwJS", () => {
 
     // Each water should have 2 O-H bonds = 6 total
     expect(bonds.length / 2).toBe(6);
+  });
+
+  it("exposes a default VDW factor of 0.6", () => {
+    expect(DEFAULT_VDW_BOND_FACTOR).toBe(0.6);
+  });
+
+  it("tightening the threshold removes borderline bonds", () => {
+    // Two carbons at 1.9 Å: bonded at the default 0.6 ((1.7+1.7)*0.6 = 2.04),
+    // but not at a tighter 0.5 scale ((1.7+1.7)*0.5 = 1.7).
+    const positions = new Float32Array([0, 0, 0, 1.9, 0, 0]);
+    const elements = new Uint8Array([6, 6]);
+
+    expect(inferBondsVdwJS(positions, elements, 2, 0.6).length).toBe(2);
+    expect(inferBondsVdwJS(positions, elements, 2, 0.5).length).toBe(0);
+  });
+
+  it("loosening the threshold adds bonds beyond the default range", () => {
+    // Two carbons at 2.3 Å: not bonded at 0.6 (threshold 2.04) but bonded at
+    // a looser 0.8 scale ((1.7+1.7)*0.8 = 2.72).
+    const positions = new Float32Array([0, 0, 0, 2.3, 0, 0]);
+    const elements = new Uint8Array([6, 6]);
+
+    expect(inferBondsVdwJS(positions, elements, 2, 0.6).length).toBe(0);
+    expect(inferBondsVdwJS(positions, elements, 2, 0.8).length).toBe(2);
   });
 
   it("bonds carbon atoms at covalent-like distance", () => {

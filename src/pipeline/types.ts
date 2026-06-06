@@ -404,6 +404,13 @@ export interface AddBondParams {
   bondFileName?: string | null;
   /** Ephemeral: parsed bond indices from topology file. Not serialized. */
   bondFileData?: Uint32Array | null;
+  /**
+   * VDW threshold scale for distance-based bond inference. Two atoms bond when
+   * their distance is <= (vdw_i + vdw_j) * vdwScale. Higher loosens (more
+   * bonds), lower tightens (fewer bonds). Defaults to DEFAULT_VDW_BOND_FACTOR
+   * (0.6) when unset.
+   */
+  vdwScale?: number;
 }
 
 /**

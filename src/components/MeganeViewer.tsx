@@ -16,7 +16,7 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MeasurementListPanel } from "./MeasurementListPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
-import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
@@ -283,7 +283,7 @@ export function MeganeViewer({
       frame.positions,
       snapshot.elements,
       snapshot.nAtoms,
-      0.6,
+      (params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
       snapshot.box,
     );
 
