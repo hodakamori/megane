@@ -42,22 +42,28 @@ const plugin: JupyterFrontEndPlugin<void> = {
     }
     app.docRegistry.addFileType(PIPELINE_FILETYPE);
 
-    const textFactory = new MeganeDocFactory({
-      name: FACTORY_NAME,
-      modelName: "text",
-      fileTypes: STRUCTURE_FILETYPE_NAMES_TEXT,
-      defaultFor: STRUCTURE_FILETYPE_NAMES_TEXT,
-      readOnly: true,
-    });
+    const textFactory = new MeganeDocFactory(
+      {
+        name: FACTORY_NAME,
+        modelName: "text",
+        fileTypes: STRUCTURE_FILETYPE_NAMES_TEXT,
+        defaultFor: STRUCTURE_FILETYPE_NAMES_TEXT,
+        readOnly: true,
+      },
+      app.serviceManager.contents,
+    );
     app.docRegistry.addWidgetFactory(textFactory);
 
-    const binaryFactory = new MeganeDocFactory({
-      name: FACTORY_NAME_BINARY,
-      modelName: "base64",
-      fileTypes: STRUCTURE_FILETYPE_NAMES_BINARY,
-      defaultFor: STRUCTURE_FILETYPE_NAMES_BINARY,
-      readOnly: true,
-    });
+    const binaryFactory = new MeganeDocFactory(
+      {
+        name: FACTORY_NAME_BINARY,
+        modelName: "base64",
+        fileTypes: STRUCTURE_FILETYPE_NAMES_BINARY,
+        defaultFor: STRUCTURE_FILETYPE_NAMES_BINARY,
+        readOnly: true,
+      },
+      app.serviceManager.contents,
+    );
     app.docRegistry.addWidgetFactory(binaryFactory);
 
     const pipelineFactory = new MeganePipelineDocFactory(

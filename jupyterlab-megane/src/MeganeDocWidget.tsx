@@ -1,5 +1,6 @@
 import { ReactWidget } from "@jupyterlab/ui-components";
 import type { DocumentRegistry } from "@jupyterlab/docregistry";
+import type { Contents } from "@jupyterlab/services";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
@@ -33,6 +34,7 @@ type ActivationSubscribe = (cb: () => void) => () => void;
 
 interface DocBodyProps {
   context: DocumentRegistry.Context;
+  contents: Contents.IManager;
   subscribeActivation: ActivationSubscribe;
   onFrameChange?: (frame: number) => void;
   onSelectionChange?: (selection: SelectionState) => void;
@@ -60,6 +62,7 @@ function ThemeSync() {
 
 function DocBody({
   context,
+  contents,
   subscribeActivation,
   onFrameChange,
   onSelectionChange,
@@ -128,7 +131,7 @@ function DocBody({
               : "";
             const topPath = dir ? `${dir}/${topName}` : topName;
             try {
-              const model = await context.manager.services.contents.get(topPath, {
+              const model = await contents.get(topPath, {
                 content: true,
                 format: "text",
               });
@@ -271,7 +274,10 @@ export class MeganeReactView extends ReactWidget {
     this._measurementSub.emit(measurement);
   };
 
-  constructor(private readonly context: DocumentRegistry.Context) {
+  constructor(
+    private readonly context: DocumentRegistry.Context,
+    private readonly contents: Contents.IManager,
+  ) {
     super();
     this.addClass("megane-jupyter-doc");
   }
@@ -299,6 +305,7 @@ export class MeganeReactView extends ReactWidget {
     return (
       <DocBody
         context={this.context}
+        contents={this.contents}
         subscribeActivation={this.subscribeActivation}
         onFrameChange={this._handleFrameChange}
         onSelectionChange={this._handleSelectionChange}

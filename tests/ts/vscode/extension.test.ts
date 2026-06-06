@@ -308,6 +308,8 @@ describe("MeganeEditorProvider — structureViewer", () => {
       contentBytes: [72, 73, 74],
       filename: "sample.pdb",
       wasmBytes: [1, 2, 3],
+      topBytes: null,
+      topFilename: null,
     });
   });
 
