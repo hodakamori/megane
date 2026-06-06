@@ -1,0 +1,52 @@
+data_degly19
+_audit_creation_method           CRYSTALS_ver_12.39
+_oxford_structure_analysis_title 'delta glcyine in P2(1)/a'
+_chemical_name_systematic        'delta glycine'
+
+_cell_length_a                   11.156(4)
+_cell_length_b                   5.8644(11)
+_cell_length_c                   5.3417(17)
+_cell_angle_alpha                90
+_cell_angle_beta                 125.83(4)
+_cell_angle_gamma                90
+_cell_volume                     283.3(2)
+
+_symmetry_cell_setting           Monoclinic
+_symmetry_space_group_name_H-M   P21/a
+_symmetry_space_group_name_Hall  '-P 2yab'
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-x,-y,-z
+-x+1/2,y+1/2,-z
+x+1/2,-y+1/2,z
+
+_cell_formula_units_Z            4
+
+_chemical_formula_sum            'C2 H5 N1 O2'
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_U_iso_or_equiv
+_atom_site_occupancy
+_atom_site_adp_type
+_atom_site_refinement_flags_posn
+_atom_site_refinement_flags_adp
+_atom_site_refinement_flags_occupancy
+_atom_site_disorder_assembly
+_atom_site_disorder_group
+_atom_site_attached_hydrogens
+O1 O 0.7229(7) 0.8423(7) 0.8321(11) 0.0243(16) 1.0000 Uiso D . . . . .
+O2 O 0.9645(8) 0.7762(8) 1.1784(11) 0.0313(18) 1.0000 Uiso D . . . . .
+C1 C 0.8358(7) 0.8089(10) 1.1024(10) 0.018(2) 1.0000 Uiso D . . . . .
+C2 C 0.8159(8) 0.8232(10) 1.3588(14) 0.024(2) 1.0000 Uiso D . . . . .
+N1 N 0.9304(9) 0.6906(9) 1.6316(13) 0.0262(19) 1.0000 Uiso D . . . . .
+H1 H 0.8224 0.9816 1.4181 0.0357 1.0000 Uiso . . . . . .
+H2 H 0.7193 0.7634 1.2844 0.0357 1.0000 Uiso . . . . . .
+H3 H 0.9161 0.7019 1.7786 0.0393 1.0000 Uiso . . . . . .
+H4 H 1.0193 0.7451 1.7017 0.0393 1.0000 Uiso . . . . . .
+H5 H 0.9247 0.5449 1.5790 0.0393 1.0000 Uiso . . . . . .

@@ -63,3 +63,15 @@ def test_cif_without_symmetry_has_empty_ops():
     """A CIF lacking a symmetry loop yields an empty operation list."""
     s = load_cif(str(FIXTURES / "nacl.cif"))
     assert s.symmetry_ops == []
+
+
+def test_delta_glycine_issue_460():
+    """Issue #460: the delta-glycine (P2_1/a) CIF loads its asymmetric unit
+    (one glycine molecule) and carries the four space-group operations that the
+    Supercell node expands to pack the cell."""
+    s = load_cif(str(FIXTURES / "delta_glycine.cif"))
+    assert s.n_atoms == 10  # one glycine zwitterion (asymmetric unit)
+    assert len(s.symmetry_ops) == 4  # P2_1/a: 4 equivalent positions
+    normalized = {op.replace(" ", "") for op in s.symmetry_ops}
+    assert "x,y,z" in normalized
+    assert "-x+1/2,y+1/2,-z" in normalized
