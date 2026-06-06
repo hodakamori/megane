@@ -148,6 +148,8 @@ Bond order visualization:
 - **Triple** — 3 cylinders in triangular arrangement
 - **Aromatic** — 1 solid + 1 dashed offset cylinder
 
+Bond coloring is **split by endpoint**: each bond carries two per-instance colors (`instanceColorA`/`instanceColorB`), and the fragment shader picks one based on the sign of the cylinder's axial coordinate (`vCylUv.y`), so the half nearest each atom takes that atom's color (e.g. a C–H bond is half grey, half white). This matches the convention used by VMD/PyMOL/Mol*. The same split applies under every color scheme (by element/residue/chain/etc.) because the colors are derived from the per-atom color buffer.
+
 ### Shader Architecture
 
 All shaders are in `src/renderer/shaders.ts` as GLSL 3.0 ES strings, used with `RawShaderMaterial`. This requires explicit declaration of all uniforms and attributes (no Three.js auto-injection).
