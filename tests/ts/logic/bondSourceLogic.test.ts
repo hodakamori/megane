@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock the WASM-dependent parsers/structure module before importing bondSourceLogic
 vi.mock("@/parsers/structure", () => ({
@@ -104,6 +104,14 @@ describe("computeBondsForSource", () => {
 });
 
 describe("loadBondFileData", () => {
+  // vitest 4 reuses the existing module mock when vi.spyOn targets an
+  // already-mocked method, so call history accumulates across tests (e.g.
+  // parsePdbBonds is exercised in multiple cases). Clear call history between
+  // tests to isolate call counts.
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   // jsdom does not implement File.text(); create a minimal File-like stub.
   function makeFile(name: string, content: string): File {
     const blob = new Blob([content], { type: "text/plain" });
