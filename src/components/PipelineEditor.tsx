@@ -90,7 +90,11 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },
-  { category: "modify", label: "Modify", types: ["modify", "supercell", "color", "representation"] },
+  {
+    category: "modify",
+    label: "Modify",
+    types: ["modify", "supercell", "color", "representation"],
+  },
   {
     category: "overlay",
     label: "Overlay",

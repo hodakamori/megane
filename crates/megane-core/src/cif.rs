@@ -124,11 +124,7 @@ fn strip_quotes(s: &str) -> &str {
 
 /// Split a `_tag value` line into (tag, value-remainder).
 fn split_tag_value(line: &str) -> Option<(&str, &str)> {
-    let line = line.trim();
-    let mut it = line.splitn(2, char::is_whitespace);
-    let tag = it.next()?;
-    let rest = it.next()?;
-    Some((tag, rest))
+    line.trim().split_once(char::is_whitespace)
 }
 
 /// Extract the symop field from a single data row of a symmetry loop.

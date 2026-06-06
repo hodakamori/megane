@@ -189,8 +189,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
   const result = parseFn(text) as WasmParseResult;
 
   const caCount = result.ca_count;
-  const symmetryOps =
-    result.symmetry_op_count > 0 ? result.symmetry_ops.split("\n") : undefined;
+  const symmetryOps = result.symmetry_op_count > 0 ? result.symmetry_ops.split("\n") : undefined;
   const snapshot: Snapshot = {
     nAtoms: result.n_atoms,
     nBonds: result.n_bonds,
