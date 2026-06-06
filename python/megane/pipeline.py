@@ -252,6 +252,45 @@ class Modify(PipelineNode):
         self.opacity = opacity
 
 
+class Supercell(PipelineNode):
+    """Replicate the unit cell and/or apply crystallographic symmetry.
+
+    Tiles the (optionally symmetry-expanded) unit cell across an
+    ``na × nb × nc`` grid. When ``apply_symmetry=True`` and the source CIF
+    carried a ``_symmetry_equiv_pos_as_xyz`` loop, the space-group operations
+    are applied first to fill each cell with its symmetry-equivalent molecules
+    (VESTA-style packing). Translational replication alone is enough to
+    "display multiple unit cells"; symmetry expansion additionally matches
+    VESTA for molecular crystals.
+
+    Args:
+        na, nb, nc: Unit-cell repeats along the a, b, c cell axes (each ≥ 1).
+        apply_symmetry: Apply the CIF symmetry operations before tiling.
+
+    Ports:
+        inp.particle — atom data in
+        out.particle — expanded atom data
+    """
+
+    _node_type = "supercell"
+    _out_ports = {"particle": "out"}
+    _inp_ports = {"particle": "in"}
+
+    def __init__(
+        self,
+        *,
+        na: int = 1,
+        nb: int = 1,
+        nc: int = 1,
+        apply_symmetry: bool = False,
+    ) -> None:
+        super().__init__()
+        self.na = na
+        self.nb = nb
+        self.nc = nc
+        self.apply_symmetry = apply_symmetry
+
+
 class Color(PipelineNode):
     """Recolor the upstream particle stream by a chosen scheme.
 
@@ -701,6 +740,13 @@ class Pipeline:
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
         elif ntype == "modify":
             return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0))
+        elif ntype == "supercell":
+            return Supercell(
+                na=nd.get("na", 1),
+                nb=nd.get("nb", 1),
+                nc=nd.get("nc", 1),
+                apply_symmetry=nd.get("applySymmetry", False),
+            )
         elif ntype == "color":
             range_val = nd.get("range")
             return Color(
@@ -876,6 +922,11 @@ class Pipeline:
         elif isinstance(node, Modify):
             base["scale"] = node.scale
             base["opacity"] = node.opacity
+        elif isinstance(node, Supercell):
+            base["na"] = node.na
+            base["nb"] = node.nb
+            base["nc"] = node.nc
+            base["applySymmetry"] = node.apply_symmetry
         elif isinstance(node, Color):
             base["mode"] = node.mode
             base["uniformColor"] = node.uniform_color

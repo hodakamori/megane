@@ -19,6 +19,13 @@ export interface Snapshot {
   caChainIds?: Uint8Array; // per-Cα chain ID as ASCII byte (e.g. 65 = 'A')
   caResNums?: Uint32Array; // per-Cα residue sequence number
   caSsType?: Uint8Array; // per-Cα secondary structure: 0=coil, 1=helix, 2=sheet
+  /**
+   * Crystallographic symmetry operations as raw `x,y,z`-style strings, captured
+   * from a CIF `_symmetry_equiv_pos_as_xyz` loop. Undefined for formats without
+   * space-group information. Not applied at parse time — the Supercell node
+   * expands them on demand.
+   */
+  symmetryOps?: string[];
 }
 
 /** Data mode for the application. */

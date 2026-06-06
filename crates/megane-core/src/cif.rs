@@ -100,6 +100,126 @@ fn element_from_symbol(s: &str) -> u8 {
     symbol_to_atomic_num(&first)
 }
 
+/// CIF/mmCIF loop tags whose column holds a symmetry operation string.
+const SYMOP_TAGS: [&str; 2] = [
+    "_symmetry_equiv_pos_as_xyz",
+    "_space_group_symop_operation_xyz",
+];
+
+fn is_symop_tag(tag: &str) -> bool {
+    SYMOP_TAGS.contains(&tag)
+}
+
+/// Strip a single pair of surrounding single/double quotes from a CIF value.
+fn strip_quotes(s: &str) -> &str {
+    let s = s.trim();
+    let b = s.as_bytes();
+    if b.len() >= 2
+        && ((b[0] == b'\'' && b[b.len() - 1] == b'\'') || (b[0] == b'"' && b[b.len() - 1] == b'"'))
+    {
+        return &s[1..s.len() - 1];
+    }
+    s
+}
+
+/// Split a `_tag value` line into (tag, value-remainder).
+fn split_tag_value(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim();
+    let mut it = line.splitn(2, char::is_whitespace);
+    let tag = it.next()?;
+    let rest = it.next()?;
+    Some((tag, rest))
+}
+
+/// Extract the symop field from a single data row of a symmetry loop.
+fn extract_symop_field(line: &str, col: usize, col_count: usize) -> Option<String> {
+    let line = line.trim();
+    // Single-column loop: the entire (possibly quoted) line is the symop.
+    if col_count == 1 {
+        let v = strip_quotes(line);
+        return (!v.is_empty()).then(|| v.to_string());
+    }
+    let fields: Vec<&str> = line.split_whitespace().collect();
+    if fields.len() < col_count {
+        // Quoted symop containing spaces desynced the column count — fall back
+        // to the first token that looks like an `x,y,z` operation.
+        return fields
+            .iter()
+            .find(|f| f.contains(','))
+            .map(|f| strip_quotes(f).to_string());
+    }
+    fields.get(col).map(|f| strip_quotes(f).to_string())
+}
+
+/// Extract crystallographic symmetry operations from CIF/mmCIF text.
+///
+/// Recognizes both the loop form (`loop_ _symmetry_equiv_pos_as_xyz ...`) with
+/// an optional id column, and the single key-value form
+/// (`_symmetry_equiv_pos_as_xyz 'x,y,z'`). Returns the raw operation strings
+/// (e.g. `"-x+1/2,y+1/2,-z"`) without applying them.
+pub fn extract_symmetry_ops(text: &str) -> Vec<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut ops: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+        if trimmed == "loop_" {
+            i += 1;
+            // Read loop header tags (tolerate blank/comment lines).
+            let mut tags: Vec<String> = Vec::new();
+            while i < lines.len() {
+                let t = lines[i].trim();
+                if t.is_empty() || t.starts_with('#') {
+                    i += 1;
+                    continue;
+                }
+                if t.starts_with('_') {
+                    tags.push(t.to_ascii_lowercase());
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+            if let Some(col) = tags.iter().position(|t| is_symop_tag(t)) {
+                let col_count = tags.len();
+                while i < lines.len() {
+                    let t = lines[i].trim();
+                    if t.is_empty() || t.starts_with('#') {
+                        i += 1;
+                        continue;
+                    }
+                    if t.starts_with("loop_")
+                        || t.starts_with("data_")
+                        || t.starts_with("save_")
+                        || t.starts_with("global_")
+                        || t.starts_with('_')
+                    {
+                        break;
+                    }
+                    if let Some(op) = extract_symop_field(t, col, col_count) {
+                        ops.push(op);
+                    }
+                    i += 1;
+                }
+            }
+            // `i` already advanced past this loop's header/data; keep scanning.
+        } else {
+            if trimmed.starts_with('_') {
+                if let Some((tag, rest)) = split_tag_value(trimmed) {
+                    if is_symop_tag(&tag.to_ascii_lowercase()) {
+                        let v = strip_quotes(rest.trim());
+                        if !v.is_empty() {
+                            ops.push(v.to_string());
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+    ops
+}
+
 pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
 
@@ -314,12 +434,95 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids: vec![],
         ca_res_nums: vec![],
         ca_ss_type: vec![],
+        symmetry_ops: extract_symmetry_ops(text),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_extract_symmetry_ops_single_column_loop() {
+        let cif = r#"data_x
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-x,-y,-z
+-x+1/2,y+1/2,-z
+x+1/2,-y+1/2,z
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Na1 Na 0.0 0.0 0.0
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(
+            ops,
+            vec!["x,y,z", "-x,-y,-z", "-x+1/2,y+1/2,-z", "x+1/2,-y+1/2,z"]
+        );
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_id_column_and_space_group_tag() {
+        let cif = r#"data_x
+loop_
+_space_group_symop_id
+_space_group_symop_operation_xyz
+1 x,y,z
+2 -x,-y,-z
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_quoted_keyvalue() {
+        let cif = "data_x\n_symmetry_equiv_pos_as_xyz 'x,y,z'\n";
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_absent() {
+        let cif = "data_x\n_cell_length_a 5.0\n";
+        assert!(extract_symmetry_ops(cif).is_empty());
+    }
+
+    /// The Issue #460 CIF carries the P2_1/a equivalent positions.
+    #[test]
+    fn test_parse_cif_captures_symmetry_ops() {
+        let cif = r#"data_degly19
+_cell_length_a 11.156
+_cell_length_b 5.8644
+_cell_length_c 5.3417
+_cell_angle_alpha 90
+_cell_angle_beta 125.83
+_cell_angle_gamma 90
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-x,-y,-z
+-x+1/2,y+1/2,-z
+x+1/2,-y+1/2,z
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+O1 O 0.7229 0.8423 0.8321
+"#;
+        let result = parse(cif).expect("parse failed");
+        // Parser still returns only the asymmetric unit.
+        assert_eq!(result.n_atoms, 1);
+        assert_eq!(result.symmetry_ops.len(), 4);
+        assert_eq!(result.symmetry_ops[2], "-x+1/2,y+1/2,-z");
+    }
 
     #[test]
     fn test_strip_su() {

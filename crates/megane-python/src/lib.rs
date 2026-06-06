@@ -22,6 +22,10 @@ struct PyStructure {
     box_matrix: Py<PyArray2<f32>>,
     #[pyo3(get)]
     frame_positions: Py<PyArray2<f32>>,
+    /// Crystallographic symmetry operations as a list of `x,y,z` strings.
+    /// Empty for formats that carry no space-group information.
+    #[pyo3(get)]
+    symmetry_ops: Vec<String>,
 }
 
 impl PyStructure {
@@ -92,6 +96,7 @@ impl PyStructure {
             bond_orders: bo_array.into_pyarray(py).into(),
             box_matrix: box_array.into_pyarray(py).into(),
             frame_positions: frame_array.into_pyarray(py).into(),
+            symmetry_ops: data.symmetry_ops,
         })
     }
 }

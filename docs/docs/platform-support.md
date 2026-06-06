@@ -84,6 +84,8 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | Multi-layer rendering | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | Solvent-accessible surface (SAS) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
 | Surface mesh (alpha-shape envelope) | ✓ | ✓ (via pipeline) | ✓ | ✓ | n/a |
+| Supercell / unit-cell replication (`Supercell` node) | ✓ | ✓ (via pipeline) | ✓ | ✓ | ✓ (`megane.Supercell`) |
+| Crystallographic symmetry expansion (CIF `_symmetry_equiv_pos_as_xyz`) | ✓ | ✓ (via pipeline) | ✓ | ✓ | ✓ (`Supercell(apply_symmetry=True)`) |
 | `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | ✓ (React props) | ✓ | ✓² | ✓² | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | ✓³ | ✓⁴ | n/a |
@@ -122,3 +124,4 @@ These are formats or features that the parser layer supports but a given platfor
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.
 - **`selection_change` / `measurement` events on JupyterLab use a subscription API, not a Python callback.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Use `MeganeReactView.subscribeSelectionChange` and `subscribeMeasurementChange` from another JupyterLab extension.
 - **`frame_change` callback for JupyterLab is surfaced as a status-bar frame counter.** The JupyterLab DocWidget has no Python kernel connection, so there is no Python callback surface. Instead, when `IStatusBar` is available, the current frame index is shown in the JupyterLab status bar (right side). The `subscribeFrameChange` method on `MeganeReactView` can also be used by other JupyterLab extensions to react to frame changes.
+- **CIF parsing returns only the asymmetric unit.** The CIF/mmCIF parser converts the listed `_atom_site` rows to Cartesian coordinates without applying space-group symmetry. To reproduce a VESTA-style packed cell for a molecular crystal, add a `Supercell` node with `apply_symmetry=True` (it expands the captured `_symmetry_equiv_pos_as_xyz` operations) and the desired `na × nb × nc` repeats. Translational replication alone (symmetry off) tiles the asymmetric unit and will not match VESTA's intra-cell molecule count.

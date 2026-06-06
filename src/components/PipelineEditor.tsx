@@ -40,6 +40,7 @@ import { AddBondNode } from "./nodes/AddBondNode";
 import { ViewportNode } from "./nodes/ViewportNode";
 import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
+import { SupercellNode } from "./nodes/SupercellNode";
 import { ColorNode } from "./nodes/ColorNode";
 import { RepresentationNode } from "./nodes/RepresentationNode";
 import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
@@ -65,6 +66,7 @@ const nodeTypes = {
   viewport: ViewportNode,
   filter: FilterNode,
   modify: ModifyNode,
+  supercell: SupercellNode,
   color: ColorNode,
   representation: RepresentationNode,
   label_generator: LabelGeneratorNode,
@@ -88,7 +90,7 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },
-  { category: "modify", label: "Modify", types: ["modify", "color", "representation"] },
+  { category: "modify", label: "Modify", types: ["modify", "supercell", "color", "representation"] },
   {
     category: "overlay",
     label: "Overlay",

@@ -17,6 +17,7 @@ const VALID_NODE_TYPES: Set<string> = new Set([
   "viewport",
   "filter",
   "modify",
+  "supercell",
   "color",
   "representation",
   "label_generator",
@@ -307,6 +308,7 @@ function findReachableViewport(
       if (
         tgt.type !== "filter" &&
         tgt.type !== "modify" &&
+        tgt.type !== "supercell" &&
         tgt.type !== "color" &&
         tgt.type !== "representation"
       )

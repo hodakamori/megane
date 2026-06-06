@@ -81,6 +81,19 @@ Modifies visual properties (scale, opacity).
 - Inputs: \`in\` (accepts particle or bond data type)
 - Outputs: \`out\` (same type as input)
 
+### supercell
+Replicates the unit cell across an na×nb×nc grid and/or applies the
+crystallographic symmetry operations from the CIF \`_symmetry_equiv_pos_as_xyz\`
+loop to fill each cell (VESTA-style packing for molecular crystals). Place it
+right after load_structure — it rebuilds the particle set, so upstream per-atom
+overrides are dropped. Requires a unit cell; symmetry expansion is a no-op when
+the structure carries no symmetry operations.
+- Parameters: \`{ type: "supercell", na: number, nb: number, nc: number, applySymmetry: boolean }\`
+  - na, nb, nc: unit-cell repeats along the a, b, c axes (each ≥ 1, default 1)
+  - applySymmetry: expand space-group symmetry to fill each cell (default false)
+- Inputs: \`in\` (particle data type)
+- Outputs: \`out\` (particle data type)
+
 ### label_generator
 Generates text labels for atoms.
 - Parameters: \`{ type: "label_generator", source: "element" | "resname" | "index" }\`

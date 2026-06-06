@@ -268,6 +268,48 @@ export class Modify extends PipelineNode {
 }
 
 /**
+ * Replicate the unit cell across an na×nb×nc grid and/or apply the CIF
+ * crystallographic symmetry operations to fill each cell (VESTA-style packing).
+ *
+ * Ports:
+ *   inp.particle — atom data in
+ *   out.particle — expanded atom data
+ */
+export class Supercell extends PipelineNode {
+  readonly nodeType = "supercell";
+  protected readonly _outPorts = { particle: "out" };
+  protected readonly _inpPorts = { particle: "in" };
+
+  public na: number;
+  public nb: number;
+  public nc: number;
+  public applySymmetry: boolean;
+
+  constructor({
+    na = 1,
+    nb = 1,
+    nc = 1,
+    applySymmetry = false,
+  }: { na?: number; nb?: number; nc?: number; applySymmetry?: boolean } = {}) {
+    super();
+    this.na = na;
+    this.nb = nb;
+    this.nc = nc;
+    this.applySymmetry = applySymmetry;
+  }
+
+  _toSerializedParams() {
+    return {
+      type: this.nodeType,
+      na: this.na,
+      nb: this.nb,
+      nc: this.nc,
+      applySymmetry: this.applySymmetry,
+    };
+  }
+}
+
+/**
  * Per-stream coloring (Ovito-style). The Viewport reads color overrides
  * directly off the particle stream, so multiple Color nodes can stack.
  *

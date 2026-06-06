@@ -17,6 +17,7 @@ import type {
   AddBondParams,
   FilterParams,
   ModifyParams,
+  SupercellParams,
   ColorParams,
   RepresentationParams,
   LabelGeneratorParams,
@@ -38,6 +39,7 @@ import { executeLoadTrajectory } from "./executors/loadTrajectory";
 import { executeAddBond } from "./executors/addBond";
 import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
+import { executeSupercell } from "./executors/supercell";
 import { executeColor } from "./executors/color";
 import { executeRepresentation } from "./executors/representation";
 import { executeLabelGenerator } from "./executors/labelGenerator";
@@ -206,6 +208,20 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "supercell": {
+        const outputs = executeSupercell(data.params as SupercellParams, inputs);
+        edgeOutputs.set(id, outputs);
+        const supercellIn = inputs.get("in")?.[0];
+        if (!supercellIn) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (supercellIn.type === "particle" && !supercellIn.source.box) {
+          addError(id, {
+            message: "Structure has no unit cell — nothing to replicate",
+            severity: "warning",
+          });
         }
         break;
       }

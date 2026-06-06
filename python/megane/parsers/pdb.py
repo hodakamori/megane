@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -28,6 +28,8 @@ class Structure:
     bonds: np.ndarray  # (M, 2) uint32 - bond pairs
     bond_orders: np.ndarray  # (M,) uint8 - 1=single, 2=double, 3=triple, 4=aromatic
     box: np.ndarray  # (3, 3) float32 - cell vectors as rows, zero if no cell
+    # Crystallographic symmetry operations as `x,y,z`-style strings (CIF only).
+    symmetry_ops: list[str] = field(default_factory=list)
 
 
 def cell_params_to_matrix(

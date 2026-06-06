@@ -67,6 +67,8 @@ pub struct ParseResult {
     ca_chain_ids: Vec<u8>,
     ca_res_nums: Vec<u32>,
     ca_ss_type: Vec<u8>,
+    // Crystallographic symmetry operations (newline-delimited `x,y,z` strings).
+    symmetry_ops: String,
 }
 
 #[wasm_bindgen]
@@ -202,6 +204,23 @@ impl ParseResult {
     pub fn ca_ss_type(&self) -> Uint8Array {
         Uint8Array::from(&self.ca_ss_type[..])
     }
+
+    /// Number of crystallographic symmetry operations (0 when none).
+    #[wasm_bindgen(getter)]
+    pub fn symmetry_op_count(&self) -> u32 {
+        if self.symmetry_ops.is_empty() {
+            0
+        } else {
+            self.symmetry_ops.split('\n').count() as u32
+        }
+    }
+
+    /// Symmetry operations as a newline-delimited string of `x,y,z` operations.
+    /// Empty when the format carries no space-group information.
+    #[wasm_bindgen(getter)]
+    pub fn symmetry_ops(&self) -> String {
+        self.symmetry_ops.clone()
+    }
 }
 
 impl ParseResult {
@@ -259,6 +278,7 @@ impl ParseResult {
             ca_chain_ids: data.ca_chain_ids,
             ca_res_nums: data.ca_res_nums,
             ca_ss_type: data.ca_ss_type,
+            symmetry_ops: data.symmetry_ops.join("\n"),
         }
     }
 }

@@ -46,3 +46,20 @@ def test_load_glycine_csd_cif():
     assert np.any(s.positions != 0)
     assert s.box.shape == (3, 3)
     assert np.any(s.box != 0)
+
+
+def test_cif_captures_symmetry_ops():
+    """CCDC CIFs carry a `_symmetry_equiv_pos_as_xyz` loop; the parser surfaces
+    the operations (still returning only the asymmetric unit)."""
+    s = load_cif(str(FIXTURES / "glycine_csd.cif"))
+    assert len(s.symmetry_ops) == 4
+    # Identity is always the first operation.
+    assert s.symmetry_ops[0].replace(" ", "") == "x,y,z"
+    # Inversion is present for this centrosymmetric space group.
+    assert any(op.replace(" ", "") == "-x,-y,-z" for op in s.symmetry_ops)
+
+
+def test_cif_without_symmetry_has_empty_ops():
+    """A CIF lacking a symmetry loop yields an empty operation list."""
+    s = load_cif(str(FIXTURES / "nacl.cif"))
+    assert s.symmetry_ops == []

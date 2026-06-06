@@ -19,6 +19,7 @@ import type { NodeSnapshotData } from "./execute";
 const TRANSPARENT_NODE_TYPES: ReadonlySet<string> = new Set([
   "filter",
   "modify",
+  "supercell",
   "color",
   "representation",
   "add_bond",
