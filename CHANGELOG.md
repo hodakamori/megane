@@ -10,11 +10,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+#### Parsers / formats
+
+- **DCD trajectory parser** (CHARMM/NAMD/X-PLOR) registered across all hosts (#386)
+- **AMBER NetCDF trajectory parser** (`.nc`) (#394)
+- **mmCIF (PDBx) parser** with auto-detection and full host registration (#431)
+- **PSF (CHARMM/NAMD) topology parser** (#423)
+- **AMBER prmtop topology parser** (#428)
+- **SDF V3000 (CTfile)** support added to the MOL parser (#421)
+- **Nested `#include` resolution** in the GROMACS `.top` parser (#433)
+- Sibling `.top` file is auto-loaded when opening a `.gro` in VSCode and JupyterLab (#490)
+
+#### Representations / rendering
+
+- **Cartoon/ribbon representation** for proteins, rewritten for Mol*-quality output (#362, #400, #411)
+- **Solvent-Accessible Surface (SAS) representation** (#406)
+- **OVITO-style surface mesh** pipeline node (alpha-shape envelope) and template (#412, #432)
+- **Isosurface representation** for volumetric data (#364, #443)
+- **VESTA-style polyhedra** auto-detection with opt-out checkboxes (#453)
+- **Atom color schemes**: `byResidue`, `byChain`, `byBFactor`, `byProperty` in addition to `byElement` and uniform hex (#365, #382)
+- **Dark mode / theme support** (#375, #396)
+
+#### Pipeline / UI
+
+- **Replicate (supercell) node** for unit-cell replication, plus automatic CIF crystallographic symmetry expansion on load (#460, #486)
 - **Adjustable VDW bond threshold.** The AddBond node's distance (VDW) mode now exposes a "Threshold" slider that scales the bonding cutoff `(vdw_i + vdw_j) * scale`. Loosen it to capture longer bonds or tighten it to drop spurious ones, per system. Defaults to 0.6, so existing pipelines render identically unless adjusted (#459)
+- **URL-shareable pipeline permalinks** (#395)
+- **Camera state persistence** across sessions (#374, #392)
+- **Protein** and **Surface Mesh** pipeline templates (#410, #432)
+- **Multi-measurement list management UI** (#366, #435)
+- **Timeline controls**: step buttons, speed multiplier, and loop range (#426)
+- Pipeline editor splits the editor and chat into tabs (#436)
+- **Render/export**: glTF and OBJ 3D-model export from the render modal (#434); SVG export from the snapshot modal (#372, #437)
+
+#### Python / JS API
+
+- Python structure parsers: `load_gro`, `load_mol`, `load_sdf`, `load_mol2` (#418); MOL2/CIF dispatch in `LoadStructure` (#399)
+- Python trajectory parsers: `load_dcd`, `load_netcdf`, `load_lammpstrj` (#417)
+- Programmatic frame seek in JupyterLab and VSCode (#416)
+- `onSelectionChange` / `onMeasurementChange` props on `MeganeViewer`, with `selection_change` / `measurement` events wired on JupyterLab and VSCode (#413, #414)
+- `frame_change` callback and frame counter in the JupyterLab status bar (#405)
 
 ### Changed
 
 - **Atom coloring moved out of the Viewport node and into the Modify node.** The Viewport "Color scheme" dropdown is gone; coloring is now a pipeline-edge concern. The Modify node has a new `Color` toggle plus a mode selector (uniform hex, byElement, byResidue, byChain, byBFactor, byProperty), and the chosen palette applies **only** to the upstream selection — so "color residues on chain A only" is now expressible by chaining Filter → Modify. A Modify node wired without a Filter still colors the whole structure (the previous single-mode workflow). Legacy serialized pipelines carrying `viewport.colorScheme` are silently stripped on load; they render in CPK until a Modify color rule is added.
+- Representation and Color were split into dedicated pipeline nodes (#409)
+- The Supercell node was dropped in favor of the Replicate node; CIF symmetry expansion now happens automatically on load
+- Bonds are rendered split-colored by each endpoint atom (#487)
+
+### Fixed
+
+- Cross-boundary bonds now render correctly after Replicate (#493)
+- Replicated copies animate during trajectory playback (#491)
+- CIF parser tolerates blank/comment lines inside `loop_` blocks (#458, #464)
+- Share button surfaces failures via a visible dialog instead of a silent toast, and `buildShareUrl` no longer blocks on `CompressionStream` (#401, #420, #422)
+- Renderer replays bonds when `updateBondsExt` precedes `loadSnapshot`, and composes bond visibility with pipeline bond availability
+- Stale renderer state is reset when switching pipeline templates (#424, #425)
+- Pipeline editor keeps the pipeline visible across tab switches and stops the toolbar row from eating canvas height (#444, #445)
+- `ViewportParams.colorScheme` made optional to preserve backward compatibility
+
+### Packaging
+
+- Bumped `pyo3` and `numpy` to 0.28 and added Python 3.14 wheels; ship `wheel-share` in the sdist (#463)
+
+### Documentation
+
+- Numerous docs/source reconciliations across format tables, parser lists, the architecture diagram, and the React API examples; documented the Codecov merge gate and the E2E verification requirement for UI-affecting changes (#385, #393, #398, #427, and others)
 
 ## [0.7.0] - 2026-05-02
 
