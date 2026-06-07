@@ -133,12 +133,14 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   in float instanceAtomB;
   in float instanceOffsetX;
   in float instanceOffsetY;
-  in vec3 instanceColor;
+  in vec3 instanceColorA;
+  in vec3 instanceColorB;
   in float instanceRadius;
   in float instanceDashed;
   in float instanceBondOpacity;
 
-  out vec3 vColor;
+  out vec3 vColorA;
+  out vec3 vColorB;
   out vec2 vCylUv;
   out float vDashed;
   out float vBondOpacity;
@@ -150,7 +152,8 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   }
 
   void main() {
-    vColor = instanceColor;
+    vColorA = instanceColorA;
+    vColorB = instanceColorB;
     vCylUv = uv;
     vDashed = instanceDashed;
     vBondOpacity = instanceBondOpacity;
@@ -197,7 +200,8 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 
 export const bondFragmentShader = /* glsl */ `precision highp float;
 
-  in vec3 vColor;
+  in vec3 vColorA;
+  in vec3 vColorB;
   in vec2 vCylUv;
   in float vDashed;
   in float vBondOpacity;
@@ -212,6 +216,10 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     if (vDashed > 0.5) {
       if (sin(vCylUv.y * 30.0) < 0.0) discard;
     }
+
+    // vCylUv.y runs from -1 at atom A to +1 at atom B; split the bond at its
+    // midpoint so each half takes its endpoint atom's color.
+    vec3 baseColor = vCylUv.y < 0.0 ? vColorA : vColorB;
 
     float nx = vCylUv.x;
     float nz = sqrt(max(0.0, 1.0 - nx * nx));
@@ -238,7 +246,7 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     // Fresnel rim
     float fresnel = pow(1.0 - nz, 3.0) * 0.1;
 
-    vec3 color = vColor * (ambient + diffuse)
+    vec3 color = baseColor * (ambient + diffuse)
                + vec3(1.0) * spec * 0.2
                + vec3(0.1) * fresnel;
     float finalOpacity = uOpacity;

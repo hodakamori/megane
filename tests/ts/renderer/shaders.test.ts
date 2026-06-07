@@ -85,7 +85,8 @@ describe("bond shaders", () => {
       "instanceAtomB",
       "instanceOffsetX",
       "instanceOffsetY",
-      "instanceColor",
+      "instanceColorA",
+      "instanceColorB",
       "instanceRadius",
       "instanceDashed",
       "instanceBondOpacity",
@@ -93,6 +94,15 @@ describe("bond shaders", () => {
     for (const attr of required) {
       expect(bondVertexShader, attr).toMatch(new RegExp(`\\bin\\b[^;]*\\b${attr}\\b`));
     }
+  });
+
+  it("splits the bond into two endpoint colors via vColorA / vColorB varyings", () => {
+    for (const v of ["vColorA", "vColorB"]) {
+      expect(bondVertexShader, `${v} out`).toMatch(new RegExp(`\\bout\\b[^;]*\\b${v}\\b`));
+      expect(bondFragmentShader, `${v} in`).toMatch(new RegExp(`\\bin\\b[^;]*\\b${v}\\b`));
+    }
+    // The midpoint split decides which endpoint color a fragment uses.
+    expect(bondFragmentShader).toMatch(/vCylUv\.y\s*<\s*0\.0\s*\?\s*vColorA\s*:\s*vColorB/);
   });
 
   it("vertex shader fetches atom positions from the position texture", () => {

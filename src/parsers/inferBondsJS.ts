@@ -16,7 +16,7 @@
 import { VDW_RADII, DEFAULT_RADIUS } from "../constants";
 import { invert3x3 } from "../pipeline/executors/mathUtils";
 
-const DEFAULT_VDW_BOND_FACTOR = 0.6;
+export const DEFAULT_VDW_BOND_FACTOR = 0.6;
 const MIN_BOND_DIST = 0.4;
 const CELL_SIZE = 2.0;
 

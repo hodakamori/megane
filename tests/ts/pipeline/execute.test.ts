@@ -114,6 +114,48 @@ describe("executePipeline", () => {
       expect(result.cells[0].box[0]).toBe(10);
     });
 
+    it("replicates particles and enlarges the cell through a replicate node", () => {
+      const boxSnapshot = makeSnapshot({
+        nAtoms: 1,
+        positions: [1, 1, 1],
+        elements: [6],
+        box: [10, 0, 0, 0, 10, 0, 0, 0, 10],
+      });
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
+        makeNode("rep", "replicate", { nx: 2, ny: 1, nz: 1 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "rep", "particle"),
+        makeEdge("ls", "cell", "rep", "cell"),
+        makeEdge("rep", "particle", "vp", "particle"),
+        makeEdge("rep", "cell", "vp", "cell"),
+      ];
+
+      const { viewportState: result, nodeErrors } = executePipeline(nodes, edges, {
+        snapshot: boxSnapshot,
+      });
+      expect(result.particles[0].source.nAtoms).toBe(2);
+      expect(result.cells[0].box[0]).toBe(20);
+      expect(nodeErrors.get("rep")).toBeUndefined();
+    });
+
+    it("warns when a replicate node has no unit cell but counts > 1", () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("rep", "replicate", { nx: 2, ny: 2, nz: 2 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "rep", "particle"),
+        makeEdge("rep", "particle", "vp", "particle"),
+      ];
+
+      const { nodeErrors } = executePipeline(nodes, edges, { snapshot: waterSnapshot });
+      expect(nodeErrors.get("rep")?.[0].message).toContain("unit cell");
+    });
+
     it("produces trajectory output when frames exist", () => {
       const frames: Frame[] = [
         { frameId: 0, nAtoms: 3, positions: new Float32Array(9) },

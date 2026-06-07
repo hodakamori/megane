@@ -42,7 +42,11 @@ export class ImpostorBondMesh {
   private atomBBuf: Float32Array;
   private offsetXBuf: Float32Array;
   private offsetYBuf: Float32Array;
-  private colorBuf: Float32Array;
+  // Two endpoint colors per visual instance: A = atomA side, B = atomB side.
+  // The bond fragment shader splits the cylinder at its midpoint so each half
+  // takes its endpoint atom's color.
+  private colorABuf: Float32Array;
+  private colorBBuf: Float32Array;
   private radiusBuf: Float32Array;
   private dashedBuf: Float32Array;
   private opacityBuf: Float32Array; // per-visual-instance opacity override
@@ -55,7 +59,8 @@ export class ImpostorBondMesh {
   private atomBAttr!: THREE.InstancedBufferAttribute;
   private offsetXAttr!: THREE.InstancedBufferAttribute;
   private offsetYAttr!: THREE.InstancedBufferAttribute;
-  private colorAttr!: THREE.InstancedBufferAttribute;
+  private colorAAttr!: THREE.InstancedBufferAttribute;
+  private colorBAttr!: THREE.InstancedBufferAttribute;
   private radiusAttr!: THREE.InstancedBufferAttribute;
   private dashedAttr!: THREE.InstancedBufferAttribute;
   private opacityAttr!: THREE.InstancedBufferAttribute;
@@ -87,7 +92,8 @@ export class ImpostorBondMesh {
     this.atomBBuf = new Float32Array(maxBonds);
     this.offsetXBuf = new Float32Array(maxBonds);
     this.offsetYBuf = new Float32Array(maxBonds);
-    this.colorBuf = new Float32Array(maxBonds * 3);
+    this.colorABuf = new Float32Array(maxBonds * 3);
+    this.colorBBuf = new Float32Array(maxBonds * 3);
     this.radiusBuf = new Float32Array(maxBonds);
     this.dashedBuf = new Float32Array(maxBonds);
     this.opacityBuf = new Float32Array(maxBonds).fill(1.0);
@@ -175,16 +181,13 @@ export class ImpostorBondMesh {
       const bi = bonds[i * 2 + 1];
       const order = bondOrders ? bondOrders[i] : BOND_SINGLE;
 
-      // Colors: average the two endpoint colors for the bond
-      const [r1, g1, b1] = colorCtx
+      // Split coloring: atomA color on the A half, atomB color on the B half.
+      const [ar, ag, ab] = colorCtx
         ? getAtomColorForScheme(ai, snapshot, colorCtx)
         : getColor(elements[ai]);
-      const [r2, g2, b2] = colorCtx
+      const [br, bg, bb] = colorCtx
         ? getAtomColorForScheme(bi, snapshot, colorCtx)
         : getColor(elements[bi]);
-      const cr = (r1 + r2) * 0.5;
-      const cg = (g1 + g2) * 0.5;
-      const cb = (b1 + b2) * 0.5;
 
       if (order === BOND_DOUBLE) {
         for (const sign of [-1, 1]) {
@@ -195,9 +198,12 @@ export class ImpostorBondMesh {
             sign * DOUBLE_BOND_OFFSET,
             0,
             DOUBLE_BOND_RADIUS,
-            cr,
-            cg,
-            cb,
+            ar,
+            ag,
+            ab,
+            br,
+            bg,
+            bb,
             0,
           );
           this.logicalBondIdx[idx] = i;
@@ -209,25 +215,39 @@ export class ImpostorBondMesh {
         for (const angle of angles) {
           const ox = Math.cos(angle) * TRIPLE_BOND_OFFSET;
           const oy = Math.sin(angle) * TRIPLE_BOND_OFFSET;
-          this.setTopology(idx, ai, bi, ox, oy, TRIPLE_BOND_RADIUS, cr, cg, cb, 0);
+          this.setTopology(idx, ai, bi, ox, oy, TRIPLE_BOND_RADIUS, ar, ag, ab, br, bg, bb, 0);
           this.logicalBondIdx[idx] = i;
           this.opacityBuf[idx] = 1.0;
           idx++;
         }
       } else if (order === BOND_AROMATIC) {
         // Solid bond
-        this.setTopology(idx, ai, bi, 0, 0, AROMATIC_BOND_RADIUS, cr, cg, cb, 0);
+        this.setTopology(idx, ai, bi, 0, 0, AROMATIC_BOND_RADIUS, ar, ag, ab, br, bg, bb, 0);
         this.logicalBondIdx[idx] = i;
         this.opacityBuf[idx] = 1.0;
         idx++;
         // Dashed offset bond
-        this.setTopology(idx, ai, bi, DOUBLE_BOND_OFFSET, 0, AROMATIC_DASH_RADIUS, cr, cg, cb, 1);
+        this.setTopology(
+          idx,
+          ai,
+          bi,
+          DOUBLE_BOND_OFFSET,
+          0,
+          AROMATIC_DASH_RADIUS,
+          ar,
+          ag,
+          ab,
+          br,
+          bg,
+          bb,
+          1,
+        );
         this.logicalBondIdx[idx] = i;
         this.opacityBuf[idx] = 1.0;
         idx++;
       } else {
         // Single bond
-        this.setTopology(idx, ai, bi, 0, 0, BOND_RADIUS, cr, cg, cb, 0);
+        this.setTopology(idx, ai, bi, 0, 0, BOND_RADIUS, ar, ag, ab, br, bg, bb, 0);
         this.logicalBondIdx[idx] = i;
         this.opacityBuf[idx] = 1.0;
         idx++;
@@ -271,9 +291,12 @@ export class ImpostorBondMesh {
 
       const ai3 = ai * 3;
       const bi3 = bi * 3;
-      const cr = (atomColors[ai3] + atomColors[bi3]) * 0.5;
-      const cg = (atomColors[ai3 + 1] + atomColors[bi3 + 1]) * 0.5;
-      const cb = (atomColors[ai3 + 2] + atomColors[bi3 + 2]) * 0.5;
+      const ar = atomColors[ai3];
+      const ag = atomColors[ai3 + 1];
+      const ab = atomColors[ai3 + 2];
+      const br = atomColors[bi3];
+      const bg = atomColors[bi3 + 1];
+      const bb = atomColors[bi3 + 2];
 
       let perBond = 1;
       if (order === BOND_DOUBLE || order === BOND_AROMATIC) perBond = 2;
@@ -281,13 +304,17 @@ export class ImpostorBondMesh {
 
       for (let k = 0; k < perBond; k++) {
         const j3 = idx * 3;
-        this.colorBuf[j3] = cr;
-        this.colorBuf[j3 + 1] = cg;
-        this.colorBuf[j3 + 2] = cb;
+        this.colorABuf[j3] = ar;
+        this.colorABuf[j3 + 1] = ag;
+        this.colorABuf[j3 + 2] = ab;
+        this.colorBBuf[j3] = br;
+        this.colorBBuf[j3 + 1] = bg;
+        this.colorBBuf[j3 + 2] = bb;
         idx++;
       }
     }
-    this.colorAttr.needsUpdate = true;
+    this.colorAAttr.needsUpdate = true;
+    this.colorBAttr.needsUpdate = true;
   }
 
   private setTopology(
@@ -297,9 +324,12 @@ export class ImpostorBondMesh {
     offsetX: number,
     offsetY: number,
     radius: number,
-    cr: number,
-    cg: number,
-    cb: number,
+    ar: number,
+    ag: number,
+    ab: number,
+    br: number,
+    bg: number,
+    bb: number,
     dashed: number,
   ): void {
     this.atomABuf[idx] = ai;
@@ -308,9 +338,12 @@ export class ImpostorBondMesh {
     this.offsetYBuf[idx] = offsetY;
 
     const i3 = idx * 3;
-    this.colorBuf[i3] = cr;
-    this.colorBuf[i3 + 1] = cg;
-    this.colorBuf[i3 + 2] = cb;
+    this.colorABuf[i3] = ar;
+    this.colorABuf[i3 + 1] = ag;
+    this.colorABuf[i3 + 2] = ab;
+    this.colorBBuf[i3] = br;
+    this.colorBBuf[i3 + 1] = bg;
+    this.colorBBuf[i3 + 2] = bb;
 
     this.radiusBuf[idx] = radius;
     this.dashedBuf[idx] = dashed;
@@ -343,7 +376,8 @@ export class ImpostorBondMesh {
     this.atomBAttr = new THREE.InstancedBufferAttribute(this.atomBBuf, 1);
     this.offsetXAttr = new THREE.InstancedBufferAttribute(this.offsetXBuf, 1);
     this.offsetYAttr = new THREE.InstancedBufferAttribute(this.offsetYBuf, 1);
-    this.colorAttr = new THREE.InstancedBufferAttribute(this.colorBuf, 3);
+    this.colorAAttr = new THREE.InstancedBufferAttribute(this.colorABuf, 3);
+    this.colorBAttr = new THREE.InstancedBufferAttribute(this.colorBBuf, 3);
     this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
     this.dashedAttr = new THREE.InstancedBufferAttribute(this.dashedBuf, 1);
     this.opacityAttr = new THREE.InstancedBufferAttribute(this.opacityBuf, 1);
@@ -352,7 +386,8 @@ export class ImpostorBondMesh {
     this.geo.setAttribute("instanceAtomB", this.atomBAttr);
     this.geo.setAttribute("instanceOffsetX", this.offsetXAttr);
     this.geo.setAttribute("instanceOffsetY", this.offsetYAttr);
-    this.geo.setAttribute("instanceColor", this.colorAttr);
+    this.geo.setAttribute("instanceColorA", this.colorAAttr);
+    this.geo.setAttribute("instanceColorB", this.colorBAttr);
     this.geo.setAttribute("instanceRadius", this.radiusAttr);
     this.geo.setAttribute("instanceDashed", this.dashedAttr);
     this.geo.setAttribute("instanceBondOpacity", this.opacityAttr);
@@ -379,7 +414,8 @@ export class ImpostorBondMesh {
     dispose(this.atomBAttr);
     dispose(this.offsetXAttr);
     dispose(this.offsetYAttr);
-    dispose(this.colorAttr);
+    dispose(this.colorAAttr);
+    dispose(this.colorBAttr);
     dispose(this.radiusAttr);
     dispose(this.dashedAttr);
     dispose(this.opacityAttr);
@@ -390,7 +426,8 @@ export class ImpostorBondMesh {
     this.atomBAttr.needsUpdate = true;
     this.offsetXAttr.needsUpdate = true;
     this.offsetYAttr.needsUpdate = true;
-    this.colorAttr.needsUpdate = true;
+    this.colorAAttr.needsUpdate = true;
+    this.colorBAttr.needsUpdate = true;
     this.radiusAttr.needsUpdate = true;
     this.dashedAttr.needsUpdate = true;
     this.opacityAttr.needsUpdate = true;
@@ -403,7 +440,8 @@ export class ImpostorBondMesh {
     const newAtomB = new Float32Array(this.capacity);
     const newOffsetX = new Float32Array(this.capacity);
     const newOffsetY = new Float32Array(this.capacity);
-    const newColor = new Float32Array(this.capacity * 3);
+    const newColorA = new Float32Array(this.capacity * 3);
+    const newColorB = new Float32Array(this.capacity * 3);
     const newRadius = new Float32Array(this.capacity);
     const newDashed = new Float32Array(this.capacity);
     const newOpacity = new Float32Array(this.capacity).fill(1.0);
@@ -413,7 +451,8 @@ export class ImpostorBondMesh {
     newAtomB.set(this.atomBBuf);
     newOffsetX.set(this.offsetXBuf);
     newOffsetY.set(this.offsetYBuf);
-    newColor.set(this.colorBuf);
+    newColorA.set(this.colorABuf);
+    newColorB.set(this.colorBBuf);
     newRadius.set(this.radiusBuf);
     newDashed.set(this.dashedBuf);
     newOpacity.set(this.opacityBuf);
@@ -423,7 +462,8 @@ export class ImpostorBondMesh {
     this.atomBBuf = newAtomB;
     this.offsetXBuf = newOffsetX;
     this.offsetYBuf = newOffsetY;
-    this.colorBuf = newColor;
+    this.colorABuf = newColorA;
+    this.colorBBuf = newColorB;
     this.radiusBuf = newRadius;
     this.dashedBuf = newDashed;
     this.opacityBuf = newOpacity;

@@ -95,12 +95,33 @@ export function syncAddBondSourceForLoader(
 ): void {
   const desired = defaultBondSourceForFile(filename);
   const targets = new Set<string>();
-  for (const edge of state.edges) {
-    if (edge.source !== loaderId) continue;
-    if (edge.sourceHandle && edge.sourceHandle !== "particle") continue;
-    if (edge.targetHandle && edge.targetHandle !== "particle") continue;
-    const targetNode = state.nodes.find((n) => n.id === edge.target);
-    if (targetNode?.type === "add_bond") targets.add(targetNode.id);
+  // Walk forward along particle-carrying edges. AddBond may sit downstream of
+  // particle pass-through nodes (replicate / filter / modify / color /
+  // representation), so we traverse through those to find it rather than only
+  // looking at the loader's direct neighbours.
+  const PASS_THROUGH = new Set(["replicate", "filter", "modify", "color", "representation"]);
+  const visited = new Set<string>([loaderId]);
+  const stack: string[] = [loaderId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    for (const edge of state.edges) {
+      if (edge.source !== id) continue;
+      // Only follow particle-bearing outputs (load_structure "particle",
+      // replicate "particle", filter/modify/color/representation "out").
+      const sh = edge.sourceHandle ?? "particle";
+      if (sh !== "particle" && sh !== "out") continue;
+      const targetNode = state.nodes.find((n) => n.id === edge.target);
+      if (!targetNode) continue;
+      if (targetNode.type === "add_bond") {
+        if ((edge.targetHandle ?? "particle") === "particle") targets.add(targetNode.id);
+      } else if (PASS_THROUGH.has(targetNode.type ?? "") && !visited.has(targetNode.id)) {
+        // Only chase particle inputs into the pass-through node.
+        if ((edge.targetHandle ?? "particle") === "particle" || edge.targetHandle === "in") {
+          visited.add(targetNode.id);
+          stack.push(targetNode.id);
+        }
+      }
+    }
   }
   for (const id of targets) {
     state.updateNodeParams(id, { bondSource: desired });

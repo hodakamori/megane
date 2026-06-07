@@ -19,6 +19,7 @@ from megane.pipeline import (
     NodePort,
     Pipeline,
     PortNamespace,
+    Replicate,
     Representation,
     VectorOverlay,
     Viewport,
@@ -66,6 +67,19 @@ class TestNodeClasses:
         assert n.mode == "byElement"
         assert n.uniform_color == "#112233"
         assert n.range == (0.0, 10.0)
+
+    def test_replicate_defaults(self):
+        n = Replicate()
+        assert n.nx == 1
+        assert n.ny == 1
+        assert n.nz == 1
+        assert n._node_type == "replicate"
+
+    def test_replicate_custom(self):
+        n = Replicate(nx=2, ny=3, nz=4)
+        assert n.nx == 2
+        assert n.ny == 3
+        assert n.nz == 4
 
     def test_representation_defaults(self):
         n = Representation()
@@ -454,6 +468,30 @@ class TestPipelineSerialization:
 
         modify_node = next(n for n in result["nodes"] if n["type"] == "modify")
         assert modify_node["scale"] == 1.5
+
+    def test_replicate_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        r = pipe.add_node(Replicate(nx=2, ny=3, nz=4))
+        pipe.add_edge(s.out.particle, r.inp.particle)
+        pipe.add_edge(s.out.cell, r.inp.cell)
+        result = pipe.to_dict()
+
+        rep_node = next(n for n in result["nodes"] if n["type"] == "replicate")
+        assert rep_node["nx"] == 2
+        assert rep_node["ny"] == 3
+        assert rep_node["nz"] == 4
+
+    def test_replicate_round_trip(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        r = pipe.add_node(Replicate(nx=2, ny=1, nz=3))
+        pipe.add_edge(s.out.cell, r.inp.cell)
+
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        rebuilt = pipe2._nodes[r._id][0]
+        assert isinstance(rebuilt, Replicate)
+        assert (rebuilt.nx, rebuilt.ny, rebuilt.nz) == (2, 1, 3)
 
     def test_add_bonds_serialization(self):
         pipe = Pipeline()

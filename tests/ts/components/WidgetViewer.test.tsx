@@ -16,6 +16,7 @@ vi.mock("@/components/MeasurementPanel", () => ({
 // Spy on bond inference so we can assert the per-frame effect fires.
 vi.mock("@/parsers/inferBondsJS", () => ({
   inferBondsVdwJS: vi.fn(() => new Uint32Array(0)),
+  DEFAULT_VDW_BOND_FACTOR: 0.6,
 }));
 // Stub PBC post-processing only — preserve other exports (executeAddBond etc.)
 // that the pipeline store's execute() depends on.

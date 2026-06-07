@@ -17,6 +17,7 @@ const VALID_NODE_TYPES: Set<string> = new Set([
   "viewport",
   "filter",
   "modify",
+  "replicate",
   "color",
   "representation",
   "label_generator",

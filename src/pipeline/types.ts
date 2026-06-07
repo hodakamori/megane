@@ -211,6 +211,7 @@ export type PipelineNodeType =
   | "viewport"
   | "filter"
   | "modify"
+  | "replicate"
   | "color"
   | "representation"
   | "label_generator"
@@ -230,6 +231,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   viewport: "Viewport",
   filter: "Filter",
   modify: "Modify",
+  replicate: "Replicate",
   color: "Color",
   representation: "Representation",
   label_generator: "Labels",
@@ -253,6 +255,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   add_bond: "bond",
   filter: "filter",
   modify: "modify",
+  replicate: "modify",
   color: "modify",
   representation: "modify",
   label_generator: "overlay",
@@ -331,6 +334,16 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
     outputs: [{ name: "out", dataType: "particle", label: "Out" }],
   },
+  replicate: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "cell", dataType: "cell", label: "Cell" },
+    ],
+    outputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "cell", dataType: "cell", label: "Cell" },
+    ],
+  },
   color: {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
     outputs: [{ name: "out", dataType: "particle", label: "Out" }],
@@ -404,6 +417,13 @@ export interface AddBondParams {
   bondFileName?: string | null;
   /** Ephemeral: parsed bond indices from topology file. Not serialized. */
   bondFileData?: Uint32Array | null;
+  /**
+   * VDW threshold scale for distance-based bond inference. Two atoms bond when
+   * their distance is <= (vdw_i + vdw_j) * vdwScale. Higher loosens (more
+   * bonds), lower tightens (fewer bonds). Defaults to DEFAULT_VDW_BOND_FACTOR
+   * (0.6) when unset.
+   */
+  vdwScale?: number;
 }
 
 /**
@@ -440,6 +460,21 @@ export interface ModifyParams {
   opacity: number;
 }
 
+/**
+ * Replicate node parameters — OVITO/VESTA-style supercell builder.
+ * Copies every atom (and its bonds) into an `nx × ny × nz` grid of cell
+ * images and enlarges the simulation cell so the viewport draws the full
+ * supercell boundary. Requires a unit cell on the input particle stream.
+ */
+export interface ReplicateParams {
+  type: "replicate";
+  /** Number of cell images along the a (x) lattice vector (>= 1). */
+  nx: number;
+  /** Number of cell images along the b (y) lattice vector (>= 1). */
+  ny: number;
+  /** Number of cell images along the c (z) lattice vector (>= 1). */
+  nz: number;
+}
 
 export interface ColorParams {
   type: "color";
@@ -537,6 +572,7 @@ export type PipelineNodeParams =
   | ViewportParams
   | FilterParams
   | ModifyParams
+  | ReplicateParams
   | ColorParams
   | RepresentationParams
   | LabelGeneratorParams
@@ -574,6 +610,8 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         scale: 1.0,
         opacity: 1.0,
       };
+    case "replicate":
+      return { type, nx: 1, ny: 1, nz: 1 };
     case "color":
       return {
         type,

@@ -17,6 +17,7 @@ import type {
   AddBondParams,
   FilterParams,
   ModifyParams,
+  ReplicateParams,
   ColorParams,
   RepresentationParams,
   LabelGeneratorParams,
@@ -38,6 +39,7 @@ import { executeLoadTrajectory } from "./executors/loadTrajectory";
 import { executeAddBond } from "./executors/addBond";
 import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
+import { executeReplicate } from "./executors/replicate";
 import { executeColor } from "./executors/color";
 import { executeRepresentation } from "./executors/representation";
 import { executeLabelGenerator } from "./executors/labelGenerator";
@@ -206,6 +208,20 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "replicate": {
+        const replicateParams = data.params as ReplicateParams;
+        const outputs = executeReplicate(replicateParams, inputs);
+        edgeOutputs.set(id, outputs);
+        const particleIn = inputs.get("particle")?.[0] as ParticleData | undefined;
+        const counts = [replicateParams.nx, replicateParams.ny, replicateParams.nz];
+        const wantsReplication = counts.some((n) => Math.floor(n) > 1);
+        if (!particleIn) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (wantsReplication && !particleIn.source.box) {
+          addError(id, { message: "Replicate requires a unit cell", severity: "warning" });
         }
         break;
       }

@@ -38,7 +38,7 @@ import { deserializePipeline } from "../pipeline/serialize";
 import { executePipeline } from "../pipeline/execute";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { parseStructureFile } from "../parsers/structure";
-import { inferBondsVdwJS } from "../parsers/inferBondsJS";
+import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import type { PipelineNodeData, NodeSnapshotData } from "../pipeline/execute";
 import type {
@@ -251,6 +251,16 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     [nodes],
   );
 
+  // VDW threshold scale for the active distance-bond node (default 0.6).
+  const distanceBondScale = useMemo(() => {
+    const node = nodes.find(
+      (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
+    );
+    return node
+      ? ((node.data.params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR)
+      : DEFAULT_VDW_BOND_FACTOR;
+  }, [nodes]);
+
   useEffect(() => {
     if (!hasDistanceBond) return;
     if (!currentFrameData || !primarySnapshot) return;
@@ -261,7 +271,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
       currentFrameData.positions,
       primarySnapshot.elements,
       primarySnapshot.nAtoms,
-      0.6,
+      distanceBondScale,
       primarySnapshot.box,
     );
     const result = processPbcBonds(
@@ -279,7 +289,7 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
       result.elements,
       result.nAtoms,
     );
-  }, [currentFrameData, primarySnapshot, hasDistanceBond]);
+  }, [currentFrameData, primarySnapshot, hasDistanceBond, distanceBondScale]);
 
   // ─── Playback ────────────────────────────────────────────────────
 
