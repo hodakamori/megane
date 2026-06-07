@@ -435,6 +435,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids: vec![],
         ca_res_nums: vec![],
         ca_ss_type: vec![],
+        symmetry_ops: Vec::new(),
     })
 }
 

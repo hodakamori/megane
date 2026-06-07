@@ -44,6 +44,12 @@ pub struct ParsedStructure {
     pub ca_res_nums: Vec<u32>,
     /// Per-Cα secondary-structure type: 0 = coil, 1 = helix, 2 = sheet.
     pub ca_ss_type: Vec<u8>,
+    /// Crystallographic symmetry operations as raw `x,y,z`-style strings,
+    /// captured from a CIF `_symmetry_equiv_pos_as_xyz` /
+    /// `_space_group_symop_operation_xyz` loop. Empty for formats that carry
+    /// no space-group information. The parser does NOT apply these — it always
+    /// returns the asymmetric unit; symmetry expansion is a downstream feature.
+    pub symmetry_ops: Vec<String>,
 }
 
 /// Secondary-structure range from a PDB HELIX or SHEET record.
@@ -468,6 +474,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids,
         ca_res_nums,
         ca_ss_type,
+        symmetry_ops: Vec::new(),
     })
 }
 

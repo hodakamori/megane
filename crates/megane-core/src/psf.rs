@@ -205,6 +205,7 @@ pub fn parse_psf(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids: Vec::new(),
         ca_res_nums: Vec::new(),
         ca_ss_type: Vec::new(),
+        symmetry_ops: Vec::new(),
     })
 }
 

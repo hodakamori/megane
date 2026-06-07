@@ -6,6 +6,7 @@ use std::collections::HashSet;
 
 use crate::atomic::{capitalize, symbol_to_atomic_num};
 use crate::bonds;
+use crate::crystal;
 use crate::parser::{cell_params_to_matrix, ParsedStructure};
 
 /// Strip trailing parenthesized uncertainty from a CIF numeric value.
@@ -98,6 +99,122 @@ fn element_from_symbol(s: &str) -> u8 {
     // Try first character only
     let first = capitalize(&cleaned[..1]);
     symbol_to_atomic_num(&first)
+}
+
+/// CIF/mmCIF loop tags whose column holds a symmetry operation string.
+const SYMOP_TAGS: [&str; 2] = [
+    "_symmetry_equiv_pos_as_xyz",
+    "_space_group_symop_operation_xyz",
+];
+
+fn is_symop_tag(tag: &str) -> bool {
+    SYMOP_TAGS.contains(&tag)
+}
+
+/// Strip a single pair of surrounding single/double quotes from a CIF value.
+fn strip_quotes(s: &str) -> &str {
+    let s = s.trim();
+    let b = s.as_bytes();
+    if b.len() >= 2
+        && ((b[0] == b'\'' && b[b.len() - 1] == b'\'') || (b[0] == b'"' && b[b.len() - 1] == b'"'))
+    {
+        return &s[1..s.len() - 1];
+    }
+    s
+}
+
+/// Split a `_tag value` line into (tag, value-remainder).
+fn split_tag_value(line: &str) -> Option<(&str, &str)> {
+    line.trim().split_once(char::is_whitespace)
+}
+
+/// Extract the symop field from a single data row of a symmetry loop.
+fn extract_symop_field(line: &str, col: usize, col_count: usize) -> Option<String> {
+    let line = line.trim();
+    // Single-column loop: the entire (possibly quoted) line is the symop.
+    if col_count == 1 {
+        let v = strip_quotes(line);
+        return (!v.is_empty()).then(|| v.to_string());
+    }
+    let fields: Vec<&str> = line.split_whitespace().collect();
+    if fields.len() < col_count {
+        // Quoted symop containing spaces desynced the column count — fall back
+        // to the first token that looks like an `x,y,z` operation.
+        return fields
+            .iter()
+            .find(|f| f.contains(','))
+            .map(|f| strip_quotes(f).to_string());
+    }
+    fields.get(col).map(|f| strip_quotes(f).to_string())
+}
+
+/// Extract crystallographic symmetry operations from CIF/mmCIF text.
+///
+/// Recognizes both the loop form (`loop_ _symmetry_equiv_pos_as_xyz ...`) with
+/// an optional id column, and the single key-value form
+/// (`_symmetry_equiv_pos_as_xyz 'x,y,z'`). Returns the raw operation strings
+/// (e.g. `"-x+1/2,y+1/2,-z"`) without applying them.
+pub fn extract_symmetry_ops(text: &str) -> Vec<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut ops: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+        if trimmed == "loop_" {
+            i += 1;
+            // Read loop header tags (tolerate blank/comment lines).
+            let mut tags: Vec<String> = Vec::new();
+            while i < lines.len() {
+                let t = lines[i].trim();
+                if t.is_empty() || t.starts_with('#') {
+                    i += 1;
+                    continue;
+                }
+                if t.starts_with('_') {
+                    tags.push(t.to_ascii_lowercase());
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+            if let Some(col) = tags.iter().position(|t| is_symop_tag(t)) {
+                let col_count = tags.len();
+                while i < lines.len() {
+                    let t = lines[i].trim();
+                    if t.is_empty() || t.starts_with('#') {
+                        i += 1;
+                        continue;
+                    }
+                    if t.starts_with("loop_")
+                        || t.starts_with("data_")
+                        || t.starts_with("save_")
+                        || t.starts_with("global_")
+                        || t.starts_with('_')
+                    {
+                        break;
+                    }
+                    if let Some(op) = extract_symop_field(t, col, col_count) {
+                        ops.push(op);
+                    }
+                    i += 1;
+                }
+            }
+            // `i` already advanced past this loop's header/data; keep scanning.
+        } else {
+            if trimmed.starts_with('_') {
+                if let Some((tag, rest)) = split_tag_value(trimmed) {
+                    if is_symop_tag(&tag.to_ascii_lowercase()) {
+                        let v = strip_quotes(rest.trim());
+                        if !v.is_empty() {
+                            ops.push(v.to_string());
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+    ops
 }
 
 pub fn parse(text: &str) -> Result<ParsedStructure, String> {
@@ -287,7 +404,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         return Err("CIF file contains no atom sites".to_string());
     }
 
-    // Infer bonds
+    // Infer bonds on the asymmetric unit.
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
 
@@ -296,6 +413,25 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     } else {
         None
     };
+
+    // Apply space-group symmetry to fill the unit cell (VESTA-style packing).
+    // A CIF lists only the asymmetric unit; expansion is the standard way to
+    // recover the full cell. No-op for CIFs without (non-identity) operations.
+    let symmetry_ops = extract_symmetry_ops(text);
+    let (positions, elements, bonds, labels) = match box_matrix.as_ref().and_then(|bm| {
+        crystal::expand_symmetry(
+            &positions,
+            &elements,
+            &bonds,
+            labels.as_deref(),
+            bm,
+            &symmetry_ops,
+        )
+    }) {
+        Some((p, e, b, l)) => (p, e, b, l),
+        None => (positions, elements, bonds, labels),
+    };
+    let n_atoms = elements.len();
 
     Ok(ParsedStructure {
         n_atoms,
@@ -314,12 +450,121 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_chain_ids: vec![],
         ca_res_nums: vec![],
         ca_ss_type: vec![],
+        symmetry_ops,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_extract_symmetry_ops_single_column_loop() {
+        let cif = r#"data_x
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-x,-y,-z
+-x+1/2,y+1/2,-z
+x+1/2,-y+1/2,z
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Na1 Na 0.0 0.0 0.0
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(
+            ops,
+            vec!["x,y,z", "-x,-y,-z", "-x+1/2,y+1/2,-z", "x+1/2,-y+1/2,z"]
+        );
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_id_column_and_space_group_tag() {
+        let cif = r#"data_x
+loop_
+_space_group_symop_id
+_space_group_symop_operation_xyz
+1 x,y,z
+2 -x,-y,-z
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_quoted_keyvalue() {
+        let cif = "data_x\n_symmetry_equiv_pos_as_xyz 'x,y,z'\n";
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_double_quoted() {
+        // Single-column loop with a double-quoted operation.
+        let cif = "data_x\nloop_\n_symmetry_equiv_pos_as_xyz\n\"x,y,z\"\n\"-x,-y,-z\"\n";
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_fewer_fields_than_columns() {
+        // A multi-column symmetry loop whose data row collapses to a single
+        // quoted token (fewer whitespace fields than header tags) exercises the
+        // comma-token fallback in extract_symop_field.
+        let cif = r#"data_x
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+_symmetry_extra_flag
+'x,y,z'
+'-x,-y,-z'
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_absent() {
+        let cif = "data_x\n_cell_length_a 5.0\n";
+        assert!(extract_symmetry_ops(cif).is_empty());
+    }
+
+    /// The Issue #460 CIF carries the P2_1/a equivalent positions.
+    #[test]
+    fn test_parse_cif_captures_symmetry_ops() {
+        let cif = r#"data_degly19
+_cell_length_a 11.156
+_cell_length_b 5.8644
+_cell_length_c 5.3417
+_cell_angle_alpha 90
+_cell_angle_beta 125.83
+_cell_angle_gamma 90
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-x,-y,-z
+-x+1/2,y+1/2,-z
+x+1/2,-y+1/2,z
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+O1 O 0.7229 0.8423 0.8321
+"#;
+        let result = parse(cif).expect("parse failed");
+        // The single asymmetric-unit atom is expanded by the 4 P2_1/a
+        // operations into 4 symmetry-equivalent atoms filling the cell.
+        assert_eq!(result.n_atoms, 4);
+        assert_eq!(result.symmetry_ops.len(), 4);
+        assert_eq!(result.symmetry_ops[2], "-x+1/2,y+1/2,-z");
+    }
 
     #[test]
     fn test_strip_su() {
@@ -514,7 +759,9 @@ Cl1 Cl 0.5 0.5 0.5
         ))
         .expect("read fixture");
         let result = parse(&text).expect("parse failed");
-        assert_eq!(result.n_atoms, 10);
+        // The 10-atom asymmetric unit is symmetry-expanded by the 4 space-group
+        // operations into a full unit cell of 4 glycine molecules (40 atoms).
+        assert_eq!(result.n_atoms, 40);
         assert!(result.elements.contains(&1)); // H
         assert!(result.elements.contains(&6)); // C
         assert!(result.elements.contains(&7)); // N
@@ -525,12 +772,14 @@ Cl1 Cl 0.5 0.5 0.5
         let n_c = result.elements.iter().filter(|&&e| e == 6).count();
         let n_n = result.elements.iter().filter(|&&e| e == 7).count();
         let n_h = result.elements.iter().filter(|&&e| e == 1).count();
-        assert_eq!(n_o, 2);
-        assert_eq!(n_c, 2);
-        assert_eq!(n_n, 1);
-        assert_eq!(n_h, 5);
+        assert_eq!(n_o, 8);
+        assert_eq!(n_c, 8);
+        assert_eq!(n_n, 4);
+        assert_eq!(n_h, 20);
         // First atom O1 fract=(0.30478, 0.09443, 0.23515) → Cartesian non-zero
         assert!(result.positions[0].abs() > 0.1);
+        // Labels are tiled across symmetry images; the first image preserves the
+        // original asymmetric-unit labels.
         let labels = result.atom_labels.as_ref().expect("labels");
         assert_eq!(labels[0], "O1");
         assert_eq!(labels[9], "H10");

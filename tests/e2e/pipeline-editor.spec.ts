@@ -57,6 +57,24 @@ test.describe("pipeline-editor: webapp default graph", () => {
     await expect(page.locator('[data-testid="render-modal"]')).toBeHidden();
   });
 
+  test("Add Node menu adds a Supercell node with its controls", async ({ page }) => {
+    // Open the Add Node palette and add a Supercell node.
+    await page.getByTitle("Add Node").click();
+    await page.getByRole("button", { name: "Supercell", exact: true }).click();
+
+    // The node mounts with its na/nb/nc repeat inputs.
+    const node = page.locator('[data-testid="pipeline-node-supercell"]').first();
+    await expect(node).toBeVisible();
+    await expect(page.locator('[data-testid="supercell-node-na"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="supercell-node-nb"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="supercell-node-nc"]').first()).toBeVisible();
+
+    // Repeat count edits are accepted.
+    const na = page.locator('[data-testid="supercell-node-na"]').first();
+    await na.fill("2");
+    await expect(na).toHaveValue("2");
+  });
+
   test("tab selector switches between editor and chat panes", async ({ page }) => {
     const editorTab = page.locator('[data-testid="pipeline-editor-tab-editor"]');
     const chatTab = page.locator('[data-testid="pipeline-editor-tab-chat"]');

@@ -34,6 +34,8 @@ interface WasmParseResult {
   vector_channel_count: number;
   vector_channel_meta: string;
   ca_count: number;
+  symmetry_op_count: number;
+  symmetry_ops: string;
   positions(): Float32Array;
   elements(): Uint8Array;
   bonds(): Uint32Array;
@@ -187,6 +189,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
   const result = parseFn(text) as WasmParseResult;
 
   const caCount = result.ca_count;
+  const symmetryOps = result.symmetry_op_count > 0 ? result.symmetry_ops.split("\n") : undefined;
   const snapshot: Snapshot = {
     nAtoms: result.n_atoms,
     nBonds: result.n_bonds,
@@ -204,6 +207,7 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
       caResNums: result.ca_res_nums(),
       caSsType: result.ca_ss_type(),
     }),
+    ...(symmetryOps && { symmetryOps }),
   };
 
   const frames: Frame[] = [];

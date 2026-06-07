@@ -19,6 +19,14 @@ export interface Snapshot {
   caChainIds?: Uint8Array; // per-Cα chain ID as ASCII byte (e.g. 65 = 'A')
   caResNums?: Uint32Array; // per-Cα residue sequence number
   caSsType?: Uint8Array; // per-Cα secondary structure: 0=coil, 1=helix, 2=sheet
+  /**
+   * Crystallographic symmetry operations as raw `x,y,z`-style strings, captured
+   * from a CIF `_symmetry_equiv_pos_as_xyz` loop. Undefined for formats without
+   * space-group information. Informational only: the CIF parser already applies
+   * these to expand the asymmetric unit into the full unit cell, so `positions`
+   * holds the expanded structure (not the raw asymmetric unit).
+   */
+  symmetryOps?: string[];
 }
 
 /** Data mode for the application. */
