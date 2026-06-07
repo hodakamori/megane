@@ -17,12 +17,7 @@ vi.mock("@/parsers/xtc", () => ({
 
 import { parseStructureFile, parseTopBonds, parsePsfBonds } from "@/parsers/structure";
 import { applyTopologyFile } from "@/pipeline/openFile";
-import {
-  parseXTCFile,
-  parseLammpstrjFile,
-  parseDCDFile,
-  parseNetCDFFile,
-} from "@/parsers/xtc";
+import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "@/parsers/xtc";
 import { usePipelineStore } from "@/pipeline/store";
 import type { Snapshot, Frame, TrajectoryMeta } from "@/types";
 
@@ -117,10 +112,21 @@ describe("usePipelineStore.openFile — single structure file", () => {
     // node itself, so the seed LoadTrajectory node should be removed and
     // its downstream consumers rewired to LoadStructure.trajectory.
     expect(state.nodes.find((n) => n.type === "load_trajectory")).toBeUndefined();
+    // The trajectory routes through the replicate node so replicated copies
+    // animate: LoadStructure.trajectory → Replicate.trajectory → Viewport.
+    const replicate = state.nodes.find((n) => n.type === "replicate")!;
     const viewport = state.nodes.find((n) => n.type === "viewport")!;
-    const trajEdge = state.edges.find(
+    const rewiredEdge = state.edges.find(
       (e) =>
         e.source === loader.id &&
+        e.sourceHandle === "trajectory" &&
+        e.target === replicate.id &&
+        e.targetHandle === "trajectory",
+    );
+    expect(rewiredEdge).toBeDefined();
+    const trajEdge = state.edges.find(
+      (e) =>
+        e.source === replicate.id &&
         e.sourceHandle === "trajectory" &&
         e.target === viewport.id &&
         e.targetHandle === "trajectory",
@@ -637,7 +643,9 @@ describe("usePipelineStore — cross-document state isolation", () => {
     await usePipelineStore
       .getState()
       .openFile(new File([JSON.stringify(pipeline)], "loaderless.megane.json"));
-    expect(usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")).toBeUndefined();
+    expect(
+      usePipelineStore.getState().nodes.find((n) => n.type === "load_structure"),
+    ).toBeUndefined();
 
     mockParseStructureFile.mockResolvedValueOnce({
       snapshot: makeSnapshot(5),

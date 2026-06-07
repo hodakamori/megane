@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { executeReplicate } from "@/pipeline/executors/replicate";
-import type { ReplicateParams, ParticleData, CellData, PipelineData } from "@/pipeline/types";
-import type { Snapshot } from "@/types";
+import type {
+  ReplicateParams,
+  ParticleData,
+  CellData,
+  PipelineData,
+  TrajectoryData,
+} from "@/pipeline/types";
+import { MemoryFrameProvider } from "@/pipeline/types";
+import type { Snapshot, Frame, TrajectoryMeta } from "@/types";
 
 /** Two atoms at (1,1,1) and (2,2,2) with one bond, in a 10 Å cubic cell. */
 function makeSnapshot(box: Float32Array | null): Snapshot {
@@ -43,10 +50,33 @@ function params(nx: number, ny: number, nz: number): ReplicateParams {
   return { type: "replicate", nx, ny, nz };
 }
 
-function inputs(particle?: ParticleData, cell?: CellData): Map<string, PipelineData[]> {
+/**
+ * Two-frame trajectory of the 2-atom snapshot. Frame 0 is the base, frame 1
+ * shifts both atoms by +5 in x so we can confirm per-frame motion replicates.
+ */
+function makeTrajectory(): TrajectoryData {
+  const meta: TrajectoryMeta = { nFrames: 2, timestepPs: 1, nAtoms: 2 };
+  const frames: Frame[] = [
+    { frameId: 0, nAtoms: 2, positions: new Float32Array([1, 1, 1, 2, 2, 2]) },
+    { frameId: 1, nAtoms: 2, positions: new Float32Array([6, 1, 1, 7, 2, 2]) },
+  ];
+  return {
+    type: "trajectory",
+    provider: new MemoryFrameProvider(frames, meta),
+    meta,
+    source: "file",
+  };
+}
+
+function inputs(
+  particle?: ParticleData,
+  cell?: CellData,
+  trajectory?: TrajectoryData,
+): Map<string, PipelineData[]> {
   const m = new Map<string, PipelineData[]>();
   if (particle) m.set("particle", [particle]);
   if (cell) m.set("cell", [cell]);
+  if (trajectory) m.set("trajectory", [trajectory]);
   return m;
 }
 
@@ -146,5 +176,78 @@ describe("executeReplicate", () => {
     const cell = out.get("cell") as CellData;
     expect(cell.type).toBe("cell");
     expect(Array.from(cell.box)).toEqual([20, 0, 0, 0, 10, 0, 0, 0, 10]);
+  });
+
+  it("emits no trajectory output when none is wired in", () => {
+    const particle = makeParticle(CUBIC());
+    const out = executeReplicate(params(2, 1, 1), inputs(particle, makeCell(CUBIC())));
+    expect(out.has("trajectory")).toBe(false);
+  });
+
+  it("replicates trajectory frames with the same per-image offsets as the snapshot", () => {
+    const particle = makeParticle(CUBIC());
+    const out = executeReplicate(
+      params(2, 1, 1),
+      inputs(particle, makeCell(CUBIC()), makeTrajectory()),
+    );
+    const traj = out.get("trajectory") as TrajectoryData;
+    expect(traj.type).toBe("trajectory");
+
+    // Frame 0: original two atoms, then the +a (10 in x) image.
+    const f0 = traj.provider.getFrame(0)!;
+    expect(f0.nAtoms).toBe(4);
+    expect(Array.from(f0.positions.slice(0, 6))).toEqual([1, 1, 1, 2, 2, 2]);
+    expect(Array.from(f0.positions.slice(6, 12))).toEqual([11, 1, 1, 12, 2, 2]);
+
+    // Frame 1 (atoms shifted +5 in x): the image is still shifted by +a on top.
+    const f1 = traj.provider.getFrame(1)!;
+    expect(Array.from(f1.positions.slice(0, 6))).toEqual([6, 1, 1, 7, 2, 2]);
+    expect(Array.from(f1.positions.slice(6, 12))).toEqual([16, 1, 1, 17, 2, 2]);
+  });
+
+  it("scales trajectory meta nAtoms by the image count, preserving nFrames", () => {
+    const particle = makeParticle(CUBIC());
+    const out = executeReplicate(
+      params(2, 2, 2),
+      inputs(particle, makeCell(CUBIC()), makeTrajectory()),
+    );
+    const traj = out.get("trajectory") as TrajectoryData;
+    expect(traj.meta.nAtoms).toBe(2 * 8);
+    expect(traj.meta.nFrames).toBe(2);
+    expect(traj.source).toBe("file");
+  });
+
+  it("preserves the provider's streaming kind", () => {
+    const particle = makeParticle(CUBIC());
+    const out = executeReplicate(
+      params(2, 1, 1),
+      inputs(particle, makeCell(CUBIC()), makeTrajectory()),
+    );
+    const traj = out.get("trajectory") as TrajectoryData;
+    expect(traj.provider.kind).toBe("memory");
+  });
+
+  it("returns null from the replicated provider when the source has no frame", () => {
+    const particle = makeParticle(CUBIC());
+    const out = executeReplicate(
+      params(2, 1, 1),
+      inputs(particle, makeCell(CUBIC()), makeTrajectory()),
+    );
+    const traj = out.get("trajectory") as TrajectoryData;
+    expect(traj.provider.getFrame(99)).toBeNull();
+  });
+
+  it("passes the trajectory through unchanged for 1×1×1 (identity)", () => {
+    const particle = makeParticle(CUBIC());
+    const trajectory = makeTrajectory();
+    const out = executeReplicate(params(1, 1, 1), inputs(particle, makeCell(CUBIC()), trajectory));
+    expect(out.get("trajectory")).toBe(trajectory);
+  });
+
+  it("passes the trajectory through unchanged when there is no unit cell", () => {
+    const particle = makeParticle(null);
+    const trajectory = makeTrajectory();
+    const out = executeReplicate(params(2, 1, 1), inputs(particle, undefined, trajectory));
+    expect(out.get("trajectory")).toBe(trajectory);
   });
 });

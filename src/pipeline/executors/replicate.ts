@@ -1,5 +1,12 @@
-import type { Snapshot } from "../../types";
-import type { PipelineData, ParticleData, CellData, ReplicateParams } from "../types";
+import type { Snapshot, Frame, TrajectoryMeta } from "../../types";
+import type {
+  PipelineData,
+  ParticleData,
+  CellData,
+  ReplicateParams,
+  TrajectoryData,
+  FrameProvider,
+} from "../types";
 
 /**
  * Replicate node — OVITO/VESTA-style supercell builder.
@@ -21,6 +28,7 @@ export function executeReplicate(
   const outputs = new Map<string, PipelineData>();
   const particle = inputs.get("particle")?.[0] as ParticleData | undefined;
   const cellIn = inputs.get("cell")?.[0] as CellData | undefined;
+  const trajIn = inputs.get("trajectory")?.[0] as TrajectoryData | undefined;
   if (!particle) return outputs;
 
   const nx = Math.max(1, Math.floor(params.nx));
@@ -32,6 +40,7 @@ export function executeReplicate(
   if ((nx === 1 && ny === 1 && nz === 1) || !box) {
     outputs.set("particle", particle);
     if (cellIn) outputs.set("cell", cellIn);
+    if (trajIn) outputs.set("trajectory", trajIn);
     return outputs;
   }
 
@@ -52,30 +61,42 @@ export function executeReplicate(
     cy = box[7],
     cz = box[8];
 
+  // Per-image translation offsets — the single source of truth for image
+  // placement, reused for both the static snapshot and trajectory frames.
+  // Image order: i (nx outer), j (ny), k (nz inner), matching the atom layout.
+  const offsets = new Float32Array(total * 3);
+  {
+    let m = 0;
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        for (let k = 0; k < nz; k++, m++) {
+          offsets[m * 3] = i * ax + j * bx + k * cx;
+          offsets[m * 3 + 1] = i * ay + j * by + k * cy;
+          offsets[m * 3 + 2] = i * az + j * bz + k * cz;
+        }
+      }
+    }
+  }
+
   const positions = new Float32Array(nAtomsNew * 3);
   const elements = new Uint8Array(nAtomsNew);
   const atomChainIds = src.atomChainIds ? new Uint8Array(nAtomsNew) : null;
   const atomBFactors = src.atomBFactors ? new Float32Array(nAtomsNew) : null;
 
-  let img = 0;
-  for (let i = 0; i < nx; i++) {
-    for (let j = 0; j < ny; j++) {
-      for (let k = 0; k < nz; k++, img++) {
-        const offX = i * ax + j * bx + k * cx;
-        const offY = i * ay + j * by + k * cy;
-        const offZ = i * az + j * bz + k * cz;
-        const atomBase = img * nAtomsOld;
-        for (let a = 0; a < nAtomsOld; a++) {
-          const dst = (atomBase + a) * 3;
-          const s = a * 3;
-          positions[dst] = src.positions[s] + offX;
-          positions[dst + 1] = src.positions[s + 1] + offY;
-          positions[dst + 2] = src.positions[s + 2] + offZ;
-          elements[atomBase + a] = src.elements[a];
-          if (atomChainIds) atomChainIds[atomBase + a] = src.atomChainIds![a];
-          if (atomBFactors) atomBFactors[atomBase + a] = src.atomBFactors![a];
-        }
-      }
+  for (let img = 0; img < total; img++) {
+    const offX = offsets[img * 3];
+    const offY = offsets[img * 3 + 1];
+    const offZ = offsets[img * 3 + 2];
+    const atomBase = img * nAtomsOld;
+    for (let a = 0; a < nAtomsOld; a++) {
+      const dst = (atomBase + a) * 3;
+      const s = a * 3;
+      positions[dst] = src.positions[s] + offX;
+      positions[dst + 1] = src.positions[s + 1] + offY;
+      positions[dst + 2] = src.positions[s + 2] + offZ;
+      elements[atomBase + a] = src.elements[a];
+      if (atomChainIds) atomChainIds[atomBase + a] = src.atomChainIds![a];
+      if (atomBFactors) atomBFactors[atomBase + a] = src.atomBFactors![a];
     }
   }
 
@@ -164,7 +185,73 @@ export function executeReplicate(
   };
   outputs.set("cell", newCell);
 
+  // Trajectory: wrap the upstream provider so every frame is tiled across the
+  // same image grid as the static snapshot. Without this the replicated copies
+  // would freeze at their base positions while only the original cell animates.
+  if (trajIn) {
+    const newMeta: TrajectoryMeta = {
+      ...trajIn.meta,
+      nAtoms: trajIn.meta.nAtoms * total,
+    };
+    const newTrajectory: TrajectoryData = {
+      type: "trajectory",
+      provider: new ReplicatedFrameProvider(trajIn.provider, offsets, newMeta),
+      meta: newMeta,
+      source: trajIn.source,
+    };
+    outputs.set("trajectory", newTrajectory);
+  }
+
   return outputs;
+}
+
+/**
+ * Wraps a FrameProvider and replicates each frame's positions across an
+ * `nx×ny×nz` image grid using the supplied per-image `offsets` (length
+ * `total·3`). The number of atoms per image is derived from each frame's own
+ * positions array, so the provider stays robust to frame/structure atom-count
+ * differences. Streaming semantics are preserved: `getFrame` returns `null`
+ * when the wrapped provider has no frame available yet.
+ */
+class ReplicatedFrameProvider implements FrameProvider {
+  readonly kind: "memory" | "stream";
+  readonly meta: TrajectoryMeta;
+  private readonly source: FrameProvider;
+  private readonly offsets: Float32Array;
+  private readonly total: number;
+
+  constructor(source: FrameProvider, offsets: Float32Array, meta: TrajectoryMeta) {
+    this.source = source;
+    this.offsets = offsets;
+    this.total = offsets.length / 3;
+    this.kind = source.kind;
+    this.meta = meta;
+  }
+
+  getFrame(index: number): Frame | null {
+    const frame = this.source.getFrame(index);
+    if (!frame) return null;
+    const nAtomsPerImage = frame.positions.length / 3;
+    const out = new Float32Array(nAtomsPerImage * this.total * 3);
+    for (let img = 0; img < this.total; img++) {
+      const offX = this.offsets[img * 3];
+      const offY = this.offsets[img * 3 + 1];
+      const offZ = this.offsets[img * 3 + 2];
+      const base = img * nAtomsPerImage * 3;
+      for (let a = 0; a < nAtomsPerImage; a++) {
+        const s = a * 3;
+        const dst = base + s;
+        out[dst] = frame.positions[s] + offX;
+        out[dst + 1] = frame.positions[s + 1] + offY;
+        out[dst + 2] = frame.positions[s + 2] + offZ;
+      }
+    }
+    return {
+      frameId: frame.frameId,
+      nAtoms: nAtomsPerImage * this.total,
+      positions: out,
+    };
+  }
 }
 
 /** Tile a per-atom selection index array, shifting each copy by img·nAtomsOld. */
