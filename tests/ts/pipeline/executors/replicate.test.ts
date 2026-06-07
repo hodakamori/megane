@@ -251,3 +251,121 @@ describe("executeReplicate", () => {
     expect(out.get("trajectory")).toBe(trajectory);
   });
 });
+
+describe("executeReplicate image-aware bond connectivity", () => {
+  /**
+   * Snapshot with a single bond whose two atoms straddle the +x boundary of a
+   * 10 Å cubic cell: atom 0 at x=9, atom 1 at x=1. The bond's true partner of
+   * atom 1 is one cell to the −x of atom 0, so the minimum-image shift is
+   * g = (−1, 0, 0).
+   */
+  function makeCrossingSnapshot(): Snapshot {
+    return {
+      nAtoms: 2,
+      nBonds: 1,
+      nFileBonds: 1,
+      positions: new Float32Array([9, 5, 5, 1, 5, 5]),
+      elements: new Uint8Array([6, 8]),
+      bonds: new Uint32Array([0, 1]),
+      bondOrders: new Uint8Array([1]),
+      box: CUBIC(),
+    } as unknown as Snapshot;
+  }
+
+  function crossingParticle(snap: Snapshot): ParticleData {
+    return {
+      type: "particle",
+      source: snap,
+      sourceNodeId: "loader-1",
+      indices: null,
+      scaleOverrides: null,
+      opacityOverrides: null,
+      colorOverrides: null,
+      representationOverride: null,
+    } as ParticleData;
+  }
+
+  it("reconnects a +x boundary-crossing bond to the neighboring image", () => {
+    const particle = crossingParticle(makeCrossingSnapshot());
+    const out = executeReplicate(params(2, 1, 1), inputs(particle, makeCell(CUBIC())));
+    const s = (out.get("particle") as ParticleData).source;
+
+    // g = (−1,0,0). Image 0 (ix=0): J_x = 0−(−1)=1 → atom 1 in image 1 (index 3):
+    //   interior reconnection (atoms 9 and 11 → 2 Å apart, a real bond).
+    // Image 1 (ix=1): J_x = 1−(−1)=2 → mod 2 = 0 → atom 1 in image 0 (index 1):
+    //   supercell-boundary wrap (downstream processPbcBonds splits it).
+    expect(Array.from(s.bonds)).toEqual([0, 3, 2, 1]);
+    expect(s.nBonds).toBe(2);
+  });
+
+  it("keeps a non-crossing bond within its own image (regression)", () => {
+    // Original fixture: atoms (1,1,1)-(2,2,2), displacement (1,1,1) → g=0.
+    const particle = makeParticle(CUBIC());
+    const out = executeReplicate(params(2, 1, 1), inputs(particle, makeCell(CUBIC())));
+    const s = (out.get("particle") as ParticleData).source;
+    expect(Array.from(s.bonds)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("uses the full inverse for a triclinic (off-diagonal) cell", () => {
+    // Monoclinic-ish box: a along x, b tilted into x, c along z.
+    const box = new Float32Array([10, 0, 0, 3, 10, 0, 0, 0, 10]);
+    const snap = {
+      nAtoms: 2,
+      nBonds: 1,
+      nFileBonds: 1,
+      // Atom 1 sits just across the +b face: posⱼ−posᵢ = b = (3,10,0) → s=(0,1,0).
+      positions: new Float32Array([1, 1, 1, 4, 11, 1]),
+      elements: new Uint8Array([6, 8]),
+      bonds: new Uint32Array([0, 1]),
+      bondOrders: new Uint8Array([1]),
+      box,
+    } as unknown as Snapshot;
+    const particle = crossingParticle(snap);
+    const out = executeReplicate(params(1, 2, 1), inputs(particle, makeCell(box)));
+    const s = (out.get("particle") as ParticleData).source;
+    // g=(0,−1,0). Image (iy=0): J_y=0−(−1)=1 → atom 1 in image 1 (index 3).
+    // Image (iy=1): J_y=1−(−1)=2 → mod 2 = 0 → atom 1 in image 0 (index 1).
+    expect(Array.from(s.bonds)).toEqual([0, 3, 2, 1]);
+  });
+
+  it("falls back to naive tiling when the cell is singular", () => {
+    // Degenerate box (a and b parallel) → invert3x3 returns null → g=0 tiling.
+    const box = new Float32Array([10, 0, 0, 10, 0, 0, 0, 0, 10]);
+    const snap = {
+      nAtoms: 2,
+      nBonds: 1,
+      nFileBonds: 1,
+      positions: new Float32Array([9, 5, 5, 1, 5, 5]),
+      elements: new Uint8Array([6, 8]),
+      bonds: new Uint32Array([0, 1]),
+      bondOrders: new Uint8Array([1]),
+      box,
+    } as unknown as Snapshot;
+    const particle = crossingParticle(snap);
+    expect(() =>
+      executeReplicate(params(2, 1, 1), inputs(particle, makeCell(box))),
+    ).not.toThrow();
+    const out = executeReplicate(params(2, 1, 1), inputs(particle, makeCell(box)));
+    const s = (out.get("particle") as ParticleData).source;
+    expect(Array.from(s.bonds)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("does not create an inter-image bond along an unreplicated axis", () => {
+    // Bond crosses +z (g_z=1) but nz=1 → J_z stays 0; bond stays within image.
+    const snap = {
+      nAtoms: 2,
+      nBonds: 1,
+      nFileBonds: 1,
+      positions: new Float32Array([5, 5, 9, 5, 5, 1]),
+      elements: new Uint8Array([6, 8]),
+      bonds: new Uint32Array([0, 1]),
+      bondOrders: new Uint8Array([1]),
+      box: CUBIC(),
+    } as unknown as Snapshot;
+    const particle = crossingParticle(snap);
+    const out = executeReplicate(params(2, 1, 1), inputs(particle, makeCell(CUBIC())));
+    const s = (out.get("particle") as ParticleData).source;
+    // Both images keep the bond internal (image 0 → [0,1], image 1 → [2,3]).
+    expect(Array.from(s.bonds)).toEqual([0, 1, 2, 3]);
+  });
+});

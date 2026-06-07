@@ -100,6 +100,36 @@ describe("ImpostorBondMesh.recomputeColorsFromAtomBuffer", () => {
     expect(m.colorAAttr.version).toBeGreaterThan(beforeA);
     expect(m.colorBAttr.version).toBeGreaterThan(beforeB);
   });
+
+  it("colors a ghost endpoint from its element instead of black (PBC stub)", () => {
+    // Extended snapshot: 2 real atoms + 1 ghost (a Carbon copy, Z=6) appended
+    // at index 2. The half-bond connects real atom 1 (Oxygen) to the ghost.
+    const extSnap = {
+      nAtoms: 3,
+      nBonds: 1,
+      positions: new Float32Array([0, 0, 0, 1, 0, 0, 2, 0, 0]),
+      elements: new Uint8Array([6, 8, 6]),
+      bonds: new Uint32Array([1, 2]),
+      bondOrders: null,
+    } as Snapshot;
+
+    const mesh = new ImpostorBondMesh(16);
+    mesh.loadSnapshot(extSnap);
+
+    // Atom color buffer only covers the 2 real atoms (no ghost entry).
+    const atomColors = new Float32Array([1, 0, 0, 0, 1, 0]);
+    mesh.recomputeColorsFromAtomBuffer(atomColors, extSnap);
+
+    const { a, b } = buffers(mesh);
+    // A half = real atom 1's color from the atom buffer (green).
+    expect(Array.from(a.subarray(0, 3))).toEqual([0, 1, 0]);
+    // B half = ghost (Z=6) element color, not 0/NaN.
+    const carbon = getColor(6);
+    expect(b[0]).toBeCloseTo(carbon[0], 6);
+    expect(b[1]).toBeCloseTo(carbon[1], 6);
+    expect(b[2]).toBeCloseTo(carbon[2], 6);
+    expect(Number.isNaN(b[0])).toBe(false);
+  });
 });
 
 describe("ImpostorBondMesh.loadSnapshot split coloring", () => {
