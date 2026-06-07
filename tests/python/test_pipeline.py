@@ -20,7 +20,6 @@ from megane.pipeline import (
     Pipeline,
     PortNamespace,
     Representation,
-    Supercell,
     VectorOverlay,
     Viewport,
     build_pipeline,
@@ -54,17 +53,6 @@ class TestNodeClasses:
         n = Modify(scale=1.5, opacity=0.3)
         assert n.scale == 1.5
         assert n.opacity == 0.3
-
-    def test_supercell_defaults(self):
-        n = Supercell()
-        assert n.na == 1
-        assert n.nb == 1
-        assert n.nc == 1
-        assert n._node_type == "supercell"
-
-    def test_supercell_custom(self):
-        n = Supercell(na=2, nb=3, nc=1)
-        assert (n.na, n.nb, n.nc) == (2, 3, 1)
 
     def test_color_defaults(self):
         n = Color()
@@ -550,30 +538,6 @@ class TestPipelineSerialization:
         types = [config["type"] for _, config in rebuilt._nodes.values()]
         assert "color" in types
         assert "representation" in types
-
-    def test_supercell_serialization(self):
-        pipe = Pipeline()
-        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
-        sc = pipe.add_node(Supercell(na=2, nb=2, nc=1))
-        pipe.add_edge(s.out.particle, sc.inp.particle)
-        result = pipe.to_dict()
-
-        sc_node = next(n for n in result["nodes"] if n["type"] == "supercell")
-        assert sc_node["na"] == 2
-        assert sc_node["nb"] == 2
-        assert sc_node["nc"] == 1
-
-    def test_supercell_round_trip(self):
-        pipe = Pipeline()
-        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
-        sc = pipe.add_node(Supercell(na=3))
-        v = pipe.add_node(Viewport())
-        pipe.add_edge(s.out.particle, sc.inp.particle)
-        pipe.add_edge(sc.out.particle, v.inp.particle)
-
-        rebuilt = Pipeline.from_dict(pipe.to_dict())
-        sc_cfg = next(c for _, c in rebuilt._nodes.values() if c["type"] == "supercell")
-        assert sc_cfg["na"] == 3
 
     def test_polyhedra_serialization(self):
         pipe = Pipeline()

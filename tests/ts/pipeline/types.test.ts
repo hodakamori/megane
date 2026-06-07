@@ -104,16 +104,6 @@ describe("defaultParams", () => {
     });
   });
 
-  it("returns correct defaults for supercell", () => {
-    const params = defaultParams("supercell");
-    expect(params).toEqual({
-      type: "supercell",
-      na: 1,
-      nb: 1,
-      nc: 1,
-    });
-  });
-
   it("returns correct defaults for color", () => {
     const params = defaultParams("color");
     expect(params).toEqual({

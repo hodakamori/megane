@@ -8,7 +8,6 @@ import {
   Streaming,
   Filter,
   Modify,
-  Supercell,
   AddBonds,
   AddLabels,
   AddPolyhedra,
@@ -174,27 +173,6 @@ describe("Modify", () => {
   it("accepts custom values", () => {
     const node = new Modify({ scale: 1.5, opacity: 0.3 });
     expect(node._toSerializedParams()).toMatchObject({ scale: 1.5, opacity: 0.3 });
-  });
-});
-
-describe("Supercell", () => {
-  it("uses default 1×1×1 repeat", () => {
-    const node = new Supercell();
-    expect(node._toSerializedParams()).toMatchObject({
-      type: "supercell",
-      na: 1,
-      nb: 1,
-      nc: 1,
-    });
-  });
-
-  it("accepts custom repeat counts", () => {
-    const node = new Supercell({ na: 2, nb: 3, nc: 1 });
-    expect(node._toSerializedParams()).toMatchObject({
-      na: 2,
-      nb: 3,
-      nc: 1,
-    });
   });
 });
 

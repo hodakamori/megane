@@ -246,56 +246,6 @@ describe("executePipeline", () => {
     });
   });
 
-  describe("Supercell node", () => {
-    const cellSnapshot = makeSnapshot({
-      nAtoms: 2,
-      positions: [0, 0, 0, 1, 2, 3],
-      elements: [11, 17],
-      bonds: [0, 1],
-      bondOrders: [1],
-      box: [10, 0, 0, 0, 10, 0, 0, 0, 10],
-    });
-
-    it("replicates the cell across an na×nb×nc grid", () => {
-      const nodes = [
-        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
-        makeNode("sc", "supercell", { na: 2, nb: 2, nc: 1 }),
-        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
-      ];
-      const edges = [
-        makeEdge("ls", "particle", "sc", "in"),
-        makeEdge("sc", "out", "vp", "particle"),
-      ];
-
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: cellSnapshot });
-      const p = result.particles[0];
-      expect(p.source.nAtoms).toBe(8); // 2 atoms × 4 cells
-      expect(p.source.box![0]).toBeCloseTo(20); // enlarged a axis
-    });
-
-    it("warns when the structure has no unit cell", () => {
-      const noBox = makeSnapshot({
-        nAtoms: 2,
-        positions: [0, 0, 0, 1, 0, 0],
-        elements: [6, 6],
-      });
-      const nodes = [
-        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
-        makeNode("sc", "supercell", { na: 2, nb: 2, nc: 2 }),
-        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
-      ];
-      const edges = [
-        makeEdge("ls", "particle", "sc", "in"),
-        makeEdge("sc", "out", "vp", "particle"),
-      ];
-
-      const { viewportState: result, nodeErrors } = executePipeline(nodes, edges, { snapshot: noBox });
-      // Pass-through: still one molecule, no expansion.
-      expect(result.particles[0].source.nAtoms).toBe(2);
-      expect(nodeErrors.get("sc")?.some((e) => /no unit cell/i.test(e.message))).toBe(true);
-    });
-  });
-
   describe("AddBond node", () => {
     it("uses structure bonds when bondSource is 'structure'", () => {
       const nodes = [

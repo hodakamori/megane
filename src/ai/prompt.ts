@@ -81,18 +81,6 @@ Modifies visual properties (scale, opacity).
 - Inputs: \`in\` (accepts particle or bond data type)
 - Outputs: \`out\` (same type as input)
 
-### supercell
-Replicates the unit cell across an na×nb×nc grid (a true supercell,
-translational replication only). Crystallographic symmetry expansion
-(asymmetric unit → full cell) happens automatically when a CIF is loaded, so the
-incoming snapshot already holds the full unit cell. Place it right after
-load_structure — it rebuilds the particle set, so upstream per-atom overrides
-are dropped. Requires a unit cell.
-- Parameters: \`{ type: "supercell", na: number, nb: number, nc: number }\`
-  - na, nb, nc: unit-cell repeats along the a, b, c axes (each ≥ 1, default 1)
-- Inputs: \`in\` (particle data type)
-- Outputs: \`out\` (particle data type)
-
 ### label_generator
 Generates text labels for atoms.
 - Parameters: \`{ type: "label_generator", source: "element" | "resname" | "index" }\`

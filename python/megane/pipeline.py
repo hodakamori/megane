@@ -252,38 +252,6 @@ class Modify(PipelineNode):
         self.opacity = opacity
 
 
-class Supercell(PipelineNode):
-    """Replicate the unit cell across an ``na × nb × nc`` grid (a true supercell).
-
-    Crystallographic symmetry expansion (asymmetric unit → full unit cell)
-    happens automatically when a CIF is loaded, so this node only performs
-    translational replication.
-
-    Args:
-        na, nb, nc: Unit-cell repeats along the a, b, c cell axes (each ≥ 1).
-
-    Ports:
-        inp.particle — atom data in
-        out.particle — replicated atom data
-    """
-
-    _node_type = "supercell"
-    _out_ports = {"particle": "out"}
-    _inp_ports = {"particle": "in"}
-
-    def __init__(
-        self,
-        *,
-        na: int = 1,
-        nb: int = 1,
-        nc: int = 1,
-    ) -> None:
-        super().__init__()
-        self.na = na
-        self.nb = nb
-        self.nc = nc
-
-
 class Color(PipelineNode):
     """Recolor the upstream particle stream by a chosen scheme.
 
@@ -733,12 +701,6 @@ class Pipeline:
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
         elif ntype == "modify":
             return Modify(scale=nd.get("scale", 1.0), opacity=nd.get("opacity", 1.0))
-        elif ntype == "supercell":
-            return Supercell(
-                na=nd.get("na", 1),
-                nb=nd.get("nb", 1),
-                nc=nd.get("nc", 1),
-            )
         elif ntype == "color":
             range_val = nd.get("range")
             return Color(
@@ -914,10 +876,6 @@ class Pipeline:
         elif isinstance(node, Modify):
             base["scale"] = node.scale
             base["opacity"] = node.opacity
-        elif isinstance(node, Supercell):
-            base["na"] = node.na
-            base["nb"] = node.nb
-            base["nc"] = node.nc
         elif isinstance(node, Color):
             base["mode"] = node.mode
             base["uniformColor"] = node.uniform_color

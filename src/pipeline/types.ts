@@ -211,7 +211,6 @@ export type PipelineNodeType =
   | "viewport"
   | "filter"
   | "modify"
-  | "supercell"
   | "color"
   | "representation"
   | "label_generator"
@@ -231,7 +230,6 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   viewport: "Viewport",
   filter: "Filter",
   modify: "Modify",
-  supercell: "Supercell",
   color: "Color",
   representation: "Representation",
   label_generator: "Labels",
@@ -255,7 +253,6 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   add_bond: "bond",
   filter: "filter",
   modify: "modify",
-  supercell: "modify",
   color: "modify",
   representation: "modify",
   label_generator: "overlay",
@@ -334,10 +331,6 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
     outputs: [{ name: "out", dataType: "particle", label: "Out" }],
   },
-  supercell: {
-    inputs: [{ name: "in", dataType: "particle", label: "In" }],
-    outputs: [{ name: "out", dataType: "particle", label: "Out" }],
-  },
   color: {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
     outputs: [{ name: "out", dataType: "particle", label: "Out" }],
@@ -379,7 +372,6 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
 export const GENERIC_NODE_ACCEPTS: Record<string, PipelineDataType[]> = {
   filter: ["particle", "bond"],
   modify: ["particle", "bond"],
-  supercell: ["particle"],
   color: ["particle"],
   representation: ["particle"],
 };
@@ -448,19 +440,6 @@ export interface ModifyParams {
   opacity: number;
 }
 
-export interface SupercellParams {
-  type: "supercell";
-  /**
-   * Number of unit-cell repeats along the a, b, c cell axes (each ≥ 1).
-   *
-   * This is pure translational replication. Crystallographic symmetry
-   * expansion (asymmetric unit → full cell) happens automatically when the CIF
-   * is parsed, so the incoming snapshot already holds the full unit cell.
-   */
-  na: number;
-  nb: number;
-  nc: number;
-}
 
 export interface ColorParams {
   type: "color";
@@ -558,7 +537,6 @@ export type PipelineNodeParams =
   | ViewportParams
   | FilterParams
   | ModifyParams
-  | SupercellParams
   | ColorParams
   | RepresentationParams
   | LabelGeneratorParams
@@ -595,13 +573,6 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         type,
         scale: 1.0,
         opacity: 1.0,
-      };
-    case "supercell":
-      return {
-        type,
-        na: 1,
-        nb: 1,
-        nc: 1,
       };
     case "color":
       return {

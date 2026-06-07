@@ -267,41 +267,6 @@ export class Modify extends PipelineNode {
   }
 }
 
-/**
- * Replicate the unit cell across an na×nb×nc grid (a true supercell).
- *
- * Crystallographic symmetry expansion happens automatically when a CIF is
- * loaded, so this node only does translational replication.
- *
- * Ports:
- *   inp.particle — atom data in
- *   out.particle — replicated atom data
- */
-export class Supercell extends PipelineNode {
-  readonly nodeType = "supercell";
-  protected readonly _outPorts = { particle: "out" };
-  protected readonly _inpPorts = { particle: "in" };
-
-  public na: number;
-  public nb: number;
-  public nc: number;
-
-  constructor({ na = 1, nb = 1, nc = 1 }: { na?: number; nb?: number; nc?: number } = {}) {
-    super();
-    this.na = na;
-    this.nb = nb;
-    this.nc = nc;
-  }
-
-  _toSerializedParams() {
-    return {
-      type: this.nodeType,
-      na: this.na,
-      nb: this.nb,
-      nc: this.nc,
-    };
-  }
-}
 
 /**
  * Per-stream coloring (Ovito-style). The Viewport reads color overrides
