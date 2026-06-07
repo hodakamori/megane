@@ -136,6 +136,13 @@ export function createDefaultPipeline(): {
       {
         id: "e8",
         source: "traj-1",
+        target: "replicate-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e9",
+        source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "trajectory",
         targetHandle: "trajectory",
@@ -280,6 +287,13 @@ export function createMinimalStructurePipeline(): {
       {
         id: "e8",
         source: "traj-1",
+        target: "replicate-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e9",
+        source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "trajectory",
         targetHandle: "trajectory",
@@ -401,6 +415,13 @@ export function createEmptyPipeline(): {
       {
         id: "e7",
         source: "loader-1",
+        target: "replicate-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e8",
+        source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "trajectory",
         targetHandle: "trajectory",
