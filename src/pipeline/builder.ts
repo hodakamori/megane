@@ -267,7 +267,6 @@ export class Modify extends PipelineNode {
   }
 }
 
-
 /**
  * Per-stream coloring (Ovito-style). The Viewport reads color overrides
  * directly off the particle stream, so multiple Color nodes can stack.
