@@ -282,21 +282,28 @@ export class ImpostorBondMesh {
    * topology buffers.
    */
   recomputeColorsFromAtomBuffer(atomColors: Float32Array, snapshot: Snapshot): void {
-    const { nBonds, bonds, bondOrders } = snapshot;
+    const { nBonds, bonds, bondOrders, elements } = snapshot;
+    // The atom color buffer only covers real atoms. PBC half-bonds reference
+    // ghost atoms appended past that range (index >= nRealAtoms); reading them
+    // from `atomColors` yields undefined → NaN → black. Fall back to the ghost
+    // atom's element color, which `processPbcBonds` set on the extended
+    // `elements` array, so boundary stubs keep their proper CPK color.
+    const nRealAtoms = atomColors.length / 3;
+    const endpointColor = (idx: number): [number, number, number] => {
+      if (idx < nRealAtoms) {
+        const i3 = idx * 3;
+        return [atomColors[i3], atomColors[i3 + 1], atomColors[i3 + 2]];
+      }
+      return getColor(elements[idx]);
+    };
     let idx = 0;
     for (let i = 0; i < nBonds; i++) {
       const ai = bonds[i * 2];
       const bi = bonds[i * 2 + 1];
       const order = bondOrders ? bondOrders[i] : BOND_SINGLE;
 
-      const ai3 = ai * 3;
-      const bi3 = bi * 3;
-      const ar = atomColors[ai3];
-      const ag = atomColors[ai3 + 1];
-      const ab = atomColors[ai3 + 2];
-      const br = atomColors[bi3];
-      const bg = atomColors[bi3 + 1];
-      const bb = atomColors[bi3 + 2];
+      const [ar, ag, ab] = endpointColor(ai);
+      const [br, bg, bb] = endpointColor(bi);
 
       let perBond = 1;
       if (order === BOND_DOUBLE || order === BOND_AROMATIC) perBond = 2;

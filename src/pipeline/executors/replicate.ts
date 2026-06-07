@@ -7,6 +7,7 @@ import type {
   TrajectoryData,
   FrameProvider,
 } from "../types";
+import { invert3x3 } from "./mathUtils";
 
 /**
  * Replicate node — OVITO/VESTA-style supercell builder.
@@ -100,16 +101,61 @@ export function executeReplicate(
     }
   }
 
-  // Bonds: tile with an index offset of img·nAtomsOld per image.
+  // Bonds: image-aware tiling (OVITO/VESTA-style supercell connectivity).
+  //
+  // A unit-cell bond (i,j) that crosses a periodic boundary actually connects
+  // atom i to the *periodic image* of j shifted by an integer lattice
+  // combination g = round(B⁻¹·(posⱼ−posᵢ)). After replication that partner is
+  // usually a real atom in a neighboring image, so bond (i@I) must point at
+  // (j@(I−g)) rather than blindly at (j@I). For g=0 (intra-cell) bonds this
+  // reduces to the old naive tiling. Boundary bonds that fall outside the
+  // supercell wrap around (positive modulo); their endpoints end up a full
+  // supercell apart, which the downstream add_bond `processPbcBonds` step then
+  // splits into ghost-atom stubs — exactly as it does for a single cell.
+  //
+  // Per-bond integer shift g, derived from the *original* (unit-cell) box.
+  const boxInv = invert3x3(box);
+  const bondShifts = new Int32Array(nBondsOld * 3);
+  if (boxInv) {
+    for (let bd = 0; bd < nBondsOld; bd++) {
+      const i = src.bonds[bd * 2];
+      const j = src.bonds[bd * 2 + 1];
+      const dx = src.positions[j * 3] - src.positions[i * 3];
+      const dy = src.positions[j * 3 + 1] - src.positions[i * 3 + 1];
+      const dz = src.positions[j * 3 + 2] - src.positions[i * 3 + 2];
+      // Fractional displacement (row-major inverse, matching addBond.ts).
+      const sx = boxInv[0] * dx + boxInv[3] * dy + boxInv[6] * dz;
+      const sy = boxInv[1] * dx + boxInv[4] * dy + boxInv[7] * dz;
+      const sz = boxInv[2] * dx + boxInv[5] * dy + boxInv[8] * dz;
+      bondShifts[bd * 3] = Math.round(sx);
+      bondShifts[bd * 3 + 1] = Math.round(sy);
+      bondShifts[bd * 3 + 2] = Math.round(sz);
+    }
+  }
+  // Flatten an image triple to its atom-block index (matches the offsets loop:
+  // ix outer (nx), iy (ny), iz inner (nz)).
+  const imageIndex = (ix: number, iy: number, iz: number) => (ix * ny + iy) * nz + iz;
+  const posMod = (v: number, n: number) => ((v % n) + n) % n;
+
   const bonds = new Uint32Array(nBondsOld * total * 2);
   const bondOrders = src.bondOrders ? new Uint8Array(nBondsOld * total) : null;
-  for (let m = 0; m < total; m++) {
-    const atomOffset = m * nAtomsOld;
-    const bondBase = m * nBondsOld;
-    for (let bd = 0; bd < nBondsOld; bd++) {
-      bonds[(bondBase + bd) * 2] = src.bonds[bd * 2] + atomOffset;
-      bonds[(bondBase + bd) * 2 + 1] = src.bonds[bd * 2 + 1] + atomOffset;
-      if (bondOrders) bondOrders[bondBase + bd] = src.bondOrders![bd];
+  for (let ix = 0; ix < nx; ix++) {
+    for (let iy = 0; iy < ny; iy++) {
+      for (let iz = 0; iz < nz; iz++) {
+        const m = imageIndex(ix, iy, iz);
+        const srcOffset = m * nAtomsOld;
+        const bondBase = m * nBondsOld;
+        for (let bd = 0; bd < nBondsOld; bd++) {
+          const gx = bondShifts[bd * 3];
+          const gy = bondShifts[bd * 3 + 1];
+          const gz = bondShifts[bd * 3 + 2];
+          const jImage = imageIndex(posMod(ix - gx, nx), posMod(iy - gy, ny), posMod(iz - gz, nz));
+          const dstOffset = jImage * nAtomsOld;
+          bonds[(bondBase + bd) * 2] = src.bonds[bd * 2] + srcOffset;
+          bonds[(bondBase + bd) * 2 + 1] = src.bonds[bd * 2 + 1] + dstOffset;
+          if (bondOrders) bondOrders[bondBase + bd] = src.bondOrders![bd];
+        }
+      }
     }
   }
 
