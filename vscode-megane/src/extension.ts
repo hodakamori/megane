@@ -189,11 +189,30 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
       // Send raw bytes (not decoded text) so binary formats like .traj survive
       // the trip into the webview. The webview builds a File and the shared
       // parser dispatches by extension to either text() or arrayBuffer().
+      const filename = path.basename(document.uri.fsPath);
+      let topBytes: number[] | null = null;
+      let topFilename: string | null = null;
+      if (filename.toLowerCase().endsWith(".gro")) {
+        const stem = filename.slice(0, filename.lastIndexOf("."));
+        const topName = stem + ".top";
+        const topUri = vscode.Uri.file(
+          path.join(path.dirname(document.uri.fsPath), topName),
+        );
+        try {
+          const topData = await vscode.workspace.fs.readFile(topUri);
+          topBytes = Array.from(topData);
+          topFilename = topName;
+        } catch {
+          // .top file not found — proceed without topology bonds
+        }
+      }
       payload = {
         type: "loadFile",
         contentBytes: Array.from(fileData),
-        filename: path.basename(document.uri.fsPath),
+        filename,
         wasmBytes: Array.from(wasmData),
+        topBytes,
+        topFilename,
       };
     } catch (err) {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };

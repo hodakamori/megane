@@ -1,5 +1,6 @@
 import { ReactWidget } from "@jupyterlab/ui-components";
 import type { DocumentRegistry } from "@jupyterlab/docregistry";
+import type { Contents } from "@jupyterlab/services";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
@@ -33,6 +34,7 @@ type ActivationSubscribe = (cb: () => void) => () => void;
 
 interface DocBodyProps {
   context: DocumentRegistry.Context;
+  contents: Contents.IManager;
   subscribeActivation: ActivationSubscribe;
   onFrameChange?: (frame: number) => void;
   onSelectionChange?: (selection: SelectionState) => void;
@@ -60,6 +62,7 @@ function ThemeSync() {
 
 function DocBody({
   context,
+  contents,
   subscribeActivation,
   onFrameChange,
   onSelectionChange,
@@ -118,7 +121,28 @@ function DocBody({
             );
           }
         } else {
-          await local.loadFile(file);
+          // For .gro files, probe for a sibling .top file with the same stem.
+          let topFile: File | undefined;
+          if (ext === ".gro") {
+            const stem = filename.slice(0, filename.lastIndexOf("."));
+            const topName = stem + ".top";
+            const dir = context.path.includes("/")
+              ? context.path.slice(0, context.path.lastIndexOf("/"))
+              : "";
+            const topPath = dir ? `${dir}/${topName}` : topName;
+            try {
+              const model = await contents.get(topPath, {
+                content: true,
+                format: "text",
+              });
+              if (model.content) {
+                topFile = new File([String(model.content)], topName);
+              }
+            } catch {
+              // .top file not present — proceed without topology bonds
+            }
+          }
+          await local.loadFile(file, topFile);
         }
         if (token.cancelled) return;
         cachedRef.current = capturePipelineStore(usePipelineStore.getState());
@@ -250,7 +274,10 @@ export class MeganeReactView extends ReactWidget {
     this._measurementSub.emit(measurement);
   };
 
-  constructor(private readonly context: DocumentRegistry.Context) {
+  constructor(
+    private readonly context: DocumentRegistry.Context,
+    private readonly contents: Contents.IManager,
+  ) {
     super();
     this.addClass("megane-jupyter-doc");
   }
@@ -278,6 +305,7 @@ export class MeganeReactView extends ReactWidget {
     return (
       <DocBody
         context={this.context}
+        contents={this.contents}
         subscribeActivation={this.subscribeActivation}
         onFrameChange={this._handleFrameChange}
         onSelectionChange={this._handleSelectionChange}

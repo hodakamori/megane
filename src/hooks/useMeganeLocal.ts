@@ -14,7 +14,7 @@ import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
 import { usePipelineStore } from "../pipeline/store";
 import { createMinimalStructurePipeline } from "../pipeline/defaults";
-import { syncAddBondSourceForLoader } from "../pipeline/openFile";
+import { syncAddBondSourceForLoader, applyTopologyFile } from "../pipeline/openFile";
 import { getLayoutedElements } from "../pipeline/layout";
 import type {
   Snapshot,
@@ -35,7 +35,7 @@ export interface MeganeLocalState {
   currentFrameRef: React.MutableRefObject<number>;
   pdbFileName: string | null;
   xtcFileName: string | null;
-  loadFile: (pdb: File) => Promise<void>;
+  loadFile: (pdb: File, topFile?: File) => Promise<void>;
   loadText: (text: string, fileName?: string) => Promise<StructureParseResult>;
   loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
@@ -254,11 +254,21 @@ export function useMeganeLocal(): MeganeLocalState {
   );
 
   const loadFile = useCallback(
-    async (pdb: File) => {
+    async (pdb: File, topFile?: File) => {
       const result = await parseStructureFile(pdb);
       applyResult(result, pdb.name);
       setPdbFileName(pdb.name);
       setXtcFileName(result.meta ? "PDB models" : null);
+
+      // applyResult calls syncAddBondSourceForLoader (sets "distance" for GRO).
+      // If the host pre-loaded a sibling .top, overwrite with topology bonds.
+      if (topFile) {
+        const store = usePipelineStore.getState();
+        const loaderNode = store.nodes.find((n) => n.type === "load_structure");
+        if (loaderNode) {
+          await applyTopologyFile(store, loaderNode.id, topFile);
+        }
+      }
     },
     [applyResult],
   );

@@ -5,6 +5,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // parsing is covered by Rust tests and E2E specs.
 vi.mock("@/parsers/structure", () => ({
   parseStructureFile: vi.fn(),
+  parseTopBonds: vi.fn(),
+  parsePsfBonds: vi.fn(),
 }));
 vi.mock("@/parsers/xtc", () => ({
   parseXTCFile: vi.fn(),
@@ -13,7 +15,8 @@ vi.mock("@/parsers/xtc", () => ({
   parseNetCDFFile: vi.fn(),
 }));
 
-import { parseStructureFile } from "@/parsers/structure";
+import { parseStructureFile, parseTopBonds, parsePsfBonds } from "@/parsers/structure";
+import { applyTopologyFile } from "@/pipeline/openFile";
 import {
   parseXTCFile,
   parseLammpstrjFile,
@@ -24,6 +27,8 @@ import { usePipelineStore } from "@/pipeline/store";
 import type { Snapshot, Frame, TrajectoryMeta } from "@/types";
 
 const mockParseStructureFile = vi.mocked(parseStructureFile);
+const mockParseTopBonds = vi.mocked(parseTopBonds);
+const mockParsePsfBonds = vi.mocked(parsePsfBonds);
 const mockParseXTCFile = vi.mocked(parseXTCFile);
 const mockParseLammpstrjFile = vi.mocked(parseLammpstrjFile);
 const mockParseDCDFile = vi.mocked(parseDCDFile);
@@ -61,6 +66,8 @@ beforeEach(() => {
   // `openFile`.
   usePipelineStore.getState().reset();
   mockParseStructureFile.mockReset();
+  mockParseTopBonds.mockReset();
+  mockParsePsfBonds.mockReset();
   mockParseXTCFile.mockReset();
   mockParseLammpstrjFile.mockReset();
   mockParseDCDFile.mockReset();
@@ -468,6 +475,97 @@ describe("usePipelineStore.openFile — error cases", () => {
     await expect(usePipelineStore.getState().openFile(file)).rejects.toThrow(
       /unsupported file type/i,
     );
+  });
+});
+
+describe("applyTopologyFile", () => {
+  function findAddBondParams(loaderId: string): Record<string, unknown> | undefined {
+    const state = usePipelineStore.getState();
+    const passThrough = new Set(["replicate", "filter", "modify", "color", "representation"]);
+    const visited = new Set<string>([loaderId]);
+    const stack: string[] = [loaderId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      for (const e of state.edges) {
+        if (e.source !== id) continue;
+        const sh = e.sourceHandle ?? "particle";
+        if (sh !== "particle" && sh !== "out") continue;
+        const node = state.nodes.find((n) => n.id === e.target);
+        if (node?.type === "add_bond") {
+          return node.data.params as Record<string, unknown>;
+        }
+        if (node && passThrough.has(node.type ?? "") && !visited.has(node.id)) {
+          visited.add(node.id);
+          stack.push(node.id);
+        }
+      }
+    }
+    return undefined;
+  }
+
+  async function openGro(): Promise<string> {
+    mockParseStructureFile.mockResolvedValueOnce({
+      snapshot: makeSnapshot(3),
+      frames: [],
+      meta: null,
+      labels: null,
+      vectorChannels: [],
+    });
+    await usePipelineStore.getState().openFile(new File(["<gro>"], "water.gro"), {
+      mode: "replace",
+    });
+    const loader = usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")!;
+    return loader.id;
+  }
+
+  it("sets bondSource:'file' and bondFileName on AddBond when topFile is .top", async () => {
+    const mockBonds = new Uint32Array([0, 1, 1, 2]);
+    mockParseTopBonds.mockResolvedValueOnce(mockBonds);
+
+    const loaderId = await openGro();
+
+    const topFile = new File(["[ bonds ]\n0 1\n1 2\n"], "water.top");
+    await applyTopologyFile(usePipelineStore.getState(), loaderId, topFile);
+
+    const params = findAddBondParams(loaderId);
+    expect(params?.bondSource).toBe("file");
+    expect(params?.bondFileName).toBe("water.top");
+    expect(params?.bondFileData).toEqual(mockBonds);
+    expect(mockParseTopBonds).toHaveBeenCalledWith(expect.any(String), 0xffffffff);
+    expect(mockParsePsfBonds).not.toHaveBeenCalled();
+  });
+
+  it("sets bondSource:'file' and calls parsePsfBonds for .psf file", async () => {
+    const mockBonds = new Uint32Array([0, 1]);
+    mockParsePsfBonds.mockResolvedValueOnce(mockBonds);
+
+    const loaderId = await openGro();
+
+    const psfFile = new File(["PSF content"], "water.psf");
+    await applyTopologyFile(usePipelineStore.getState(), loaderId, psfFile);
+
+    const params = findAddBondParams(loaderId);
+    expect(params?.bondSource).toBe("file");
+    expect(params?.bondFileName).toBe("water.psf");
+    expect(params?.bondFileData).toEqual(mockBonds);
+    expect(mockParsePsfBonds).toHaveBeenCalledWith(expect.any(String), 0xffffffff);
+    expect(mockParseTopBonds).not.toHaveBeenCalled();
+  });
+
+  it("overwrites the 'distance' default set by syncAddBondSourceForLoader", async () => {
+    // syncAddBondSourceForLoader sets "distance" for .gro; applyTopologyFile must override it.
+    const mockBonds = new Uint32Array([0, 1]);
+    mockParseTopBonds.mockResolvedValueOnce(mockBonds);
+
+    const loaderId = await openGro();
+
+    // Confirm the default is "distance" before applying topology
+    expect(findAddBondParams(loaderId)?.bondSource).toBe("distance");
+
+    const topFile = new File(["[ bonds ]\n0 1\n"], "water.top");
+    await applyTopologyFile(usePipelineStore.getState(), loaderId, topFile);
+
+    expect(findAddBondParams(loaderId)?.bondSource).toBe("file");
   });
 });
 

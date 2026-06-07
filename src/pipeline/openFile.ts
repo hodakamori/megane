@@ -23,14 +23,14 @@
 
 import type { StoreApi } from "zustand";
 import type { Node, Edge } from "@xyflow/react";
-import { parseStructureFile } from "../parsers/structure";
+import { parseStructureFile, parseTopBonds, parsePsfBonds } from "../parsers/structure";
 import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "../parsers/xtc";
 import { createMinimalStructurePipeline } from "./defaults";
 import { getLayoutedElements } from "./layout";
 import type { PipelineNodeData } from "./execute";
 import type { PipelineStore } from "./store";
 import type { SerializedPipeline } from "./types";
-import type { Snapshot } from "../types";
+import type { Snapshot, BondSource } from "../types";
 
 export type OpenFileMode = "replace" | "merge";
 
@@ -338,6 +338,54 @@ async function openPipeline(
     state.setFileFrames(frames, meta ?? null);
     state.updateNodeParams(node.id, { fileName: name });
     break;
+  }
+}
+
+/**
+ * Parse a topology file (.top or .psf) and apply the resulting bonds to every
+ * AddBond node that is downstream of `loaderId` in the current graph.
+ *
+ * This is the programmatic equivalent of the user dropping a .top file onto
+ * the AddBond node in the UI.  Call it *after* `syncAddBondSourceForLoader`
+ * so it overwrites the format-based default ("distance" for GRO).
+ */
+export async function applyTopologyFile(
+  state: PipelineStore,
+  loaderId: string,
+  topFile: File,
+): Promise<void> {
+  const text = await readBlobAsText(topFile);
+  const lower = topFile.name.toLowerCase();
+  const bondIndices = lower.endsWith(".psf")
+    ? await parsePsfBonds(text, 0xffffffff)
+    : await parseTopBonds(text, 0xffffffff);
+
+  const PASS_THROUGH = new Set(["replicate", "filter", "modify", "color", "representation"]);
+  const visited = new Set<string>([loaderId]);
+  const stack: string[] = [loaderId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    for (const edge of state.edges) {
+      if (edge.source !== id) continue;
+      const sh = edge.sourceHandle ?? "particle";
+      if (sh !== "particle" && sh !== "out") continue;
+      const targetNode = state.nodes.find((n) => n.id === edge.target);
+      if (!targetNode) continue;
+      if (targetNode.type === "add_bond") {
+        if ((edge.targetHandle ?? "particle") === "particle") {
+          state.updateNodeParams(targetNode.id, {
+            bondSource: "file" as BondSource,
+            bondFileName: topFile.name,
+            bondFileData: bondIndices,
+          });
+        }
+      } else if (PASS_THROUGH.has(targetNode.type ?? "") && !visited.has(targetNode.id)) {
+        if ((edge.targetHandle ?? "particle") === "particle" || edge.targetHandle === "in") {
+          visited.add(targetNode.id);
+          stack.push(targetNode.id);
+        }
+      }
+    }
   }
 }
 

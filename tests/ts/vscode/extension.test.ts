@@ -308,6 +308,52 @@ describe("MeganeEditorProvider — structureViewer", () => {
       contentBytes: [72, 73, 74],
       filename: "sample.pdb",
       wasmBytes: [1, 2, 3],
+      topBytes: null,
+      topFilename: null,
+    });
+  });
+
+  it("includes topBytes and topFilename when a sibling .top file exists alongside a .gro", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile
+      .mockResolvedValueOnce(new Uint8Array([10, 20, 30])) // .gro doc bytes
+      .mockResolvedValueOnce(new Uint8Array([1, 2, 3]))    // wasm bytes
+      .mockResolvedValueOnce(new Uint8Array([40, 50, 60])); // .top bytes
+
+    const doc = { uri: VscodeUri.file("/work/water.gro"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+    fireMessage({ type: "ready" });
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "loadFile",
+      contentBytes: [10, 20, 30],
+      filename: "water.gro",
+      wasmBytes: [1, 2, 3],
+      topBytes: [40, 50, 60],
+      topFilename: "water.top",
+    });
+  });
+
+  it("sets topBytes/topFilename to null when no sibling .top exists for a .gro", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile
+      .mockResolvedValueOnce(new Uint8Array([10, 20, 30])) // .gro doc bytes
+      .mockResolvedValueOnce(new Uint8Array([1, 2, 3]))    // wasm bytes
+      .mockRejectedValueOnce(new Error("FileNotFound"));    // .top not present
+
+    const doc = { uri: VscodeUri.file("/work/water.gro"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+    fireMessage({ type: "ready" });
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      type: "loadFile",
+      contentBytes: [10, 20, 30],
+      filename: "water.gro",
+      wasmBytes: [1, 2, 3],
+      topBytes: null,
+      topFilename: null,
     });
   });
 

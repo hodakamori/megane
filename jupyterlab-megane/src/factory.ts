@@ -8,10 +8,17 @@ export class MeganeDocFactory extends ABCWidgetFactory<
   IDocumentWidget<MeganeReactView>,
   DocumentRegistry.IModel
 > {
+  constructor(
+    options: DocumentRegistry.IWidgetFactoryOptions<IDocumentWidget<MeganeReactView>>,
+    private readonly contents: Contents.IManager,
+  ) {
+    super(options);
+  }
+
   protected createNewWidget(
     context: DocumentRegistry.Context,
   ): IDocumentWidget<MeganeReactView> {
-    const content = new MeganeReactView(context);
+    const content = new MeganeReactView(context, this.contents);
     const widget = new DocumentWidget({ content, context });
     widget.title.iconClass = "jp-MaterialIcon jp-FileIcon";
     return widget;

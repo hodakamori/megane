@@ -5,8 +5,8 @@ vi.mock("../../../jupyterlab-megane/src/MeganeDocWidget", () => ({
   // Use a regular function (not an arrow) so the mock can be invoked with `new`.
   // vitest 4 calls a mock's implementation as a constructor under `new`, and
   // arrow functions are not constructable.
-  MeganeReactView: vi.fn().mockImplementation(function (context: unknown) {
-    return { kind: "structure", context };
+  MeganeReactView: vi.fn().mockImplementation(function (context: unknown, contents: unknown) {
+    return { kind: "structure", context, contents };
   }),
 }));
 
@@ -58,20 +58,20 @@ beforeEach(() => {
 });
 
 describe("MeganeDocFactory", () => {
-  it("constructs without throwing when given ABCWidgetFactory options", () => {
-    expect(() => new MeganeDocFactory(factoryOptions)).not.toThrow();
+  it("constructs without throwing when given ABCWidgetFactory options and contents", () => {
+    expect(() => new MeganeDocFactory(factoryOptions, fakeContents)).not.toThrow();
   });
 
-  it("createNewWidget instantiates MeganeReactView with the context arg", () => {
-    const factory = new MeganeDocFactory(factoryOptions);
+  it("createNewWidget instantiates MeganeReactView with context and contents", () => {
+    const factory = new MeganeDocFactory(factoryOptions, fakeContents);
     (factory as unknown as Exposed).createNewWidget(fakeContext);
 
     expect(MeganeReactView).toHaveBeenCalledTimes(1);
-    expect(MeganeReactView).toHaveBeenCalledWith(fakeContext);
+    expect(MeganeReactView).toHaveBeenCalledWith(fakeContext, fakeContents);
   });
 
   it("createNewWidget returns a DocumentWidget with the megane iconClass", () => {
-    const factory = new MeganeDocFactory(factoryOptions);
+    const factory = new MeganeDocFactory(factoryOptions, fakeContents);
     const widget = (factory as unknown as Exposed<{ title: { iconClass: string } }>)
       .createNewWidget(fakeContext);
 
@@ -109,7 +109,7 @@ describe("MeganePipelineDocFactory", () => {
 
 describe("MeganeDocFactory vs MeganePipelineDocFactory", () => {
   it("produce wrappers around different widget classes", () => {
-    const structureFactory = new MeganeDocFactory(factoryOptions);
+    const structureFactory = new MeganeDocFactory(factoryOptions, fakeContents);
     const pipelineFactory = new MeganePipelineDocFactory(factoryOptions, fakeContents);
 
     (structureFactory as unknown as Exposed).createNewWidget(fakeContext);
