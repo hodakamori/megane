@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-07
+
 ### Added
 
 - **Adjustable VDW bond threshold.** The AddBond node's distance (VDW) mode now exposes a "Threshold" slider that scales the bonding cutoff `(vdw_i + vdw_j) * scale`. Loosen it to capture longer bonds or tighten it to drop spurious ones, per system. Defaults to 0.6, so existing pipelines render identically unless adjusted (#459)
