@@ -69,7 +69,18 @@ export function buildModelList(env: Env): string[] {
 }
 export const MAX_TOKENS = 2048;
 export const MAX_MESSAGES = 10;
+/**
+ * Length cap for user/assistant messages — these carry untrusted input
+ * from the public, so keep them tight.
+ */
 export const MAX_MESSAGE_LENGTH = 8000;
+/**
+ * Length cap for the system message. The frontend's generated system
+ * prompt embeds the full pipeline schema plus the skill templates and is
+ * legitimately large (~13k chars), so it gets a roomier limit than the
+ * untrusted user/assistant messages above.
+ */
+export const MAX_SYSTEM_MESSAGE_LENGTH = 24000;
 export const PER_MINUTE_LIMIT = 3;
 export const PER_DAY_LIMIT = 20;
 
@@ -223,7 +234,8 @@ export function sanitizeMessages(payload: unknown): ChatMessage[] | null {
     const role = (entry as Record<string, unknown>).role;
     const content = (entry as Record<string, unknown>).content;
     if (role !== "system" && role !== "user" && role !== "assistant") return null;
-    if (typeof content !== "string" || content.length === 0 || content.length > MAX_MESSAGE_LENGTH) {
+    const maxLength = role === "system" ? MAX_SYSTEM_MESSAGE_LENGTH : MAX_MESSAGE_LENGTH;
+    if (typeof content !== "string" || content.length === 0 || content.length > maxLength) {
       return null;
     }
     sanitized.push({ role, content });

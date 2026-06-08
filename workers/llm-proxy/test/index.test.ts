@@ -108,9 +108,27 @@ describe("sanitizeMessages", () => {
     expect(sanitizeMessages({ messages: [{ role: "user", content: "" }] })).toBeNull();
   });
 
-  it("rejects content longer than the maximum length", () => {
+  it("rejects user content longer than the maximum length", () => {
     const huge = "x".repeat(8001);
     expect(sanitizeMessages({ messages: [{ role: "user", content: huge }] })).toBeNull();
+  });
+
+  it("allows a large system message but caps it at the system limit", () => {
+    // A system prompt over the user limit (8000) but within the system
+    // limit (24000) must be accepted — the inlined skill templates push
+    // the generated prompt to ~13k chars.
+    const bigSystem = "s".repeat(13000);
+    const ok = sanitizeMessages({
+      messages: [
+        { role: "system", content: bigSystem },
+        { role: "user", content: "hi" },
+      ],
+    });
+    expect(ok).not.toBeNull();
+    expect(ok?.[0].content.length).toBe(13000);
+
+    const tooBigSystem = "s".repeat(24001);
+    expect(sanitizeMessages({ messages: [{ role: "system", content: tooBigSystem }] })).toBeNull();
   });
 
   it("rejects malformed message entries", () => {
