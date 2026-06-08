@@ -1,0 +1,8 @@
+# Copy this file to .dev.vars (gitignored) for local `wrangler dev` testing.
+# .dev.vars overrides [vars] in wrangler.toml during local development only.
+
+# Get a free key at https://openrouter.ai/keys
+OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx
+
+# Match the origin the Vite dev server runs on (default http://localhost:5173)
+ALLOWED_ORIGIN=http://localhost:5173
