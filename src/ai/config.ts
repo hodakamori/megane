@@ -5,7 +5,7 @@
 
 import { create } from "zustand";
 
-export type AIProvider = "anthropic" | "openai";
+export type AIProvider = "anthropic" | "openai" | "demo";
 
 export interface AIConfig {
   provider: AIProvider;
@@ -22,7 +22,24 @@ export const PROVIDER_MODELS: Record<AIProvider, { value: string; label: string 
     { value: "gpt-4o", label: "GPT-4o" },
     { value: "gpt-4o-mini", label: "GPT-4o Mini" },
   ],
+  demo: [{ value: "demo", label: "Free Demo (no API key needed)" }],
 };
+
+/**
+ * The "demo" provider proxies through a Cloudflare Worker that holds its
+ * own server-side API key, so it never needs one from the user.
+ */
+export function providerRequiresApiKey(provider: AIProvider): boolean {
+  return provider !== "demo";
+}
+
+/**
+ * The demo provider is only usable when the proxy URL was injected at
+ * build time (currently only the docs demo build sets this).
+ */
+export function isDemoProviderAvailable(): boolean {
+  return Boolean(import.meta.env.VITE_LLM_PROXY_URL);
+}
 
 const STORAGE_KEY = "megane-ai-config";
 

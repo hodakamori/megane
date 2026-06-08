@@ -1,0 +1,18 @@
+name = "megane-llm-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Origin allowed to call this proxy. CORS and the explicit Origin check
+# in src/index.ts both key off this value.
+[vars]
+ALLOWED_ORIGIN = "https://hodakamori.github.io"
+
+# Created once via `wrangler kv namespace create RATE_LIMIT_KV`; replace
+# the id below with the value it prints.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# OPENROUTER_API_KEY is a secret — set it with:
+#   wrangler secret put OPENROUTER_API_KEY
+# Never commit it to wrangler.toml or [vars].

@@ -5,7 +5,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAIConfigStore, PROVIDER_MODELS } from "../ai/config";
+import {
+  useAIConfigStore,
+  PROVIDER_MODELS,
+  providerRequiresApiKey,
+  isDemoProviderAvailable,
+} from "../ai/config";
 import type { AIProvider } from "../ai/config";
 import { generatePipeline, extractPipelineJSON } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
@@ -209,7 +214,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     const trimmed = input.trim();
     if (!trimmed || isStreaming) return;
 
-    if (!apiKey) {
+    if (providerRequiresApiKey(provider) && !apiKey) {
       setShowConfig(true);
       setMessages((prev) => [
         ...prev,
@@ -309,6 +314,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
               onChange={(e) => setProvider(e.target.value as AIProvider)}
               style={configSelectStyle}
             >
+              {isDemoProviderAvailable() && <option value="demo">Free Demo</option>}
               <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
             </select>
@@ -327,16 +333,24 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
               ))}
             </select>
           </div>
-          <div style={configRowStyle}>
-            <span style={configLabelStyle}>API Key</span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
-              style={configInputStyle}
-            />
-          </div>
+          {providerRequiresApiKey(provider) ? (
+            <div style={configRowStyle}>
+              <span style={configLabelStyle}>API Key</span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
+                style={configInputStyle}
+              />
+            </div>
+          ) : (
+            <div style={{ color: "#64748b", fontSize: 11, fontStyle: "italic" }}>
+              The free demo runs through megane&apos;s shared proxy — no API key needed. It uses a
+              rate-limited free-tier model, so responses may be slower or lower quality than your
+              own API key.
+            </div>
+          )}
         </div>
       )}
 

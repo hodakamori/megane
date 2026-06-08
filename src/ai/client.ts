@@ -54,6 +54,8 @@ export async function generatePipeline(
       onChunk,
       signal,
     );
+  } else if (config.provider === "demo") {
+    return streamDemoProxy(systemPrompt, userMessage, onChunk, signal);
   } else {
     return streamOpenAI(config, systemPrompt, userMessage, onChunk, signal);
   }
@@ -276,7 +278,60 @@ async function streamOpenAI(
   });
 }
 
-// ─── Shared SSE reader (used by OpenAI path) ────────────────────────
+// ─── Demo proxy (no API key required) ────────────────────────────────
+
+/**
+ * Stream a chat completion through the docs-demo Cloudflare Worker proxy.
+ * The proxy holds its own OpenRouter API key and forwards an
+ * OpenAI-compatible streamed response, so we can reuse `readSSE`.
+ */
+async function streamDemoProxy(
+  systemPrompt: string,
+  userMessage: string,
+  onChunk: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const proxyUrl = import.meta.env.VITE_LLM_PROXY_URL;
+  if (!proxyUrl) {
+    throw new Error("The free demo is not available in this build.");
+  }
+
+  const response = await fetch(proxyUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Demo proxy error (${response.status}): ${body}`);
+  }
+
+  return readSSE(response, (_event, data) => {
+    if (data === "[DONE]") return null;
+    try {
+      const parsed = JSON.parse(data);
+      const text = parsed.choices?.[0]?.delta?.content;
+      if (text) {
+        onChunk(text);
+        return text;
+      }
+    } catch {
+      // skip unparseable lines
+    }
+    return null;
+  });
+}
+
+// ─── Shared SSE reader (used by OpenAI and demo-proxy paths) ────────
 
 async function readSSE(
   response: Response,

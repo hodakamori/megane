@@ -39,6 +39,10 @@ docs/node_modules
 docs/.docusaurus/
 docs/build/
 docs/docs/api/python/
+
+# Cloudflare Worker (LLM proxy)
+workers/llm-proxy/.wrangler/
+workers/llm-proxy/.dev.vars
 docs/docs/api/typescript/
 docs/notebooks/
 docs/public/notebooks/

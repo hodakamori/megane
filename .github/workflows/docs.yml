@@ -62,6 +62,8 @@ jobs:
         run: npm run build:wasm
 
       - name: Build demo app for docs
+        env:
+          VITE_LLM_PROXY_URL: ${{ vars.LLM_PROXY_URL }}
         run: npx vite build --config vite.docs-demo.config.ts
 
       - name: Generate demo data

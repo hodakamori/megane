@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const STORAGE_KEY = "megane-ai-config";
 
@@ -77,17 +77,41 @@ describe("useAIConfigStore", () => {
 });
 
 describe("PROVIDER_MODELS", () => {
-  it("declares both anthropic and openai with non-empty model lists", async () => {
+  it("declares anthropic, openai, and demo with non-empty model lists", async () => {
     const { PROVIDER_MODELS } = await import("@/ai/config");
-    expect(PROVIDER_MODELS.anthropic.length).toBeGreaterThan(0);
-    expect(PROVIDER_MODELS.openai.length).toBeGreaterThan(0);
-    for (const model of PROVIDER_MODELS.anthropic) {
-      expect(model.value).toBeTruthy();
-      expect(model.label).toBeTruthy();
+    for (const provider of ["anthropic", "openai", "demo"] as const) {
+      expect(PROVIDER_MODELS[provider].length).toBeGreaterThan(0);
+      for (const model of PROVIDER_MODELS[provider]) {
+        expect(model.value).toBeTruthy();
+        expect(model.label).toBeTruthy();
+      }
     }
-    for (const model of PROVIDER_MODELS.openai) {
-      expect(model.value).toBeTruthy();
-      expect(model.label).toBeTruthy();
-    }
+  });
+});
+
+describe("providerRequiresApiKey", () => {
+  it("requires an API key for anthropic and openai but not demo", async () => {
+    const { providerRequiresApiKey } = await import("@/ai/config");
+    expect(providerRequiresApiKey("anthropic")).toBe(true);
+    expect(providerRequiresApiKey("openai")).toBe(true);
+    expect(providerRequiresApiKey("demo")).toBe(false);
+  });
+});
+
+describe("isDemoProviderAvailable", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("returns false when VITE_LLM_PROXY_URL is not set", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "");
+    const { isDemoProviderAvailable } = await import("@/ai/config");
+    expect(isDemoProviderAvailable()).toBe(false);
+  });
+
+  it("returns true when VITE_LLM_PROXY_URL is set", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    const { isDemoProviderAvailable } = await import("@/ai/config");
+    expect(isDemoProviderAvailable()).toBe(true);
   });
 });

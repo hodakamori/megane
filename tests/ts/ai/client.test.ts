@@ -54,6 +54,12 @@ const OPENAI_CONFIG: AIConfig = {
   apiKey: "sk-test",
 };
 
+const DEMO_CONFIG: AIConfig = {
+  provider: "demo",
+  model: "demo",
+  apiKey: "",
+};
+
 const MINIMAL_PIPELINE_JSON = JSON.stringify({
   version: 3,
   nodes: [{ id: "v1", type: "viewport", position: { x: 0, y: 0 } }],
@@ -275,6 +281,67 @@ describe("generatePipeline (OpenAI)", () => {
     fetchMock.mockResolvedValueOnce(makeJSONResponse("bad request", 400));
     await expect(generatePipeline(OPENAI_CONFIG, "msg", () => {})).rejects.toThrow(
       /OpenAI API error \(400\)/,
+    );
+  });
+});
+
+describe("generatePipeline (demo proxy)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("throws when no proxy URL is configured for this build", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "");
+    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(
+      /free demo is not available/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("posts to the proxy URL without an Authorization header and streams the reply", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        { event: "", data: { choices: [{ delta: { content: "hi " } }] } },
+        { event: "", data: { choices: [{ delta: { content: "there" } }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    const chunks: string[] = [];
+    const result = await generatePipeline(DEMO_CONFIG, "msg", (c) => chunks.push(c));
+
+    expect(chunks).toEqual(["hi ", "there"]);
+    expect(result).toBe("hi there");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://proxy.example.com/chat");
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers["Content-Type"]).toBe("application/json");
+
+    const body = JSON.parse(init.body as string);
+    expect(body.messages).toEqual([
+      { role: "system", content: expect.stringContaining("Megane") },
+      { role: "user", content: "msg" },
+    ]);
+    expect(body.model).toBeUndefined();
+  });
+
+  it("throws a descriptive error when the proxy returns a non-OK status", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limit exceeded", 429));
+
+    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(
+      /Demo proxy error \(429\)/,
     );
   });
 });
