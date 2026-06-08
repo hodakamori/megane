@@ -13,6 +13,14 @@ export interface AIConfig {
   apiKey: string;
 }
 
+/**
+ * Persisted user preferences layered on top of {@link AIConfig}: whether
+ * to bring their own API key (BYOK) instead of the shared demo proxy.
+ */
+export interface AIPreferences extends AIConfig {
+  useOwnKey: boolean;
+}
+
 export const PROVIDER_MODELS: Record<AIProvider, { value: string; label: string }[]> = {
   anthropic: [
     { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
@@ -44,17 +52,20 @@ export function isDemoProviderAvailable(): boolean {
 const STORAGE_KEY = "megane-ai-config";
 
 /**
- * Default to the no-setup-required demo proxy when this build has one
- * configured (currently only the docs demo); otherwise fall back to
- * Anthropic, which still requires the user to bring their own key.
+ * The "demo" provider is selected exclusively via the `useOwnKey` toggle
+ * (see {@link AIPreferences}), not through the provider dropdown — so the
+ * persisted provider/model always represent the user's BYOK choice and
+ * default to Anthropic.
  */
 function defaultProviderAndModel(): { provider: AIProvider; model: string } {
-  const provider: AIProvider = isDemoProviderAvailable() ? "demo" : "anthropic";
+  const provider: AIProvider = "anthropic";
   return { provider, model: PROVIDER_MODELS[provider][0].value };
 }
 
-function loadConfig(): AIConfig {
+function loadConfig(): AIPreferences {
   const fallback = defaultProviderAndModel();
+  // Default to BYOK only when no demo proxy is available in this build.
+  const fallbackUseOwnKey = !isDemoProviderAvailable();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -63,28 +74,31 @@ function loadConfig(): AIConfig {
         provider: parsed.provider ?? fallback.provider,
         model: parsed.model ?? fallback.model,
         apiKey: "",
+        useOwnKey: parsed.useOwnKey ?? fallbackUseOwnKey,
       };
     }
   } catch {
     // ignore parse errors
   }
-  return { ...fallback, apiKey: "" };
+  return { ...fallback, apiKey: "", useOwnKey: fallbackUseOwnKey };
 }
 
-function saveConfig(config: AIConfig) {
+function saveConfig(config: AIPreferences) {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
       provider: config.provider,
       model: config.model,
+      useOwnKey: config.useOwnKey,
     }),
   );
 }
 
-interface AIConfigStore extends AIConfig {
+interface AIConfigStore extends AIPreferences {
   setProvider: (provider: AIProvider) => void;
   setModel: (model: string) => void;
   setApiKey: (apiKey: string) => void;
+  setUseOwnKey: (useOwnKey: boolean) => void;
 }
 
 export const useAIConfigStore = create<AIConfigStore>((set, get) => ({
@@ -104,5 +118,10 @@ export const useAIConfigStore = create<AIConfigStore>((set, get) => ({
   setApiKey: (apiKey) => {
     set({ apiKey });
     saveConfig({ ...get(), apiKey });
+  },
+
+  setUseOwnKey: (useOwnKey) => {
+    set({ useOwnKey });
+    saveConfig({ ...get(), useOwnKey });
   },
 }));

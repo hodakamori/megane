@@ -35,44 +35,56 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  useAIConfigStore.setState({ provider: "anthropic", model: "claude-sonnet-4-20250514", apiKey: "" });
+  useAIConfigStore.setState({
+    provider: "anthropic",
+    model: "claude-sonnet-4-20250514",
+    apiKey: "",
+    useOwnKey: false,
+  });
 });
 
-describe("PipelineChatBox — provider selection", () => {
-  it("hides the Free Demo option when no proxy URL is configured for this build", () => {
+describe("PipelineChatBox — use-own-key checkbox", () => {
+  it("hides the checkbox and BYOK fields and shows the demo notice when no proxy is configured", () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "");
+    useAIConfigStore.setState({ useOwnKey: false });
     render(<PipelineChatBox />);
     openConfigPanel();
 
-    expect(screen.queryByRole("option", { name: "Free Demo" })).toBeNull();
+    expect(screen.queryByText("Use my own API key")).toBeNull();
+    expect(screen.queryByPlaceholderText(/sk-/)).toBeTruthy();
   });
 
-  it("shows the Free Demo option when a proxy URL is configured for this build", () => {
+  it("shows the checkbox and the demo notice (no API key field) when unchecked and a proxy is configured", () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    useAIConfigStore.setState({ useOwnKey: false });
     render(<PipelineChatBox />);
     openConfigPanel();
 
-    expect(screen.getByRole("option", { name: "Free Demo" })).toBeTruthy();
-  });
-
-  it("hides the API key field and shows a notice when the demo provider is selected", () => {
-    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
-    useAIConfigStore.setState({ provider: "demo", model: "demo", apiKey: "" });
-    render(<PipelineChatBox />);
-    openConfigPanel();
-
+    expect(screen.getByText("Use my own API key")).toBeTruthy();
     expect(screen.queryByPlaceholderText(/sk-/)).toBeNull();
     expect(screen.getByText(/shared proxy/)).toBeTruthy();
   });
 
-  it("shows the API key field for providers other than demo", () => {
+  it("reveals provider/model/API key fields when the checkbox is checked", () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
-    useAIConfigStore.setState({ provider: "anthropic", model: "claude-sonnet-4-20250514", apiKey: "" });
+    useAIConfigStore.setState({ useOwnKey: false });
     render(<PipelineChatBox />);
     openConfigPanel();
 
+    fireEvent.click(screen.getByRole("checkbox"));
+
+    expect(useAIConfigStore.getState().useOwnKey).toBe(true);
     expect(screen.getByPlaceholderText("sk-ant-...")).toBeTruthy();
     expect(screen.queryByText(/shared proxy/)).toBeNull();
+  });
+
+  it("does not offer 'demo' as a provider option in the BYOK dropdown", () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    useAIConfigStore.setState({ useOwnKey: true });
+    render(<PipelineChatBox />);
+    openConfigPanel();
+
+    expect(screen.queryByRole("option", { name: /demo/i })).toBeNull();
   });
 });
 
@@ -86,8 +98,14 @@ describe("PipelineChatBox — submission", () => {
     );
   });
 
-  it("requires an API key before submitting for providers other than demo", () => {
-    useAIConfigStore.setState({ provider: "anthropic", model: "claude-sonnet-4-20250514", apiKey: "" });
+  it("requires an API key before submitting when using your own key", () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "");
+    useAIConfigStore.setState({
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      apiKey: "",
+      useOwnKey: true,
+    });
     render(<PipelineChatBox />);
 
     fireEvent.change(screen.getByPlaceholderText("Describe the pipeline you want..."), {
@@ -99,9 +117,14 @@ describe("PipelineChatBox — submission", () => {
     expect(generatePipeline).not.toHaveBeenCalled();
   });
 
-  it("submits without requiring an API key when the demo provider is selected", () => {
+  it("submits without requiring an API key when using the free demo", () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
-    useAIConfigStore.setState({ provider: "demo", model: "demo", apiKey: "" });
+    useAIConfigStore.setState({
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      apiKey: "",
+      useOwnKey: false,
+    });
     render(<PipelineChatBox />);
 
     fireEvent.change(screen.getByPlaceholderText("Describe the pipeline you want..."), {

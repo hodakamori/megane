@@ -12,21 +12,22 @@ describe("useAIConfigStore", () => {
     vi.unstubAllEnvs();
   });
 
-  it("uses anthropic defaults when no localStorage entry exists and no demo proxy is configured", async () => {
+  it("uses anthropic defaults and forces useOwnKey when no demo proxy is configured", async () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "");
     const { useAIConfigStore } = await import("@/ai/config");
     const state = useAIConfigStore.getState();
     expect(state.provider).toBe("anthropic");
     expect(state.model).toBe("claude-sonnet-4-20250514");
     expect(state.apiKey).toBe("");
+    expect(state.useOwnKey).toBe(true);
   });
 
-  it("defaults to the demo provider when this build has a proxy configured", async () => {
+  it("defaults to using the shared demo proxy (useOwnKey=false) when this build has a proxy configured", async () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
     const { useAIConfigStore } = await import("@/ai/config");
     const state = useAIConfigStore.getState();
-    expect(state.provider).toBe("demo");
-    expect(state.model).toBe("demo");
+    expect(state.provider).toBe("anthropic");
+    expect(state.useOwnKey).toBe(false);
     expect(state.apiKey).toBe("");
   });
 
@@ -57,6 +58,27 @@ describe("useAIConfigStore", () => {
     const state = useAIConfigStore.getState();
     expect(state.provider).toBe("anthropic");
     expect(state.model).toBe("claude-sonnet-4-20250514");
+    expect(state.useOwnKey).toBe(true);
+  });
+
+  it("loads a persisted useOwnKey preference from localStorage", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ provider: "openai", model: "gpt-4o", useOwnKey: true }),
+    );
+    const { useAIConfigStore } = await import("@/ai/config");
+    expect(useAIConfigStore.getState().useOwnKey).toBe(true);
+  });
+
+  it("setUseOwnKey updates and persists the preference", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    const { useAIConfigStore } = await import("@/ai/config");
+    useAIConfigStore.getState().setUseOwnKey(true);
+
+    expect(useAIConfigStore.getState().useOwnKey).toBe(true);
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
+    expect(persisted.useOwnKey).toBe(true);
   });
 
   it("setProvider switches to that provider's first model and persists", async () => {

@@ -86,9 +86,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "==> Starting LLM proxy worker on $PROXY_URL ..."
+echo "    Its request logs (including the [llm-proxy] lines logged by"
+echo "    workers/llm-proxy/src/index.ts) appear below prefixed with [proxy]."
 (
   cd "$PROXY_DIR"
-  npx wrangler dev --port "$PROXY_PORT"
+  npx wrangler dev --port "$PROXY_PORT" 2>&1 | sed -u 's/^/[proxy] /'
 ) &
 PIDS+=("$!")
 
@@ -104,7 +106,9 @@ done
 
 echo "==> Starting Vite dev server on http://localhost:$APP_PORT ..."
 echo "    VITE_LLM_PROXY_URL=$PROXY_URL"
-VITE_LLM_PROXY_URL="$PROXY_URL" npx vite --port "$APP_PORT" &
+(
+  VITE_LLM_PROXY_URL="$PROXY_URL" npx vite --port "$APP_PORT" 2>&1 | sed -u 's/^/[vite]  /'
+) &
 PIDS+=("$!")
 
 wait

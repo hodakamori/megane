@@ -31,21 +31,27 @@ type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get("Origin");
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const log = (message: string) => console.log(`[llm-proxy] ${ip} ${message}`);
+
+    log(`${request.method} origin=${origin ?? "none"}`);
 
     if (request.method === "OPTIONS") {
       return handlePreflight(origin, env);
     }
 
     if (request.method !== "POST") {
+      log(`rejected: method ${request.method} not allowed`);
       return jsonError("Method not allowed", 405, origin, env);
     }
 
     if (!isAllowedOrigin(origin, env)) {
+      log(`rejected: forbidden origin ${origin ?? "none"} (expected ${env.ALLOWED_ORIGIN})`);
       return jsonError("Forbidden origin", 403, origin, env);
     }
 
-    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
     if (await isRateLimited(ip, env)) {
+      log("rejected: rate limit exceeded");
       return jsonError("Rate limit exceeded. Please try again later.", 429, origin, env);
     }
 
@@ -53,34 +59,47 @@ export default {
     try {
       payload = await request.json();
     } catch {
+      log("rejected: invalid JSON body");
       return jsonError("Invalid JSON body", 400, origin, env);
     }
 
     const messages = sanitizeMessages(payload);
     if (!messages) {
+      log("rejected: missing or invalid 'messages' array");
       return jsonError("Missing or invalid 'messages' array", 400, origin, env);
     }
 
-    const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": env.ALLOWED_ORIGIN,
-        "X-Title": "megane demo",
-      },
-      body: JSON.stringify({
-        model: FREE_MODEL,
-        messages,
-        max_tokens: MAX_TOKENS,
-        stream: true,
-      }),
-    });
+    log(`forwarding ${messages.length} message(s) to OpenRouter (model=${FREE_MODEL})`);
+
+    let upstream: Response;
+    try {
+      upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": env.ALLOWED_ORIGIN,
+          "X-Title": "megane demo",
+        },
+        body: JSON.stringify({
+          model: FREE_MODEL,
+          messages,
+          max_tokens: MAX_TOKENS,
+          stream: true,
+        }),
+      });
+    } catch (err) {
+      console.error(`[llm-proxy] ${ip} upstream fetch failed: ${(err as Error).message}`);
+      return jsonError("Upstream request failed", 502, origin, env);
+    }
 
     if (!upstream.ok || !upstream.body) {
       const text = await upstream.text();
+      console.error(`[llm-proxy] ${ip} upstream error ${upstream.status}: ${text}`);
       return jsonError(`Upstream error: ${text}`, upstream.status || 502, origin, env);
     }
+
+    log(`upstream responded ${upstream.status}, streaming back to client`);
 
     return new Response(upstream.body, {
       status: 200,

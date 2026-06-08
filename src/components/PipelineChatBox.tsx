@@ -4,14 +4,9 @@
  * Includes inline config panel for API key and model settings.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  useAIConfigStore,
-  PROVIDER_MODELS,
-  providerRequiresApiKey,
-  isDemoProviderAvailable,
-} from "../ai/config";
-import type { AIProvider } from "../ai/config";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAIConfigStore, PROVIDER_MODELS, isDemoProviderAvailable } from "../ai/config";
+import type { AIConfig, AIProvider } from "../ai/config";
 import { generatePipeline, extractPipelineJSON } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
@@ -198,9 +193,20 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
   const provider = useAIConfigStore((s) => s.provider);
   const model = useAIConfigStore((s) => s.model);
   const apiKey = useAIConfigStore((s) => s.apiKey);
+  const useOwnKey = useAIConfigStore((s) => s.useOwnKey);
   const setProvider = useAIConfigStore((s) => s.setProvider);
   const setModel = useAIConfigStore((s) => s.setModel);
   const setApiKey = useAIConfigStore((s) => s.setApiKey);
+  const setUseOwnKey = useAIConfigStore((s) => s.setUseOwnKey);
+
+  const demoAvailable = isDemoProviderAvailable();
+  // Use the shared free demo unless the visitor opted into BYOK (or no
+  // demo proxy is configured in this build, which forces BYOK).
+  const useDemo = demoAvailable && !useOwnKey;
+  const effectiveConfig: AIConfig = useMemo(
+    () => (useDemo ? { provider: "demo", model: "demo", apiKey: "" } : { provider, model, apiKey }),
+    [useDemo, provider, model, apiKey],
+  );
 
   const deserialize = usePipelineStore((s) => s.deserialize);
   const autoLayout = usePipelineStore((s) => s.autoLayout);
@@ -214,7 +220,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     const trimmed = input.trim();
     if (!trimmed || isStreaming) return;
 
-    if (providerRequiresApiKey(provider) && !apiKey) {
+    if (!useDemo && !apiKey) {
       setShowConfig(true);
       setMessages((prev) => [
         ...prev,
@@ -236,7 +242,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
 
     try {
       const fullResponse = await generatePipeline(
-        { provider, model, apiKey },
+        effectiveConfig,
         trimmed,
         (chunk) => {
           setMessages((prev) => {
@@ -280,8 +286,8 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     input,
     isStreaming,
     apiKey,
-    provider,
-    model,
+    useDemo,
+    effectiveConfig,
     deserialize,
     autoLayout,
     onPipelineApplied,
@@ -307,49 +313,62 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       {/* Config panel */}
       {showConfig && (
         <div style={configPanelStyle}>
-          <div style={configRowStyle}>
-            <span style={configLabelStyle}>Provider</span>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as AIProvider)}
-              style={configSelectStyle}
+          {demoAvailable && (
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
             >
-              {isDemoProviderAvailable() && <option value="demo">Free Demo</option>}
-              <option value="anthropic">Anthropic</option>
-              <option value="openai">OpenAI</option>
-            </select>
-          </div>
-          <div style={configRowStyle}>
-            <span style={configLabelStyle}>Model</span>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              style={configSelectStyle}
-            >
-              {PROVIDER_MODELS[provider].map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {providerRequiresApiKey(provider) ? (
-            <div style={configRowStyle}>
-              <span style={configLabelStyle}>API Key</span>
               <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
-                style={configInputStyle}
+                type="checkbox"
+                checked={useOwnKey}
+                onChange={(e) => setUseOwnKey(e.target.checked)}
               />
-            </div>
-          ) : (
+              <span style={{ color: "#475569" }}>Use my own API key</span>
+            </label>
+          )}
+          {useDemo ? (
             <div style={{ color: "#64748b", fontSize: 11, fontStyle: "italic" }}>
               The free demo runs through megane&apos;s shared proxy — no API key needed. It uses a
               rate-limited free-tier model, so responses may be slower or lower quality than your
               own API key.
             </div>
+          ) : (
+            <>
+              <div style={configRowStyle}>
+                <span style={configLabelStyle}>Provider</span>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value as AIProvider)}
+                  style={configSelectStyle}
+                >
+                  <option value="anthropic">Anthropic</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+              <div style={configRowStyle}>
+                <span style={configLabelStyle}>Model</span>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  style={configSelectStyle}
+                >
+                  {PROVIDER_MODELS[provider].map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={configRowStyle}>
+                <span style={configLabelStyle}>API Key</span>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
+                  style={configInputStyle}
+                />
+              </div>
+            </>
           )}
         </div>
       )}
