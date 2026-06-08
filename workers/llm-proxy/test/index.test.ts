@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import worker, {
+import worker from "../src/index";
+import {
   isAllowedOrigin,
   corsHeaders,
   sanitizeMessages,
@@ -8,7 +9,7 @@ import worker, {
   PER_DAY_LIMIT,
   FREE_MODEL,
   type Env,
-} from "../src/index";
+} from "../src/proxy";
 
 const ALLOWED_ORIGIN = "https://hodakamori.github.io";
 
