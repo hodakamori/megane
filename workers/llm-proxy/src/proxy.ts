@@ -14,9 +14,22 @@ export interface Env {
   OPENROUTER_API_KEY: string;
   ALLOWED_ORIGIN: string;
   RATE_LIMIT_KV: KVNamespace;
+  /**
+   * Optional override for the OpenRouter model slug. Free `:free` models
+   * come and go (and occasionally flip to paid-only, returning a 404), so
+   * keeping this in config lets you swap models — or move to a paid model
+   * like an Anthropic one — without a code change. Falls back to
+   * {@link DEFAULT_MODEL}.
+   */
+  OPENROUTER_MODEL?: string;
 }
 
-export const FREE_MODEL = "deepseek/deepseek-chat-v3.1:free";
+/**
+ * Default model when OPENROUTER_MODEL is unset. A currently-available
+ * free instruction-following model; update it here (or via the env var)
+ * if OpenRouter retires it.
+ */
+export const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 export const MAX_TOKENS = 2048;
 export const MAX_MESSAGES = 10;
 export const MAX_MESSAGE_LENGTH = 8000;
@@ -68,7 +81,8 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return jsonError("Missing or invalid 'messages' array", 400, origin, env);
   }
 
-  log(`forwarding ${messages.length} message(s) to OpenRouter (model=${FREE_MODEL})`);
+  const model = env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  log(`forwarding ${messages.length} message(s) to OpenRouter (model=${model})`);
 
   let upstream: Response;
   try {
@@ -81,7 +95,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
         "X-Title": "megane demo",
       },
       body: JSON.stringify({
-        model: FREE_MODEL,
+        model,
         messages,
         max_tokens: MAX_TOKENS,
         stream: true,

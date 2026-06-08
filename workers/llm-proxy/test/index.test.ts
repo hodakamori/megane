@@ -7,7 +7,7 @@ import {
   isRateLimited,
   PER_MINUTE_LIMIT,
   PER_DAY_LIMIT,
-  FREE_MODEL,
+  DEFAULT_MODEL,
   type Env,
 } from "../src/proxy";
 
@@ -240,7 +240,7 @@ describe("worker fetch handler", () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
       expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
       const sentBody = JSON.parse(init.body as string);
-      expect(sentBody.model).toBe(FREE_MODEL);
+      expect(sentBody.model).toBe(DEFAULT_MODEL);
       expect(sentBody.stream).toBe(true);
       expect(sentBody.messages).toEqual([{ role: "user", content: "hi" }]);
       const headers = init.headers as Record<string, string>;
@@ -258,6 +258,24 @@ describe("worker fetch handler", () => {
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
     expect(await res.text()).toBe(upstreamBody);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("uses the OPENROUTER_MODEL override when one is configured", async () => {
+    const env = { ...makeEnv(), OPENROUTER_MODEL: "anthropic/claude-3.5-sonnet" };
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const sentBody = JSON.parse(init.body as string);
+      expect(sentBody.model).toBe("anthropic/claude-3.5-sonnet");
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({ origin: ALLOWED_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

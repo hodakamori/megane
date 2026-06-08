@@ -7,6 +7,14 @@ compatibility_date = "2025-01-01"
 [vars]
 ALLOWED_ORIGIN = "https://hodakamori.github.io"
 
+# OpenRouter model slug. Free `:free` models are occasionally retired or
+# flipped to paid-only (which returns a 404) — when that happens, pick a
+# currently-available one from https://openrouter.ai/models?max_price=0
+# and set it here, no code change needed. Leave unset to use the default
+# in src/proxy.ts. To move to paid Claude, set e.g.
+# "anthropic/claude-3.5-sonnet" (requires OpenRouter credit).
+OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
+
 # Created once via `wrangler kv namespace create RATE_LIMIT_KV`; replace
 # the id below with the value it prints.
 [[kv_namespaces]]
