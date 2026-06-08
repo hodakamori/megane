@@ -15,21 +15,55 @@ export interface Env {
   ALLOWED_ORIGIN: string;
   RATE_LIMIT_KV: KVNamespace;
   /**
-   * Optional override for the OpenRouter model slug. Free `:free` models
-   * come and go (and occasionally flip to paid-only, returning a 404), so
-   * keeping this in config lets you swap models — or move to a paid model
-   * like an Anthropic one — without a code change. Falls back to
-   * {@link DEFAULT_MODEL}.
+   * Optional override for the primary OpenRouter model slug. Free `:free`
+   * models come and go (and occasionally flip to paid-only, returning a
+   * 404), so keeping this in config lets you swap models — or move to a
+   * paid model like an Anthropic one — without a code change. Falls back
+   * to {@link DEFAULT_MODEL}.
    */
   OPENROUTER_MODEL?: string;
+  /**
+   * Optional comma-separated fallback models. OpenRouter tries the primary
+   * first and routes to the next on error (e.g. a free model that is
+   * temporarily rate-limited upstream returns 429). Falls back to
+   * {@link DEFAULT_FALLBACK_MODELS}.
+   */
+  OPENROUTER_FALLBACK_MODELS?: string;
 }
 
 /**
- * Default model when OPENROUTER_MODEL is unset. A currently-available
- * free instruction-following model; update it here (or via the env var)
- * if OpenRouter retires it.
+ * Default primary model when OPENROUTER_MODEL is unset. A currently-
+ * available free instruction-following model; update it here (or via the
+ * env var) if OpenRouter retires it.
  */
 export const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+
+/**
+ * Free models from different upstream providers, tried in order after the
+ * primary. Free tiers are heavily rate-limited per provider, so spreading
+ * across providers makes a transient 429 on one fall through to another
+ * instead of failing the request.
+ */
+export const DEFAULT_FALLBACK_MODELS = [
+  "openai/gpt-oss-120b:free",
+  "z-ai/glm-4.5-air:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+];
+
+/**
+ * Builds the ordered, de-duplicated model list sent to OpenRouter as its
+ * `models` routing array: the configured primary first, then the fallbacks.
+ */
+export function buildModelList(env: Env): string[] {
+  const primary = env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  const fallbacks =
+    env.OPENROUTER_FALLBACK_MODELS !== undefined
+      ? env.OPENROUTER_FALLBACK_MODELS.split(",")
+          .map((m) => m.trim())
+          .filter((m) => m.length > 0)
+      : DEFAULT_FALLBACK_MODELS;
+  return [...new Set([primary, ...fallbacks])];
+}
 export const MAX_TOKENS = 2048;
 export const MAX_MESSAGES = 10;
 export const MAX_MESSAGE_LENGTH = 8000;
@@ -81,8 +115,11 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return jsonError("Missing or invalid 'messages' array", 400, origin, env);
   }
 
-  const model = env.OPENROUTER_MODEL || DEFAULT_MODEL;
-  log(`forwarding ${messages.length} message(s) to OpenRouter (model=${model})`);
+  const models = buildModelList(env);
+  log(
+    `forwarding ${messages.length} message(s) to OpenRouter (model=${models[0]}` +
+      `${models.length > 1 ? ` +${models.length - 1} fallback(s)` : ""})`,
+  );
 
   let upstream: Response;
   try {
@@ -95,7 +132,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
         "X-Title": "megane demo",
       },
       body: JSON.stringify({
-        model,
+        models,
         messages,
         max_tokens: MAX_TOKENS,
         stream: true,

@@ -12,3 +12,8 @@ ALLOWED_ORIGIN=http://localhost:5173
 # new slug from https://openrouter.ai/models?max_price=0). Leave unset to
 # use the default in src/proxy.ts.
 # OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
+
+# Optional: comma-separated fallback models. A free model that is
+# temporarily rate-limited upstream returns 429; OpenRouter then routes to
+# the next of these. Leave unset to use DEFAULT_FALLBACK_MODELS.
+# OPENROUTER_FALLBACK_MODELS=openai/gpt-oss-120b:free,z-ai/glm-4.5-air:free

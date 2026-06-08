@@ -8,6 +8,8 @@ import {
   PER_MINUTE_LIMIT,
   PER_DAY_LIMIT,
   DEFAULT_MODEL,
+  DEFAULT_FALLBACK_MODELS,
+  buildModelList,
   type Env,
 } from "../src/proxy";
 
@@ -166,6 +168,46 @@ function makeRequest(init: { method?: string; origin?: string | null; body?: unk
   });
 }
 
+describe("buildModelList", () => {
+  it("defaults to the primary model followed by the default fallbacks", () => {
+    const list = buildModelList(makeEnv());
+    expect(list[0]).toBe(DEFAULT_MODEL);
+    expect(list.slice(1)).toEqual(DEFAULT_FALLBACK_MODELS);
+  });
+
+  it("puts the OPENROUTER_MODEL override first", () => {
+    const list = buildModelList({ ...makeEnv(), OPENROUTER_MODEL: "x/y" });
+    expect(list[0]).toBe("x/y");
+  });
+
+  it("de-duplicates when the primary also appears in the fallback list", () => {
+    const list = buildModelList({
+      ...makeEnv(),
+      OPENROUTER_MODEL: "a/one",
+      OPENROUTER_FALLBACK_MODELS: "a/one, b/two",
+    });
+    expect(list).toEqual(["a/one", "b/two"]);
+  });
+
+  it("ignores blank entries in OPENROUTER_FALLBACK_MODELS", () => {
+    const list = buildModelList({
+      ...makeEnv(),
+      OPENROUTER_MODEL: "p/m",
+      OPENROUTER_FALLBACK_MODELS: " , a/one ,, ",
+    });
+    expect(list).toEqual(["p/m", "a/one"]);
+  });
+
+  it("returns only the primary when fallbacks are explicitly empty", () => {
+    const list = buildModelList({
+      ...makeEnv(),
+      OPENROUTER_MODEL: "p/m",
+      OPENROUTER_FALLBACK_MODELS: "",
+    });
+    expect(list).toEqual(["p/m"]);
+  });
+});
+
 describe("worker fetch handler", () => {
   it("responds to a CORS preflight from the allowed origin", async () => {
     const env = makeEnv();
@@ -240,7 +282,9 @@ describe("worker fetch handler", () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
       expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
       const sentBody = JSON.parse(init.body as string);
-      expect(sentBody.model).toBe(DEFAULT_MODEL);
+      expect(sentBody.models[0]).toBe(DEFAULT_MODEL);
+      expect(sentBody.models.length).toBeGreaterThan(1);
+      expect(sentBody.model).toBeUndefined();
       expect(sentBody.stream).toBe(true);
       expect(sentBody.messages).toEqual([{ role: "user", content: "hi" }]);
       const headers = init.headers as Record<string, string>;
@@ -261,11 +305,33 @@ describe("worker fetch handler", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("uses the OPENROUTER_MODEL override when one is configured", async () => {
+  it("uses the OPENROUTER_MODEL override as the primary model", async () => {
     const env = { ...makeEnv(), OPENROUTER_MODEL: "anthropic/claude-3.5-sonnet" };
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const sentBody = JSON.parse(init.body as string);
-      expect(sentBody.model).toBe("anthropic/claude-3.5-sonnet");
+      expect(sentBody.models[0]).toBe("anthropic/claude-3.5-sonnet");
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({ origin: ALLOWED_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("sends only the configured fallback models when OPENROUTER_FALLBACK_MODELS is set", async () => {
+    const env = {
+      ...makeEnv(),
+      OPENROUTER_MODEL: "primary/model",
+      OPENROUTER_FALLBACK_MODELS: "a/one, b/two",
+    };
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const sentBody = JSON.parse(init.body as string);
+      expect(sentBody.models).toEqual(["primary/model", "a/one", "b/two"]);
       return new Response("data: ok\n\n", { status: 200 });
     });
     vi.stubGlobal("fetch", fetchMock);
