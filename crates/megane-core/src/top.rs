@@ -116,14 +116,240 @@ fn expand_includes<F: TopFileSystem>(
     Ok(result)
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Molecule-type-aware parsing ───────────────────────────────────────────────
 
-/// Parse a GROMACS `.top` / `.itp` text and extract bond pairs.
+/// A `[ moleculetype ]` block: its atom count and its bonds expressed with
+/// LOCAL (0-indexed, relative to the molecule's own first atom) indices.
+struct MoleculeType {
+    n_atoms: usize,
+    bonds: Vec<(u32, u32)>,
+}
+
+/// Strip an inline `;` comment and return the trimmed remainder, or `None`
+/// if the line is empty/comment-only.
+fn data_line(trimmed: &str) -> Option<&str> {
+    let data = match trimmed.find(';') {
+        Some(pos) => &trimmed[..pos],
+        None => trimmed,
+    };
+    let data = data.trim();
+    if data.is_empty() {
+        None
+    } else {
+        Some(data)
+    }
+}
+
+/// Store the currently-accumulated `[ moleculetype ]` block (if any) into
+/// `moltypes`, recording first-seen order in `order`.
+fn finalize_moltype(
+    moltypes: &mut HashMap<String, MoleculeType>,
+    order: &mut Vec<String>,
+    name: Option<String>,
+    atoms_section_count: usize,
+    max_atom_index: u32,
+    bonds: Vec<(u32, u32)>,
+) {
+    let Some(name) = name else { return };
+    let n_atoms = if atoms_section_count > 0 {
+        atoms_section_count
+    } else {
+        max_atom_index as usize
+    };
+    if !moltypes.contains_key(&name) {
+        order.push(name.clone());
+    }
+    moltypes.insert(name, MoleculeType { n_atoms, bonds });
+}
+
+/// Parse `text` honoring GROMACS `[ moleculetype ]` / `[ molecules ]`
+/// semantics: bonds inside a `[ moleculetype ]` block use atom indices LOCAL
+/// to that molecule, and the `[ molecules ]` section lists how many copies of
+/// each molecule type appear (in order) in the actual system. Each copy
+/// contributes its own bonds, offset by the cumulative atom count of all
+/// preceding molecule instances.
 ///
-/// Returns `Vec<(a, b)>` with 0-indexed atom pairs where `a < b`.
-/// `#include` directives are **not** resolved; pass pre-expanded text or use
-/// [`parse_top_bonds_with_fs`] / [`parse_top_bonds_from_path`] instead.
-pub fn parse_top_bonds(text: &str, n_atoms: usize) -> Vec<(u32, u32)> {
+/// Returns `None` if `text` contains no `[ moleculetype ]` block, so the
+/// caller can fall back to flat parsing for bare `.itp` snippets that don't
+/// follow the full molecule-type structure (e.g. force-field fragments).
+///
+/// If the `[ molecules ]` section references a molecule type that could not
+/// be resolved (e.g. its `#include` was missing), replication stops at that
+/// point — continuing would require guessing that molecule's atom count and
+/// could produce bonds at incorrect offsets for everything after it.
+fn parse_top_bonds_grouped(text: &str, n_atoms: usize) -> Option<Vec<(u32, u32)>> {
+    #[derive(PartialEq)]
+    enum Section {
+        None,
+        Atoms,
+        Bonds,
+        Molecules,
+    }
+
+    let mut moltypes: HashMap<String, MoleculeType> = HashMap::new();
+    let mut moltype_order: Vec<String> = Vec::new();
+    let mut molecules: Vec<(String, usize)> = Vec::new();
+
+    let mut current_name: Option<String> = None;
+    let mut awaiting_name = false;
+    let mut current_atoms_count = 0usize;
+    let mut current_max_atom_index = 0u32;
+    let mut current_bonds: Vec<(u32, u32)> = Vec::new();
+    let mut section = Section::None;
+    let mut found_moleculetype = false;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if trimmed.starts_with('[') {
+            let section_name = trimmed
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .trim()
+                .to_lowercase();
+
+            match section_name.as_str() {
+                "moleculetype" => {
+                    finalize_moltype(
+                        &mut moltypes,
+                        &mut moltype_order,
+                        current_name.take(),
+                        current_atoms_count,
+                        current_max_atom_index,
+                        std::mem::take(&mut current_bonds),
+                    );
+                    current_atoms_count = 0;
+                    current_max_atom_index = 0;
+                    awaiting_name = true;
+                    found_moleculetype = true;
+                    section = Section::None;
+                }
+                "molecules" => {
+                    finalize_moltype(
+                        &mut moltypes,
+                        &mut moltype_order,
+                        current_name.take(),
+                        current_atoms_count,
+                        current_max_atom_index,
+                        std::mem::take(&mut current_bonds),
+                    );
+                    current_atoms_count = 0;
+                    current_max_atom_index = 0;
+                    section = Section::Molecules;
+                }
+                "atoms" => section = Section::Atoms,
+                "bonds" => section = Section::Bonds,
+                _ => section = Section::None,
+            }
+            continue;
+        }
+
+        let Some(data) = data_line(trimmed) else {
+            continue;
+        };
+
+        if awaiting_name {
+            if let Some(name) = data.split_whitespace().next() {
+                current_name = Some(name.to_string());
+            }
+            awaiting_name = false;
+            continue;
+        }
+
+        match section {
+            Section::Atoms => {
+                current_atoms_count += 1;
+                if let Some(idx) = data.split_whitespace().next().and_then(|s| s.parse().ok()) {
+                    current_max_atom_index = current_max_atom_index.max(idx);
+                }
+            }
+            Section::Bonds => {
+                let mut parts = data.split_whitespace();
+                let ai: u32 = match parts.next().and_then(|s| s.parse().ok()) {
+                    Some(v) => v,
+                    None => continue,
+                };
+                let aj: u32 = match parts.next().and_then(|s| s.parse().ok()) {
+                    Some(v) => v,
+                    None => continue,
+                };
+                if ai == 0 || aj == 0 {
+                    continue;
+                }
+                current_max_atom_index = current_max_atom_index.max(ai).max(aj);
+                current_bonds.push(((ai - 1).min(aj - 1), (ai - 1).max(aj - 1)));
+            }
+            Section::Molecules => {
+                let mut parts = data.split_whitespace();
+                let name = match parts.next() {
+                    Some(v) => v.to_string(),
+                    None => continue,
+                };
+                let count: usize = match parts.next().and_then(|s| s.parse().ok()) {
+                    Some(v) => v,
+                    None => continue,
+                };
+                molecules.push((name, count));
+            }
+            Section::None => {}
+        }
+    }
+
+    finalize_moltype(
+        &mut moltypes,
+        &mut moltype_order,
+        current_name,
+        current_atoms_count,
+        current_max_atom_index,
+        current_bonds,
+    );
+
+    if !found_moleculetype {
+        return None;
+    }
+
+    // Prefer the explicit `[ molecules ]` system composition; fall back to
+    // "each molecule type appears once, in definition order" when absent
+    // (e.g. a single-molecule `.top` with no `[ molecules ]` section).
+    let order: Vec<(String, usize)> = if !molecules.is_empty() {
+        molecules
+    } else {
+        moltype_order.into_iter().map(|name| (name, 1)).collect()
+    };
+
+    let mut bonds = Vec::new();
+    let mut offset: u32 = 0;
+    for (name, count) in order {
+        let Some(moltype) = moltypes.get(&name) else {
+            // Unresolvable molecule type (e.g. missing #include) — stop here
+            // rather than guess its atom count and miscompute later offsets.
+            break;
+        };
+        for _ in 0..count {
+            for &(a, b) in &moltype.bonds {
+                let (ga, gb) = (offset + a, offset + b);
+                if (gb as usize) < n_atoms {
+                    bonds.push((ga, gb));
+                }
+            }
+            offset += moltype.n_atoms as u32;
+        }
+    }
+
+    Some(bonds)
+}
+
+/// Flat fallback: scan every `[ bonds ]` section in `text` and treat the
+/// listed atom indices as global (system-wide) 1-based indices.
+///
+/// This matches the historical behaviour and is used for inputs that contain
+/// no `[ moleculetype ]` block (e.g. bare `.itp` bond fragments), where there
+/// is no molecule structure to replicate against.
+fn parse_top_bonds_flat(text: &str, n_atoms: usize) -> Vec<(u32, u32)> {
     let mut bonds = Vec::new();
     let mut in_bonds_section = false;
 
@@ -148,10 +374,8 @@ pub fn parse_top_bonds(text: &str, n_atoms: usize) -> Vec<(u32, u32)> {
             continue;
         }
 
-        let data = if let Some(pos) = trimmed.find(';') {
-            &trimmed[..pos]
-        } else {
-            trimmed
+        let Some(data) = data_line(trimmed) else {
+            continue;
         };
 
         let mut parts = data.split_whitespace();
@@ -176,6 +400,32 @@ pub fn parse_top_bonds(text: &str, n_atoms: usize) -> Vec<(u32, u32)> {
     }
 
     bonds
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/// Parse a GROMACS `.top` / `.itp` text and extract bond pairs.
+///
+/// Honors `[ moleculetype ]` / `[ molecules ]` semantics: atom indices inside
+/// a `[ moleculetype ]` block's `[ bonds ]` section are LOCAL to that molecule,
+/// and the `[ molecules ]` section lists how many copies of each molecule type
+/// the system contains. Each copy's bonds are emitted with indices offset by
+/// the cumulative atom count of preceding molecule instances, so a system
+/// with e.g. 1000 copies of a 3-atom water molecule yields 1000 sets of
+/// equivalent bonds rather than just the ones written literally in the file.
+///
+/// Inputs without any `[ moleculetype ]` block (bare bond fragments) fall
+/// back to treating listed indices as global 1-based atom indices, matching
+/// historical behaviour.
+///
+/// Returns `Vec<(a, b)>` with 0-indexed atom pairs where `a < b`.
+/// `#include` directives are **not** resolved; pass pre-expanded text or use
+/// [`parse_top_bonds_with_fs`] / [`parse_top_bonds_from_path`] instead.
+pub fn parse_top_bonds(text: &str, n_atoms: usize) -> Vec<(u32, u32)> {
+    match parse_top_bonds_grouped(text, n_atoms) {
+        Some(bonds) => bonds,
+        None => parse_top_bonds_flat(text, n_atoms),
+    }
 }
 
 /// Parse a GROMACS `.top` text with `#include` resolution via a custom
@@ -251,6 +501,160 @@ protein  3
         let bonds = parse_top_bonds(text, 3);
         assert_eq!(bonds.len(), 1);
         assert_eq!(bonds[0], (0, 1));
+    }
+
+    // ── molecule replication via [ molecules ] ────────────────────────────────
+
+    #[test]
+    fn test_molecule_replication_multiple_copies() {
+        // A 3-atom "SOL" molecule with bonds 1-2 and 2-3 (local), replicated
+        // 4 times by [ molecules ] -> bonds should appear at every offset.
+        let text = r#"
+[ moleculetype ]
+SOL  2
+
+[ atoms ]
+     1  OW   1  SOL  OW   1   0.0   16.00
+     2  HW1  1  SOL  HW1  2   0.0    1.01
+     3  HW2  1  SOL  HW2  3   0.0    1.01
+
+[ bonds ]
+     1     2     1
+     1     3     1
+
+[ molecules ]
+SOL  4
+"#;
+        let bonds = parse_top_bonds(text, 12);
+        assert_eq!(
+            bonds,
+            vec![
+                (0, 1),
+                (0, 2),
+                (3, 4),
+                (3, 5),
+                (6, 7),
+                (6, 8),
+                (9, 10),
+                (9, 11),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_molecule_replication_multiple_types() {
+        // protein (5 atoms, 4 bonds) appears once, then SOL (3 atoms, 2 bonds)
+        // appears twice -- offsets must account for the preceding molecules.
+        let text = r#"
+[ moleculetype ]
+protein  3
+
+[ atoms ]
+     1  N    1  ALA  N    1  -0.3   14.01
+     2  CA   1  ALA  CA   2   0.0   12.01
+     3  C    1  ALA  C    3   0.6   12.01
+     4  O    1  ALA  O    4  -0.5   16.00
+     5  CB   1  ALA  CB   5  -0.1   12.01
+
+[ bonds ]
+     1     2     1
+     2     3     1
+     3     4     1
+     2     5     1
+
+[ moleculetype ]
+SOL  2
+
+[ atoms ]
+     1  OW   1  SOL  OW   1   0.0   16.00
+     2  HW1  1  SOL  HW1  2   0.0    1.01
+     3  HW2  1  SOL  HW2  3   0.0    1.01
+
+[ bonds ]
+     1     2     1
+     1     3     1
+
+[ molecules ]
+protein  1
+SOL      2
+"#;
+        let bonds = parse_top_bonds(text, 11);
+        assert_eq!(
+            bonds,
+            vec![
+                (0, 1),
+                (1, 2),
+                (2, 3),
+                (1, 4),
+                (5, 6),
+                (5, 7),
+                (8, 9),
+                (8, 10),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_molecule_replication_default_order_without_molecules_section() {
+        // No [ molecules ] section: each moleculetype is assumed to appear
+        // exactly once, in file order, so a single-molecule .top behaves
+        // exactly like the legacy flat parser.
+        let text = r#"
+[ moleculetype ]
+protein  3
+
+[ atoms ]
+     1  N    1  ALA  N    1  -0.3   14.01
+     2  CA   1  ALA  CA   2   0.0   12.01
+
+[ bonds ]
+     1     2     1
+"#;
+        let bonds = parse_top_bonds(text, 2);
+        assert_eq!(bonds, vec![(0, 1)]);
+    }
+
+    #[test]
+    fn test_molecule_replication_unresolved_type_stops_replication() {
+        // SOL has no [ moleculetype ] definition (e.g. its #include was
+        // missing); replication should stop there rather than guess its
+        // atom count and miscompute offsets for anything that follows.
+        let text = r#"
+[ moleculetype ]
+protein  3
+
+[ atoms ]
+     1  N    1  ALA  N    1  -0.3   14.01
+     2  CA   1  ALA  CA   2   0.0   12.01
+
+[ bonds ]
+     1     2     1
+
+[ molecules ]
+protein  1
+SOL      10
+"#;
+        let bonds = parse_top_bonds(text, 32);
+        assert_eq!(bonds, vec![(0, 1)]);
+    }
+
+    #[test]
+    fn test_molecule_replication_n_atoms_inferred_without_atoms_section() {
+        // No [ atoms ] section: molecule atom count is inferred from the
+        // highest atom index referenced in [ bonds ].
+        let text = r#"
+[ moleculetype ]
+SOL  2
+
+[ bonds ]
+     1     2     1
+     1     3     1
+
+[ molecules ]
+SOL  2
+"#;
+        let bonds = parse_top_bonds(text, 6);
+        assert_eq!(bonds, vec![(0, 1), (0, 2), (3, 4), (3, 5)]);
     }
 
     // ── parse_include_directive ───────────────────────────────────────────────
