@@ -17,9 +17,10 @@ OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free"
 
 # Comma-separated fallback models. Free tiers are rate-limited per upstream
 # provider, so when the primary returns a transient 429, OpenRouter routes
-# to the next of these (ideally on different providers). Unset = the
-# DEFAULT_FALLBACK_MODELS list in src/proxy.ts.
-OPENROUTER_FALLBACK_MODELS = "openai/gpt-oss-120b:free,z-ai/glm-4.5-air:free,qwen/qwen3-next-80b-a3b-instruct:free"
+# to the next of these (ideally on different providers). OpenRouter caps the
+# total routing list at 3, so keep this to 2 entries alongside the primary.
+# Unset = the DEFAULT_FALLBACK_MODELS list in src/proxy.ts.
+OPENROUTER_FALLBACK_MODELS = "openai/gpt-oss-120b:free,z-ai/glm-4.5-air:free"
 
 # Created once via `wrangler kv namespace create RATE_LIMIT_KV`; replace
 # the id below with the value it prints.

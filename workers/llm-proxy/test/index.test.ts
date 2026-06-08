@@ -206,6 +206,19 @@ describe("buildModelList", () => {
     });
     expect(list).toEqual(["p/m"]);
   });
+
+  it("caps the list at MAX_MODELS (3) — OpenRouter rejects a 4th entry", () => {
+    const list = buildModelList({
+      ...makeEnv(),
+      OPENROUTER_MODEL: "p/m",
+      OPENROUTER_FALLBACK_MODELS: "a/one, b/two, c/three, d/four",
+    });
+    expect(list).toEqual(["p/m", "a/one", "b/two"]);
+  });
+
+  it("keeps the default list within the OpenRouter 3-item cap", () => {
+    expect(buildModelList(makeEnv()).length).toBeLessThanOrEqual(3);
+  });
 });
 
 describe("worker fetch handler", () => {

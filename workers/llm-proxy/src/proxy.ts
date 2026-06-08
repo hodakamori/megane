@@ -44,15 +44,18 @@ export const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
  * across providers makes a transient 429 on one fall through to another
  * instead of failing the request.
  */
-export const DEFAULT_FALLBACK_MODELS = [
-  "openai/gpt-oss-120b:free",
-  "z-ai/glm-4.5-air:free",
-  "qwen/qwen3-next-80b-a3b-instruct:free",
-];
+export const DEFAULT_FALLBACK_MODELS = ["openai/gpt-oss-120b:free", "z-ai/glm-4.5-air:free"];
+
+/**
+ * OpenRouter caps its `models` routing array at 3 entries (a 4th yields a
+ * 400 "'models' array must have 3 items or fewer.").
+ */
+export const MAX_MODELS = 3;
 
 /**
  * Builds the ordered, de-duplicated model list sent to OpenRouter as its
- * `models` routing array: the configured primary first, then the fallbacks.
+ * `models` routing array: the configured primary first, then the
+ * fallbacks, capped at {@link MAX_MODELS}.
  */
 export function buildModelList(env: Env): string[] {
   const primary = env.OPENROUTER_MODEL || DEFAULT_MODEL;
@@ -62,7 +65,7 @@ export function buildModelList(env: Env): string[] {
           .map((m) => m.trim())
           .filter((m) => m.length > 0)
       : DEFAULT_FALLBACK_MODELS;
-  return [...new Set([primary, ...fallbacks])];
+  return [...new Set([primary, ...fallbacks])].slice(0, MAX_MODELS);
 }
 export const MAX_TOKENS = 2048;
 export const MAX_MESSAGES = 10;
