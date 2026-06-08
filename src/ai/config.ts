@@ -43,21 +43,32 @@ export function isDemoProviderAvailable(): boolean {
 
 const STORAGE_KEY = "megane-ai-config";
 
+/**
+ * Default to the no-setup-required demo proxy when this build has one
+ * configured (currently only the docs demo); otherwise fall back to
+ * Anthropic, which still requires the user to bring their own key.
+ */
+function defaultProviderAndModel(): { provider: AIProvider; model: string } {
+  const provider: AIProvider = isDemoProviderAvailable() ? "demo" : "anthropic";
+  return { provider, model: PROVIDER_MODELS[provider][0].value };
+}
+
 function loadConfig(): AIConfig {
+  const fallback = defaultProviderAndModel();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        provider: parsed.provider ?? "anthropic",
-        model: parsed.model ?? "claude-sonnet-4-20250514",
+        provider: parsed.provider ?? fallback.provider,
+        model: parsed.model ?? fallback.model,
         apiKey: "",
       };
     }
   } catch {
     // ignore parse errors
   }
-  return { provider: "anthropic", model: "claude-sonnet-4-20250514", apiKey: "" };
+  return { ...fallback, apiKey: "" };
 }
 
 function saveConfig(config: AIConfig) {

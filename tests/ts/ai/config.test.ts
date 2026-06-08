@@ -8,11 +8,25 @@ beforeEach(() => {
 });
 
 describe("useAIConfigStore", () => {
-  it("uses anthropic defaults when no localStorage entry exists", async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("uses anthropic defaults when no localStorage entry exists and no demo proxy is configured", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "");
     const { useAIConfigStore } = await import("@/ai/config");
     const state = useAIConfigStore.getState();
     expect(state.provider).toBe("anthropic");
     expect(state.model).toBe("claude-sonnet-4-20250514");
+    expect(state.apiKey).toBe("");
+  });
+
+  it("defaults to the demo provider when this build has a proxy configured", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    const { useAIConfigStore } = await import("@/ai/config");
+    const state = useAIConfigStore.getState();
+    expect(state.provider).toBe("demo");
+    expect(state.model).toBe("demo");
     expect(state.apiKey).toBe("");
   });
 
@@ -37,6 +51,7 @@ describe("useAIConfigStore", () => {
   });
 
   it("falls back to defaults when persisted JSON is malformed", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "");
     localStorage.setItem(STORAGE_KEY, "{not json");
     const { useAIConfigStore } = await import("@/ai/config");
     const state = useAIConfigStore.getState();
