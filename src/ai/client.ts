@@ -9,6 +9,7 @@ import { buildSystemPrompt } from "./prompt";
 import {
   getSkills,
   buildToolDefinitions,
+  buildSkillsReference,
   executeSkill,
   type PipelineSkill,
   type ToolDefinition,
@@ -41,9 +42,9 @@ export async function generatePipeline(
   signal?: AbortSignal,
 ): Promise<string> {
   const systemPrompt = buildSystemPrompt();
+  const skills = getSkills();
 
   if (config.provider === "anthropic") {
-    const skills = getSkills();
     const tools = buildToolDefinitions(skills);
     return streamAnthropicWithSkills(
       config,
@@ -54,11 +55,19 @@ export async function generatePipeline(
       onChunk,
       signal,
     );
-  } else if (config.provider === "demo") {
-    return streamDemoProxy(systemPrompt, userMessage, onChunk, signal);
-  } else {
-    return streamOpenAI(config, systemPrompt, userMessage, onChunk, signal);
   }
+
+  // OpenAI-compatible providers (and the demo proxy that fronts one) don't
+  // get the tool_use round trip, so inline the skill templates directly
+  // into the system prompt instead — otherwise they never see the
+  // reference pipelines Claude fetches on demand, which visibly hurts
+  // output quality.
+  const promptWithSkills = systemPrompt + buildSkillsReference(skills);
+
+  if (config.provider === "demo") {
+    return streamDemoProxy(promptWithSkills, userMessage, onChunk, signal);
+  }
+  return streamOpenAI(config, promptWithSkills, userMessage, onChunk, signal);
 }
 
 // ─── Anthropic with tool_use ─────────────────────────────────────────

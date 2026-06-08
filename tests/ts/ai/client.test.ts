@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("@/ai/skillLoader", () => ({
   getSkills: vi.fn(() => []),
   buildToolDefinitions: vi.fn(() => []),
+  buildSkillsReference: vi.fn(() => ""),
   executeSkill: vi.fn((_skills: unknown, name: string) =>
     name === "known_skill" ? "skill content" : null,
   ),
@@ -283,6 +284,20 @@ describe("generatePipeline (OpenAI)", () => {
       /OpenAI API error \(400\)/,
     );
   });
+
+  it("inlines the skills reference into the system prompt (no tool_use available)", async () => {
+    const skillLoader = await import("@/ai/skillLoader");
+    vi.mocked(skillLoader.buildSkillsReference).mockReturnValueOnce(
+      "\n\n## Reference Pipeline Templates\n\nTEMPLATE_MARKER",
+    );
+    fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
+
+    await generatePipeline(OPENAI_CONFIG, "msg", () => {});
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0].content).toContain("TEMPLATE_MARKER");
+  });
 });
 
 describe("generatePipeline (demo proxy)", () => {
@@ -334,6 +349,21 @@ describe("generatePipeline (demo proxy)", () => {
       { role: "user", content: "msg" },
     ]);
     expect(body.model).toBeUndefined();
+  });
+
+  it("inlines the skills reference into the system prompt sent to the proxy", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    const skillLoader = await import("@/ai/skillLoader");
+    vi.mocked(skillLoader.buildSkillsReference).mockReturnValueOnce(
+      "\n\n## Reference Pipeline Templates\n\nTEMPLATE_MARKER",
+    );
+    fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
+
+    await generatePipeline(DEMO_CONFIG, "msg", () => {});
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0].content).toContain("TEMPLATE_MARKER");
   });
 
   it("throws a descriptive error when the proxy returns a non-OK status", async () => {

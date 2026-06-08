@@ -116,6 +116,23 @@ export function executeSkill(skills: PipelineSkill[], toolName: string): string 
   return skill?.content ?? null;
 }
 
+/**
+ * Render skills as an inline markdown reference block for providers that
+ * don't support tool_use (OpenAI-compatible APIs, the demo proxy). Without
+ * this, those providers never see the pipeline templates that Claude
+ * fetches on demand via tools, which noticeably lowers output quality.
+ * Returns an empty string when there are no skills to include.
+ */
+export function buildSkillsReference(skills: PipelineSkill[]): string {
+  if (skills.length === 0) return "";
+
+  const sections = skills
+    .map((skill) => `### ${skill.name}\n${skill.description}\n\n${skill.content}`)
+    .join("\n\n");
+
+  return `\n\n## Reference Pipeline Templates\n\nUse these as starting points when they match the user's request — adapt node IDs, positions, and parameters as needed:\n\n${sections}`;
+}
+
 /** Cached skills loaded at module init. */
 let _cachedSkills: PipelineSkill[] | null = null;
 

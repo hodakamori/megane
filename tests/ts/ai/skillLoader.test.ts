@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildSkillsReference,
   buildToolDefinitions,
   executeSkill,
   getSkills,
@@ -104,6 +105,28 @@ describe("executeSkill", () => {
 
   it("returns null for an empty skills array", () => {
     expect(executeSkill([], "anything")).toBeNull();
+  });
+});
+
+describe("buildSkillsReference", () => {
+  it("returns an empty string for no skills", () => {
+    expect(buildSkillsReference([])).toBe("");
+  });
+
+  it("renders each skill's name, description, and content under a reference heading", () => {
+    const skills: PipelineSkill[] = [
+      { name: "get-molecule-template", description: "For molecules", content: "MOL_JSON" },
+      { name: "get-solid-template", description: "For crystals", content: "SOLID_JSON" },
+    ];
+    const reference = buildSkillsReference(skills);
+
+    expect(reference).toContain("## Reference Pipeline Templates");
+    expect(reference).toContain("### get-molecule-template");
+    expect(reference).toContain("For molecules");
+    expect(reference).toContain("MOL_JSON");
+    expect(reference).toContain("### get-solid-template");
+    expect(reference).toContain("For crystals");
+    expect(reference).toContain("SOLID_JSON");
   });
 });
 
