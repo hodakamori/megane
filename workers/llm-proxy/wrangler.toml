@@ -7,19 +7,19 @@ compatibility_date = "2025-01-01"
 [vars]
 ALLOWED_ORIGIN = "https://hodakamori.github.io"
 
-# OpenRouter model slug. Set to paid Anthropic Claude 3.5 Haiku for
-# reliable instruction-following (consumes OpenRouter credit; ~0.5c per
-# request). To swap models — e.g. back to a free `:free` model, or up to
-# anthropic/claude-sonnet-4 for top quality — just change this value, no
-# code change needed. Leave unset to use the default in src/proxy.ts.
-OPENROUTER_MODEL = "anthropic/claude-3.5-haiku"
+# OpenRouter model slug. Set to Anthropic Claude Sonnet 4.5 for strong
+# instruction-following and pipeline generation quality (~1.8c per request).
+# To downgrade to claude-3.5-haiku (~0.5c) or a free model, just change
+# this value — no code change needed. Leave unset to use the default in
+# src/proxy.ts.
+OPENROUTER_MODEL = "anthropic/claude-sonnet-4-5"
 
-# Comma-separated fallback models, used only if the primary errors. These
-# stay on free models as a no-cost safety net so the demo never hard-fails
-# if Claude has a transient issue. OpenRouter caps the total routing list
-# at 3, so keep this to 2 entries alongside the primary. Unset = the
-# DEFAULT_FALLBACK_MODELS list in src/proxy.ts.
-OPENROUTER_FALLBACK_MODELS = "openai/gpt-oss-120b:free,z-ai/glm-4.5-air:free"
+# Comma-separated fallback models, used only if the primary errors. Falls
+# back to Haiku (cheap but reliable) then a free model as a last resort.
+# OpenRouter caps the total routing list at 3, so keep this to 2 entries
+# alongside the primary. Unset = the DEFAULT_FALLBACK_MODELS list in
+# src/proxy.ts.
+OPENROUTER_FALLBACK_MODELS = "anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70b-instruct:free"
 
 # Created once via `wrangler kv namespace create RATE_LIMIT_KV`; replace
 # the id below with the value it prints.
