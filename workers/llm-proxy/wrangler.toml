@@ -21,11 +21,11 @@ OPENROUTER_MODEL = "anthropic/claude-sonnet-4-6"
 # src/proxy.ts.
 OPENROUTER_FALLBACK_MODELS = "anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70b-instruct:free"
 
-# Created once via `wrangler kv namespace create RATE_LIMIT_KV`; replace
-# the id below with the value it prints.
+# Created via `wrangler kv namespace create RATE_LIMIT_KV`. The id is not a
+# secret, so it is committed here directly.
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "e40298c13f7b46db89436cb67390fd86"
 
 # OPENROUTER_API_KEY is a secret — set it with:
 #   wrangler secret put OPENROUTER_API_KEY
