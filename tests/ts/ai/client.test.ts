@@ -11,6 +11,7 @@ vi.mock("@/ai/skillLoader", () => ({
 
 import {
   extractPipelineJSON,
+  tryExtractPipeline,
   generatePipeline,
   formatActionSummary,
   stripPipelineJSON,
@@ -507,26 +508,56 @@ describe("formatActionSummary", () => {
 });
 
 describe("stripPipelineJSON", () => {
-  it("returns the prose before a fenced json block", () => {
+  it("returns the prose that follows a fenced json block (JSON-first format)", () => {
+    expect(
+      stripPipelineJSON('```json\n{ "version": 3 }\n```\n\nLoads benzene and shows bonds.'),
+    ).toBe("Loads benzene and shows bonds.");
+  });
+
+  it("still strips a fenced block that comes after the prose", () => {
     expect(
       stripPipelineJSON('Loads benzene and shows bonds.\n```json\n{ "version": 3 }\n```'),
     ).toBe("Loads benzene and shows bonds.");
   });
 
-  it("returns the prose before a raw JSON object", () => {
-    expect(stripPipelineJSON('Here you go.  { "version": 3, "nodes": [] }')).toBe("Here you go.");
+  it("returns an empty string while the JSON is still streaming (unclosed fence)", () => {
+    expect(stripPipelineJSON('```json\n{ "version": 3, "nodes": [')).toBe("");
   });
 
-  it("cuts at whichever marker comes first (brace before fence)", () => {
-    expect(stripPipelineJSON("intro {x} more ```json```")).toBe("intro");
+  it("returns an empty string for an unfenced partial object", () => {
+    expect(stripPipelineJSON('{ "version": 3, "nodes": [')).toBe("");
   });
 
-  it("returns an empty string when the response is only JSON", () => {
+  it("returns an empty string when the response is only a fenced JSON block", () => {
     expect(stripPipelineJSON('```json\n{ "version": 3 }\n```')).toBe("");
-    expect(stripPipelineJSON('{ "version": 3 }')).toBe("");
   });
 
   it("returns the whole trimmed text when there is no JSON", () => {
     expect(stripPipelineJSON("  just a sentence.  ")).toBe("just a sentence.");
+  });
+});
+
+describe("tryExtractPipeline", () => {
+  it("returns null while the fence is still open (JSON streaming)", () => {
+    expect(tryExtractPipeline('```json\n{ "version": 3, "nodes": [')).toBeNull();
+  });
+
+  it("returns null when no fence is present at all", () => {
+    expect(tryExtractPipeline(`prefix ${MINIMAL_PIPELINE_JSON} suffix`)).toBeNull();
+  });
+
+  it("returns the parsed pipeline once a closed fence has arrived", () => {
+    const result = tryExtractPipeline(`\`\`\`json\n${MINIMAL_PIPELINE_JSON}\n\`\`\``);
+    expect(result?.version).toBe(3);
+    expect(result?.nodes).toHaveLength(1);
+  });
+
+  it("returns null when a closed fence holds invalid JSON instead of throwing", () => {
+    expect(tryExtractPipeline("```json\n{ not json }\n```")).toBeNull();
+  });
+
+  it("returns null when the fenced JSON has the wrong version", () => {
+    const wrong = JSON.stringify({ version: 2, nodes: [], edges: [] });
+    expect(tryExtractPipeline(`\`\`\`json\n${wrong}\n\`\`\``)).toBeNull();
   });
 });

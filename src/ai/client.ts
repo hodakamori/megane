@@ -479,19 +479,29 @@ export function formatActionSummary(nodeCount: number): string {
 }
 
 /**
- * Strip the pipeline JSON (a fenced ```` ```json ```` block, or a raw `{...}`
- * object) from an LLM response, returning just the surrounding natural-language
- * text. Used to show the assistant's explanation in the chat without the
- * machine-readable payload. The system prompt instructs the model to put its
- * one-sentence explanation before the JSON, so cutting at the first code-fence
- * or brace yields that explanation.
+ * Strip the pipeline JSON from an LLM response, returning just the surrounding
+ * natural-language text. Used to show the assistant's explanation in the chat
+ * without the machine-readable payload.
+ *
+ * The system prompt puts the fenced JSON block first and the one-sentence
+ * explanation immediately after it, so we remove any *closed* ```` ```json ````
+ * fence wherever it sits and return the remaining prose. While the JSON is
+ * still streaming (an unclosed fence, or a bare `{` with no fence yet) there is
+ * no prose to show, so we return an empty string and let the caller fall back
+ * to a "Generating…" placeholder — this guarantees a half-written payload is
+ * never surfaced to the user.
  */
 export function stripPipelineJSON(text: string): string {
-  const fence = text.indexOf("```");
-  const brace = text.indexOf("{");
-  const markers = [fence, brace].filter((i) => i !== -1);
-  if (markers.length === 0) return text.trim();
-  return text.slice(0, Math.min(...markers)).trim();
+  const withoutFence = text.replace(/```(?:json)?\s*\n?[\s\S]*?```/g, "").trim();
+  if (withoutFence !== text.trim()) {
+    return withoutFence;
+  }
+  // No closed fence: the JSON is still streaming (or arrived unfenced). Surface
+  // nothing rather than a partial object.
+  if (text.includes("```") || text.includes("{")) {
+    return "";
+  }
+  return text.trim();
 }
 
 // ─── JSON extraction ─────────────────────────────────────────────────
@@ -533,4 +543,22 @@ export function extractPipelineJSON(response: string): SerializedPipeline {
   }
 
   return pipeline;
+}
+
+/**
+ * Try to extract a complete pipeline from a partial streaming buffer, returning
+ * the parsed pipeline as soon as a *closed* ```` ```json ```` fence has arrived
+ * and validates, or `null` otherwise. Unlike {@link extractPipelineJSON} this
+ * never throws on incomplete or invalid input, so it is safe to call on every
+ * streamed chunk to apply the graph the instant the JSON finishes — without
+ * waiting for the trailing one-sentence explanation. Requiring a closed fence
+ * guards against parsing a half-streamed object.
+ */
+export function tryExtractPipeline(partial: string): SerializedPipeline | null {
+  if (!/```(?:json)?\s*\n?[\s\S]*?```/.test(partial)) return null;
+  try {
+    return extractPipelineJSON(partial);
+  } catch {
+    return null;
+  }
 }

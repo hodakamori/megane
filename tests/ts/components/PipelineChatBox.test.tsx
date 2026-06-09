@@ -17,11 +17,19 @@ const { storeState } = vi.hoisted(() => ({
 vi.mock("@/ai/client", () => ({
   generatePipeline: vi.fn(),
   extractPipelineJSON: vi.fn(),
+  // Only resolves once a *closed* fence has streamed in, mirroring the real
+  // helper that drives the early-apply path.
+  tryExtractPipeline: (text: string) =>
+    /```[\s\S]*?```/.test(text)
+      ? { version: 3, nodes: [{ id: "a" }, { id: "b" }], edges: [] }
+      : null,
   formatActionSummary: (n: number) =>
     `Pipeline applied — ${n} ${n === 1 ? "node" : "nodes"} added to the editor.`,
   stripPipelineJSON: (text: string) => {
-    const markers = [text.indexOf("```"), text.indexOf("{")].filter((i) => i !== -1);
-    return (markers.length === 0 ? text : text.slice(0, Math.min(...markers))).trim();
+    const withoutFence = text.replace(/```(?:json)?\s*\n?[\s\S]*?```/g, "").trim();
+    if (withoutFence !== text.trim()) return withoutFence;
+    if (text.includes("```") || text.includes("{")) return "";
+    return text.trim();
   },
 }));
 vi.mock("@/pipeline/store", () => {
@@ -291,6 +299,26 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     ).toBeTruthy();
     // The raw JSON must never appear in the transcript.
     expect(screen.queryByText(/"version": 3/)).toBeNull();
+    expect(storeState.deserialize).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies the pipeline the instant the JSON block closes, before the prose streams", async () => {
+    (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_config, _msg, onChunk: (c: string) => void) => {
+        // The closed fence arrives first; deserialize must fire on this chunk,
+        // not only after the trailing prose finishes streaming.
+        onChunk('```json\n{ "version": 3, "nodes": [] }\n```');
+        expect(storeState.deserialize).toHaveBeenCalledTimes(1);
+        onChunk("\nLoads the structure.");
+        return '```json\n{ "version": 3, "nodes": [] }\n```\nLoads the structure.';
+      },
+    );
+    render(<PipelineChatBox />);
+    submit("show it");
+
+    expect(await screen.findByText("Loads the structure.")).toBeTruthy();
+    // Applied exactly once — via the streaming early-apply, not the
+    // post-stream fallback.
     expect(storeState.deserialize).toHaveBeenCalledTimes(1);
   });
 

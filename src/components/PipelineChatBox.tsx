@@ -10,12 +10,13 @@ import type { AIConfig, AIProvider } from "../ai/config";
 import {
   generatePipeline,
   extractPipelineJSON,
+  tryExtractPipeline,
   formatActionSummary,
   stripPipelineJSON,
 } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
 import type { NodeSnapshotData } from "../pipeline/execute";
-import type { LoadStructureParams } from "../pipeline/types";
+import type { LoadStructureParams, SerializedPipeline } from "../pipeline/types";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 
 interface ChatMessage {
@@ -299,29 +300,14 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     const abort = new AbortController();
     abortRef.current = abort;
 
-    try {
-      const fullResponse = await generatePipeline(
-        effectiveConfig,
-        trimmed,
-        (chunk) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last && last.role === "assistant") {
-              updated[updated.length - 1] = { ...last, content: last.content + chunk };
-            }
-            return updated;
-          });
-        },
-        abort.signal,
-      );
-
-      const pipeline = extractPipelineJSON(fullResponse);
-
-      // Preserve the structure the user already loaded. The AI returns a fresh
-      // graph whose load_structure node has `fileName: null`, and deserialize()
-      // clears nodeSnapshots, so without re-applying this the loaded structure
-      // would disappear from the viewport.
+    // Apply a generated pipeline. The AI returns a fresh graph whose
+    // load_structure node has `fileName: null`, and deserialize() clears
+    // nodeSnapshots, so we capture the currently loaded structure first and
+    // re-attach it to the new loader afterwards — otherwise the loaded
+    // structure would disappear from the viewport. `appliedNodeCount` doubles
+    // as a "have we applied yet?" guard (-1 = not applied).
+    let appliedNodeCount = -1;
+    const applyPipeline = (pipeline: SerializedPipeline) => {
       const preState = usePipelineStore.getState();
       const preserved = captureLoadedStructure(preState.nodes, preState.nodeSnapshots);
 
@@ -341,10 +327,44 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
         }
       }
 
+      appliedNodeCount = pipeline.nodes.length;
       // Surface the result on the editor tab and trigger fitView via the
       // panel's mode-change effect.
       usePipelineUIStore.getState().markPipelineApplied();
       onPipelineApplied?.();
+    };
+
+    try {
+      let streamBuffer = "";
+      const fullResponse = await generatePipeline(
+        effectiveConfig,
+        trimmed,
+        (chunk) => {
+          streamBuffer += chunk;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.role === "assistant") {
+              updated[updated.length - 1] = { ...last, content: last.content + chunk };
+            }
+            return updated;
+          });
+          // Apply the graph the instant a complete JSON block has streamed in.
+          // The model emits the JSON first, so the viewport updates without
+          // waiting for the trailing one-sentence explanation to finish.
+          if (appliedNodeCount < 0) {
+            const early = tryExtractPipeline(streamBuffer);
+            if (early) applyPipeline(early);
+          }
+        },
+        abort.signal,
+      );
+
+      // Fallback: the JSON may only have closed in the final, non-streamed text
+      // (or arrived after a tool round trip), so apply it now if we haven't yet.
+      if (appliedNodeCount < 0) {
+        applyPipeline(extractPipelineJSON(fullResponse));
+      }
 
       // Show the assistant's own explanation (everything except the JSON
       // payload); fall back to a generic summary if the model returned only
@@ -353,7 +373,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       setMessages((prev) =>
         replaceTrailingAssistant(prev, {
           role: "assistant",
-          content: explanation || formatActionSummary(pipeline.nodes.length),
+          content: explanation || formatActionSummary(appliedNodeCount),
         }),
       );
     } catch (e: unknown) {

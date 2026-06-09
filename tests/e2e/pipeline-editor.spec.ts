@@ -57,22 +57,25 @@ test.describe("pipeline-editor: webapp default graph", () => {
     await expect(page.locator('[data-testid="render-modal"]')).toBeHidden();
   });
 
-  test("Add Node menu adds a Supercell node with its controls", async ({ page }) => {
-    // Open the Add Node palette and add a Supercell node.
+  test("Add Node menu adds a Replicate node with its controls", async ({ page }) => {
+    // Add Node lives in the editor toolbar; the Chat tab is the default, so
+    // switch to the Editor tab first.
+    await page.locator('[data-testid="pipeline-editor-tab-editor"]').click();
+    // Open the Add Node palette and add a Replicate (supercell builder) node.
     await page.getByTitle("Add Node").click();
-    await page.getByRole("button", { name: "Supercell", exact: true }).click();
+    await page.getByRole("button", { name: "Replicate", exact: true }).click();
 
-    // The node mounts with its na/nb/nc repeat inputs.
-    const node = page.locator('[data-testid="pipeline-node-supercell"]').first();
+    // The node mounts with its nx/ny/nz repeat inputs.
+    const node = page.locator('[data-testid="pipeline-node-replicate"]').first();
     await expect(node).toBeVisible();
-    await expect(page.locator('[data-testid="supercell-node-na"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid="supercell-node-nb"]').first()).toBeVisible();
-    await expect(page.locator('[data-testid="supercell-node-nc"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="replicate-node-nx"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="replicate-node-ny"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="replicate-node-nz"]').first()).toBeVisible();
 
     // Repeat count edits are accepted.
-    const na = page.locator('[data-testid="supercell-node-na"]').first();
-    await na.fill("2");
-    await expect(na).toHaveValue("2");
+    const nx = page.locator('[data-testid="replicate-node-nx"]').first();
+    await nx.fill("2");
+    await expect(nx).toHaveValue("2");
   });
 
   test("tab selector switches between editor and chat panes", async ({ page }) => {
@@ -81,6 +84,22 @@ test.describe("pipeline-editor: webapp default graph", () => {
     const editorPanel = page.locator("#pipeline-tabpanel-editor");
     const chatPanel = page.locator("#pipeline-tabpanel-chat");
 
+    // Chat is the default tab — the assistant is the primary entry point.
+    await expect(chatTab).toHaveAttribute("aria-selected", "true");
+    await expect(editorTab).toHaveAttribute("aria-selected", "false");
+    await expect(chatPanel).toBeVisible();
+    // The editor pane stays in the layout (visibility:hidden) so ReactFlow
+    // keeps its measurements; Playwright still treats it as hidden.
+    await expect(editorPanel).toBeHidden();
+    // Templates button is inside the hidden editor tabpanel.
+    await expect(page.locator('[data-testid="pipeline-editor-templates"]')).toBeHidden();
+    // I/O row stays visible from Chat (Render/Share apply to the current pipeline).
+    await expect(page.locator('[data-testid="pipeline-editor-render"]')).toBeVisible();
+    // Editor-side Others row is unmounted on chat to give the input more room.
+    await expect(page.locator('[data-testid="pipeline-editor-theme"]')).toBeHidden();
+
+    // Switch to the Editor tab.
+    await editorTab.click();
     await expect(editorTab).toHaveAttribute("aria-selected", "true");
     await expect(chatTab).toHaveAttribute("aria-selected", "false");
     await expect(editorPanel).toBeVisible();
@@ -99,26 +118,16 @@ test.describe("pipeline-editor: webapp default graph", () => {
     // toolbar's flex basis previously made the row claim the entire pane
     // height, leaving the buttons stranded inside an empty band. We assert
     // the row height is well below the pane height so the canvas dominates.
-    const toolbarBox = await page
-      .locator('[data-testid="pipeline-editor-row"]')
-      .boundingBox();
+    const toolbarBox = await page.locator('[data-testid="pipeline-editor-row"]').boundingBox();
     expect(toolbarBox?.height ?? 0).toBeGreaterThan(0);
     expect(toolbarBox?.height ?? 0).toBeLessThan((editorBox?.height ?? 0) / 3);
 
+    // Back to Chat: editor pane hides again.
     await chatTab.click();
     await expect(chatTab).toHaveAttribute("aria-selected", "true");
     await expect(editorTab).toHaveAttribute("aria-selected", "false");
     await expect(chatPanel).toBeVisible();
-    // The editor pane stays in the layout (visibility:hidden) so ReactFlow
-    // keeps its measurements; Playwright still treats it as hidden.
     await expect(editorPanel).toBeHidden();
-    // Templates button is inside the hidden editor tabpanel.
-    await expect(page.locator('[data-testid="pipeline-editor-templates"]')).toBeHidden();
-
-    // I/O row stays visible from Chat (Render/Share apply to the current pipeline).
-    await expect(page.locator('[data-testid="pipeline-editor-render"]')).toBeVisible();
-    // Editor-side Others row is unmounted on chat to give the input more room.
-    await expect(page.locator('[data-testid="pipeline-editor-theme"]')).toBeHidden();
 
     // Toggle back to the Editor tab; canvas is still non-zero.
     await editorTab.click();
