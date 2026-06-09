@@ -30,6 +30,16 @@ export interface ToolDefinition {
   input_schema: { type: "object"; properties: Record<string, never> };
 }
 
+/** OpenAI-compatible function tool definition shape (also used by OpenRouter). */
+export interface OpenAITool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: { type: "object"; properties: Record<string, never> };
+  };
+}
+
 /**
  * Import all .md files from the skills directory at build time.
  * Vite's import.meta.glob with ?raw returns file contents as strings.
@@ -117,20 +127,20 @@ export function executeSkill(skills: PipelineSkill[], toolName: string): string 
 }
 
 /**
- * Render skills as an inline markdown reference block for providers that
- * don't support tool_use (OpenAI-compatible APIs, the demo proxy). Without
- * this, those providers never see the pipeline templates that Claude
- * fetches on demand via tools, which noticeably lowers output quality.
- * Returns an empty string when there are no skills to include.
+ * Build OpenAI-compatible function tool definitions from loaded skills.
+ * Used for the OpenAI API and the OpenRouter-backed demo proxy, which both
+ * speak the OpenAI tool-calling protocol. Each skill becomes a parameterless
+ * function the model can call on demand to fetch the template.
  */
-export function buildSkillsReference(skills: PipelineSkill[]): string {
-  if (skills.length === 0) return "";
-
-  const sections = skills
-    .map((skill) => `### ${skill.name}\n${skill.description}\n\n${skill.content}`)
-    .join("\n\n");
-
-  return `\n\n## Reference Pipeline Templates\n\nUse these as starting points when they match the user's request — adapt node IDs, positions, and parameters as needed:\n\n${sections}`;
+export function buildOpenAITools(skills: PipelineSkill[]): OpenAITool[] {
+  return skills.map((skill) => ({
+    type: "function",
+    function: {
+      name: toSnakeCase(skill.name),
+      description: skill.description,
+      parameters: { type: "object" as const, properties: {} },
+    },
+  }));
 }
 
 /** Cached skills loaded at module init. */

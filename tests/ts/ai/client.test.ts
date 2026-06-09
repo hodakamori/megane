@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("@/ai/skillLoader", () => ({
   getSkills: vi.fn(() => []),
   buildToolDefinitions: vi.fn(() => []),
-  buildSkillsReference: vi.fn(() => ""),
+  buildOpenAITools: vi.fn(() => []),
   executeSkill: vi.fn((_skills: unknown, name: string) =>
     name === "known_skill" ? "skill content" : null,
   ),
@@ -285,18 +285,96 @@ describe("generatePipeline (OpenAI)", () => {
     );
   });
 
-  it("inlines the skills reference into the system prompt (no tool_use available)", async () => {
+  it("includes the skill tools in the request body when skills are present", async () => {
     const skillLoader = await import("@/ai/skillLoader");
-    vi.mocked(skillLoader.buildSkillsReference).mockReturnValueOnce(
-      "\n\n## Reference Pipeline Templates\n\nTEMPLATE_MARKER",
-    );
+    vi.mocked(skillLoader.buildOpenAITools).mockReturnValueOnce([
+      {
+        type: "function",
+        function: {
+          name: "known_skill",
+          description: "d",
+          parameters: { type: "object", properties: {} },
+        },
+      },
+    ]);
     fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
 
     await generatePipeline(OPENAI_CONFIG, "msg", () => {});
 
-    const init = fetchMock.mock.calls[0][1] as RequestInit;
-    const body = JSON.parse(init.body as string);
-    expect(body.messages[0].content).toContain("TEMPLATE_MARKER");
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.tools[0].function.name).toBe("known_skill");
+  });
+
+  it("runs a tool-call round trip and feeds the skill result back", async () => {
+    // 1st response: the model asks to call a skill function.
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        {
+          event: "",
+          data: {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    { index: 0, id: "call_1", type: "function", function: { name: "known_skill", arguments: "" } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "tool_calls" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+    // 2nd response: the final text answer.
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        { event: "", data: { choices: [{ delta: { content: "final" } }] } },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "stop" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    const result = await generatePipeline(OPENAI_CONFIG, "msg", () => {});
+    expect(result).toBe("final");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    const assistantMsg = secondBody.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistantMsg.tool_calls[0].function.name).toBe("known_skill");
+    const toolMsg = secondBody.messages.find((m: { role: string }) => m.role === "tool");
+    expect(toolMsg.content).toBe("skill content");
+    expect(toolMsg.tool_call_id).toBe("call_1");
+  });
+
+  it("throws after too many tool-call rounds", async () => {
+    // Always respond with a tool call so the loop never terminates. Build a
+    // fresh Response each call since a stream body can only be read once.
+    fetchMock.mockImplementation(async () =>
+      makeSSEResponse([
+        {
+          event: "",
+          data: {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    { index: 0, id: "call_1", type: "function", function: { name: "known_skill", arguments: "" } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "tool_calls" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    await expect(generatePipeline(OPENAI_CONFIG, "msg", () => {})).rejects.toThrow(
+      /Too many tool-use rounds/,
+    );
   });
 });
 
@@ -351,19 +429,49 @@ describe("generatePipeline (demo proxy)", () => {
     expect(body.model).toBeUndefined();
   });
 
-  it("inlines the skills reference into the system prompt sent to the proxy", async () => {
+  it("runs the tool-call round trip through the proxy without a model field", async () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
-    const skillLoader = await import("@/ai/skillLoader");
-    vi.mocked(skillLoader.buildSkillsReference).mockReturnValueOnce(
-      "\n\n## Reference Pipeline Templates\n\nTEMPLATE_MARKER",
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        {
+          event: "",
+          data: {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    { index: 0, id: "call_1", type: "function", function: { name: "known_skill", arguments: "" } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "tool_calls" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
     );
-    fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        { event: "", data: { choices: [{ delta: { content: "done" } }] } },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "stop" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
 
-    await generatePipeline(DEMO_CONFIG, "msg", () => {});
+    const result = await generatePipeline(DEMO_CONFIG, "msg", () => {});
+    expect(result).toBe("done");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
-    expect(body.messages[0].content).toContain("TEMPLATE_MARKER");
+    for (const call of fetchMock.mock.calls) {
+      expect(call[0]).toBe("https://proxy.example.com/chat");
+      const body = JSON.parse((call[1] as RequestInit).body as string);
+      expect(body.model).toBeUndefined(); // proxy chooses the model server-side
+    }
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(secondBody.messages.find((m: { role: string }) => m.role === "tool").content).toBe(
+      "skill content",
+    );
   });
 
   it("throws a descriptive error when the proxy returns a non-OK status", async () => {

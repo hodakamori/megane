@@ -4,6 +4,7 @@ import {
   isAllowedOrigin,
   corsHeaders,
   sanitizeMessages,
+  sanitizeTools,
   isRateLimited,
   PER_MINUTE_LIMIT,
   PER_DAY_LIMIT,
@@ -95,12 +96,12 @@ describe("sanitizeMessages", () => {
   });
 
   it("rejects more than the maximum number of messages", () => {
-    const messages = Array.from({ length: 11 }, () => ({ role: "user", content: "hi" }));
+    const messages = Array.from({ length: 13 }, () => ({ role: "user", content: "hi" }));
     expect(sanitizeMessages({ messages })).toBeNull();
   });
 
   it("rejects an unknown role", () => {
-    expect(sanitizeMessages({ messages: [{ role: "tool", content: "hi" }] })).toBeNull();
+    expect(sanitizeMessages({ messages: [{ role: "system_admin", content: "hi" }] })).toBeNull();
   });
 
   it("rejects non-string or empty content", () => {
@@ -125,7 +126,7 @@ describe("sanitizeMessages", () => {
       ],
     });
     expect(ok).not.toBeNull();
-    expect(ok?.[0].content.length).toBe(13000);
+    expect(ok?.[0].content).toHaveLength(13000);
 
     const tooBigSystem = "s".repeat(24001);
     expect(sanitizeMessages({ messages: [{ role: "system", content: tooBigSystem }] })).toBeNull();
@@ -134,6 +135,127 @@ describe("sanitizeMessages", () => {
   it("rejects malformed message entries", () => {
     expect(sanitizeMessages({ messages: [null] })).toBeNull();
     expect(sanitizeMessages({ messages: [{ role: "user" }] })).toBeNull();
+  });
+
+  it("accepts an assistant message carrying tool_calls with null content", () => {
+    const out = sanitizeMessages({
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "call_1", type: "function", function: { name: "get_x", arguments: "{}" } },
+          ],
+        },
+      ],
+    });
+    expect(out).not.toBeNull();
+    expect(out?.[1].tool_calls).toHaveLength(1);
+    expect(out?.[1].content).toBeNull();
+  });
+
+  it("accepts a tool message with a tool_call_id and large content", () => {
+    const out = sanitizeMessages({
+      messages: [
+        { role: "tool", content: "x".repeat(13000), tool_call_id: "call_1" },
+      ],
+    });
+    expect(out).not.toBeNull();
+    expect(out?.[0].tool_call_id).toBe("call_1");
+  });
+
+  it("rejects null content on a non-assistant message", () => {
+    expect(sanitizeMessages({ messages: [{ role: "user", content: null }] })).toBeNull();
+  });
+
+  it("rejects assistant null content without tool_calls", () => {
+    expect(sanitizeMessages({ messages: [{ role: "assistant", content: null }] })).toBeNull();
+  });
+
+  it("rejects tool_calls on a non-assistant message", () => {
+    expect(
+      sanitizeMessages({
+        messages: [
+          {
+            role: "user",
+            content: "hi",
+            tool_calls: [
+              { id: "c1", type: "function", function: { name: "x", arguments: "{}" } },
+            ],
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a tool message without a tool_call_id", () => {
+    expect(sanitizeMessages({ messages: [{ role: "tool", content: "result" }] })).toBeNull();
+  });
+
+  it("rejects tool_call_id on a non-tool message", () => {
+    expect(
+      sanitizeMessages({
+        messages: [{ role: "user", content: "hi", tool_call_id: "c1" }],
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects malformed tool_calls", () => {
+    const wrap = (toolCalls: unknown) =>
+      sanitizeMessages({
+        messages: [{ role: "assistant", content: null, tool_calls: toolCalls }],
+      });
+    expect(wrap([])).toBeNull(); // empty
+    expect(wrap([{ id: "c1", type: "not_function", function: { name: "x", arguments: "{}" } }])).toBeNull();
+    expect(wrap([{ id: "", type: "function", function: { name: "x", arguments: "{}" } }])).toBeNull();
+    expect(wrap([{ id: "c1", type: "function", function: { name: "", arguments: "{}" } }])).toBeNull();
+    expect(wrap([{ id: "c1", type: "function", function: { name: "x", arguments: 5 } }])).toBeNull();
+    expect(wrap([{ id: "c1", type: "function" }])).toBeNull();
+  });
+});
+
+describe("sanitizeTools", () => {
+  const validTool = {
+    type: "function",
+    function: { name: "get_molecule_template", description: "desc", parameters: { type: "object", properties: {} } },
+  };
+
+  it("returns undefined when no tools key is present", () => {
+    expect(sanitizeTools({ messages: [] })).toBeUndefined();
+    expect(sanitizeTools("nope")).toBeUndefined();
+    expect(sanitizeTools(null)).toBeUndefined();
+  });
+
+  it("returns the sanitized tools when valid", () => {
+    const out = sanitizeTools({ tools: [validTool] });
+    expect(out).toHaveLength(1);
+    expect(out?.[0].function.name).toBe("get_molecule_template");
+  });
+
+  it("accepts a function tool without description or parameters", () => {
+    const out = sanitizeTools({ tools: [{ type: "function", function: { name: "x" } }] });
+    expect(out).toHaveLength(1);
+    expect(out?.[0].function.description).toBeUndefined();
+  });
+
+  it("returns null for more than the maximum number of tools", () => {
+    const tools = Array.from({ length: 17 }, () => validTool);
+    expect(sanitizeTools({ tools })).toBeNull();
+  });
+
+  it("returns null for malformed tool entries", () => {
+    expect(sanitizeTools({ tools: "not-an-array" })).toBeNull();
+    expect(sanitizeTools({ tools: [null] })).toBeNull();
+    expect(sanitizeTools({ tools: [{ type: "not_function", function: { name: "x" } }] })).toBeNull();
+    expect(sanitizeTools({ tools: [{ type: "function", function: null }] })).toBeNull();
+    expect(sanitizeTools({ tools: [{ type: "function", function: { name: "" } }] })).toBeNull();
+    expect(
+      sanitizeTools({ tools: [{ type: "function", function: { name: "x", description: 5 } }] }),
+    ).toBeNull();
+    expect(
+      sanitizeTools({ tools: [{ type: "function", function: { name: "x", parameters: "no" } }] }),
+    ).toBeNull();
   });
 });
 
@@ -334,6 +456,46 @@ describe("worker fetch handler", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
     expect(await res.text()).toBe(upstreamBody);
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("forwards a valid tools array to OpenRouter", async () => {
+    const env = makeEnv();
+    const tool = {
+      type: "function",
+      function: { name: "get_x", description: "d", parameters: { type: "object", properties: {} } },
+    };
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const sentBody = JSON.parse(init.body as string);
+      expect(sentBody.tools).toHaveLength(1);
+      expect(sentBody.tools[0].function.name).toBe("get_x");
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }], tools: [tool] },
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 when the tools array is malformed", async () => {
+    const env = makeEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 200 })),
+    );
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }], tools: [{ type: "function" }] },
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
   });
 
   it("uses the OPENROUTER_MODEL override as the primary model", async () => {

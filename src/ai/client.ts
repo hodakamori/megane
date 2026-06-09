@@ -9,10 +9,11 @@ import { buildSystemPrompt } from "./prompt";
 import {
   getSkills,
   buildToolDefinitions,
-  buildSkillsReference,
+  buildOpenAITools,
   executeSkill,
   type PipelineSkill,
   type ToolDefinition,
+  type OpenAITool,
 } from "./skillLoader";
 
 // ─── Types for Anthropic SSE parsing ─────────────────────────────────
@@ -57,17 +58,16 @@ export async function generatePipeline(
     );
   }
 
-  // OpenAI-compatible providers (and the demo proxy that fronts one) don't
-  // get the tool_use round trip, so inline the skill templates directly
-  // into the system prompt instead — otherwise they never see the
-  // reference pipelines Claude fetches on demand, which visibly hurts
-  // output quality.
-  const promptWithSkills = systemPrompt + buildSkillsReference(skills);
+  // OpenAI-compatible providers (and the OpenRouter-backed demo proxy)
+  // speak the OpenAI tool-calling protocol, so the model fetches skill
+  // templates on demand via function calls — the same on-demand behaviour
+  // as the Anthropic path, no inlining required.
+  const tools = buildOpenAITools(skills);
 
   if (config.provider === "demo") {
-    return streamDemoProxy(promptWithSkills, userMessage, onChunk, signal);
+    return streamDemoProxy(systemPrompt, userMessage, skills, tools, onChunk, signal);
   }
-  return streamOpenAI(config, promptWithSkills, userMessage, onChunk, signal);
+  return streamOpenAI(config, systemPrompt, userMessage, skills, tools, onChunk, signal);
 }
 
 // ─── Anthropic with tool_use ─────────────────────────────────────────
@@ -240,117 +240,109 @@ async function readAnthropicSSE(
   return { text, stopReason, toolUses };
 }
 
-// ─── OpenAI (unchanged) ─────────────────────────────────────────────
+// ─── OpenAI-compatible tool calling (OpenAI API + demo proxy) ────────
 
-async function streamOpenAI(
-  config: AIConfig,
-  systemPrompt: string,
-  userMessage: string,
-  onChunk: (text: string) => void,
-  signal?: AbortSignal,
-): Promise<string> {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      stream: true,
-    }),
-    signal,
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI API error (${response.status}): ${body}`);
-  }
-
-  return readSSE(response, (_event, data) => {
-    if (data === "[DONE]") return null;
-    try {
-      const parsed = JSON.parse(data);
-      const text = parsed.choices?.[0]?.delta?.content;
-      if (text) {
-        onChunk(text);
-        return text;
-      }
-    } catch {
-      // skip unparseable lines
-    }
-    return null;
-  });
+interface OpenAIToolCallAccumulator {
+  index: number;
+  id: string;
+  name: string;
+  argsJson: string;
 }
 
-// ─── Demo proxy (no API key required) ────────────────────────────────
+interface OpenAIStreamResult {
+  text: string;
+  finishReason: string;
+  toolCalls: OpenAIToolCallAccumulator[];
+}
+
+/** Sends one request body and returns the raw streaming Response. */
+type OpenAISender = (body: Record<string, unknown>, signal?: AbortSignal) => Promise<Response>;
+
+interface OpenAIChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: unknown;
+  tool_call_id?: string;
+}
 
 /**
- * Stream a chat completion through the docs-demo Cloudflare Worker proxy.
- * The proxy holds its own OpenRouter API key and forwards an
- * OpenAI-compatible streamed response, so we can reuse `readSSE`.
+ * Drive an OpenAI-compatible chat completion with the skill functions,
+ * handling the tool-call round trip: when the model emits tool_calls we
+ * run each skill locally and feed the result back, just like the Anthropic
+ * path. `model` is omitted for the demo proxy, which picks it server-side.
  */
-async function streamDemoProxy(
+async function streamOpenAICompatWithSkills(
+  send: OpenAISender,
+  model: string | undefined,
   systemPrompt: string,
   userMessage: string,
+  skills: PipelineSkill[],
+  tools: OpenAITool[],
   onChunk: (text: string) => void,
+  errorLabel: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const proxyUrl = import.meta.env.VITE_LLM_PROXY_URL;
-  if (!proxyUrl) {
-    throw new Error("The free demo is not available in this build.");
-  }
+  const messages: OpenAIChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ];
 
-  const response = await fetch(proxyUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    }),
-    signal,
-  });
+  // Allow up to 3 tool-call round trips to prevent infinite loops.
+  for (let turn = 0; turn < 4; turn++) {
+    const body: Record<string, unknown> = { messages, stream: true };
+    if (model) body.model = model;
+    if (tools.length > 0) body.tools = tools;
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Demo proxy error (${response.status}): ${body}`);
-  }
-
-  return readSSE(response, (_event, data) => {
-    if (data === "[DONE]") return null;
-    try {
-      const parsed = JSON.parse(data);
-      const text = parsed.choices?.[0]?.delta?.content;
-      if (text) {
-        onChunk(text);
-        return text;
-      }
-    } catch {
-      // skip unparseable lines
+    const response = await send(body, signal);
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`${errorLabel} (${response.status}): ${errBody}`);
     }
-    return null;
-  });
+
+    const result = await readOpenAISSE(response, onChunk);
+
+    if (result.finishReason !== "tool_calls" || result.toolCalls.length === 0) {
+      return result.text;
+    }
+
+    // Echo the assistant's tool_calls back, then answer each one.
+    messages.push({
+      role: "assistant",
+      content: result.text || null,
+      tool_calls: result.toolCalls.map((tc) => ({
+        id: tc.id,
+        type: "function",
+        function: { name: tc.name, arguments: tc.argsJson || "{}" },
+      })),
+    });
+
+    for (const tc of result.toolCalls) {
+      const skillResult = executeSkill(skills, tc.name);
+      messages.push({
+        role: "tool",
+        tool_call_id: tc.id,
+        content: skillResult ?? `Unknown skill: ${tc.name}`,
+      });
+    }
+  }
+
+  throw new Error("Too many tool-use rounds. Please try again.");
 }
 
-// ─── Shared SSE reader (used by OpenAI and demo-proxy paths) ────────
-
-async function readSSE(
+/**
+ * Read an OpenAI-compatible SSE stream, accumulating text deltas and any
+ * streamed tool_calls (whose `arguments` arrive as fragments keyed by index).
+ */
+async function readOpenAISSE(
   response: Response,
-  handler: (event: string, data: string) => string | null,
-): Promise<string> {
+  onChunk: (text: string) => void,
+): Promise<OpenAIStreamResult> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
-  let accumulated = "";
   let buffer = "";
-  let currentEvent = "";
+  let text = "";
+  let finishReason = "stop";
+  const toolCallsByIndex = new Map<number, OpenAIToolCallAccumulator>();
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -361,19 +353,121 @@ async function readSSE(
     buffer = lines.pop()!;
 
     for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        currentEvent = line.slice(7).trim();
-      } else if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        const text = handler(currentEvent, data);
-        if (text) accumulated += text;
-      } else if (line === "") {
-        currentEvent = "";
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6);
+      if (data === "[DONE]") continue;
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        continue;
+      }
+
+      const choice = (parsed.choices as Array<Record<string, unknown>> | undefined)?.[0];
+      if (!choice) continue;
+
+      const delta = choice.delta as Record<string, unknown> | undefined;
+      if (typeof delta?.content === "string" && delta.content) {
+        text += delta.content;
+        onChunk(delta.content);
+      }
+
+      const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+      if (deltaToolCalls) {
+        for (const tc of deltaToolCalls) {
+          const idx = typeof tc.index === "number" ? tc.index : 0;
+          let acc = toolCallsByIndex.get(idx);
+          if (!acc) {
+            acc = { index: idx, id: "", name: "", argsJson: "" };
+            toolCallsByIndex.set(idx, acc);
+          }
+          if (typeof tc.id === "string") acc.id = tc.id;
+          const fn = tc.function as Record<string, unknown> | undefined;
+          if (typeof fn?.name === "string") acc.name += fn.name;
+          if (typeof fn?.arguments === "string") acc.argsJson += fn.arguments;
+        }
+      }
+
+      if (typeof choice.finish_reason === "string") {
+        finishReason = choice.finish_reason;
       }
     }
   }
 
-  return accumulated;
+  const toolCalls = [...toolCallsByIndex.values()].sort((a, b) => a.index - b.index);
+  return { text, finishReason, toolCalls };
+}
+
+async function streamOpenAI(
+  config: AIConfig,
+  systemPrompt: string,
+  userMessage: string,
+  skills: PipelineSkill[],
+  tools: OpenAITool[],
+  onChunk: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  return streamOpenAICompatWithSkills(
+    (body, sig) =>
+      fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: sig,
+      }),
+    config.model,
+    systemPrompt,
+    userMessage,
+    skills,
+    tools,
+    onChunk,
+    "OpenAI API error",
+    signal,
+  );
+}
+
+// ─── Demo proxy (no API key required) ────────────────────────────────
+
+/**
+ * Stream a chat completion through the docs-demo Cloudflare Worker proxy.
+ * The proxy holds its own OpenRouter API key, picks the model server-side,
+ * and speaks the OpenAI tool-calling protocol, so the same skill round
+ * trip works end to end.
+ */
+async function streamDemoProxy(
+  systemPrompt: string,
+  userMessage: string,
+  skills: PipelineSkill[],
+  tools: OpenAITool[],
+  onChunk: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const proxyUrl = import.meta.env.VITE_LLM_PROXY_URL;
+  if (!proxyUrl) {
+    throw new Error("The free demo is not available in this build.");
+  }
+
+  return streamOpenAICompatWithSkills(
+    (body, sig) =>
+      fetch(proxyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: sig,
+      }),
+    undefined, // the proxy chooses the model server-side
+    systemPrompt,
+    userMessage,
+    skills,
+    tools,
+    onChunk,
+    "Demo proxy error",
+    signal,
+  );
 }
 
 // ─── JSON extraction ─────────────────────────────────────────────────

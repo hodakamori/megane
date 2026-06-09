@@ -68,26 +68,49 @@ export function buildModelList(env: Env): string[] {
   return [...new Set([primary, ...fallbacks])].slice(0, MAX_MODELS);
 }
 export const MAX_TOKENS = 2048;
-export const MAX_MESSAGES = 10;
+export const MAX_MESSAGES = 12;
 /**
  * Length cap for user/assistant messages — these carry untrusted input
  * from the public, so keep them tight.
  */
 export const MAX_MESSAGE_LENGTH = 8000;
 /**
- * Length cap for the system message. The frontend's generated system
- * prompt embeds the full pipeline schema plus the skill templates and is
- * legitimately large (~13k chars), so it gets a roomier limit than the
- * untrusted user/assistant messages above.
+ * Length cap for system and tool messages. The system prompt carries the
+ * full pipeline schema (~7.6k chars) and tool messages carry skill
+ * templates the frontend feeds back during the tool-call round trip, so
+ * both are app-generated and legitimately larger than untrusted
+ * user/assistant input.
  */
 export const MAX_SYSTEM_MESSAGE_LENGTH = 24000;
+/** Bounds on the optional OpenAI tool-calling fields forwarded upstream. */
+export const MAX_TOOLS = 16;
+export const MAX_TOOL_CALLS = 16;
+export const MAX_TOOL_NAME_LENGTH = 64;
+export const MAX_TOOL_DESCRIPTION_LENGTH = 1024;
+export const MAX_TOOL_CALL_ID_LENGTH = 256;
 export const PER_MINUTE_LIMIT = 3;
 export const PER_DAY_LIMIT = 20;
 
 const MINUTE_TTL_SECONDS = 90;
 const DAY_TTL_SECONDS = 2 * 24 * 60 * 60;
 
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+type ToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+};
+
+type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+};
+
+type ToolDefinition = {
+  type: "function";
+  function: { name: string; description?: string; parameters?: Record<string, unknown> };
+};
 
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
   const origin = request.headers.get("Origin");
@@ -129,11 +152,28 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return jsonError("Missing or invalid 'messages' array", 400, origin, env);
   }
 
+  const tools = sanitizeTools(payload);
+  if (tools === null) {
+    log("rejected: invalid 'tools' array");
+    return jsonError("Invalid 'tools' array", 400, origin, env);
+  }
+
   const models = buildModelList(env);
   log(
-    `forwarding ${messages.length} message(s) to OpenRouter (model=${models[0]}` +
-      `${models.length > 1 ? ` +${models.length - 1} fallback(s)` : ""})`,
+    `forwarding ${messages.length} message(s)` +
+      `${tools && tools.length > 0 ? ` + ${tools.length} tool(s)` : ""} to OpenRouter ` +
+      `(model=${models[0]}${models.length > 1 ? ` +${models.length - 1} fallback(s)` : ""})`,
   );
+
+  const upstreamBody: Record<string, unknown> = {
+    models,
+    messages,
+    max_tokens: MAX_TOKENS,
+    stream: true,
+  };
+  if (tools && tools.length > 0) {
+    upstreamBody.tools = tools;
+  }
 
   let upstream: Response;
   try {
@@ -145,12 +185,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
         "HTTP-Referer": env.ALLOWED_ORIGIN,
         "X-Title": "megane demo",
       },
-      body: JSON.stringify({
-        models,
-        messages,
-        max_tokens: MAX_TOKENS,
-        stream: true,
-      }),
+      body: JSON.stringify(upstreamBody),
     });
   } catch (err) {
     console.error(`[llm-proxy] ${ip} upstream fetch failed: ${(err as Error).message}`);
@@ -220,6 +255,10 @@ function jsonError(message: string, status: number, origin: string | null, env: 
  * Validates and narrows the request body to a small, bounded list of
  * chat messages. Returns null for anything malformed or oversized so
  * the worker never forwards untrusted shapes (or huge prompts) upstream.
+ *
+ * Supports the OpenAI tool-calling round trip: assistant messages may
+ * carry `tool_calls` (with null content), and `tool` messages carry a
+ * `tool_call_id` plus the skill-result content.
  */
 export function sanitizeMessages(payload: unknown): ChatMessage[] | null {
   if (typeof payload !== "object" || payload === null) return null;
@@ -231,16 +270,121 @@ export function sanitizeMessages(payload: unknown): ChatMessage[] | null {
   const sanitized: ChatMessage[] = [];
   for (const entry of messages) {
     if (typeof entry !== "object" || entry === null) return null;
-    const role = (entry as Record<string, unknown>).role;
-    const content = (entry as Record<string, unknown>).content;
-    if (role !== "system" && role !== "user" && role !== "assistant") return null;
-    const maxLength = role === "system" ? MAX_SYSTEM_MESSAGE_LENGTH : MAX_MESSAGE_LENGTH;
-    if (typeof content !== "string" || content.length === 0 || content.length > maxLength) {
+    const e = entry as Record<string, unknown>;
+    const role = e.role;
+    if (role !== "system" && role !== "user" && role !== "assistant" && role !== "tool") {
       return null;
     }
-    sanitized.push({ role, content });
+
+    // tool_calls are only valid on assistant messages.
+    let toolCalls: ToolCall[] | undefined;
+    if (e.tool_calls !== undefined) {
+      if (role !== "assistant") return null;
+      const parsed = sanitizeToolCalls(e.tool_calls);
+      if (parsed === null) return null;
+      toolCalls = parsed;
+    }
+
+    // tool_call_id is required on (and only on) tool messages.
+    let toolCallId: string | undefined;
+    if (role === "tool") {
+      const id = e.tool_call_id;
+      if (typeof id !== "string" || id.length === 0 || id.length > MAX_TOOL_CALL_ID_LENGTH) {
+        return null;
+      }
+      toolCallId = id;
+    } else if (e.tool_call_id !== undefined) {
+      return null;
+    }
+
+    // Content may be null only for an assistant message that carries
+    // tool_calls; otherwise it must be a bounded non-empty string.
+    const content = e.content;
+    if (content === null) {
+      if (!(role === "assistant" && toolCalls && toolCalls.length > 0)) return null;
+    } else {
+      const maxLength =
+        role === "system" || role === "tool" ? MAX_SYSTEM_MESSAGE_LENGTH : MAX_MESSAGE_LENGTH;
+      if (typeof content !== "string" || content.length === 0 || content.length > maxLength) {
+        return null;
+      }
+    }
+
+    const msg: ChatMessage = { role, content: content === null ? null : (content as string) };
+    if (toolCalls) msg.tool_calls = toolCalls;
+    if (toolCallId) msg.tool_call_id = toolCallId;
+    sanitized.push(msg);
   }
   return sanitized;
+}
+
+/**
+ * Validates an assistant message's `tool_calls` array. Returns null for
+ * any malformed or oversized shape.
+ */
+function sanitizeToolCalls(raw: unknown): ToolCall[] | null {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_TOOL_CALLS) return null;
+
+  const out: ToolCall[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const tc = entry as Record<string, unknown>;
+    if (tc.type !== "function") return null;
+    const id = tc.id;
+    if (typeof id !== "string" || id.length === 0 || id.length > MAX_TOOL_CALL_ID_LENGTH) {
+      return null;
+    }
+    const fn = tc.function;
+    if (typeof fn !== "object" || fn === null) return null;
+    const name = (fn as Record<string, unknown>).name;
+    const args = (fn as Record<string, unknown>).arguments;
+    if (typeof name !== "string" || name.length === 0 || name.length > MAX_TOOL_NAME_LENGTH) {
+      return null;
+    }
+    if (typeof args !== "string" || args.length > MAX_MESSAGE_LENGTH) return null;
+    out.push({ id, type: "function", function: { name, arguments: args } });
+  }
+  return out;
+}
+
+/**
+ * Validates the optional `tools` array (OpenAI function definitions).
+ * Returns undefined when absent, the sanitized array when valid, or null
+ * when present-but-malformed (which the caller turns into a 400).
+ */
+export function sanitizeTools(payload: unknown): ToolDefinition[] | null | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const tools = (payload as Record<string, unknown>).tools;
+  if (tools === undefined) return undefined;
+  if (!Array.isArray(tools) || tools.length > MAX_TOOLS) return null;
+
+  const out: ToolDefinition[] = [];
+  for (const entry of tools) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const t = entry as Record<string, unknown>;
+    if (t.type !== "function") return null;
+    const fn = t.function;
+    if (typeof fn !== "object" || fn === null) return null;
+    const f = fn as Record<string, unknown>;
+    const name = f.name;
+    if (typeof name !== "string" || name.length === 0 || name.length > MAX_TOOL_NAME_LENGTH) {
+      return null;
+    }
+    let description: string | undefined;
+    if (f.description !== undefined) {
+      if (typeof f.description !== "string" || f.description.length > MAX_TOOL_DESCRIPTION_LENGTH) {
+        return null;
+      }
+      description = f.description;
+    }
+    let parameters: Record<string, unknown> | undefined;
+    if (f.parameters !== undefined) {
+      if (typeof f.parameters !== "object" || f.parameters === null) return null;
+      parameters = f.parameters as Record<string, unknown>;
+    }
+    out.push({ type: "function", function: { name, description, parameters } });
+  }
+  return out;
 }
 
 // ─── Rate limiting ───────────────────────────────────────────────────

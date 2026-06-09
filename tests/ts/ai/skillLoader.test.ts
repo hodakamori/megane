@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildSkillsReference,
+  buildOpenAITools,
   buildToolDefinitions,
   executeSkill,
   getSkills,
@@ -108,25 +108,28 @@ describe("executeSkill", () => {
   });
 });
 
-describe("buildSkillsReference", () => {
-  it("returns an empty string for no skills", () => {
-    expect(buildSkillsReference([])).toBe("");
+describe("buildOpenAITools", () => {
+  it("returns an empty array for no skills", () => {
+    expect(buildOpenAITools([])).toEqual([]);
   });
 
-  it("renders each skill's name, description, and content under a reference heading", () => {
+  it("converts each skill into a parameterless OpenAI function tool with a snake_case name", () => {
     const skills: PipelineSkill[] = [
-      { name: "get-molecule-template", description: "For molecules", content: "MOL_JSON" },
-      { name: "get-solid-template", description: "For crystals", content: "SOLID_JSON" },
+      { name: "get-molecule-template", description: "For molecules", content: "MOL" },
+      { name: "get-solid-template", description: "For crystals", content: "SOLID" },
     ];
-    const reference = buildSkillsReference(skills);
+    const tools = buildOpenAITools(skills);
 
-    expect(reference).toContain("## Reference Pipeline Templates");
-    expect(reference).toContain("### get-molecule-template");
-    expect(reference).toContain("For molecules");
-    expect(reference).toContain("MOL_JSON");
-    expect(reference).toContain("### get-solid-template");
-    expect(reference).toContain("For crystals");
-    expect(reference).toContain("SOLID_JSON");
+    expect(tools).toHaveLength(2);
+    expect(tools[0]).toEqual({
+      type: "function",
+      function: {
+        name: "get_molecule_template",
+        description: "For molecules",
+        parameters: { type: "object", properties: {} },
+      },
+    });
+    expect(tools[1].function.name).toBe("get_solid_template");
   });
 });
 
