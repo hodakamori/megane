@@ -129,23 +129,26 @@ describe("PipelineEditor — tab switching", () => {
     expect(editorPanel.contains(screen.getByTestId("pipeline-editor-templates"))).toBe(true);
   });
 
-  it("auto-switches back to editor and shows the applied notice when chat applies a pipeline", () => {
+  it("stays on the chat tab when a pipeline is applied so the reply stays visible", () => {
     usePipelineUIStore.setState({ mode: "chat", pendingNotice: null });
     render(<PipelineEditor collapsed={false} onToggleCollapse={() => {}} />);
 
     expect(screen.getByTestId("pipeline-editor-tab-chat").getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(screen.queryByTestId("pipeline-editor-applied-notice")).toBeNull();
 
     act(() => {
       usePipelineUIStore.getState().markPipelineApplied();
     });
 
-    expect(usePipelineUIStore.getState().mode).toBe("editor");
-    expect(screen.getByTestId("pipeline-editor-tab-editor").getAttribute("aria-selected")).toBe(
+    // The tab does not change — the assistant's explanation remains in view.
+    expect(usePipelineUIStore.getState().mode).toBe("chat");
+    expect(screen.getByTestId("pipeline-editor-tab-chat").getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(screen.getByTestId("pipeline-editor-applied-notice")).toBeTruthy();
+    // A one-shot notice is still stamped (consumed by the editor pane when the
+    // user switches to it), but the editor-only banner is not shown on chat.
+    expect(usePipelineUIStore.getState().pendingNotice).toMatchObject({ kind: "applied" });
+    expect(screen.queryByTestId("pipeline-editor-applied-notice")).toBeNull();
   });
 });

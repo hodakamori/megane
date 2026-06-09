@@ -9,7 +9,12 @@ vi.mock("@/ai/skillLoader", () => ({
   ),
 }));
 
-import { extractPipelineJSON, generatePipeline, formatActionSummary } from "@/ai/client";
+import {
+  extractPipelineJSON,
+  generatePipeline,
+  formatActionSummary,
+  stripPipelineJSON,
+} from "@/ai/client";
 import type { AIConfig } from "@/ai/config";
 
 type SSEEvent = { event: string; data: unknown };
@@ -498,5 +503,30 @@ describe("formatActionSummary", () => {
 
   it("returns plural phrasing for zero nodes", () => {
     expect(formatActionSummary(0)).toBe("Pipeline applied — 0 nodes added to the editor.");
+  });
+});
+
+describe("stripPipelineJSON", () => {
+  it("returns the prose before a fenced json block", () => {
+    expect(
+      stripPipelineJSON('Loads benzene and shows bonds.\n```json\n{ "version": 3 }\n```'),
+    ).toBe("Loads benzene and shows bonds.");
+  });
+
+  it("returns the prose before a raw JSON object", () => {
+    expect(stripPipelineJSON('Here you go.  { "version": 3, "nodes": [] }')).toBe("Here you go.");
+  });
+
+  it("cuts at whichever marker comes first (brace before fence)", () => {
+    expect(stripPipelineJSON("intro {x} more ```json```")).toBe("intro");
+  });
+
+  it("returns an empty string when the response is only JSON", () => {
+    expect(stripPipelineJSON('```json\n{ "version": 3 }\n```')).toBe("");
+    expect(stripPipelineJSON('{ "version": 3 }')).toBe("");
+  });
+
+  it("returns the whole trimmed text when there is no JSON", () => {
+    expect(stripPipelineJSON("  just a sentence.  ")).toBe("just a sentence.");
   });
 });

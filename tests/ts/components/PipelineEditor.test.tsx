@@ -51,6 +51,14 @@ vi.mock("@/pipeline/shareLink", async () => {
 
 import { PipelineEditor } from "@/components/PipelineEditor";
 import { useThemeStore } from "@/stores/useThemeStore";
+import { usePipelineUIStore } from "@/stores/usePipelineUIStore";
+
+beforeEach(() => {
+  // The editor toolbar (theme button, dropdowns) is hidden on the Chat tab,
+  // which is now the default. These tests exercise the editor chrome, so pin
+  // the panel to the Editor tab.
+  usePipelineUIStore.setState({ mode: "editor", pendingNotice: null });
+});
 
 afterEach(() => {
   cleanup();

@@ -19,6 +19,10 @@ vi.mock("@/ai/client", () => ({
   extractPipelineJSON: vi.fn(),
   formatActionSummary: (n: number) =>
     `Pipeline applied — ${n} ${n === 1 ? "node" : "nodes"} added to the editor.`,
+  stripPipelineJSON: (text: string) => {
+    const markers = [text.indexOf("```"), text.indexOf("{")].filter((i) => i !== -1);
+    return (markers.length === 0 ? text : text.slice(0, Math.min(...markers))).trim();
+  },
 }));
 vi.mock("@/pipeline/store", () => {
   const usePipelineStore = (selector: (s: typeof storeState) => unknown) => selector(storeState);
@@ -278,7 +282,7 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     fireEvent.click(screen.getByText("Generate"));
   }
 
-  it("shows a concise action summary instead of the raw JSON", async () => {
+  it("falls back to a concise action summary when the model returns only JSON", async () => {
     render(<PipelineChatBox />);
     submit("build me a pipeline");
 
@@ -288,6 +292,23 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     // The raw JSON must never appear in the transcript.
     expect(screen.queryByText(/"version": 3/)).toBeNull();
     expect(storeState.deserialize).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the assistant's prose explanation, stripping the JSON payload", async () => {
+    (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_config, _msg, onChunk: (c: string) => void) => {
+        onChunk("Loads benzene and shows it with bonds.\n");
+        onChunk('```json\n{ "version": 3, "nodes": [] }\n```');
+        return 'Loads benzene and shows it with bonds.\n```json\n{ "version": 3, "nodes": [] }\n```';
+      },
+    );
+    render(<PipelineChatBox />);
+    submit("show benzene");
+
+    expect(await screen.findByText("Loads benzene and shows it with bonds.")).toBeTruthy();
+    // Neither the JSON nor the generic summary should appear when prose exists.
+    expect(screen.queryByText(/"version": 3/)).toBeNull();
+    expect(screen.queryByText(/Pipeline applied/)).toBeNull();
   });
 
   it("re-applies the previously loaded structure to the new load_structure node", async () => {

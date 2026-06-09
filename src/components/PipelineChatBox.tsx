@@ -7,7 +7,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAIConfigStore, PROVIDER_MODELS, isDemoProviderAvailable } from "../ai/config";
 import type { AIConfig, AIProvider } from "../ai/config";
-import { generatePipeline, extractPipelineJSON, formatActionSummary } from "../ai/client";
+import {
+  generatePipeline,
+  extractPipelineJSON,
+  formatActionSummary,
+  stripPipelineJSON,
+} from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
 import type { NodeSnapshotData } from "../pipeline/execute";
 import type { LoadStructureParams } from "../pipeline/types";
@@ -341,11 +346,14 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       usePipelineUIStore.getState().markPipelineApplied();
       onPipelineApplied?.();
 
-      // Swap the raw streaming JSON placeholder for a concise action summary.
+      // Show the assistant's own explanation (everything except the JSON
+      // payload); fall back to a generic summary if the model returned only
+      // JSON with no prose.
+      const explanation = stripPipelineJSON(fullResponse);
       setMessages((prev) =>
         replaceTrailingAssistant(prev, {
           role: "assistant",
-          content: formatActionSummary(pipeline.nodes.length),
+          content: explanation || formatActionSummary(pipeline.nodes.length),
         }),
       );
     } catch (e: unknown) {
@@ -483,11 +491,13 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // Streaming placeholder: the model streams raw pipeline JSON, which
-            // we never surface to the user — show a neutral status instead.
+            // Show the assistant's prose, stripping the JSON payload. While the
+            // explanation is still streaming in (or the model emitted only
+            // JSON), fall back to a neutral status.
+            const prose = stripPipelineJSON(msg.content);
             return (
               <div key={i} style={assistantMsgStyle}>
-                Generating…
+                {prose || "Generating…"}
               </div>
             );
           })

@@ -478,6 +478,22 @@ export function formatActionSummary(nodeCount: number): string {
   return `Pipeline applied — ${nodeCount} ${noun} added to the editor.`;
 }
 
+/**
+ * Strip the pipeline JSON (a fenced ```` ```json ```` block, or a raw `{...}`
+ * object) from an LLM response, returning just the surrounding natural-language
+ * text. Used to show the assistant's explanation in the chat without the
+ * machine-readable payload. The system prompt instructs the model to put its
+ * one-sentence explanation before the JSON, so cutting at the first code-fence
+ * or brace yields that explanation.
+ */
+export function stripPipelineJSON(text: string): string {
+  const fence = text.indexOf("```");
+  const brace = text.indexOf("{");
+  const markers = [fence, brace].filter((i) => i !== -1);
+  if (markers.length === 0) return text.trim();
+  return text.slice(0, Math.min(...markers)).trim();
+}
+
 // ─── JSON extraction ─────────────────────────────────────────────────
 
 /**
