@@ -9,11 +9,64 @@ import { useAIConfigStore, PROVIDER_MODELS, isDemoProviderAvailable } from "../a
 import type { AIConfig, AIProvider } from "../ai/config";
 import { generatePipeline, extractPipelineJSON, formatActionSummary } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
+import type { NodeSnapshotData } from "../pipeline/execute";
+import type { LoadStructureParams } from "../pipeline/types";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 
 interface ChatMessage {
   role: "user" | "assistant" | "error";
   content: string;
+}
+
+/**
+ * Snapshot of the structure the user currently has loaded, captured before an
+ * AI-generated pipeline replaces the graph so it can be re-applied afterwards.
+ */
+export interface PreservedStructure {
+  snapshot: NodeSnapshotData;
+  fileName: string | null;
+  hasTrajectory: boolean;
+  hasCell: boolean;
+}
+
+/**
+ * Capture the first load_structure node's loaded data + file params, or null
+ * when no structure is loaded. The AI returns a fresh graph whose loaders have
+ * `fileName: null`, and `deserialize()` clears `nodeSnapshots`, so without
+ * re-applying this the loaded structure would disappear from the viewport.
+ */
+export function captureLoadedStructure(
+  nodes: Array<{ id: string; type?: string; data: { params: unknown } }>,
+  nodeSnapshots: Record<string, NodeSnapshotData>,
+): PreservedStructure | null {
+  const loader = nodes.find((n) => n.type === "load_structure");
+  if (!loader) return null;
+  const snapshot = nodeSnapshots[loader.id];
+  if (!snapshot) return null;
+  const params = loader.data.params as Partial<LoadStructureParams>;
+  return {
+    snapshot,
+    fileName: params.fileName ?? null,
+    hasTrajectory: !!params.hasTrajectory,
+    hasCell: !!params.hasCell,
+  };
+}
+
+/**
+ * Replace the trailing assistant placeholder with `message` (or append it when
+ * the last message isn't an assistant placeholder). Used to swap the raw
+ * streaming JSON for the final action summary or error, so the user never sees
+ * the raw pipeline JSON.
+ */
+export function replaceTrailingAssistant(
+  messages: ChatMessage[],
+  message: ChatMessage,
+): ChatMessage[] {
+  const last = messages[messages.length - 1];
+  if (last && last.role === "assistant") {
+    return [...messages.slice(0, -1), message];
+  }
+  return [...messages, message];
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────
@@ -233,8 +286,9 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setIsStreaming(true);
 
-    // Add a placeholder assistant message for streaming
-    const _assistantIdx = messages.length + 1; // index of the new assistant message
+    // Add a placeholder assistant message. The model streams raw pipeline JSON
+    // into it, which we never surface — it is replaced by an action summary (or
+    // error) once the request settles.
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     const abort = new AbortController();
@@ -258,26 +312,48 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       );
 
       const pipeline = extractPipelineJSON(fullResponse);
+
+      // Preserve the structure the user already loaded. The AI returns a fresh
+      // graph whose load_structure node has `fileName: null`, and deserialize()
+      // clears nodeSnapshots, so without re-applying this the loaded structure
+      // would disappear from the viewport.
+      const preState = usePipelineStore.getState();
+      const preserved = captureLoadedStructure(preState.nodes, preState.nodeSnapshots);
+
       deserialize(pipeline);
       autoLayout();
+
+      if (preserved) {
+        const postState = usePipelineStore.getState();
+        const newLoader = postState.nodes.find((n) => n.type === "load_structure");
+        if (newLoader) {
+          postState.setNodeSnapshot(newLoader.id, preserved.snapshot);
+          postState.updateNodeParams(newLoader.id, {
+            fileName: preserved.fileName,
+            hasTrajectory: preserved.hasTrajectory,
+            hasCell: preserved.hasCell,
+          });
+        }
+      }
+
       // Surface the result on the editor tab and trigger fitView via the
       // panel's mode-change effect.
       usePipelineUIStore.getState().markPipelineApplied();
       onPipelineApplied?.();
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant" as const, content: formatActionSummary(pipeline.nodes.length) },
-      ]);
+      // Swap the raw streaming JSON placeholder for a concise action summary.
+      setMessages((prev) =>
+        replaceTrailingAssistant(prev, {
+          role: "assistant",
+          content: formatActionSummary(pipeline.nodes.length),
+        }),
+      );
     } catch (e: unknown) {
-      if ((e as Error).name === "AbortError") {
-        setMessages((prev) => [...prev, { role: "error", content: "Generation cancelled." }]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "error", content: "Something went wrong. Please try again." },
-        ]);
-      }
+      const content =
+        (e as Error).name === "AbortError"
+          ? "Generation cancelled."
+          : "Something went wrong. Please try again.";
+      setMessages((prev) => replaceTrailingAssistant(prev, { role: "error", content }));
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
@@ -291,7 +367,6 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     deserialize,
     autoLayout,
     onPipelineApplied,
-    messages.length,
   ]);
 
   const handleCancel = useCallback(() => {
@@ -314,9 +389,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       {showConfig && (
         <div style={configPanelStyle}>
           {demoAvailable && (
-            <label
-              style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
-            >
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={useOwnKey}
@@ -410,14 +483,11 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // Show truncated streaming content
-            const display =
-              msg.content.length > 80
-                ? msg.content.slice(0, 80) + "..."
-                : msg.content || (isStreaming ? "Generating..." : "");
+            // Streaming placeholder: the model streams raw pipeline JSON, which
+            // we never surface to the user — show a neutral status instead.
             return (
               <div key={i} style={assistantMsgStyle}>
-                {display}
+                Generating…
               </div>
             );
           })

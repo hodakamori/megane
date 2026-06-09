@@ -69,7 +69,9 @@ const MINIMAL_PIPELINE_JSON = JSON.stringify({
 
 describe("extractPipelineJSON", () => {
   it("parses a fenced ```json block", () => {
-    const result = extractPipelineJSON(`Here you go:\n\`\`\`json\n${MINIMAL_PIPELINE_JSON}\n\`\`\``);
+    const result = extractPipelineJSON(
+      `Here you go:\n\`\`\`json\n${MINIMAL_PIPELINE_JSON}\n\`\`\``,
+    );
     expect(result.version).toBe(3);
     expect(result.nodes).toHaveLength(1);
   });
@@ -89,9 +91,7 @@ describe("extractPipelineJSON", () => {
   });
 
   it("throws when the JSON is malformed", () => {
-    expect(() => extractPipelineJSON("```json\n{ not json }\n```")).toThrow(
-      /Failed to parse JSON/,
-    );
+    expect(() => extractPipelineJSON("```json\n{ not json }\n```")).toThrow(/Failed to parse JSON/);
   });
 
   it("throws when version is not 3", () => {
@@ -103,14 +103,10 @@ describe("extractPipelineJSON", () => {
 
   it("throws when nodes or edges are missing", () => {
     const noNodes = JSON.stringify({ version: 3, edges: [] });
-    expect(() => extractPipelineJSON(`\`\`\`json\n${noNodes}\n\`\`\``)).toThrow(
-      /Invalid pipeline/,
-    );
+    expect(() => extractPipelineJSON(`\`\`\`json\n${noNodes}\n\`\`\``)).toThrow(/Invalid pipeline/);
 
     const noEdges = JSON.stringify({ version: 3, nodes: [] });
-    expect(() => extractPipelineJSON(`\`\`\`json\n${noEdges}\n\`\`\``)).toThrow(
-      /Invalid pipeline/,
-    );
+    expect(() => extractPipelineJSON(`\`\`\`json\n${noEdges}\n\`\`\``)).toThrow(/Invalid pipeline/);
   });
 });
 
@@ -146,9 +142,7 @@ describe("generatePipeline (Anthropic)", () => {
 
   it("sets the required Anthropic headers", async () => {
     fetchMock.mockResolvedValueOnce(
-      makeSSEResponse([
-        { event: "message_delta", data: { delta: { stop_reason: "end_turn" } } },
-      ]),
+      makeSSEResponse([{ event: "message_delta", data: { delta: { stop_reason: "end_turn" } } }]),
     );
 
     await generatePipeline(ANTHROPIC_CONFIG, "msg", () => {});
@@ -198,15 +192,13 @@ describe("generatePipeline (Anthropic)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // The second request body should include the assistant tool_use and a user tool_result.
-    const secondBody = JSON.parse(
-      (fetchMock.mock.calls[1][1] as RequestInit).body as string,
-    );
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
     expect(Array.isArray(secondBody.messages)).toBe(true);
     const lastTwo = secondBody.messages.slice(-2);
     expect(lastTwo[0].role).toBe("assistant");
-    expect(
-      (lastTwo[0].content as { type: string }[]).some((c) => c.type === "tool_use"),
-    ).toBe(true);
+    expect((lastTwo[0].content as { type: string }[]).some((c) => c.type === "tool_use")).toBe(
+      true,
+    );
     expect(lastTwo[1].role).toBe("user");
     const toolResult = (lastTwo[1].content as { type: string; content: string }[])[0];
     expect(toolResult.type).toBe("tool_result");
@@ -215,9 +207,9 @@ describe("generatePipeline (Anthropic)", () => {
 
   it("throws a generic error when the API returns a non-OK status", async () => {
     fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limited", 429));
-    await expect(
-      generatePipeline(ANTHROPIC_CONFIG, "msg", () => {}),
-    ).rejects.toThrow(/Request failed/);
+    await expect(generatePipeline(ANTHROPIC_CONFIG, "msg", () => {})).rejects.toThrow(
+      /Request failed/,
+    );
   });
 });
 
@@ -250,9 +242,7 @@ describe("generatePipeline (OpenAI)", () => {
   });
 
   it("sets the OpenAI Authorization header and body", async () => {
-    fetchMock.mockResolvedValueOnce(
-      makeSSEResponse([{ event: "", data: "[DONE]" }]),
-    );
+    fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
     await generatePipeline(OPENAI_CONFIG, "msg", () => {});
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
@@ -316,7 +306,12 @@ describe("generatePipeline (OpenAI)", () => {
               {
                 delta: {
                   tool_calls: [
-                    { index: 0, id: "call_1", type: "function", function: { name: "known_skill", arguments: "" } },
+                    {
+                      index: 0,
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "known_skill", arguments: "" },
+                    },
                   ],
                 },
               },
@@ -360,7 +355,12 @@ describe("generatePipeline (OpenAI)", () => {
               {
                 delta: {
                   tool_calls: [
-                    { index: 0, id: "call_1", type: "function", function: { name: "known_skill", arguments: "" } },
+                    {
+                      index: 0,
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "known_skill", arguments: "" },
+                    },
                   ],
                 },
               },
@@ -440,7 +440,12 @@ describe("generatePipeline (demo proxy)", () => {
               {
                 delta: {
                   tool_calls: [
-                    { index: 0, id: "call_1", type: "function", function: { name: "known_skill", arguments: "" } },
+                    {
+                      index: 0,
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "known_skill", arguments: "" },
+                    },
                   ],
                 },
               },
@@ -478,9 +483,7 @@ describe("generatePipeline (demo proxy)", () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
     fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limit exceeded", 429));
 
-    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(
-      /Request failed/,
-    );
+    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(/Request failed/);
   });
 });
 

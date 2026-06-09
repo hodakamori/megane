@@ -1,21 +1,42 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 
+type LoaderNode = { id: string; type?: string; data: { params: Record<string, unknown> } };
+
+const { storeState } = vi.hoisted(() => ({
+  storeState: {
+    nodes: [] as LoaderNode[],
+    nodeSnapshots: {} as Record<string, unknown>,
+    deserialize: vi.fn(),
+    autoLayout: vi.fn(),
+    setNodeSnapshot: vi.fn(),
+    updateNodeParams: vi.fn(),
+  },
+}));
+
 vi.mock("@/ai/client", () => ({
   generatePipeline: vi.fn(),
   extractPipelineJSON: vi.fn(),
+  formatActionSummary: (n: number) =>
+    `Pipeline applied — ${n} ${n === 1 ? "node" : "nodes"} added to the editor.`,
 }));
-vi.mock("@/pipeline/store", () => ({
-  usePipelineStore: (selector: (s: { deserialize: () => void; autoLayout: () => void }) => unknown) =>
-    selector({ deserialize: vi.fn(), autoLayout: vi.fn() }),
-}));
+vi.mock("@/pipeline/store", () => {
+  const usePipelineStore = (selector: (s: typeof storeState) => unknown) => selector(storeState);
+  (usePipelineStore as unknown as { getState: () => typeof storeState }).getState = () =>
+    storeState;
+  return { usePipelineStore };
+});
 vi.mock("@/stores/usePipelineUIStore", () => ({
   usePipelineUIStore: { getState: () => ({ markPipelineApplied: vi.fn() }) },
 }));
 
-import { PipelineChatBox } from "@/components/PipelineChatBox";
+import {
+  PipelineChatBox,
+  captureLoadedStructure,
+  replaceTrailingAssistant,
+} from "@/components/PipelineChatBox";
 import { useAIConfigStore } from "@/ai/config";
-import { generatePipeline } from "@/ai/client";
+import { generatePipeline, extractPipelineJSON } from "@/ai/client";
 
 function openConfigPanel() {
   fireEvent.click(screen.getByTitle("AI Settings"));
@@ -41,6 +62,12 @@ beforeEach(() => {
     apiKey: "",
     useOwnKey: false,
   });
+  storeState.nodes = [];
+  storeState.nodeSnapshots = {};
+  storeState.deserialize.mockReset();
+  storeState.autoLayout.mockReset();
+  storeState.setNodeSnapshot.mockReset();
+  storeState.updateNodeParams.mockReset();
 });
 
 describe("PipelineChatBox — use-own-key checkbox", () => {
@@ -139,5 +166,169 @@ describe("PipelineChatBox — submission", () => {
       expect.any(Function),
       expect.anything(),
     );
+  });
+});
+
+describe("captureLoadedStructure", () => {
+  const snap = { snapshot: {}, frames: null, meta: null, labels: null } as never;
+
+  it("returns null when there is no load_structure node", () => {
+    expect(captureLoadedStructure([], {})).toBeNull();
+    expect(
+      captureLoadedStructure([{ id: "v1", type: "viewport", data: { params: {} } }], { v1: snap }),
+    ).toBeNull();
+  });
+
+  it("returns null when the load_structure node has no snapshot loaded", () => {
+    expect(
+      captureLoadedStructure(
+        [{ id: "l1", type: "load_structure", data: { params: { fileName: "a.pdb" } } }],
+        {},
+      ),
+    ).toBeNull();
+  });
+
+  it("captures the snapshot and file params of the first loaded structure", () => {
+    const result = captureLoadedStructure(
+      [
+        {
+          id: "l1",
+          type: "load_structure",
+          data: { params: { fileName: "a.pdb", hasTrajectory: true, hasCell: true } },
+        },
+      ],
+      { l1: snap },
+    );
+    expect(result).toEqual({
+      snapshot: snap,
+      fileName: "a.pdb",
+      hasTrajectory: true,
+      hasCell: true,
+    });
+  });
+
+  it("defaults missing file params to null/false", () => {
+    const result = captureLoadedStructure(
+      [{ id: "l1", type: "load_structure", data: { params: {} } }],
+      { l1: snap },
+    );
+    expect(result).toEqual({
+      snapshot: snap,
+      fileName: null,
+      hasTrajectory: false,
+      hasCell: false,
+    });
+  });
+});
+
+describe("replaceTrailingAssistant", () => {
+  it("replaces the trailing assistant placeholder in place", () => {
+    const result = replaceTrailingAssistant(
+      [
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "" },
+      ],
+      { role: "assistant", content: "done" },
+    );
+    expect(result).toEqual([
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "done" },
+    ]);
+  });
+
+  it("appends when the last message is not an assistant placeholder", () => {
+    const result = replaceTrailingAssistant([{ role: "user", content: "hi" }], {
+      role: "error",
+      content: "oops",
+    });
+    expect(result).toEqual([
+      { role: "user", content: "hi" },
+      { role: "error", content: "oops" },
+    ]);
+  });
+
+  it("appends to an empty list", () => {
+    expect(replaceTrailingAssistant([], { role: "assistant", content: "x" })).toEqual([
+      { role: "assistant", content: "x" },
+    ]);
+  });
+});
+
+describe("PipelineChatBox — applying a generated pipeline", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_config, _msg, onChunk: (c: string) => void) => {
+        // The model streams raw JSON; the component must not surface it.
+        onChunk('```json\n{ "version": 3, "nodes": [');
+        return '```json\n{ "version": 3, "nodes": [] }\n```';
+      },
+    );
+    (extractPipelineJSON as ReturnType<typeof vi.fn>).mockReturnValue({
+      version: 3,
+      nodes: [{ id: "a" }, { id: "b" }],
+      edges: [],
+    });
+  });
+
+  function submit(text: string) {
+    fireEvent.change(screen.getByPlaceholderText("Describe the pipeline you want..."), {
+      target: { value: text },
+    });
+    fireEvent.click(screen.getByText("Generate"));
+  }
+
+  it("shows a concise action summary instead of the raw JSON", async () => {
+    render(<PipelineChatBox />);
+    submit("build me a pipeline");
+
+    expect(
+      await screen.findByText(/Pipeline applied — 2 nodes added to the editor\./),
+    ).toBeTruthy();
+    // The raw JSON must never appear in the transcript.
+    expect(screen.queryByText(/"version": 3/)).toBeNull();
+    expect(storeState.deserialize).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-applies the previously loaded structure to the new load_structure node", async () => {
+    const snap = { snapshot: {}, frames: null, meta: null, labels: null };
+    storeState.nodes = [
+      {
+        id: "old-loader",
+        type: "load_structure",
+        data: { params: { fileName: "mol.pdb", hasTrajectory: true, hasCell: true } },
+      },
+    ];
+    storeState.nodeSnapshots = { "old-loader": snap };
+    // deserialize installs the AI's fresh graph with a new loader id.
+    storeState.deserialize.mockImplementation(() => {
+      storeState.nodes = [
+        { id: "new-loader", type: "load_structure", data: { params: { fileName: null } } },
+      ];
+      storeState.nodeSnapshots = {};
+    });
+
+    render(<PipelineChatBox />);
+    submit("rebuild the view");
+
+    await screen.findByText(/Pipeline applied/);
+    expect(storeState.setNodeSnapshot).toHaveBeenCalledWith("new-loader", snap);
+    expect(storeState.updateNodeParams).toHaveBeenCalledWith("new-loader", {
+      fileName: "mol.pdb",
+      hasTrajectory: true,
+      hasCell: true,
+    });
+  });
+
+  it("shows a generic error message when generation fails", async () => {
+    (generatePipeline as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Anthropic API error (429): rate limited"),
+    );
+    render(<PipelineChatBox />);
+    submit("build me a pipeline");
+
+    expect(await screen.findByText("Something went wrong. Please try again.")).toBeTruthy();
+    // The underlying error detail must never leak into the transcript.
+    expect(screen.queryByText(/429/)).toBeNull();
   });
 });
