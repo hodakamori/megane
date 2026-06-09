@@ -117,8 +117,8 @@ async function streamAnthropicWithSkills(
     });
 
     if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`Anthropic API error (${response.status}): ${errBody}`);
+      await response.text(); // consume body so the connection is released
+      throw new Error("Request failed. Please try again.");
     }
 
     const result = await readAnthropicSSE(response, onChunk);
@@ -295,8 +295,8 @@ async function streamOpenAICompatWithSkills(
 
     const response = await send(body, signal);
     if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`${errorLabel} (${response.status}): ${errBody}`);
+      await response.text(); // consume body so the connection is released
+      throw new Error("Request failed. Please try again.");
     }
 
     const result = await readOpenAISSE(response, onChunk);
@@ -468,6 +468,14 @@ async function streamDemoProxy(
     "Demo proxy error",
     signal,
   );
+}
+
+// ─── Action summary ──────────────────────────────────────────────────
+
+/** Returns a brief user-facing description of the applied pipeline. */
+export function formatActionSummary(nodeCount: number): string {
+  const noun = nodeCount === 1 ? "node" : "nodes";
+  return `Pipeline applied — ${nodeCount} ${noun} added to the editor.`;
 }
 
 // ─── JSON extraction ─────────────────────────────────────────────────

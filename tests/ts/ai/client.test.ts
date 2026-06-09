@@ -9,7 +9,7 @@ vi.mock("@/ai/skillLoader", () => ({
   ),
 }));
 
-import { extractPipelineJSON, generatePipeline } from "@/ai/client";
+import { extractPipelineJSON, generatePipeline, formatActionSummary } from "@/ai/client";
 import type { AIConfig } from "@/ai/config";
 
 type SSEEvent = { event: string; data: unknown };
@@ -213,11 +213,11 @@ describe("generatePipeline (Anthropic)", () => {
     expect(toolResult.content).toBe("skill content");
   });
 
-  it("throws when the API returns a non-OK status", async () => {
+  it("throws a generic error when the API returns a non-OK status", async () => {
     fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limited", 429));
     await expect(
       generatePipeline(ANTHROPIC_CONFIG, "msg", () => {}),
-    ).rejects.toThrow(/Anthropic API error \(429\)/);
+    ).rejects.toThrow(/Request failed/);
   });
 });
 
@@ -278,10 +278,10 @@ describe("generatePipeline (OpenAI)", () => {
     expect(result).toBe("ok");
   });
 
-  it("throws when OpenAI returns a non-OK status", async () => {
+  it("throws a generic error when OpenAI returns a non-OK status", async () => {
     fetchMock.mockResolvedValueOnce(makeJSONResponse("bad request", 400));
     await expect(generatePipeline(OPENAI_CONFIG, "msg", () => {})).rejects.toThrow(
-      /OpenAI API error \(400\)/,
+      /Request failed/,
     );
   });
 
@@ -474,12 +474,26 @@ describe("generatePipeline (demo proxy)", () => {
     );
   });
 
-  it("throws a descriptive error when the proxy returns a non-OK status", async () => {
+  it("throws a generic error when the proxy returns a non-OK status", async () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
     fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limit exceeded", 429));
 
     await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(
-      /Demo proxy error \(429\)/,
+      /Request failed/,
     );
+  });
+});
+
+describe("formatActionSummary", () => {
+  it("returns singular phrasing for a single node", () => {
+    expect(formatActionSummary(1)).toBe("Pipeline applied — 1 node added to the editor.");
+  });
+
+  it("returns plural phrasing for multiple nodes", () => {
+    expect(formatActionSummary(3)).toBe("Pipeline applied — 3 nodes added to the editor.");
+  });
+
+  it("returns plural phrasing for zero nodes", () => {
+    expect(formatActionSummary(0)).toBe("Pipeline applied — 0 nodes added to the editor.");
   });
 });

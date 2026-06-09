@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAIConfigStore, PROVIDER_MODELS, isDemoProviderAvailable } from "../ai/config";
 import type { AIConfig, AIProvider } from "../ai/config";
-import { generatePipeline, extractPipelineJSON } from "../ai/client";
+import { generatePipeline, extractPipelineJSON, formatActionSummary } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 
@@ -267,7 +267,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
 
       setMessages((prev) => [
         ...prev,
-        { role: "assistant" as const, content: "Pipeline generated successfully!" },
+        { role: "assistant" as const, content: formatActionSummary(pipeline.nodes.length) },
       ]);
     } catch (e: unknown) {
       if ((e as Error).name === "AbortError") {
@@ -275,7 +275,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       } else {
         setMessages((prev) => [
           ...prev,
-          { role: "error", content: (e as Error).message || "An error occurred." },
+          { role: "error", content: "Something went wrong. Please try again." },
         ]);
       }
     } finally {
@@ -402,8 +402,8 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // assistant
-            if (msg.content === "Pipeline generated successfully!") {
+            // assistant — action summary lines start with "Pipeline applied"
+            if (msg.content.startsWith("Pipeline applied")) {
               return (
                 <div key={i} style={successMsgStyle}>
                   {msg.content}
