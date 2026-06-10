@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildOpenAITools,
   buildToolDefinitions,
   executeSkill,
   getSkills,
@@ -104,6 +105,31 @@ describe("executeSkill", () => {
 
   it("returns null for an empty skills array", () => {
     expect(executeSkill([], "anything")).toBeNull();
+  });
+});
+
+describe("buildOpenAITools", () => {
+  it("returns an empty array for no skills", () => {
+    expect(buildOpenAITools([])).toEqual([]);
+  });
+
+  it("converts each skill into a parameterless OpenAI function tool with a snake_case name", () => {
+    const skills: PipelineSkill[] = [
+      { name: "get-molecule-template", description: "For molecules", content: "MOL" },
+      { name: "get-solid-template", description: "For crystals", content: "SOLID" },
+    ];
+    const tools = buildOpenAITools(skills);
+
+    expect(tools).toHaveLength(2);
+    expect(tools[0]).toEqual({
+      type: "function",
+      function: {
+        name: "get_molecule_template",
+        description: "For molecules",
+        parameters: { type: "object", properties: {} },
+      },
+    });
+    expect(tools[1].function.name).toBe("get_solid_template");
   });
 });
 

@@ -3,12 +3,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("@/ai/skillLoader", () => ({
   getSkills: vi.fn(() => []),
   buildToolDefinitions: vi.fn(() => []),
+  buildOpenAITools: vi.fn(() => []),
   executeSkill: vi.fn((_skills: unknown, name: string) =>
     name === "known_skill" ? "skill content" : null,
   ),
 }));
 
-import { extractPipelineJSON, generatePipeline } from "@/ai/client";
+import {
+  extractPipelineJSON,
+  tryExtractPipeline,
+  generatePipeline,
+  formatActionSummary,
+  stripPipelineJSON,
+} from "@/ai/client";
 import type { AIConfig } from "@/ai/config";
 
 type SSEEvent = { event: string; data: unknown };
@@ -54,6 +61,12 @@ const OPENAI_CONFIG: AIConfig = {
   apiKey: "sk-test",
 };
 
+const DEMO_CONFIG: AIConfig = {
+  provider: "demo",
+  model: "demo",
+  apiKey: "",
+};
+
 const MINIMAL_PIPELINE_JSON = JSON.stringify({
   version: 3,
   nodes: [{ id: "v1", type: "viewport", position: { x: 0, y: 0 } }],
@@ -62,7 +75,9 @@ const MINIMAL_PIPELINE_JSON = JSON.stringify({
 
 describe("extractPipelineJSON", () => {
   it("parses a fenced ```json block", () => {
-    const result = extractPipelineJSON(`Here you go:\n\`\`\`json\n${MINIMAL_PIPELINE_JSON}\n\`\`\``);
+    const result = extractPipelineJSON(
+      `Here you go:\n\`\`\`json\n${MINIMAL_PIPELINE_JSON}\n\`\`\``,
+    );
     expect(result.version).toBe(3);
     expect(result.nodes).toHaveLength(1);
   });
@@ -82,9 +97,7 @@ describe("extractPipelineJSON", () => {
   });
 
   it("throws when the JSON is malformed", () => {
-    expect(() => extractPipelineJSON("```json\n{ not json }\n```")).toThrow(
-      /Failed to parse JSON/,
-    );
+    expect(() => extractPipelineJSON("```json\n{ not json }\n```")).toThrow(/Failed to parse JSON/);
   });
 
   it("throws when version is not 3", () => {
@@ -96,14 +109,10 @@ describe("extractPipelineJSON", () => {
 
   it("throws when nodes or edges are missing", () => {
     const noNodes = JSON.stringify({ version: 3, edges: [] });
-    expect(() => extractPipelineJSON(`\`\`\`json\n${noNodes}\n\`\`\``)).toThrow(
-      /Invalid pipeline/,
-    );
+    expect(() => extractPipelineJSON(`\`\`\`json\n${noNodes}\n\`\`\``)).toThrow(/Invalid pipeline/);
 
     const noEdges = JSON.stringify({ version: 3, nodes: [] });
-    expect(() => extractPipelineJSON(`\`\`\`json\n${noEdges}\n\`\`\``)).toThrow(
-      /Invalid pipeline/,
-    );
+    expect(() => extractPipelineJSON(`\`\`\`json\n${noEdges}\n\`\`\``)).toThrow(/Invalid pipeline/);
   });
 });
 
@@ -139,9 +148,7 @@ describe("generatePipeline (Anthropic)", () => {
 
   it("sets the required Anthropic headers", async () => {
     fetchMock.mockResolvedValueOnce(
-      makeSSEResponse([
-        { event: "message_delta", data: { delta: { stop_reason: "end_turn" } } },
-      ]),
+      makeSSEResponse([{ event: "message_delta", data: { delta: { stop_reason: "end_turn" } } }]),
     );
 
     await generatePipeline(ANTHROPIC_CONFIG, "msg", () => {});
@@ -191,26 +198,24 @@ describe("generatePipeline (Anthropic)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // The second request body should include the assistant tool_use and a user tool_result.
-    const secondBody = JSON.parse(
-      (fetchMock.mock.calls[1][1] as RequestInit).body as string,
-    );
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
     expect(Array.isArray(secondBody.messages)).toBe(true);
     const lastTwo = secondBody.messages.slice(-2);
     expect(lastTwo[0].role).toBe("assistant");
-    expect(
-      (lastTwo[0].content as { type: string }[]).some((c) => c.type === "tool_use"),
-    ).toBe(true);
+    expect((lastTwo[0].content as { type: string }[]).some((c) => c.type === "tool_use")).toBe(
+      true,
+    );
     expect(lastTwo[1].role).toBe("user");
     const toolResult = (lastTwo[1].content as { type: string; content: string }[])[0];
     expect(toolResult.type).toBe("tool_result");
     expect(toolResult.content).toBe("skill content");
   });
 
-  it("throws when the API returns a non-OK status", async () => {
+  it("throws a generic error when the API returns a non-OK status", async () => {
     fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limited", 429));
-    await expect(
-      generatePipeline(ANTHROPIC_CONFIG, "msg", () => {}),
-    ).rejects.toThrow(/Anthropic API error \(429\)/);
+    await expect(generatePipeline(ANTHROPIC_CONFIG, "msg", () => {})).rejects.toThrow(
+      /Request failed/,
+    );
   });
 });
 
@@ -243,9 +248,7 @@ describe("generatePipeline (OpenAI)", () => {
   });
 
   it("sets the OpenAI Authorization header and body", async () => {
-    fetchMock.mockResolvedValueOnce(
-      makeSSEResponse([{ event: "", data: "[DONE]" }]),
-    );
+    fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
     await generatePipeline(OPENAI_CONFIG, "msg", () => {});
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
@@ -271,10 +274,290 @@ describe("generatePipeline (OpenAI)", () => {
     expect(result).toBe("ok");
   });
 
-  it("throws when OpenAI returns a non-OK status", async () => {
+  it("throws a generic error when OpenAI returns a non-OK status", async () => {
     fetchMock.mockResolvedValueOnce(makeJSONResponse("bad request", 400));
     await expect(generatePipeline(OPENAI_CONFIG, "msg", () => {})).rejects.toThrow(
-      /OpenAI API error \(400\)/,
+      /Request failed/,
     );
+  });
+
+  it("includes the skill tools in the request body when skills are present", async () => {
+    const skillLoader = await import("@/ai/skillLoader");
+    vi.mocked(skillLoader.buildOpenAITools).mockReturnValueOnce([
+      {
+        type: "function",
+        function: {
+          name: "known_skill",
+          description: "d",
+          parameters: { type: "object", properties: {} },
+        },
+      },
+    ]);
+    fetchMock.mockResolvedValueOnce(makeSSEResponse([{ event: "", data: "[DONE]" }]));
+
+    await generatePipeline(OPENAI_CONFIG, "msg", () => {});
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.tools[0].function.name).toBe("known_skill");
+  });
+
+  it("runs a tool-call round trip and feeds the skill result back", async () => {
+    // 1st response: the model asks to call a skill function.
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        {
+          event: "",
+          data: {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "known_skill", arguments: "" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "tool_calls" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+    // 2nd response: the final text answer.
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        { event: "", data: { choices: [{ delta: { content: "final" } }] } },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "stop" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    const result = await generatePipeline(OPENAI_CONFIG, "msg", () => {});
+    expect(result).toBe("final");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    const assistantMsg = secondBody.messages.find((m: { role: string }) => m.role === "assistant");
+    expect(assistantMsg.tool_calls[0].function.name).toBe("known_skill");
+    const toolMsg = secondBody.messages.find((m: { role: string }) => m.role === "tool");
+    expect(toolMsg.content).toBe("skill content");
+    expect(toolMsg.tool_call_id).toBe("call_1");
+  });
+
+  it("throws after too many tool-call rounds", async () => {
+    // Always respond with a tool call so the loop never terminates. Build a
+    // fresh Response each call since a stream body can only be read once.
+    fetchMock.mockImplementation(async () =>
+      makeSSEResponse([
+        {
+          event: "",
+          data: {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "known_skill", arguments: "" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "tool_calls" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    await expect(generatePipeline(OPENAI_CONFIG, "msg", () => {})).rejects.toThrow(
+      /Too many tool-use rounds/,
+    );
+  });
+});
+
+describe("generatePipeline (demo proxy)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("throws when no proxy URL is configured for this build", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "");
+    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(
+      /free demo is not available/,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("posts to the proxy URL without an Authorization header and streams the reply", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        { event: "", data: { choices: [{ delta: { content: "hi " } }] } },
+        { event: "", data: { choices: [{ delta: { content: "there" } }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    const chunks: string[] = [];
+    const result = await generatePipeline(DEMO_CONFIG, "msg", (c) => chunks.push(c));
+
+    expect(chunks).toEqual(["hi ", "there"]);
+    expect(result).toBe("hi there");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://proxy.example.com/chat");
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers["Content-Type"]).toBe("application/json");
+
+    const body = JSON.parse(init.body as string);
+    expect(body.messages).toEqual([
+      { role: "system", content: expect.stringContaining("Megane") },
+      { role: "user", content: "msg" },
+    ]);
+    expect(body.model).toBeUndefined();
+  });
+
+  it("runs the tool-call round trip through the proxy without a model field", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        {
+          event: "",
+          data: {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "known_skill", arguments: "" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "tool_calls" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+    fetchMock.mockResolvedValueOnce(
+      makeSSEResponse([
+        { event: "", data: { choices: [{ delta: { content: "done" } }] } },
+        { event: "", data: { choices: [{ delta: {}, finish_reason: "stop" }] } },
+        { event: "", data: "[DONE]" },
+      ]),
+    );
+
+    const result = await generatePipeline(DEMO_CONFIG, "msg", () => {});
+    expect(result).toBe("done");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    for (const call of fetchMock.mock.calls) {
+      expect(call[0]).toBe("https://proxy.example.com/chat");
+      const body = JSON.parse((call[1] as RequestInit).body as string);
+      expect(body.model).toBeUndefined(); // proxy chooses the model server-side
+    }
+    const secondBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    expect(secondBody.messages.find((m: { role: string }) => m.role === "tool").content).toBe(
+      "skill content",
+    );
+  });
+
+  it("throws a generic error when the proxy returns a non-OK status", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limit exceeded", 429));
+
+    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(/Request failed/);
+  });
+});
+
+describe("formatActionSummary", () => {
+  it("returns singular phrasing for a single node", () => {
+    expect(formatActionSummary(1)).toBe("Pipeline applied — 1 node added to the editor.");
+  });
+
+  it("returns plural phrasing for multiple nodes", () => {
+    expect(formatActionSummary(3)).toBe("Pipeline applied — 3 nodes added to the editor.");
+  });
+
+  it("returns plural phrasing for zero nodes", () => {
+    expect(formatActionSummary(0)).toBe("Pipeline applied — 0 nodes added to the editor.");
+  });
+});
+
+describe("stripPipelineJSON", () => {
+  it("returns the prose that follows a fenced json block (JSON-first format)", () => {
+    expect(
+      stripPipelineJSON('```json\n{ "version": 3 }\n```\n\nLoads benzene and shows bonds.'),
+    ).toBe("Loads benzene and shows bonds.");
+  });
+
+  it("still strips a fenced block that comes after the prose", () => {
+    expect(
+      stripPipelineJSON('Loads benzene and shows bonds.\n```json\n{ "version": 3 }\n```'),
+    ).toBe("Loads benzene and shows bonds.");
+  });
+
+  it("returns an empty string while the JSON is still streaming (unclosed fence)", () => {
+    expect(stripPipelineJSON('```json\n{ "version": 3, "nodes": [')).toBe("");
+  });
+
+  it("returns an empty string for an unfenced partial object", () => {
+    expect(stripPipelineJSON('{ "version": 3, "nodes": [')).toBe("");
+  });
+
+  it("returns an empty string when the response is only a fenced JSON block", () => {
+    expect(stripPipelineJSON('```json\n{ "version": 3 }\n```')).toBe("");
+  });
+
+  it("returns the whole trimmed text when there is no JSON", () => {
+    expect(stripPipelineJSON("  just a sentence.  ")).toBe("just a sentence.");
+  });
+});
+
+describe("tryExtractPipeline", () => {
+  it("returns null while the fence is still open (JSON streaming)", () => {
+    expect(tryExtractPipeline('```json\n{ "version": 3, "nodes": [')).toBeNull();
+  });
+
+  it("returns null when no fence is present at all", () => {
+    expect(tryExtractPipeline(`prefix ${MINIMAL_PIPELINE_JSON} suffix`)).toBeNull();
+  });
+
+  it("returns the parsed pipeline once a closed fence has arrived", () => {
+    const result = tryExtractPipeline(`\`\`\`json\n${MINIMAL_PIPELINE_JSON}\n\`\`\``);
+    expect(result?.version).toBe(3);
+    expect(result?.nodes).toHaveLength(1);
+  });
+
+  it("returns null when a closed fence holds invalid JSON instead of throwing", () => {
+    expect(tryExtractPipeline("```json\n{ not json }\n```")).toBeNull();
+  });
+
+  it("returns null when the fenced JSON has the wrong version", () => {
+    const wrong = JSON.stringify({ version: 2, nodes: [], edges: [] });
+    expect(tryExtractPipeline(`\`\`\`json\n${wrong}\n\`\`\``)).toBeNull();
   });
 });

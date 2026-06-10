@@ -1,0 +1,32 @@
+name = "megane-llm-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Origin allowed to call this proxy. CORS and the explicit Origin check
+# in src/index.ts both key off this value.
+[vars]
+ALLOWED_ORIGIN = "https://hodakamori.github.io"
+
+# OpenRouter model slug. Set to Anthropic Claude Sonnet 4.6 (latest) for
+# strong instruction-following and pipeline generation quality.
+# To downgrade to claude-3.5-haiku (~0.5c) or a free model, just change
+# this value — no code change needed. Leave unset to use the default in
+# src/proxy.ts.
+OPENROUTER_MODEL = "anthropic/claude-sonnet-4-6"
+
+# Comma-separated fallback models, used only if the primary errors. Falls
+# back to Haiku (cheap but reliable) then a free model as a last resort.
+# OpenRouter caps the total routing list at 3, so keep this to 2 entries
+# alongside the primary. Unset = the DEFAULT_FALLBACK_MODELS list in
+# src/proxy.ts.
+OPENROUTER_FALLBACK_MODELS = "anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70b-instruct:free"
+
+# Created via `wrangler kv namespace create RATE_LIMIT_KV`. The id is not a
+# secret, so it is committed here directly.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "e40298c13f7b46db89436cb67390fd86"
+
+# OPENROUTER_API_KEY is a secret — set it with:
+#   wrangler secret put OPENROUTER_API_KEY
+# Never commit it to wrangler.toml or [vars].

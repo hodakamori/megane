@@ -4,9 +4,9 @@
  * rewrites the graph.
  *
  * Persistence is per-session (sessionStorage) rather than across reloads, so
- * every cold start opens on the Editor tab — the pipeline is always visible
- * by default. Within a session the user's tab choice is preserved across
- * navigations.
+ * every cold start opens on the Chat tab — the assistant is the primary entry
+ * point for building pipelines. Within a session the user's tab choice is
+ * preserved across navigations.
  */
 
 import { create } from "zustand";
@@ -33,14 +33,14 @@ function loadMode(): PipelinePanelMode {
   } catch {
     // ignore parse / storage errors
   }
-  // Drop any stale localStorage entry from earlier builds so a user who got
-  // stuck on "chat" via the previous persistence model is freed automatically.
+  // Drop any stale localStorage entry from earlier builds so the per-session
+  // model is the single source of truth.
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
   }
-  return "editor";
+  return "chat";
 }
 
 function saveMode(mode: PipelinePanelMode) {
@@ -55,7 +55,7 @@ interface PipelineUIStore {
   mode: PipelinePanelMode;
   pendingNotice: PipelineAppliedNotice | null;
   setMode: (mode: PipelinePanelMode) => void;
-  /** Switch to the editor tab and surface a one-shot "applied" notice. */
+  /** Surface a one-shot "applied" notice without leaving the current tab. */
   markPipelineApplied: () => void;
   dismissNotice: () => void;
 }
@@ -72,8 +72,10 @@ export const usePipelineUIStore = create<PipelineUIStore>((set) => ({
   },
 
   markPipelineApplied: () => {
-    saveMode("editor");
-    set({ mode: "editor", pendingNotice: { kind: "applied", id: nextNoticeId++ } });
+    // Stay on the current tab (typically Chat) so the assistant's reply remains
+    // visible; the editor frames the freshly applied graph via its own
+    // mode-change effect when the user switches to it.
+    set({ pendingNotice: { kind: "applied", id: nextNoticeId++ } });
   },
 
   dismissNotice: () => {

@@ -1,0 +1,19 @@
+# Copy this file to .dev.vars (gitignored) for local `wrangler dev` testing.
+# .dev.vars overrides [vars] in wrangler.toml during local development only.
+
+# Get a free key at https://openrouter.ai/keys
+OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx
+
+# Match the origin the Vite dev server runs on (default http://localhost:5173)
+ALLOWED_ORIGIN=http://localhost:5173
+
+# Optional: override the OpenRouter model. Free models occasionally get
+# retired (a 404 "unavailable for free" from OpenRouter means you need a
+# new slug from https://openrouter.ai/models?max_price=0). Leave unset to
+# use the default in src/proxy.ts.
+# OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
+
+# Optional: comma-separated fallback models. A free model that is
+# temporarily rate-limited upstream returns 429; OpenRouter then routes to
+# the next of these. Leave unset to use DEFAULT_FALLBACK_MODELS.
+# OPENROUTER_FALLBACK_MODELS=openai/gpt-oss-120b:free,z-ai/glm-4.5-air:free

@@ -9,11 +9,19 @@ Your task is to generate a pipeline configuration in JSON format based on the us
 
 ## Output Format
 
-You MUST respond with ONLY a JSON code block. No explanation, no commentary. Example:
+Output the pipeline as a single JSON code block FIRST, then write ONE short
+sentence in plain language (no markdown, no lists) describing what the pipeline
+does — that sentence is shown to the user as your reply, so keep it friendly and
+concise. The JSON code block MUST come first (so the viewport can update the
+instant it finishes, before you write the sentence), and the explanation
+sentence MUST come immediately after it as the last thing in your response.
+Example:
 
 \`\`\`json
 { "version": 3, "nodes": [...], "edges": [...] }
 \`\`\`
+
+Loads the structure, infers bonds, and displays it in the viewport.
 
 ## Pipeline Schema
 

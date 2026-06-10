@@ -4,16 +4,75 @@
  * Includes inline config panel for API key and model settings.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useAIConfigStore, PROVIDER_MODELS } from "../ai/config";
-import type { AIProvider } from "../ai/config";
-import { generatePipeline, extractPipelineJSON } from "../ai/client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAIConfigStore, PROVIDER_MODELS, isDemoProviderAvailable } from "../ai/config";
+import type { AIConfig, AIProvider } from "../ai/config";
+import {
+  generatePipeline,
+  extractPipelineJSON,
+  tryExtractPipeline,
+  formatActionSummary,
+  stripPipelineJSON,
+} from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
+import type { NodeSnapshotData } from "../pipeline/execute";
+import type { LoadStructureParams, SerializedPipeline } from "../pipeline/types";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 
 interface ChatMessage {
   role: "user" | "assistant" | "error";
   content: string;
+}
+
+/**
+ * Snapshot of the structure the user currently has loaded, captured before an
+ * AI-generated pipeline replaces the graph so it can be re-applied afterwards.
+ */
+export interface PreservedStructure {
+  snapshot: NodeSnapshotData;
+  fileName: string | null;
+  hasTrajectory: boolean;
+  hasCell: boolean;
+}
+
+/**
+ * Capture the first load_structure node's loaded data + file params, or null
+ * when no structure is loaded. The AI returns a fresh graph whose loaders have
+ * `fileName: null`, and `deserialize()` clears `nodeSnapshots`, so without
+ * re-applying this the loaded structure would disappear from the viewport.
+ */
+export function captureLoadedStructure(
+  nodes: Array<{ id: string; type?: string; data: { params: unknown } }>,
+  nodeSnapshots: Record<string, NodeSnapshotData>,
+): PreservedStructure | null {
+  const loader = nodes.find((n) => n.type === "load_structure");
+  if (!loader) return null;
+  const snapshot = nodeSnapshots[loader.id];
+  if (!snapshot) return null;
+  const params = loader.data.params as Partial<LoadStructureParams>;
+  return {
+    snapshot,
+    fileName: params.fileName ?? null,
+    hasTrajectory: !!params.hasTrajectory,
+    hasCell: !!params.hasCell,
+  };
+}
+
+/**
+ * Replace the trailing assistant placeholder with `message` (or append it when
+ * the last message isn't an assistant placeholder). Used to swap the raw
+ * streaming JSON for the final action summary or error, so the user never sees
+ * the raw pipeline JSON.
+ */
+export function replaceTrailingAssistant(
+  messages: ChatMessage[],
+  message: ChatMessage,
+): ChatMessage[] {
+  const last = messages[messages.length - 1];
+  if (last && last.role === "assistant") {
+    return [...messages.slice(0, -1), message];
+  }
+  return [...messages, message];
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────
@@ -193,9 +252,20 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
   const provider = useAIConfigStore((s) => s.provider);
   const model = useAIConfigStore((s) => s.model);
   const apiKey = useAIConfigStore((s) => s.apiKey);
+  const useOwnKey = useAIConfigStore((s) => s.useOwnKey);
   const setProvider = useAIConfigStore((s) => s.setProvider);
   const setModel = useAIConfigStore((s) => s.setModel);
   const setApiKey = useAIConfigStore((s) => s.setApiKey);
+  const setUseOwnKey = useAIConfigStore((s) => s.setUseOwnKey);
+
+  const demoAvailable = isDemoProviderAvailable();
+  // Use the shared free demo unless the visitor opted into BYOK (or no
+  // demo proxy is configured in this build, which forces BYOK).
+  const useDemo = demoAvailable && !useOwnKey;
+  const effectiveConfig: AIConfig = useMemo(
+    () => (useDemo ? { provider: "demo", model: "demo", apiKey: "" } : { provider, model, apiKey }),
+    [useDemo, provider, model, apiKey],
+  );
 
   const deserialize = usePipelineStore((s) => s.deserialize);
   const autoLayout = usePipelineStore((s) => s.autoLayout);
@@ -209,7 +279,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     const trimmed = input.trim();
     if (!trimmed || isStreaming) return;
 
-    if (!apiKey) {
+    if (!useDemo && !apiKey) {
       setShowConfig(true);
       setMessages((prev) => [
         ...prev,
@@ -222,18 +292,55 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setIsStreaming(true);
 
-    // Add a placeholder assistant message for streaming
-    const _assistantIdx = messages.length + 1; // index of the new assistant message
+    // Add a placeholder assistant message. The model streams raw pipeline JSON
+    // into it, which we never surface — it is replaced by an action summary (or
+    // error) once the request settles.
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     const abort = new AbortController();
     abortRef.current = abort;
 
+    // Apply a generated pipeline. The AI returns a fresh graph whose
+    // load_structure node has `fileName: null`, and deserialize() clears
+    // nodeSnapshots, so we capture the currently loaded structure first and
+    // re-attach it to the new loader afterwards — otherwise the loaded
+    // structure would disappear from the viewport. `appliedNodeCount` doubles
+    // as a "have we applied yet?" guard (-1 = not applied).
+    let appliedNodeCount = -1;
+    const applyPipeline = (pipeline: SerializedPipeline) => {
+      const preState = usePipelineStore.getState();
+      const preserved = captureLoadedStructure(preState.nodes, preState.nodeSnapshots);
+
+      deserialize(pipeline);
+      autoLayout();
+
+      if (preserved) {
+        const postState = usePipelineStore.getState();
+        const newLoader = postState.nodes.find((n) => n.type === "load_structure");
+        if (newLoader) {
+          postState.setNodeSnapshot(newLoader.id, preserved.snapshot);
+          postState.updateNodeParams(newLoader.id, {
+            fileName: preserved.fileName,
+            hasTrajectory: preserved.hasTrajectory,
+            hasCell: preserved.hasCell,
+          });
+        }
+      }
+
+      appliedNodeCount = pipeline.nodes.length;
+      // Surface the result on the editor tab and trigger fitView via the
+      // panel's mode-change effect.
+      usePipelineUIStore.getState().markPipelineApplied();
+      onPipelineApplied?.();
+    };
+
     try {
+      let streamBuffer = "";
       const fullResponse = await generatePipeline(
-        { provider, model, apiKey },
+        effectiveConfig,
         trimmed,
         (chunk) => {
+          streamBuffer += chunk;
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
@@ -242,31 +349,39 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
             }
             return updated;
           });
+          // Apply the graph the instant a complete JSON block has streamed in.
+          // The model emits the JSON first, so the viewport updates without
+          // waiting for the trailing one-sentence explanation to finish.
+          if (appliedNodeCount < 0) {
+            const early = tryExtractPipeline(streamBuffer);
+            if (early) applyPipeline(early);
+          }
         },
         abort.signal,
       );
 
-      const pipeline = extractPipelineJSON(fullResponse);
-      deserialize(pipeline);
-      autoLayout();
-      // Surface the result on the editor tab and trigger fitView via the
-      // panel's mode-change effect.
-      usePipelineUIStore.getState().markPipelineApplied();
-      onPipelineApplied?.();
-
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant" as const, content: "Pipeline generated successfully!" },
-      ]);
-    } catch (e: unknown) {
-      if ((e as Error).name === "AbortError") {
-        setMessages((prev) => [...prev, { role: "error", content: "Generation cancelled." }]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "error", content: (e as Error).message || "An error occurred." },
-        ]);
+      // Fallback: the JSON may only have closed in the final, non-streamed text
+      // (or arrived after a tool round trip), so apply it now if we haven't yet.
+      if (appliedNodeCount < 0) {
+        applyPipeline(extractPipelineJSON(fullResponse));
       }
+
+      // Show the assistant's own explanation (everything except the JSON
+      // payload); fall back to a generic summary if the model returned only
+      // JSON with no prose.
+      const explanation = stripPipelineJSON(fullResponse);
+      setMessages((prev) =>
+        replaceTrailingAssistant(prev, {
+          role: "assistant",
+          content: explanation || formatActionSummary(appliedNodeCount),
+        }),
+      );
+    } catch (e: unknown) {
+      const content =
+        (e as Error).name === "AbortError"
+          ? "Generation cancelled."
+          : "Something went wrong. Please try again.";
+      setMessages((prev) => replaceTrailingAssistant(prev, { role: "error", content }));
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
@@ -275,12 +390,11 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     input,
     isStreaming,
     apiKey,
-    provider,
-    model,
+    useDemo,
+    effectiveConfig,
     deserialize,
     autoLayout,
     onPipelineApplied,
-    messages.length,
   ]);
 
   const handleCancel = useCallback(() => {
@@ -302,41 +416,61 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       {/* Config panel */}
       {showConfig && (
         <div style={configPanelStyle}>
-          <div style={configRowStyle}>
-            <span style={configLabelStyle}>Provider</span>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as AIProvider)}
-              style={configSelectStyle}
-            >
-              <option value="anthropic">Anthropic</option>
-              <option value="openai">OpenAI</option>
-            </select>
-          </div>
-          <div style={configRowStyle}>
-            <span style={configLabelStyle}>Model</span>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              style={configSelectStyle}
-            >
-              {PROVIDER_MODELS[provider].map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={configRowStyle}>
-            <span style={configLabelStyle}>API Key</span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
-              style={configInputStyle}
-            />
-          </div>
+          {demoAvailable && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={useOwnKey}
+                onChange={(e) => setUseOwnKey(e.target.checked)}
+              />
+              <span style={{ color: "#475569" }}>Use my own API key</span>
+            </label>
+          )}
+          {useDemo ? (
+            <div style={{ color: "#64748b", fontSize: 11, fontStyle: "italic" }}>
+              The free demo runs through megane&apos;s shared proxy — no API key needed. It uses a
+              rate-limited free-tier model, so responses may be slower or lower quality than your
+              own API key.
+            </div>
+          ) : (
+            <>
+              <div style={configRowStyle}>
+                <span style={configLabelStyle}>Provider</span>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value as AIProvider)}
+                  style={configSelectStyle}
+                >
+                  <option value="anthropic">Anthropic</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+              <div style={configRowStyle}>
+                <span style={configLabelStyle}>Model</span>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  style={configSelectStyle}
+                >
+                  {PROVIDER_MODELS[provider].map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={configRowStyle}>
+                <span style={configLabelStyle}>API Key</span>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
+                  style={configInputStyle}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -369,22 +503,21 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // assistant
-            if (msg.content === "Pipeline generated successfully!") {
+            // assistant — action summary lines start with "Pipeline applied"
+            if (msg.content.startsWith("Pipeline applied")) {
               return (
                 <div key={i} style={successMsgStyle}>
                   {msg.content}
                 </div>
               );
             }
-            // Show truncated streaming content
-            const display =
-              msg.content.length > 80
-                ? msg.content.slice(0, 80) + "..."
-                : msg.content || (isStreaming ? "Generating..." : "");
+            // Show the assistant's prose, stripping the JSON payload. While the
+            // explanation is still streaming in (or the model emitted only
+            // JSON), fall back to a neutral status.
+            const prose = stripPipelineJSON(msg.content);
             return (
               <div key={i} style={assistantMsgStyle}>
-                {display}
+                {prose || "Generating…"}
               </div>
             );
           })

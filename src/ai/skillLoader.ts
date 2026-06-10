@@ -30,6 +30,16 @@ export interface ToolDefinition {
   input_schema: { type: "object"; properties: Record<string, never> };
 }
 
+/** OpenAI-compatible function tool definition shape (also used by OpenRouter). */
+export interface OpenAITool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: { type: "object"; properties: Record<string, never> };
+  };
+}
+
 /**
  * Import all .md files from the skills directory at build time.
  * Vite's import.meta.glob with ?raw returns file contents as strings.
@@ -114,6 +124,23 @@ export function buildToolDefinitions(skills: PipelineSkill[]): ToolDefinition[] 
 export function executeSkill(skills: PipelineSkill[], toolName: string): string | null {
   const skill = skills.find((s) => toSnakeCase(s.name) === toolName);
   return skill?.content ?? null;
+}
+
+/**
+ * Build OpenAI-compatible function tool definitions from loaded skills.
+ * Used for the OpenAI API and the OpenRouter-backed demo proxy, which both
+ * speak the OpenAI tool-calling protocol. Each skill becomes a parameterless
+ * function the model can call on demand to fetch the template.
+ */
+export function buildOpenAITools(skills: PipelineSkill[]): OpenAITool[] {
+  return skills.map((skill) => ({
+    type: "function",
+    function: {
+      name: toSnakeCase(skill.name),
+      description: skill.description,
+      parameters: { type: "object" as const, properties: {} },
+    },
+  }));
 }
 
 /** Cached skills loaded at module init. */

@@ -1,0 +1,55 @@
+name: Deploy LLM Proxy Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/llm-proxy/**"
+      - ".github/workflows/deploy-llm-proxy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-llm-proxy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workers/llm-proxy/package-lock.json
+
+      - name: Install dependencies
+        working-directory: workers/llm-proxy
+        run: npm ci
+
+      - name: Run tests
+        working-directory: workers/llm-proxy
+        run: npm test
+
+      - name: Type-check
+        working-directory: workers/llm-proxy
+        run: npx tsc --noEmit
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: workers/llm-proxy
+          command: deploy
+          # Upload the OpenRouter key as a Worker secret on every deploy. The
+          # value is read from the job env below; only the names are listed
+          # here. Cloudflare persists Worker secrets across deploys, so this is
+          # idempotent.
+          secrets: |
+            OPENROUTER_API_KEY
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
