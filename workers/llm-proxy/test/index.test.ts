@@ -3,6 +3,7 @@ import worker from "../src/index";
 import {
   isAllowedOrigin,
   corsHeaders,
+  parseAllowedOrigins,
   sanitizeMessages,
   sanitizeTools,
   isRateLimited,
@@ -15,6 +16,7 @@ import {
 } from "../src/proxy";
 
 const ALLOWED_ORIGIN = "https://hodakamori.github.io";
+const SECOND_ORIGIN = "https://megane.tech-office-mori.com";
 
 class FakeKV {
   private store = new Map<string, string>();
@@ -36,11 +38,27 @@ function makeEnv(kv: FakeKV = new FakeKV()): Env {
   };
 }
 
+/** An env whose ALLOWED_ORIGIN lists two comma-separated origins. */
+function makeMultiOriginEnv(kv: FakeKV = new FakeKV()): Env {
+  return { ...makeEnv(kv), ALLOWED_ORIGIN: `${ALLOWED_ORIGIN}, ${SECOND_ORIGIN}` };
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
 });
 
 // ─── CORS helpers ────────────────────────────────────────────────────
+
+describe("parseAllowedOrigins", () => {
+  it("returns a single-element list for one origin", () => {
+    expect(parseAllowedOrigins(makeEnv())).toEqual([ALLOWED_ORIGIN]);
+  });
+
+  it("splits, trims, and drops blank entries for a comma-separated list", () => {
+    const env = { ...makeEnv(), ALLOWED_ORIGIN: ` ${ALLOWED_ORIGIN} , ,${SECOND_ORIGIN}, ` };
+    expect(parseAllowedOrigins(env)).toEqual([ALLOWED_ORIGIN, SECOND_ORIGIN]);
+  });
+});
 
 describe("isAllowedOrigin", () => {
   it("accepts the configured origin", () => {
@@ -54,6 +72,13 @@ describe("isAllowedOrigin", () => {
   it("rejects a missing origin", () => {
     expect(isAllowedOrigin(null, makeEnv())).toBe(false);
   });
+
+  it("accepts any origin in a comma-separated list", () => {
+    const env = makeMultiOriginEnv();
+    expect(isAllowedOrigin(ALLOWED_ORIGIN, env)).toBe(true);
+    expect(isAllowedOrigin(SECOND_ORIGIN, env)).toBe(true);
+    expect(isAllowedOrigin("https://evil.example", env)).toBe(false);
+  });
 });
 
 describe("corsHeaders", () => {
@@ -65,6 +90,12 @@ describe("corsHeaders", () => {
 
   it("returns no headers for a disallowed origin", () => {
     expect(corsHeaders("https://evil.example", makeEnv())).toEqual({});
+  });
+
+  it("echoes back the matching origin from a multi-origin list", () => {
+    const env = makeMultiOriginEnv();
+    expect(corsHeaders(SECOND_ORIGIN, env)["Access-Control-Allow-Origin"]).toBe(SECOND_ORIGIN);
+    expect(corsHeaders(ALLOWED_ORIGIN, env)["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
   });
 });
 
@@ -455,6 +486,26 @@ describe("worker fetch handler", () => {
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
     expect(await res.text()).toBe(upstreamBody);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("accepts a request from a second allowed origin and echoes it in CORS", async () => {
+    const env = makeMultiOriginEnv();
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const headers = init.headers as Record<string, string>;
+      // HTTP-Referer should carry the actual caller's origin.
+      expect(headers["HTTP-Referer"]).toBe(SECOND_ORIGIN);
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({ origin: SECOND_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(SECOND_ORIGIN);
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

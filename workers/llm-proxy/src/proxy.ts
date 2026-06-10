@@ -12,6 +12,13 @@
 
 export interface Env {
   OPENROUTER_API_KEY: string;
+  /**
+   * Comma-separated list of origins allowed to call this proxy. A single
+   * value (no comma) is the common case, but multiple let one proxy serve
+   * several demo deployments — e.g. the GitHub Pages docs demo and a
+   * custom-domain S3 site. Both the explicit Origin check and the CORS
+   * headers key off this list.
+   */
   ALLOWED_ORIGIN: string;
   RATE_LIMIT_KV: KVNamespace;
   /**
@@ -182,7 +189,9 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
       headers: {
         Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": env.ALLOWED_ORIGIN,
+        // origin is guaranteed allowed (and non-null) here; fall back to the
+        // first configured origin only to satisfy the type.
+        "HTTP-Referer": origin ?? parseAllowedOrigins(env)[0],
         "X-Title": "megane demo",
       },
       body: JSON.stringify(upstreamBody),
@@ -212,14 +221,27 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
 
 // ─── CORS ────────────────────────────────────────────────────────────
 
+/**
+ * Parse the comma-separated {@link Env.ALLOWED_ORIGIN} config into a
+ * trimmed, non-empty list of origins.
+ */
+export function parseAllowedOrigins(env: Env): string[] {
+  return env.ALLOWED_ORIGIN.split(",")
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
+}
+
 export function isAllowedOrigin(origin: string | null, env: Env): boolean {
-  return origin !== null && origin === env.ALLOWED_ORIGIN;
+  return origin !== null && parseAllowedOrigins(env).includes(origin);
 }
 
 export function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   if (!isAllowedOrigin(origin, env)) return {};
+  // Echo back the matching origin (not the whole list): with multiple
+  // allowed origins the response may name only one, and it must be the
+  // caller's for the browser to accept it.
   return {
-    "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN,
+    "Access-Control-Allow-Origin": origin as string,
     Vary: "Origin",
   };
 }
