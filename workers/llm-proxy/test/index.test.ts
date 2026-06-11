@@ -326,8 +326,8 @@ describe("isRateLimited", () => {
     expect(await isRateLimited("5.6.7.8", env)).toBe(false);
   });
 
-  it("caps the free demo at 5 requests per day", () => {
-    expect(PER_DAY_LIMIT).toBe(5);
+  it("caps the free demo at 30 requests per day", () => {
+    expect(PER_DAY_LIMIT).toBe(30);
   });
 
   it("allows a request while still under the per-day limit", async () => {

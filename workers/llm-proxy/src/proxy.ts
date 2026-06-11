@@ -96,7 +96,7 @@ export const MAX_TOOL_NAME_LENGTH = 64;
 export const MAX_TOOL_DESCRIPTION_LENGTH = 1024;
 export const MAX_TOOL_CALL_ID_LENGTH = 256;
 export const PER_MINUTE_LIMIT = 3;
-export const PER_DAY_LIMIT = 5;
+export const PER_DAY_LIMIT = 30;
 
 const MINUTE_TTL_SECONDS = 90;
 const DAY_TTL_SECONDS = 2 * 24 * 60 * 60;
