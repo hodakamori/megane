@@ -2,10 +2,12 @@ name = "megane-llm-proxy"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
-# Origin allowed to call this proxy. CORS and the explicit Origin check
-# in src/index.ts both key off this value.
+# Origins allowed to call this proxy (comma-separated). CORS and the
+# explicit Origin check in src/index.ts both key off this list. The first
+# entry is the GitHub Pages docs demo; the second is the custom-domain S3
+# demo site.
 [vars]
-ALLOWED_ORIGIN = "https://hodakamori.github.io"
+ALLOWED_ORIGIN = "https://hodakamori.github.io,https://megane.tech-office-mori.com"
 
 # OpenRouter model slug. Set to Anthropic Claude Sonnet 4.6 (latest) for
 # strong instruction-following and pipeline generation quality.
