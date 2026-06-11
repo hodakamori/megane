@@ -12,7 +12,8 @@ import {
   extractPipelineJSON,
   tryExtractPipeline,
   formatActionSummary,
-  stripPipelineJSON,
+  extractTrailingExplanation,
+  RateLimitError,
 } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
 import type { NodeSnapshotData } from "../pipeline/execute";
@@ -366,10 +367,10 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
         applyPipeline(extractPipelineJSON(fullResponse));
       }
 
-      // Show the assistant's own explanation (everything except the JSON
-      // payload); fall back to a generic summary if the model returned only
-      // JSON with no prose.
-      const explanation = stripPipelineJSON(fullResponse);
+      // Show the assistant's own explanation (the sentence that follows the
+      // JSON payload); fall back to a generic summary if the model returned
+      // only JSON with no prose.
+      const explanation = extractTrailingExplanation(fullResponse);
       setMessages((prev) =>
         replaceTrailingAssistant(prev, {
           role: "assistant",
@@ -377,10 +378,14 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
         }),
       );
     } catch (e: unknown) {
-      const content =
-        (e as Error).name === "AbortError"
-          ? "Generation cancelled."
-          : "Something went wrong. Please try again.";
+      let content: string;
+      if (e instanceof RateLimitError) {
+        content = e.message;
+      } else if ((e as Error).name === "AbortError") {
+        content = "Generation cancelled.";
+      } else {
+        content = "Something went wrong. Please try again.";
+      }
       setMessages((prev) => replaceTrailingAssistant(prev, { role: "error", content }));
     } finally {
       setIsStreaming(false);
@@ -511,10 +516,12 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // Show the assistant's prose, stripping the JSON payload. While the
-            // explanation is still streaming in (or the model emitted only
-            // JSON), fall back to a neutral status.
-            const prose = stripPipelineJSON(msg.content);
+            // Show the assistant's prose — only the sentence that follows the
+            // JSON payload. While the JSON is still streaming (or the model
+            // emitted only JSON), this is empty and we fall back to a neutral
+            // status. Ignoring any preamble before the JSON keeps the reply
+            // monotonic so it never flickers back to "Generating…".
+            const prose = extractTrailingExplanation(msg.content);
             return (
               <div key={i} style={assistantMsgStyle}>
                 {prose || "Generating…"}

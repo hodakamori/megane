@@ -16,6 +16,21 @@ import {
   type OpenAITool,
 } from "./skillLoader";
 
+/**
+ * Thrown when the backend rejects the request with HTTP 429 — i.e. the
+ * shared free-demo proxy's per-IP rate limit (5 requests/day, 3/minute) was
+ * exceeded. Carries a user-facing message so the chat surfaces the real
+ * reason instead of a generic "something went wrong".
+ */
+export class RateLimitError extends Error {
+  constructor(
+    message = "Daily free-demo limit reached (5 requests/day). Try again tomorrow, or add your own API key in settings.",
+  ) {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
 // ─── Types for Anthropic SSE parsing ─────────────────────────────────
 
 interface ToolUseAccumulator {
@@ -118,6 +133,7 @@ async function streamAnthropicWithSkills(
 
     if (!response.ok) {
       await response.text(); // consume body so the connection is released
+      if (response.status === 429) throw new RateLimitError();
       throw new Error("Request failed. Please try again.");
     }
 
@@ -296,6 +312,7 @@ async function streamOpenAICompatWithSkills(
     const response = await send(body, signal);
     if (!response.ok) {
       await response.text(); // consume body so the connection is released
+      if (response.status === 429) throw new RateLimitError();
       throw new Error("Request failed. Please try again.");
     }
 
@@ -502,6 +519,29 @@ export function stripPipelineJSON(text: string): string {
     return "";
   }
   return text.trim();
+}
+
+/**
+ * Return only the natural-language explanation that follows the *last* closed
+ * ```` ```json ```` fence, or an empty string when no fence has closed yet.
+ *
+ * Unlike {@link stripPipelineJSON}, this deliberately ignores any prose that
+ * appears *before* the fence — during a skill tool round trip the model often
+ * streams a short preamble before emitting the JSON, and surfacing it would
+ * make the chat flicker (preamble shown, then reverting to a placeholder once
+ * the JSON starts streaming). The system prompt puts the JSON first and the
+ * one-sentence explanation immediately after it, so the trailing text is the
+ * only thing worth showing. Because that text only ever grows as it streams,
+ * the displayed reply is monotonic — it never jumps back to "Generating…".
+ */
+export function extractTrailingExplanation(text: string): string {
+  const lastFenceEnd = text.lastIndexOf("```");
+  if (lastFenceEnd === -1) return "";
+  // A single ``` means a fence has opened but not closed yet — still streaming
+  // the JSON, so there is no trailing explanation to show.
+  const fenceCount = (text.match(/```/g) ?? []).length;
+  if (fenceCount % 2 !== 0) return "";
+  return text.slice(lastFenceEnd + 3).trim();
 }
 
 // ─── JSON extraction ─────────────────────────────────────────────────

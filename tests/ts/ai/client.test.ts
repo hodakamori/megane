@@ -15,6 +15,8 @@ import {
   generatePipeline,
   formatActionSummary,
   stripPipelineJSON,
+  extractTrailingExplanation,
+  RateLimitError,
 } from "@/ai/client";
 import type { AIConfig } from "@/ai/config";
 
@@ -212,9 +214,16 @@ describe("generatePipeline (Anthropic)", () => {
   });
 
   it("throws a generic error when the API returns a non-OK status", async () => {
-    fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limited", 429));
+    fetchMock.mockResolvedValueOnce(makeJSONResponse("server error", 500));
     await expect(generatePipeline(ANTHROPIC_CONFIG, "msg", () => {})).rejects.toThrow(
       /Request failed/,
+    );
+  });
+
+  it("throws a RateLimitError when the API returns 429", async () => {
+    fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limited", 429));
+    await expect(generatePipeline(ANTHROPIC_CONFIG, "msg", () => {})).rejects.toBeInstanceOf(
+      RateLimitError,
     );
   });
 });
@@ -487,9 +496,18 @@ describe("generatePipeline (demo proxy)", () => {
 
   it("throws a generic error when the proxy returns a non-OK status", async () => {
     vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
-    fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limit exceeded", 429));
+    fetchMock.mockResolvedValueOnce(makeJSONResponse("server error", 500));
 
     await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toThrow(/Request failed/);
+  });
+
+  it("throws a RateLimitError when the proxy returns 429 (daily limit hit)", async () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    fetchMock.mockResolvedValueOnce(makeJSONResponse("rate limit exceeded", 429));
+
+    await expect(generatePipeline(DEMO_CONFIG, "msg", () => {})).rejects.toBeInstanceOf(
+      RateLimitError,
+    );
   });
 });
 
@@ -534,6 +552,36 @@ describe("stripPipelineJSON", () => {
 
   it("returns the whole trimmed text when there is no JSON", () => {
     expect(stripPipelineJSON("  just a sentence.  ")).toBe("just a sentence.");
+  });
+});
+
+describe("extractTrailingExplanation", () => {
+  it("returns the sentence after a closed fenced json block", () => {
+    expect(
+      extractTrailingExplanation(
+        '```json\n{ "version": 3 }\n```\n\nLoads benzene and shows bonds.',
+      ),
+    ).toBe("Loads benzene and shows bonds.");
+  });
+
+  it("ignores a preamble that precedes the json (no flicker from tool round trips)", () => {
+    expect(
+      extractTrailingExplanation(
+        'Let me fetch the molecule template.\n```json\n{ "version": 3 }\n```\nDone — shows the molecule.',
+      ),
+    ).toBe("Done — shows the molecule.");
+  });
+
+  it("returns an empty string while the JSON is still streaming (unclosed fence)", () => {
+    expect(extractTrailingExplanation('```json\n{ "version": 3, "nodes": [')).toBe("");
+  });
+
+  it("returns an empty string when the response is only a closed fenced block", () => {
+    expect(extractTrailingExplanation('```json\n{ "version": 3 }\n```')).toBe("");
+  });
+
+  it("returns an empty string when no fence is present yet", () => {
+    expect(extractTrailingExplanation("Let me think about this request")).toBe("");
   });
 });
 
