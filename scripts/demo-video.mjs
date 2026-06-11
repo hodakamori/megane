@@ -1,0 +1,353 @@
+/**
+ * Demo video director for the megane app.
+ *
+ * Interprets the storyboard in `scripts/demo-script.mjs` ("台本"), drives the
+ * live Vite app with Playwright, and records a single continuous webm while
+ * zooming into UI regions via a CSS transform tween on `#root`.
+ *
+ * Usage:
+ *   node scripts/demo-video.mjs [options]
+ *   ANTHROPIC_API_KEY=sk-ant-... node scripts/demo-video.mjs   # live AI generate
+ *
+ * Options:
+ *   --out <path>        Output webm path (default: demo/out/megane-demo-<ts>.webm)
+ *   --prompt <text>     Override the Chat prompt from the storyboard
+ *   --width <px>        Viewport width  (default: storyboard config.width)
+ *   --height <px>       Viewport height (default: storyboard config.height)
+ *   --dpr <n>           deviceScaleFactor (default: storyboard config.dpr)
+ *   --no-generate       Skip the live AI call; type the prompt only
+ *   --clean             Remove demo/out before running
+ *
+ * Requires WASM to be built first (`npm run build:wasm`); this script will
+ * build it automatically if the pkg directory is missing.
+ */
+
+import { spawn, execSync } from "child_process";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "fs";
+import { join, dirname, isAbsolute } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
+import { createRequire } from "module";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "..");
+const OUT_DIR = join(ROOT, "demo", "out");
+
+// Resolve Playwright from the global install (same pattern as dev-preview.mjs).
+const _require = createRequire("/opt/node22/lib/node_modules/");
+const { chromium } = _require("playwright");
+
+// ---- CLI parsing ----
+const args = process.argv.slice(2);
+const hasFlag = (f) => args.includes(f);
+const getFlag = (f, d) => {
+  const i = args.indexOf(f);
+  return i === -1 || i + 1 >= args.length ? d : args[i + 1];
+};
+
+const TIMESTAMP = new Date()
+  .toISOString()
+  .replace(/[:.]/g, "-")
+  .replace("T", "_")
+  .slice(0, 19);
+const PORT = 15473 + Math.floor(Math.random() * 100);
+
+// ---- Storyboard ----
+const { config, scenes } = await import(
+  pathToFileURL(join(__dirname, "demo-script.mjs")).href
+);
+
+const WIDTH = parseInt(getFlag("--width", String(config.width)), 10);
+const HEIGHT = parseInt(getFlag("--height", String(config.height)), 10);
+const DPR = parseFloat(getFlag("--dpr", String(config.dpr)));
+const TRANSITION_MS = config.transitionMs ?? 900;
+const PROMPT = getFlag("--prompt", config.prompt);
+const NO_GENERATE = hasFlag("--no-generate");
+const CLEAN = hasFlag("--clean");
+const API_KEY = process.env.ANTHROPIC_API_KEY || "";
+
+const outArg = getFlag("--out", join(OUT_DIR, `megane-demo-${TIMESTAMP}.webm`));
+const OUT_PATH = isAbsolute(outArg) ? outArg : join(ROOT, outArg);
+
+// ---- Setup helpers (reused from dev-preview.mjs patterns) ----
+
+function ensureWasm() {
+  if (existsSync(join(ROOT, "crates", "megane-wasm", "pkg"))) return;
+  console.log("WASM package not found. Building...");
+  execSync("npm run build:wasm", { cwd: ROOT, stdio: "inherit", timeout: 180000 });
+}
+
+function startViteServer() {
+  return new Promise((resolve, reject) => {
+    const proc = spawn("npx", ["vite", "--port", String(PORT), "--host", "127.0.0.1"], {
+      cwd: ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, NODE_ENV: "development" },
+    });
+    const timeout = setTimeout(() => reject(new Error("Vite did not start in time")), 30000);
+    const handler = (data) => {
+      const line = data.toString();
+      if (line.includes("Local:") && line.includes(String(PORT))) {
+        clearTimeout(timeout);
+        resolve(proc);
+      }
+    };
+    proc.stdout.on("data", handler);
+    proc.stderr.on("data", handler);
+    proc.on("error", (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+  });
+}
+
+async function waitForApp(page) {
+  await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForSelector("canvas", { timeout: 15000 });
+  // The pipeline panel defaults to the Chat tab, so the Editor tab's
+  // `.react-flow` mounts hidden — wait for it attached, not visible.
+  await page.waitForSelector('[data-testid="panel-pipeline"]', { state: "visible", timeout: 15000 });
+  await page.waitForSelector(".react-flow", { state: "attached", timeout: 15000 });
+  await page.waitForTimeout(3000); // let the first render settle
+}
+
+// ---- Zoom engine ----
+// Current #root transform: screen = translate(tx,ty) ∘ scale(s) over local coords,
+// with transform-origin at the top-left. We track it so a target element's
+// untransformed rect can be recovered from its on-screen boundingBox.
+let current = { tx: 0, ty: 0, s: 1 };
+
+async function applyTransform(page, t) {
+  current = t;
+  await page.evaluate(
+    ({ tx, ty, s }) => {
+      const root = document.getElementById("root");
+      if (root) root.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+    },
+    t,
+  );
+}
+
+async function zoomTo(page, spec) {
+  if (spec === "keep") return;
+  if (!spec || spec === "full") {
+    await applyTransform(page, { tx: 0, ty: 0, s: 1 });
+    await page.waitForTimeout(TRANSITION_MS);
+    return;
+  }
+  const { sel, pad = 0, scale } = spec;
+  const box = await page.locator(sel).first().boundingBox();
+  if (!box) {
+    console.warn(`  zoom target not found: ${sel} (skipping)`);
+    return;
+  }
+  // Recover the untransformed (local) rect from the on-screen box.
+  const lx = (box.x - current.tx) / current.s - pad;
+  const ly = (box.y - current.ty) / current.s - pad;
+  const lw = box.width / current.s + 2 * pad;
+  const lh = box.height / current.s + 2 * pad;
+  // `scale` (explicit) zooms by a fixed factor centered on the target — use it
+  // when the target is full-height (fit-to-bbox would compute ~1× and not zoom).
+  // Otherwise fit the padded bbox to the viewport.
+  const s = scale ?? Math.min(WIDTH / lw, HEIGHT / lh);
+  const cx = lx + lw / 2;
+  const cy = ly + lh / 2;
+  await applyTransform(page, { tx: WIDTH / 2 - cx * s, ty: HEIGHT / 2 - cy * s, s });
+  await page.waitForTimeout(TRANSITION_MS);
+}
+
+// ---- Scene actions ("verbs") ----
+
+const SEL = {
+  chatTab: '[data-testid="pipeline-editor-tab-chat"]',
+  editorTab: '[data-testid="pipeline-editor-tab-editor"]',
+  promptBox: 'textarea[placeholder="Describe the pipeline you want..."]',
+  generateBtn: 'button:has-text("Generate")',
+  cancelBtn: 'button:has-text("Cancel")',
+  chatMessages: '[data-testid="pipeline-chat-messages"]',
+  appliedNotice: '[data-testid="pipeline-editor-applied-notice"]',
+  viewer: '[data-testid="viewer-root"]',
+};
+
+const actions = {
+  async openChatAndType(page) {
+    // The panel defaults to the Chat tab, so the textarea is already present.
+    await page.locator(SEL.promptBox).first().waitFor({ state: "visible", timeout: 10000 });
+    // Typewriter effect driven entirely in-page: set the value via React's
+    // native textarea setter and dispatch an `input` event so React picks it up.
+    // This bypasses Playwright actionability (no per-key click/stability checks),
+    // so it stays fast and reliable even while the #root zoom transform is live.
+    for (let i = 1; i <= PROMPT.length; i++) {
+      await page.evaluate(
+        ({ sel, val }) => {
+          const el = document.querySelector(sel);
+          if (!el) return;
+          const setter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            "value",
+          ).set;
+          setter.call(el, val);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        },
+        { sel: SEL.promptBox, val: PROMPT.slice(0, i) },
+      );
+      await page.waitForTimeout(45);
+    }
+  },
+
+  async generate(page) {
+    if (NO_GENERATE || !API_KEY) {
+      console.log("  generate: skipped (no key / --no-generate); prompt left in box");
+      return;
+    }
+    await page.locator(SEL.generateBtn).first().click();
+    // While streaming, the button swaps to "Cancel"; it returns to "Generate"
+    // once the response (and pipeline apply) completes. Wait on that round trip
+    // rather than the applied-notice, which only renders on the Editor tab.
+    await page
+      .locator(SEL.cancelBtn)
+      .first()
+      .waitFor({ state: "visible", timeout: 8000 })
+      .catch(() => {});
+    await page
+      .locator(SEL.generateBtn)
+      .first()
+      .waitFor({ state: "visible", timeout: 30000 })
+      .catch(() => console.log("  generate: still streaming at timeout (recording current state)"));
+  },
+
+  async rotate(page) {
+    const box = await page.locator(SEL.viewer).first().boundingBox();
+    if (!box) return;
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const r = Math.min(box.width, box.height) * 0.18;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    const steps = 40;
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * Math.PI * 1.2;
+      await page.mouse.move(cx + r * Math.cos(a), cy + r * Math.sin(a) * 0.35);
+      await page.waitForTimeout(40);
+    }
+    await page.mouse.up();
+  },
+
+  async showPipeline(page) {
+    await page.locator(SEL.editorTab).first().click();
+    await page.waitForTimeout(500);
+  },
+};
+
+// ---- API key setup (BYOK via the Chat config panel) ----
+async function setupApiKey(page) {
+  if (NO_GENERATE || !API_KEY) return;
+  try {
+    await page.locator(SEL.chatTab).first().click();
+    await page.waitForTimeout(300);
+    await page.locator('button[title="AI Settings"]').first().click();
+    await page.waitForTimeout(300);
+    const keyInput = page.locator('input[type="password"]').first();
+    await keyInput.fill(API_KEY);
+    // Close the config panel, leaving the panel on the Chat tab (its default)
+    // so the chat scene finds the prompt box without an extra tab switch.
+    await page.locator('button[title="AI Settings"]').first().click();
+    await page.waitForTimeout(300);
+    console.log("  API key injected via Chat config panel");
+  } catch (e) {
+    console.warn("  API key setup failed (will fall back to no-generate):", e.message);
+  }
+}
+
+// ---- Main ----
+let server = null;
+let browser = null;
+let context = null;
+
+try {
+  if (CLEAN && existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true });
+  mkdirSync(OUT_DIR, { recursive: true });
+  ensureWasm();
+
+  console.log(`Output: ${OUT_PATH}`);
+  console.log(`Viewport: ${WIDTH}x${HEIGHT} @${DPR}x  | scenes: ${scenes.map((s) => s.id).join(" → ")}`);
+  console.log(`Generate: ${NO_GENERATE ? "off (--no-generate)" : API_KEY ? "live (ANTHROPIC_API_KEY)" : "off (no key)"}`);
+
+  console.log("\nStarting Vite dev server...");
+  server = await startViteServer();
+  console.log(`Vite running on port ${PORT}`);
+
+  browser = await chromium.launch({ headless: true });
+  const tmpDir = join(OUT_DIR, `tmp-${TIMESTAMP}`);
+  mkdirSync(tmpDir, { recursive: true });
+
+  context = await browser.newContext({
+    viewport: { width: WIDTH, height: HEIGHT },
+    deviceScaleFactor: DPR,
+    recordVideo: { dir: tmpDir, size: { width: WIDTH, height: HEIGHT } },
+  });
+  // Suppress the first-run tour overlay.
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem("megane-tour-prefs", JSON.stringify({ dontShowAgain: true }));
+    } catch {
+      /* noop */
+    }
+  });
+
+  const page = await context.newPage();
+  await waitForApp(page);
+
+  // Make #root zoomable with a smooth tween, anchored at the top-left.
+  await page.evaluate((ms) => {
+    const root = document.getElementById("root");
+    if (root) {
+      root.style.transformOrigin = "0 0";
+      root.style.transition = `transform ${ms}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+      root.style.willChange = "transform";
+    }
+  }, TRANSITION_MS);
+
+  await setupApiKey(page);
+
+  for (const scene of scenes) {
+    console.log(`Scene: ${scene.id}`);
+    const runAction = async () => {
+      if (!scene.action) return;
+      const fn = actions[scene.action];
+      if (!fn) throw new Error(`Unknown action: ${scene.action}`);
+      await fn(page);
+    };
+    // `actionFirst` scenes pull back to full first (so the verb's click targets
+    // are on-screen regardless of the prior zoom), run the verb — which may
+    // reveal the zoom target, e.g. the Editor tab unhiding `.react-flow` — then
+    // frame it.
+    if (scene.actionFirst) {
+      await zoomTo(page, "full");
+      await runAction();
+      await zoomTo(page, scene.zoom);
+    } else {
+      await zoomTo(page, scene.zoom);
+      await runAction();
+    }
+    if (scene.hold) await page.waitForTimeout(scene.hold);
+  }
+
+  // Finalize the recording.
+  await page.close();
+  await context.close();
+  context = null;
+
+  const file = readdirSync(tmpDir).find((f) => f.endsWith(".webm"));
+  if (!file) throw new Error(`No webm produced in ${tmpDir}`);
+  renameSync(join(tmpDir, file), OUT_PATH);
+  rmSync(tmpDir, { recursive: true });
+
+  console.log(`\nDone. Demo video saved: ${OUT_PATH}`);
+} catch (err) {
+  console.error("Demo video failed:", err.message);
+  process.exitCode = 1;
+} finally {
+  if (context) await context.close();
+  if (browser) await browser.close();
+  if (server) server.kill();
+}

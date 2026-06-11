@@ -43,6 +43,36 @@ Captures a high-quality 1280x720 DPR=2 screenshot of caffeine_water molecule.
 Output: `docs/public/screenshots/hero.png`.
 This script does NOT require WASM (uses pre-parsed JSON data).
 
+## Scripted Zoom Demo Video (storyboard-as-code)
+
+Produces a single continuous webm that walks the live app through a scripted
+flow while zooming into UI regions:
+**full screen → zoom Chat panel + type a prompt → (live AI generate) → rotate
+the molecule → zoom the pipeline graph.**
+
+```
+npm run demo:video                                   # no key → prompt typed, generate skipped
+ANTHROPIC_API_KEY=sk-ant-... npm run demo:video      # live AI generation
+npm run demo:video -- --no-generate                  # force skip the AI call
+```
+
+- **Storyboard ("台本"):** `scripts/demo-script.mjs` — a declarative `scenes`
+  array (id / zoom / action / hold). Edit it to change the demo; no need to
+  touch the engine.
+- **Director (engine):** `scripts/demo-video.mjs` — starts Vite, records a webm
+  via Playwright `recordVideo`, and zooms by tweening a CSS `transform` on
+  `#root`. Verbs: `openChatAndType`, `generate`, `rotate`, `showPipeline`.
+- **Zoom control:** scene `zoom` is `"full"`, `"keep"`, or `{ sel, scale?, pad? }`.
+  Use `scale` for full-height targets like the side panel (fit-to-bbox there is ~1×).
+- **Output:** `demo/out/megane-demo-<timestamp>.webm` (gitignored).
+- **Options:** `--out <path>`, `--prompt "<text>"`, `--width/--height`, `--dpr`,
+  `--no-generate`, `--clean`.
+- **Notes:** `deviceScaleFactor: 2` keeps CSS-zoomed pixels reasonably crisp.
+  The pipeline panel defaults to the **Chat** tab, so `.react-flow` mounts
+  hidden until the Editor tab is selected (the `pipeline` scene handles this via
+  `actionFirst`). Live generation needs `ANTHROPIC_API_KEY` + network; without
+  them the run still completes (prompt typed, generation skipped).
+
 ## Prerequisites
 
 - WASM must be built for dev-preview.mjs (it auto-builds if missing)

@@ -43,6 +43,7 @@
     "build:lib": "npm run build:wasm && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts",
     "build:lab": "cd jupyterlab-megane && npm install && npm run build",
     "preview": "vite preview",
+    "demo:video": "node scripts/demo-video.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
