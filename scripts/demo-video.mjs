@@ -60,6 +60,8 @@ const WIDTH = parseInt(getFlag("--width", String(config.width)), 10);
 const HEIGHT = parseInt(getFlag("--height", String(config.height)), 10);
 const DPR = parseFloat(getFlag("--dpr", String(config.dpr)));
 const TRANSITION_MS = config.transitionMs ?? 900;
+const PIPELINE_SCROLL_SCALE = config.pipelineScrollScale ?? 1.6;
+const PIPELINE_SCROLL_MS = config.pipelineScrollMs ?? 4800;
 const PROMPT = getFlag("--prompt", config.prompt);
 const NO_GENERATE = hasFlag("--no-generate");
 const CLEAN = hasFlag("--clean");
@@ -127,11 +129,23 @@ async function applyTransform(page, t) {
   );
 }
 
-async function zoomTo(page, spec) {
+// Swap the #root transition used for the next move (duration + easing).
+async function setTransition(page, ms, easing = "cubic-bezier(0.4, 0, 0.2, 1)") {
+  await page.evaluate(
+    ({ ms, easing }) => {
+      const root = document.getElementById("root");
+      if (root) root.style.transition = `transform ${ms}ms ${easing}`;
+    },
+    { ms, easing },
+  );
+}
+
+async function zoomTo(page, spec, ms = TRANSITION_MS) {
   if (spec === "keep") return;
+  await setTransition(page, ms);
   if (!spec || spec === "full") {
     await applyTransform(page, { tx: 0, ty: 0, s: 1 });
-    await page.waitForTimeout(TRANSITION_MS);
+    await page.waitForTimeout(ms);
     return;
   }
   const { sel, pad = 0, scale } = spec;
@@ -152,7 +166,7 @@ async function zoomTo(page, spec) {
   const cx = lx + lw / 2;
   const cy = ly + lh / 2;
   await applyTransform(page, { tx: WIDTH / 2 - cx * s, ty: HEIGHT / 2 - cy * s, s });
-  await page.waitForTimeout(TRANSITION_MS);
+  await page.waitForTimeout(ms);
 }
 
 // ---- Scene actions ("verbs") ----
@@ -166,6 +180,7 @@ const SEL = {
   chatMessages: '[data-testid="pipeline-chat-messages"]',
   appliedNotice: '[data-testid="pipeline-editor-applied-notice"]',
   viewer: '[data-testid="viewer-root"]',
+  reactFlow: ".react-flow",
 };
 
 const actions = {
@@ -232,9 +247,35 @@ const actions = {
     await page.mouse.up();
   },
 
-  async showPipeline(page) {
+  // Reveal the whole pipeline (Editor tab fitView frames every node), then
+  // scroll the graph top→bottom so each node passes through in reading order.
+  // The TB dagre layout makes a vertical scroll the natural traversal.
+  async showAndScrollPipeline(page) {
     await page.locator(SEL.editorTab).first().click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1100); // let fitView settle: whole pipeline visible
+    const box = await page.locator(SEL.reactFlow).first().boundingBox();
+    if (!box) return;
+    const S = PIPELINE_SCROLL_SCALE;
+    const topM = 56;
+    const botM = 56;
+    // Measured at identity (actionFirst reset to full), so screen == local.
+    const tx = WIDTH / 2 - (box.x + box.width / 2) * S;
+    const tyTop = topM - box.y * S;
+    const tyBottom = HEIGHT - botM - (box.y + box.height) * S;
+
+    // Ease into the top of the pipeline.
+    await setTransition(page, TRANSITION_MS);
+    await applyTransform(page, { tx, ty: tyTop, s: S });
+    await page.waitForTimeout(TRANSITION_MS + 600);
+
+    // Only scroll if the scaled graph is taller than the viewport; otherwise it
+    // already fits and we just dwell on it.
+    if (box.height * S > HEIGHT - topM - botM) {
+      await setTransition(page, PIPELINE_SCROLL_MS, "linear");
+      await applyTransform(page, { tx, ty: tyBottom, s: S });
+      await page.waitForTimeout(PIPELINE_SCROLL_MS);
+      await setTransition(page, TRANSITION_MS); // restore eased default
+    }
   },
 };
 
@@ -321,12 +362,13 @@ try {
     // are on-screen regardless of the prior zoom), run the verb — which may
     // reveal the zoom target, e.g. the Editor tab unhiding `.react-flow` — then
     // frame it.
+    const ms = scene.transitionMs ?? TRANSITION_MS;
     if (scene.actionFirst) {
-      await zoomTo(page, "full");
+      await zoomTo(page, "full", ms);
       await runAction();
-      await zoomTo(page, scene.zoom);
+      await zoomTo(page, scene.zoom, ms);
     } else {
-      await zoomTo(page, scene.zoom);
+      await zoomTo(page, scene.zoom, ms);
       await runAction();
     }
     if (scene.hold) await page.waitForTimeout(scene.hold);

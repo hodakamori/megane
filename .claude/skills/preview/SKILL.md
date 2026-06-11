@@ -61,9 +61,13 @@ npm run demo:video -- --no-generate                  # force skip the AI call
   touch the engine.
 - **Director (engine):** `scripts/demo-video.mjs` — starts Vite, records a webm
   via Playwright `recordVideo`, and zooms by tweening a CSS `transform` on
-  `#root`. Verbs: `openChatAndType`, `generate`, `rotate`, `showPipeline`.
+  `#root`. Verbs: `openChatAndType`, `generate`, `rotate`, `showAndScrollPipeline`
+  (Editor-tab fitView shows the whole pipeline, then a linear top→bottom scroll —
+  tune via `config.pipelineScrollScale` / `pipelineScrollMs`).
 - **Zoom control:** scene `zoom` is `"full"`, `"keep"`, or `{ sel, scale?, pad? }`.
   Use `scale` for full-height targets like the side panel (fit-to-bbox there is ~1×).
+  Per-scene `transitionMs` overrides the tween speed (used to make the move to the
+  Chat panel slow and legible).
 - **Output:** `demo/out/megane-demo-<timestamp>.webm` (gitignored).
 - **Options:** `--out <path>`, `--prompt "<text>"`, `--width/--height`, `--dpr`,
   `--no-generate`, `--clean`.
