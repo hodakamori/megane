@@ -9,19 +9,18 @@ compatibility_date = "2025-01-01"
 [vars]
 ALLOWED_ORIGIN = "https://hodakamori.github.io,https://megane.tech-office-mori.com"
 
-# OpenRouter model slug. Set to Anthropic Claude Sonnet 4.6 (latest) for
-# strong instruction-following and pipeline generation quality.
-# To downgrade to claude-3.5-haiku (~0.5c) or a free model, just change
-# this value — no code change needed. Leave unset to use the default in
+# OpenRouter model slug. Set to Anthropic Claude Haiku 3.5 — cheap and fast
+# while still following the pipeline-generation instructions well. To go
+# back to a stronger Sonnet model or down to a free model, just change this
+# value — no code change needed. Leave unset to use the default in
 # src/proxy.ts.
-OPENROUTER_MODEL = "anthropic/claude-sonnet-4-6"
+OPENROUTER_MODEL = "anthropic/claude-3.5-haiku"
 
 # Comma-separated fallback models, used only if the primary errors. Falls
-# back to Haiku (cheap but reliable) then a free model as a last resort.
-# OpenRouter caps the total routing list at 3, so keep this to 2 entries
-# alongside the primary. Unset = the DEFAULT_FALLBACK_MODELS list in
-# src/proxy.ts.
-OPENROUTER_FALLBACK_MODELS = "anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70b-instruct:free"
+# back to a free model as a last resort. OpenRouter caps the total routing
+# list at 3, so keep this to at most 2 entries alongside the primary.
+# Unset = the DEFAULT_FALLBACK_MODELS list in src/proxy.ts.
+OPENROUTER_FALLBACK_MODELS = "meta-llama/llama-3.3-70b-instruct:free"
 
 # Created via `wrangler kv namespace create RATE_LIMIT_KV`. The id is not a
 # secret, so it is committed here directly.

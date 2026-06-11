@@ -188,9 +188,7 @@ describe("sanitizeMessages", () => {
 
   it("accepts a tool message with a tool_call_id and large content", () => {
     const out = sanitizeMessages({
-      messages: [
-        { role: "tool", content: "x".repeat(13000), tool_call_id: "call_1" },
-      ],
+      messages: [{ role: "tool", content: "x".repeat(13000), tool_call_id: "call_1" }],
     });
     expect(out).not.toBeNull();
     expect(out?.[0].tool_call_id).toBe("call_1");
@@ -211,9 +209,7 @@ describe("sanitizeMessages", () => {
           {
             role: "user",
             content: "hi",
-            tool_calls: [
-              { id: "c1", type: "function", function: { name: "x", arguments: "{}" } },
-            ],
+            tool_calls: [{ id: "c1", type: "function", function: { name: "x", arguments: "{}" } }],
           },
         ],
       }),
@@ -238,10 +234,18 @@ describe("sanitizeMessages", () => {
         messages: [{ role: "assistant", content: null, tool_calls: toolCalls }],
       });
     expect(wrap([])).toBeNull(); // empty
-    expect(wrap([{ id: "c1", type: "not_function", function: { name: "x", arguments: "{}" } }])).toBeNull();
-    expect(wrap([{ id: "", type: "function", function: { name: "x", arguments: "{}" } }])).toBeNull();
-    expect(wrap([{ id: "c1", type: "function", function: { name: "", arguments: "{}" } }])).toBeNull();
-    expect(wrap([{ id: "c1", type: "function", function: { name: "x", arguments: 5 } }])).toBeNull();
+    expect(
+      wrap([{ id: "c1", type: "not_function", function: { name: "x", arguments: "{}" } }]),
+    ).toBeNull();
+    expect(
+      wrap([{ id: "", type: "function", function: { name: "x", arguments: "{}" } }]),
+    ).toBeNull();
+    expect(
+      wrap([{ id: "c1", type: "function", function: { name: "", arguments: "{}" } }]),
+    ).toBeNull();
+    expect(
+      wrap([{ id: "c1", type: "function", function: { name: "x", arguments: 5 } }]),
+    ).toBeNull();
     expect(wrap([{ id: "c1", type: "function" }])).toBeNull();
   });
 });
@@ -249,7 +253,11 @@ describe("sanitizeMessages", () => {
 describe("sanitizeTools", () => {
   const validTool = {
     type: "function",
-    function: { name: "get_molecule_template", description: "desc", parameters: { type: "object", properties: {} } },
+    function: {
+      name: "get_molecule_template",
+      description: "desc",
+      parameters: { type: "object", properties: {} },
+    },
   };
 
   it("returns undefined when no tools key is present", () => {
@@ -278,7 +286,9 @@ describe("sanitizeTools", () => {
   it("returns null for malformed tool entries", () => {
     expect(sanitizeTools({ tools: "not-an-array" })).toBeNull();
     expect(sanitizeTools({ tools: [null] })).toBeNull();
-    expect(sanitizeTools({ tools: [{ type: "not_function", function: { name: "x" } }] })).toBeNull();
+    expect(
+      sanitizeTools({ tools: [{ type: "not_function", function: { name: "x" } }] }),
+    ).toBeNull();
     expect(sanitizeTools({ tools: [{ type: "function", function: null }] })).toBeNull();
     expect(sanitizeTools({ tools: [{ type: "function", function: { name: "" } }] })).toBeNull();
     expect(
@@ -314,6 +324,18 @@ describe("isRateLimited", () => {
       await isRateLimited("1.2.3.4", env);
     }
     expect(await isRateLimited("5.6.7.8", env)).toBe(false);
+  });
+
+  it("caps the free demo at 5 requests per day", () => {
+    expect(PER_DAY_LIMIT).toBe(5);
+  });
+
+  it("allows a request while still under the per-day limit", async () => {
+    const env = makeEnv();
+    const kv = env.RATE_LIMIT_KV as unknown as FakeKV;
+    const dayKey = `rl:d:9.9.9.9:${Math.floor(Date.now() / 86_400_000)}`;
+    await kv.put(dayKey, String(PER_DAY_LIMIT - 1), {});
+    expect(await isRateLimited("9.9.9.9", env)).toBe(false);
   });
 
   it("blocks once the per-day limit is reached even under the per-minute limit", async () => {
@@ -478,7 +500,10 @@ describe("worker fetch handler", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await worker.fetch(
-      makeRequest({ origin: ALLOWED_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
       env,
     );
 
@@ -559,7 +584,10 @@ describe("worker fetch handler", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await worker.fetch(
-      makeRequest({ origin: ALLOWED_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
       env,
     );
 
@@ -581,7 +609,10 @@ describe("worker fetch handler", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await worker.fetch(
-      makeRequest({ origin: ALLOWED_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
       env,
     );
 
@@ -597,7 +628,10 @@ describe("worker fetch handler", () => {
     );
 
     const res = await worker.fetch(
-      makeRequest({ origin: ALLOWED_ORIGIN, body: { messages: [{ role: "user", content: "hi" }] } }),
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
       env,
     );
 

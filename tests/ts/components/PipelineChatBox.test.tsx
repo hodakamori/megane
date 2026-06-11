@@ -25,11 +25,20 @@ vi.mock("@/ai/client", () => ({
       : null,
   formatActionSummary: (n: number) =>
     `Pipeline applied — ${n} ${n === 1 ? "node" : "nodes"} added to the editor.`,
-  stripPipelineJSON: (text: string) => {
-    const withoutFence = text.replace(/```(?:json)?\s*\n?[\s\S]*?```/g, "").trim();
-    if (withoutFence !== text.trim()) return withoutFence;
-    if (text.includes("```") || text.includes("{")) return "";
-    return text.trim();
+  // Mirrors the real helper: only the text after the *last* closed fence,
+  // ignoring any preamble before the JSON.
+  extractTrailingExplanation: (text: string) => {
+    const lastFenceEnd = text.lastIndexOf("```");
+    if (lastFenceEnd === -1) return "";
+    const fenceCount = (text.match(/```/g) ?? []).length;
+    if (fenceCount % 2 !== 0) return "";
+    return text.slice(lastFenceEnd + 3).trim();
+  },
+  RateLimitError: class RateLimitError extends Error {
+    constructor(message = "Daily free-demo limit reached (5 requests/day).") {
+      super(message);
+      this.name = "RateLimitError";
+    }
   },
 }));
 vi.mock("@/pipeline/store", () => {
@@ -48,7 +57,7 @@ import {
   replaceTrailingAssistant,
 } from "@/components/PipelineChatBox";
 import { useAIConfigStore } from "@/ai/config";
-import { generatePipeline, extractPipelineJSON } from "@/ai/client";
+import { generatePipeline, extractPipelineJSON, RateLimitError } from "@/ai/client";
 
 function openConfigPanel() {
   fireEvent.click(screen.getByTitle("AI Settings"));
@@ -322,12 +331,12 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     expect(storeState.deserialize).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the assistant's prose explanation, stripping the JSON payload", async () => {
+  it("shows the assistant's trailing prose explanation, stripping the JSON payload", async () => {
     (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
       async (_config, _msg, onChunk: (c: string) => void) => {
-        onChunk("Loads benzene and shows it with bonds.\n");
-        onChunk('```json\n{ "version": 3, "nodes": [] }\n```');
-        return 'Loads benzene and shows it with bonds.\n```json\n{ "version": 3, "nodes": [] }\n```';
+        onChunk('```json\n{ "version": 3, "nodes": [] }\n```\n');
+        onChunk("Loads benzene and shows it with bonds.");
+        return '```json\n{ "version": 3, "nodes": [] }\n```\nLoads benzene and shows it with bonds.';
       },
     );
     render(<PipelineChatBox />);
@@ -337,6 +346,28 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     // Neither the JSON nor the generic summary should appear when prose exists.
     expect(screen.queryByText(/"version": 3/)).toBeNull();
     expect(screen.queryByText(/Pipeline applied/)).toBeNull();
+  });
+
+  it("ignores a preamble before the JSON so the reply never flickers back to a placeholder", async () => {
+    // A skill tool round trip can stream a short preamble before the JSON.
+    // The component must never surface it (showing it then reverting to
+    // "Generating…" once the JSON streams is the flicker we are fixing).
+    (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_config, _msg, onChunk: (c: string) => void) => {
+        onChunk("Let me fetch the molecule template.");
+        onChunk('\n```json\n{ "version": 3, "nodes": [] }\n```');
+        return 'Let me fetch the molecule template.\n```json\n{ "version": 3, "nodes": [] }\n```';
+      },
+    );
+    render(<PipelineChatBox />);
+    submit("show a molecule");
+
+    // With no trailing prose, it settles on the concise action summary — and
+    // the preamble is never shown at any point.
+    expect(
+      await screen.findByText(/Pipeline applied — 2 nodes added to the editor\./),
+    ).toBeTruthy();
+    expect(screen.queryByText(/fetch the molecule template/)).toBeNull();
   });
 
   it("re-applies the previously loaded structure to the new load_structure node", async () => {
@@ -379,5 +410,16 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     expect(await screen.findByText("Something went wrong. Please try again.")).toBeTruthy();
     // The underlying error detail must never leak into the transcript.
     expect(screen.queryByText(/429/)).toBeNull();
+  });
+
+  it("surfaces the daily-limit message verbatim when the free demo is rate limited", async () => {
+    (generatePipeline as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new RateLimitError("Daily free-demo limit reached (5 requests/day)."),
+    );
+    render(<PipelineChatBox />);
+    submit("build me a pipeline");
+
+    expect(await screen.findByText("Daily free-demo limit reached (5 requests/day).")).toBeTruthy();
+    expect(screen.queryByText("Something went wrong. Please try again.")).toBeNull();
   });
 });
