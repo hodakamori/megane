@@ -35,7 +35,7 @@ vi.mock("@/ai/client", () => ({
     return text.slice(lastFenceEnd + 3).trim();
   },
   RateLimitError: class RateLimitError extends Error {
-    constructor(message = "Daily free-demo limit reached (5 requests/day).") {
+    constructor(message = "Free demo rate limit reached. Please wait a bit and try again.") {
       super(message);
       this.name = "RateLimitError";
     }
@@ -412,14 +412,16 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
     expect(screen.queryByText(/429/)).toBeNull();
   });
 
-  it("surfaces the daily-limit message verbatim when the free demo is rate limited", async () => {
+  it("surfaces the rate-limit message verbatim when the free demo is rate limited", async () => {
     (generatePipeline as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-      new RateLimitError("Daily free-demo limit reached (5 requests/day)."),
+      new RateLimitError("Free demo rate limit reached. Please wait a bit and try again."),
     );
     render(<PipelineChatBox />);
     submit("build me a pipeline");
 
-    expect(await screen.findByText("Daily free-demo limit reached (5 requests/day).")).toBeTruthy();
+    expect(
+      await screen.findByText("Free demo rate limit reached. Please wait a bit and try again."),
+    ).toBeTruthy();
     expect(screen.queryByText("Something went wrong. Please try again.")).toBeNull();
   });
 });

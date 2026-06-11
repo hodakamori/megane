@@ -18,13 +18,15 @@ import {
 
 /**
  * Thrown when the backend rejects the request with HTTP 429 — i.e. the
- * shared free-demo proxy's per-IP rate limit (5 requests/day, 3/minute) was
- * exceeded. Carries a user-facing message so the chat surfaces the real
- * reason instead of a generic "something went wrong".
+ * shared free-demo proxy's per-IP rate limit was exceeded. The proxy enforces
+ * both a per-minute and a per-day cap and returns the same 429 for either, so
+ * the message stays generic rather than claiming a specific window. Carries a
+ * user-facing message so the chat surfaces the real reason instead of a
+ * generic "something went wrong".
  */
 export class RateLimitError extends Error {
   constructor(
-    message = "Daily free-demo limit reached (5 requests/day). Try again tomorrow, or add your own API key in settings.",
+    message = "Free demo rate limit reached. Please wait a bit and try again, or add your own API key in settings.",
   ) {
     super(message);
     this.name = "RateLimitError";
