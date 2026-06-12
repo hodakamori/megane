@@ -118,6 +118,49 @@ describe("extractPipelineJSON", () => {
   });
 });
 
+describe("extractPipelineJSON / tryExtractPipeline — multiple fences", () => {
+  const TEMPLATE_PIPELINE_JSON = JSON.stringify({
+    version: 3,
+    nodes: [{ id: "template-viewport", type: "viewport", position: { x: 0, y: 0 } }],
+    edges: [],
+  });
+  const CUSTOM_PIPELINE_JSON = JSON.stringify({
+    version: 3,
+    nodes: [
+      { id: "loader-1", type: "load_structure", position: { x: 0, y: 0 } },
+      { id: "viewport-1", type: "viewport", position: { x: 0, y: 310 } },
+    ],
+    edges: [],
+  });
+
+  it("extractPipelineJSON picks the last valid pipeline fence over an earlier template echo", () => {
+    const response =
+      `Here's the template:\n\`\`\`json\n${TEMPLATE_PIPELINE_JSON}\n\`\`\`\n` +
+      `Customized for you:\n\`\`\`json\n${CUSTOM_PIPELINE_JSON}\n\`\`\`\nLoads your structure.`;
+    const result = extractPipelineJSON(response);
+    expect(result.nodes).toHaveLength(2);
+    expect(result.nodes[0].id).toBe("loader-1");
+  });
+
+  it("tryExtractPipeline supersedes an earlier closed fence once a later one closes", () => {
+    const partial = `Here's the template:\n\`\`\`json\n${TEMPLATE_PIPELINE_JSON}\n\`\`\`\n`;
+    const early = tryExtractPipeline(partial);
+    expect(early?.nodes).toHaveLength(1);
+
+    const full = `${partial}Customized for you:\n\`\`\`json\n${CUSTOM_PIPELINE_JSON}\n\`\`\``;
+    const later = tryExtractPipeline(full);
+    expect(later?.nodes).toHaveLength(2);
+  });
+
+  it("skips a fenced block that is not valid pipeline JSON and uses a later valid one", () => {
+    const response =
+      `Format example:\n\`\`\`json\n{ "version": 3, "nodes": [...] }\n\`\`\`\n` +
+      `Actual pipeline:\n\`\`\`json\n${CUSTOM_PIPELINE_JSON}\n\`\`\``;
+    const result = extractPipelineJSON(response);
+    expect(result.nodes).toHaveLength(2);
+  });
+});
+
 describe("generatePipeline (Anthropic)", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 

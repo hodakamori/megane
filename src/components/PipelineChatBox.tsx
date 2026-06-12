@@ -305,9 +305,12 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
     // load_structure node has `fileName: null`, and deserialize() clears
     // nodeSnapshots, so we capture the currently loaded structure first and
     // re-attach it to the new loader afterwards — otherwise the loaded
-    // structure would disappear from the viewport. `appliedNodeCount` doubles
-    // as a "have we applied yet?" guard (-1 = not applied).
+    // structure would disappear from the viewport. `appliedJSON` doubles as
+    // a "have we applied yet?" guard (null = not applied) and lets us detect
+    // when a later fence supersedes an earlier one (e.g. a template echoed
+    // before the model's final, customized pipeline).
     let appliedNodeCount = -1;
+    let appliedJSON: string | null = null;
     const applyPipeline = (pipeline: SerializedPipeline) => {
       const preState = usePipelineStore.getState();
       const preserved = captureLoadedStructure(preState.nodes, preState.nodeSnapshots);
@@ -329,6 +332,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       }
 
       appliedNodeCount = pipeline.nodes.length;
+      appliedJSON = JSON.stringify(pipeline);
       // Surface the result on the editor tab and trigger fitView via the
       // panel's mode-change effect.
       usePipelineUIStore.getState().markPipelineApplied();
@@ -350,12 +354,18 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
             }
             return updated;
           });
-          // Apply the graph the instant a complete JSON block has streamed in.
-          // The model emits the JSON first, so the viewport updates without
-          // waiting for the trailing one-sentence explanation to finish.
-          if (appliedNodeCount < 0) {
-            const early = tryExtractPipeline(streamBuffer);
-            if (early) applyPipeline(early);
+          // Apply (or re-apply) the graph as soon as a complete JSON block has
+          // streamed in. The model emits the JSON first, so the viewport
+          // updates without waiting for the trailing one-sentence explanation
+          // to finish. A later fence (e.g. the model's final, customized
+          // pipeline after echoing a template) can supersede an earlier one —
+          // re-apply whenever the latest valid fence differs from what's applied.
+          const candidate = tryExtractPipeline(streamBuffer);
+          if (candidate) {
+            const candidateJSON = JSON.stringify(candidate);
+            if (candidateJSON !== appliedJSON) {
+              applyPipeline(candidate);
+            }
           }
         },
         abort.signal,
@@ -363,7 +373,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
 
       // Fallback: the JSON may only have closed in the final, non-streamed text
       // (or arrived after a tool round trip), so apply it now if we haven't yet.
-      if (appliedNodeCount < 0) {
+      if (appliedJSON === null) {
         applyPipeline(extractPipelineJSON(fullResponse));
       }
 
@@ -508,7 +518,21 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // assistant — action summary lines start with "Pipeline applied"
+            // The live placeholder (last message while streaming) holds raw
+            // model output that may include fenced JSON — show only the
+            // trailing prose that follows the last closed fence, falling
+            // back to a neutral status while the JSON is still streaming.
+            if (isStreaming && i === messages.length - 1) {
+              const prose = extractTrailingExplanation(msg.content);
+              return (
+                <div key={i} style={assistantMsgStyle}>
+                  {prose || "Generating…"}
+                </div>
+              );
+            }
+            // Completed messages already hold their final text (an action
+            // summary or the assistant's explanation) — render it as-is.
+            // Action summary lines start with "Pipeline applied".
             if (msg.content.startsWith("Pipeline applied")) {
               return (
                 <div key={i} style={successMsgStyle}>
@@ -516,15 +540,9 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
                 </div>
               );
             }
-            // Show the assistant's prose — only the sentence that follows the
-            // JSON payload. While the JSON is still streaming (or the model
-            // emitted only JSON), this is empty and we fall back to a neutral
-            // status. Ignoring any preamble before the JSON keeps the reply
-            // monotonic so it never flickers back to "Generating…".
-            const prose = extractTrailingExplanation(msg.content);
             return (
               <div key={i} style={assistantMsgStyle}>
-                {prose || "Generating…"}
+                {msg.content}
               </div>
             );
           })
