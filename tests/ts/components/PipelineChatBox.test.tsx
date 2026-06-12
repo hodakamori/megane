@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 
 type LoaderNode = { id: string; type?: string; data: { params: Record<string, unknown> } };
 
@@ -18,11 +18,13 @@ vi.mock("@/ai/client", () => ({
   generatePipeline: vi.fn(),
   extractPipelineJSON: vi.fn(),
   // Only resolves once a *closed* fence has streamed in, mirroring the real
-  // helper that drives the early-apply path.
-  tryExtractPipeline: (text: string) =>
+  // helper that drives the early-apply path. Individual tests override this
+  // with `mockImplementation` to simulate multiple, distinguishable fences.
+  tryExtractPipeline: vi.fn((text: string) =>
     /```[\s\S]*?```/.test(text)
       ? { version: 3, nodes: [{ id: "a" }, { id: "b" }], edges: [] }
       : null,
+  ),
   formatActionSummary: (n: number) =>
     `Pipeline applied — ${n} ${n === 1 ? "node" : "nodes"} added to the editor.`,
   // Mirrors the real helper: only the text after the *last* closed fence,
@@ -57,7 +59,7 @@ import {
   replaceTrailingAssistant,
 } from "@/components/PipelineChatBox";
 import { useAIConfigStore } from "@/ai/config";
-import { generatePipeline, extractPipelineJSON, RateLimitError } from "@/ai/client";
+import { generatePipeline, extractPipelineJSON, tryExtractPipeline, RateLimitError } from "@/ai/client";
 
 function openConfigPanel() {
   fireEvent.click(screen.getByTitle("AI Settings"));
@@ -290,6 +292,13 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
       nodes: [{ id: "a" }, { id: "b" }],
       edges: [],
     });
+    // Restore the default single-pipeline behavior; individual tests may
+    // override this with their own mockImplementation.
+    (tryExtractPipeline as ReturnType<typeof vi.fn>).mockImplementation((text: string) =>
+      /```[\s\S]*?```/.test(text)
+        ? { version: 3, nodes: [{ id: "a" }, { id: "b" }], edges: [] }
+        : null,
+    );
   });
 
   function submit(text: string) {
@@ -423,5 +432,70 @@ describe("PipelineChatBox — applying a generated pipeline", () => {
       await screen.findByText("Free demo rate limit reached. Please wait a bit and try again."),
     ).toBeTruthy();
     expect(screen.queryByText("Something went wrong. Please try again.")).toBeNull();
+  });
+
+  it("keeps showing the finished reply once streaming settles instead of reverting to 'Generating…'", async () => {
+    (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_config, _msg, onChunk: (c: string) => void) => {
+        onChunk('```json\n{ "version": 3, "nodes": [] }\n```\n');
+        onChunk("Loads benzene and shows it with bonds.");
+        return '```json\n{ "version": 3, "nodes": [] }\n```\nLoads benzene and shows it with bonds.';
+      },
+    );
+    render(<PipelineChatBox />);
+    submit("show benzene");
+
+    expect(await screen.findByText("Loads benzene and shows it with bonds.")).toBeTruthy();
+
+    // Wait for the request to settle (the Cancel button reverts to Generate).
+    await waitFor(() => expect(screen.getByText("Generate")).toBeTruthy());
+
+    // The completed message must keep its final text, not revert to the
+    // streaming placeholder.
+    expect(screen.getByText("Loads benzene and shows it with bonds.")).toBeTruthy();
+    expect(screen.queryByText("Generating…")).toBeNull();
+  });
+
+  it("re-applies the pipeline when a later fence supersedes an earlier template echo", async () => {
+    const TEMPLATE_FENCE = '```json\n{ "version": 3, "nodes": [{ "id": "t" }], "edges": [] }\n```';
+    const CUSTOM_FENCE =
+      '```json\n{ "version": 3, "nodes": [{ "id": "x" }, { "id": "y" }, { "id": "z" }], "edges": [] }\n```';
+    const templatePipeline = { version: 3, nodes: [{ id: "t" }], edges: [] };
+    const customPipeline = {
+      version: 3,
+      nodes: [{ id: "x" }, { id: "y" }, { id: "z" }],
+      edges: [],
+    };
+
+    (tryExtractPipeline as ReturnType<typeof vi.fn>).mockImplementation((text: string) => {
+      if (text.includes(CUSTOM_FENCE)) return customPipeline;
+      if (text.includes(TEMPLATE_FENCE)) return templatePipeline;
+      return null;
+    });
+
+    (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_config, _msg, onChunk: (c: string) => void) => {
+        onChunk(`Here's the template:\n${TEMPLATE_FENCE}\n`);
+        onChunk(`Customized for you:\n${CUSTOM_FENCE}`);
+        return `Here's the template:\n${TEMPLATE_FENCE}\nCustomized for you:\n${CUSTOM_FENCE}`;
+      },
+    );
+
+    render(<PipelineChatBox />);
+    submit("show a molecule");
+
+    expect(
+      await screen.findByText(/Pipeline applied — 3 nodes added to the editor\./),
+    ).toBeTruthy();
+
+    // Applied twice: once for the template echo, once more for the
+    // customized pipeline that supersedes it.
+    expect(storeState.deserialize).toHaveBeenCalledTimes(2);
+    expect(storeState.deserialize).toHaveBeenNthCalledWith(1, templatePipeline);
+    expect(storeState.deserialize).toHaveBeenNthCalledWith(2, customPipeline);
+
+    // The final UI reflects the second (customized) pipeline's node count,
+    // not the first template's.
+    expect(screen.queryByText(/Pipeline applied — 1 node added to the editor\./)).toBeNull();
   });
 });

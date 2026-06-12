@@ -548,11 +548,52 @@ export function extractTrailingExplanation(text: string): string {
 
 // ─── JSON extraction ─────────────────────────────────────────────────
 
+/** Narrow a parsed value to a SerializedPipeline (version 3, nodes/edges arrays). */
+function isSerializedPipeline(value: unknown): value is SerializedPipeline {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v.version === 3 && Array.isArray(v.nodes) && Array.isArray(v.edges);
+}
+
+/**
+ * Scan every closed ```` ``` ```` fence pair in `text` and return the parsed
+ * pipeline from the *last* one that validates as a SerializedPipeline, or
+ * `null` if none do.
+ *
+ * The system prompt asks for the pipeline JSON first and a one-sentence
+ * explanation last, but a less precise model can stream an earlier fence
+ * (e.g. echoing a fetched skill template) that also happens to be valid
+ * pipeline JSON. Preferring the *last* valid fence picks the model's final
+ * answer over any earlier preamble/template echo.
+ */
+function findLastValidPipeline(text: string): SerializedPipeline | null {
+  const fenceRe = /```(?:json)?\s*\n?([\s\S]*?)```/g;
+  let result: SerializedPipeline | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = fenceRe.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (isSerializedPipeline(parsed)) {
+        result = parsed;
+      }
+    } catch {
+      // Not JSON (or not a pipeline) — skip this fence.
+    }
+  }
+  return result;
+}
+
 /**
  * Extract a SerializedPipeline JSON from the LLM response text.
- * Looks for ```json ... ``` fenced blocks, falls back to raw JSON extraction.
+ * Prefers the last closed fence that validates as a pipeline (see
+ * {@link findLastValidPipeline}); falls back to the first ```` ``` ````
+ * fenced block (or raw `{...}` extraction) for precise error reporting when
+ * no fence holds valid pipeline JSON.
  */
 export function extractPipelineJSON(response: string): SerializedPipeline {
+  const fromFence = findLastValidPipeline(response);
+  if (fromFence) return fromFence;
+
   // Try fenced code block first
   const fenceMatch = response.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
   let jsonStr: string;
@@ -590,17 +631,12 @@ export function extractPipelineJSON(response: string): SerializedPipeline {
 /**
  * Try to extract a complete pipeline from a partial streaming buffer, returning
  * the parsed pipeline as soon as a *closed* ```` ```json ```` fence has arrived
- * and validates, or `null` otherwise. Unlike {@link extractPipelineJSON} this
- * never throws on incomplete or invalid input, so it is safe to call on every
- * streamed chunk to apply the graph the instant the JSON finishes — without
- * waiting for the trailing one-sentence explanation. Requiring a closed fence
- * guards against parsing a half-streamed object.
+ * and validates (see {@link findLastValidPipeline}), or `null` otherwise.
+ * Unlike {@link extractPipelineJSON} this never throws on incomplete or
+ * invalid input, so it is safe to call on every streamed chunk to apply (or
+ * re-apply, once a later fence validates) the graph without waiting for the
+ * trailing one-sentence explanation.
  */
 export function tryExtractPipeline(partial: string): SerializedPipeline | null {
-  if (!/```(?:json)?\s*\n?[\s\S]*?```/.test(partial)) return null;
-  try {
-    return extractPipelineJSON(partial);
-  } catch {
-    return null;
-  }
+  return findLastValidPipeline(partial);
 }
