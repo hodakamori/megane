@@ -59,7 +59,12 @@ import {
   replaceTrailingAssistant,
 } from "@/components/PipelineChatBox";
 import { useAIConfigStore } from "@/ai/config";
-import { generatePipeline, extractPipelineJSON, tryExtractPipeline, RateLimitError } from "@/ai/client";
+import {
+  generatePipeline,
+  extractPipelineJSON,
+  tryExtractPipeline,
+  RateLimitError,
+} from "@/ai/client";
 
 function openConfigPanel() {
   fireEvent.click(screen.getByTitle("AI Settings"));
@@ -188,6 +193,8 @@ describe("PipelineChatBox — submission", () => {
       "build me a pipeline",
       expect.any(Function),
       expect.anything(),
+      // structureSummary — null here since no structure is loaded in this test.
+      null,
     );
   });
 });

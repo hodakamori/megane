@@ -3,8 +3,8 @@
  * Contains the complete pipeline schema so the LLM can generate valid SerializedPipeline JSON.
  */
 
-export function buildSystemPrompt(): string {
-  return `You are a pipeline generator for Megane, a molecular visualization application.
+export function buildSystemPrompt(structureSummary?: string | null): string {
+  const base = `You are a pipeline generator for Megane, a molecular visualization application.
 Your task is to generate a pipeline configuration in JSON format based on the user's request.
 
 ## Output Format
@@ -75,9 +75,12 @@ Detects or infers bonds between atoms.
 - Outputs: \`bond\` (bond data type)
 
 ### filter
-Filters atoms by a selection query.
-- Parameters: \`{ type: "filter", query: string }\`
-  - Query examples: \`element == "C"\`, \`index < 10\`, \`resname == "ALA"\`, \`element == "O" or element == "N"\`
+Filters atoms (and optionally bonds) by a selection query. See the
+"Atom & Bond Selection Query Language" section below for the full, authoritative
+grammar — only the syntax documented there is supported.
+- Parameters: \`{ type: "filter", query: string, bond_query?: string }\`
+  - \`query\`: atom selection (e.g. \`element == "C"\`, \`index < 10\`, \`resname == "ALA"\`, \`element == "O" or element == "N"\`)
+  - \`bond_query\`: optional bond selection (e.g. \`both element != "H"\`)
 - Inputs: \`in\` (accepts particle or bond data type)
 - Outputs: \`out\` (same type as input)
 
@@ -135,6 +138,68 @@ The final rendering sink. Every pipeline MUST have exactly one viewport node. Al
 3. Data types: particle, bond, cell, label, mesh, trajectory, vector.
 4. Filter and Modify nodes accept both \`particle\` and \`bond\` types on their \`in\` port.
 5. Multiple edges can connect to the same viewport input port (data is collected).
+
+## Atom & Bond Selection Query Language
+
+The \`filter\` node's \`query\` (atoms) and \`bond_query\` (bonds) use a small custom
+DSL. This is NOT VMD, PyMOL, MDAnalysis, or ProDy syntax — only the grammar
+below works. Generating any other syntax silently fails (the filter falls back
+to selecting all or no atoms), so follow these rules exactly.
+
+### Atom query grammar
+\`\`\`
+Query      := OrExpr
+OrExpr     := AndExpr ("or" AndExpr)*
+AndExpr    := NotExpr ("and" NotExpr)*
+NotExpr    := "not" NotExpr | Atom
+Atom       := Comparison | "(" OrExpr ")" | "all" | "none"
+Comparison := Field Op Value
+Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass"
+Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
+Value      := QuotedString | Number
+\`\`\`
+- Fields are ONLY: \`element\`, \`index\`, \`x\`, \`y\`, \`z\`, \`resname\`, \`mass\`. No other field exists.
+- String values MUST be double-quoted: \`element == "C"\` (NOT \`element == C\`).
+  This applies to \`element\` and \`resname\`.
+- \`element\` compares the element symbol ("C", "Fe", …). \`index\` is the 0-based
+  atom index. \`x\`/\`y\`/\`z\` are Cartesian coordinates (Å). \`mass\` is atomic mass.
+- An empty query or \`all\` selects every atom; \`none\` selects nothing.
+- Combine with \`and\`, \`or\`, \`not\`, and parentheses.
+
+Valid examples:
+- \`element == "C"\` — all carbons
+- \`element != "H"\` — all non-hydrogen (heavy) atoms
+- \`index >= 10 and index <= 19\` — atoms 10–19
+- \`resname == "HOH"\` — residues named HOH
+- \`element == "O" or element == "N"\` — oxygens or nitrogens
+- \`(x > 0 and x < 10) and element == "C"\` — carbons in an x-slab
+- \`mass > 32\` — atoms heavier than sulfur
+
+### Bond query grammar
+\`\`\`
+Atom := "both" Comparison | Comparison | "(" OrExpr ")" | "all" | "none"
+Field := "bond_index" | "atom_index" | "element"
+\`\`\`
+- Fields are ONLY: \`bond_index\`, \`atom_index\`, \`element\`.
+- Prefix with \`both\` to require BOTH bonded atoms to satisfy the condition;
+  without \`both\` a bond matches if EITHER endpoint does.
+- Examples: \`both element != "H"\` (bonds between two heavy atoms),
+  \`atom_index >= 24\` (bonds touching atom 24+), \`bond_index < 10\` (first 10 bonds).
+
+### Common mistakes — DO NOT use these (left), use the megane DSL (right)
+| Other-tool / natural phrasing | megane DSL |
+| --- | --- |
+| \`name CA\`, \`protein\`, \`backbone\`, \`sidechain\` | not supported (no per-atom-name / structural selection) |
+| \`water\`, \`resname HOH WAT\` | \`resname == "HOH"\` (use an actual resname from the loaded structure) |
+| \`chain A\` | not supported (chain selection is unavailable) |
+| \`within 5 of ...\`, distance-based | not supported |
+| \`resid 1-20\`, \`index 1 to 10\` | \`index >= 1 and index <= 10\` |
+| \`element C\` (unquoted) | \`element == "C"\` |
+| \`noh\`, \`heavy\`, "non-hydrogen" | \`element != "H"\` |
+
+If a request needs an unsupported selection (atom names, chains, distance,
+secondary structure), express the closest supported approximation with
+\`element\`/\`resname\`/\`index\`, or omit the filter rather than inventing syntax.
 
 ## Common Atomic Numbers
 H=1, C=6, N=7, O=8, F=9, Na=11, Mg=12, Al=13, Si=14, P=15, S=16, Cl=17, K=19, Ca=20, Ti=22, Fe=26, Zn=30, Sr=38
@@ -204,4 +269,22 @@ User request: "Show a molecule with bonds and trajectory"
 - For modified appearance: add modify nodes to change scale/opacity.
 - You have access to pipeline skill tools. Use them to retrieve base templates and domain knowledge when relevant, then customize the result for the user's specific request.
 - If no skill matches the request, generate the pipeline from scratch using the schema above.`;
+
+  if (!structureSummary) {
+    return base;
+  }
+
+  // Append a description of the structure the user currently has loaded so that
+  // filter queries reference real element symbols / resnames instead of guesses.
+  return `${base}
+
+## Currently Loaded Structure
+
+The user already has this structure loaded. When you build a \`filter\` node, the
+\`element\` and \`resname\` values in its query MUST come from the lists below — do
+not invent resnames or elements that are not present. If the request asks for
+something not present (e.g. "water" but there is no water resname), say so in the
+explanation rather than guessing.
+
+${structureSummary}`;
 }
