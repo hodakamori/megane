@@ -12,10 +12,11 @@
  * Scene fields:
  *   id         unique label (also used for logging)
  *   zoom       "full" (reset to whole screen) | "keep" (keep current zoom)
- *              | { sel, pad?, scale? } — frame an element. With `scale` it zooms
- *              by that fixed factor centered on the element (use for full-height
- *              targets like the side panel, where fit-to-bbox would be ~1×);
- *              without `scale` it fits the padded bbox to the viewport.
+ *              | { sel, pad?, scale?, anchorX?, anchorY? } — frame an element.
+ *              With `scale` it zooms by that fixed factor; without it, fits the
+ *              padded bbox to the viewport. `anchorX`/`anchorY` (0..1, default
+ *              0.5) pick which point of the element maps to the viewport center
+ *              — e.g. anchorY: 0.72 biases toward the lower (streaming) area.
  *   action     name of a director "verb" to run after the zoom settles
  *              (one of: openChatAndType | generate | rotate | showPipeline),
  *              or omit for a static hold
@@ -38,39 +39,39 @@ export const config = {
 
 export const scenes = [
   // 1. Whole app — let the viewer take in the full UI.
-  { id: "overview", zoom: "full", hold: 2500 },
+  { id: "overview", zoom: "full", hold: 2200 },
 
-  // 2. Deliberately move the camera to the right-hand pipeline panel first, so
-  //    the next push-in reads as "we're going into the chat" rather than a jump.
+  // 2. Go straight from the full view into the Chat input, type, and submit.
   {
-    id: "chat-approach",
-    zoom: { sel: '[data-testid="panel-pipeline"]', scale: 1.25 },
-    transitionMs: 1500,
-    hold: 700,
-  },
-
-  // 3. Push in on the Chat input (centered on the prompt box) and type a prompt.
-  {
-    id: "chat",
+    id: "chat-input",
     zoom: { sel: 'textarea[placeholder="Describe the pipeline you want..."]', scale: 2.2 },
-    transitionMs: 1100,
-    action: "openChatAndType",
-    hold: 1200,
+    transitionMs: 950,
+    action: "askChat",
+    hold: 600,
   },
 
-  // 4. Run the generation (live AI; output may vary). Stays zoomed on chat.
-  { id: "generate", zoom: "keep", action: "generate", hold: 4000 },
+  // 3. Move up to the chat messages area to watch the response generate
+  //    (anchored low so the streaming reply, which auto-scrolls down, stays in
+  //    frame). With a live LLM this records the real generation; without one it
+  //    just dwells on the typed prompt. Output may vary.
+  {
+    id: "chat-generate",
+    zoom: { sel: '[data-testid="pipeline-chat-messages"]', scale: 1.7, anchorY: 0.72 },
+    transitionMs: 900,
+    action: "waitGenerate",
+    hold: 1500,
+  },
 
-  // 5. Pull out and zoom into the 3D viewport, then slowly rotate the molecule.
+  // 4. Once generation completes, move over to the 3D molecule view and rotate.
   {
     id: "molecule",
     zoom: { sel: '[data-testid="viewer-root"]', scale: 1.5 },
-    transitionMs: 1300,
+    transitionMs: 1200,
     action: "rotate",
     hold: 1500,
   },
 
-  // 6. Show the whole pipeline (Editor tab fitView), then scroll it top→bottom
+  // 5. Show the whole pipeline (Editor tab fitView), then scroll it top→bottom
   //    so every node passes through in order. The verb drives its own zoom, so
   //    the scene zoom is "keep".
   {

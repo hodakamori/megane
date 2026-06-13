@@ -11,11 +11,16 @@
  *
  * Options:
  *   --out <path>        Output webm path (default: demo/out/megane-demo-<ts>.webm)
+ *   --url <url>         Record an already-running instance (e.g. the deployed
+ *                       demo site) instead of starting a local Vite server. The
+ *                       demo site's built-in LLM proxy makes generation run with
+ *                       no API key.
  *   --prompt <text>     Override the Chat prompt from the storyboard
  *   --width <px>        Viewport width  (default: storyboard config.width)
  *   --height <px>       Viewport height (default: storyboard config.height)
  *   --dpr <n>           deviceScaleFactor (default: storyboard config.dpr)
  *   --no-generate       Skip the live AI call; type the prompt only
+ *   --generate-timeout <ms>  Max wait for the streamed response (default 45000)
  *   --clean             Remove demo/out before running
  *
  * Requires WASM to be built first (`npm run build:wasm`); this script will
@@ -66,6 +71,15 @@ const PROMPT = getFlag("--prompt", config.prompt);
 const NO_GENERATE = hasFlag("--no-generate");
 const CLEAN = hasFlag("--clean");
 const API_KEY = process.env.ANTHROPIC_API_KEY || "";
+// Point at an already-running instance (e.g. the deployed demo site) instead of
+// spinning up a local Vite server. The demo site ships the free LLM proxy, so
+// generation runs there without an API key.
+const URL = getFlag("--url", "");
+const URL_MODE = URL.length > 0;
+// Run a real generation when we have a key (local BYOK) or a site that provides
+// its own LLM (the deployed demo proxy via --url). Output is non-deterministic.
+const RUN_GENERATE = !NO_GENERATE && (Boolean(API_KEY) || URL_MODE);
+const GENERATE_TIMEOUT_MS = parseInt(getFlag("--generate-timeout", "45000"), 10);
 
 const outArg = getFlag("--out", join(OUT_DIR, `megane-demo-${TIMESTAMP}.webm`));
 const OUT_PATH = isAbsolute(outArg) ? outArg : join(ROOT, outArg);
@@ -102,9 +116,9 @@ function startViteServer() {
   });
 }
 
-async function waitForApp(page) {
-  await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.waitForSelector("canvas", { timeout: 15000 });
+async function waitForApp(page, appUrl) {
+  await page.goto(appUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForSelector("canvas", { timeout: 20000 });
   // The pipeline panel defaults to the Chat tab, so the Editor tab's
   // `.react-flow` mounts hidden — wait for it attached, not visible.
   await page.waitForSelector('[data-testid="panel-pipeline"]', { state: "visible", timeout: 15000 });
@@ -163,8 +177,10 @@ async function zoomTo(page, spec, ms = TRANSITION_MS) {
   // when the target is full-height (fit-to-bbox would compute ~1× and not zoom).
   // Otherwise fit the padded bbox to the viewport.
   const s = scale ?? Math.min(WIDTH / lw, HEIGHT / lh);
-  const cx = lx + lw / 2;
-  const cy = ly + lh / 2;
+  // anchorX/anchorY pick which point of the element maps to the viewport center
+  // (default the element centre). Biasing anchorY toward 1 frames lower content.
+  const cx = lx + lw * (spec.anchorX ?? 0.5);
+  const cy = ly + lh * (spec.anchorY ?? 0.5);
   await applyTransform(page, { tx: WIDTH / 2 - cx * s, ty: HEIGHT / 2 - cy * s, s });
   await page.waitForTimeout(ms);
 }
@@ -184,7 +200,8 @@ const SEL = {
 };
 
 const actions = {
-  async openChatAndType(page) {
+  // Type the prompt into the Chat input, then submit it (when generation is on).
+  async askChat(page) {
     // The panel defaults to the Chat tab, so the textarea is already present.
     await page.locator(SEL.promptBox).first().waitFor({ state: "visible", timeout: 10000 });
     // Typewriter effect driven entirely in-page: set the value via React's
@@ -207,27 +224,33 @@ const actions = {
       );
       await page.waitForTimeout(45);
     }
-  },
-
-  async generate(page) {
-    if (NO_GENERATE || !API_KEY) {
-      console.log("  generate: skipped (no key / --no-generate); prompt left in box");
+    if (!RUN_GENERATE) {
+      console.log("  askChat: typed prompt; generation off (no key / no site LLM / --no-generate)");
       return;
     }
-    await page.locator(SEL.generateBtn).first().click();
-    // While streaming, the button swaps to "Cancel"; it returns to "Generate"
-    // once the response (and pipeline apply) completes. Wait on that round trip
-    // rather than the applied-notice, which only renders on the Editor tab.
+    // Submit while the input row (and Generate button) is still framed.
+    await page
+      .locator(SEL.generateBtn)
+      .first()
+      .click()
+      .catch((e) => console.log("  askChat: submit click failed:", e.message));
+  },
+
+  // Wait for the streamed response to finish. While streaming the submit button
+  // reads "Cancel"; it returns to "Generate" once the response (and pipeline
+  // apply) completes — a host-agnostic signal that also covers the demo proxy.
+  async waitGenerate(page) {
+    if (!RUN_GENERATE) return;
     await page
       .locator(SEL.cancelBtn)
       .first()
-      .waitFor({ state: "visible", timeout: 8000 })
+      .waitFor({ state: "visible", timeout: 12000 })
       .catch(() => {});
     await page
       .locator(SEL.generateBtn)
       .first()
-      .waitFor({ state: "visible", timeout: 30000 })
-      .catch(() => console.log("  generate: still streaming at timeout (recording current state)"));
+      .waitFor({ state: "visible", timeout: GENERATE_TIMEOUT_MS })
+      .catch(() => console.log("  waitGenerate: still streaming at timeout (recording current state)"));
   },
 
   async rotate(page) {
@@ -280,8 +303,10 @@ const actions = {
 };
 
 // ---- API key setup (BYOK via the Chat config panel) ----
+// Only needed for local BYOK runs. In --url mode the target (e.g. the demo
+// site) provides its own LLM via the built-in proxy, so no key is entered.
 async function setupApiKey(page) {
-  if (NO_GENERATE || !API_KEY) return;
+  if (NO_GENERATE || !API_KEY || URL_MODE) return;
   try {
     await page.locator(SEL.chatTab).first().click();
     await page.waitForTimeout(300);
@@ -307,15 +332,29 @@ let context = null;
 try {
   if (CLEAN && existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true });
   mkdirSync(OUT_DIR, { recursive: true });
-  ensureWasm();
 
+  const genLabel = NO_GENERATE
+    ? "off (--no-generate)"
+    : API_KEY
+      ? "live (ANTHROPIC_API_KEY)"
+      : URL_MODE
+        ? "live (site LLM via --url)"
+        : "off (no key)";
   console.log(`Output: ${OUT_PATH}`);
   console.log(`Viewport: ${WIDTH}x${HEIGHT} @${DPR}x  | scenes: ${scenes.map((s) => s.id).join(" → ")}`);
-  console.log(`Generate: ${NO_GENERATE ? "off (--no-generate)" : API_KEY ? "live (ANTHROPIC_API_KEY)" : "off (no key)"}`);
+  console.log(`Generate: ${genLabel}`);
 
-  console.log("\nStarting Vite dev server...");
-  server = await startViteServer();
-  console.log(`Vite running on port ${PORT}`);
+  let appUrl;
+  if (URL_MODE) {
+    appUrl = URL;
+    console.log(`\nTarget: ${appUrl} (no local server)`);
+  } else {
+    ensureWasm();
+    console.log("\nStarting Vite dev server...");
+    server = await startViteServer();
+    appUrl = `http://127.0.0.1:${PORT}/`;
+    console.log(`Vite running on port ${PORT}`);
+  }
 
   browser = await chromium.launch({ headless: true });
   const tmpDir = join(OUT_DIR, `tmp-${TIMESTAMP}`);
@@ -336,7 +375,7 @@ try {
   });
 
   const page = await context.newPage();
-  await waitForApp(page);
+  await waitForApp(page, appUrl);
 
   // Make #root zoomable with a smooth tween, anchored at the top-left.
   await page.evaluate((ms) => {
