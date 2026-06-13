@@ -31,7 +31,7 @@ export const config = {
   dpr: 2, // render headroom so CSS-zoomed pixels stay crisp
   transitionMs: 900, // default zoom tween duration (CSS transition on #root)
   // The prompt typed into the Chat tab. Keep it short so it reads on screen.
-  prompt: "Show the protein as cartoon colored by chain",
+  prompt: "Make the water molecules semi-transparent",
   // After submitting, dwell this long on the fixed chat frame (the screen does
   // not move) while the reply streams in and the response becomes readable.
   chatResponseHoldMs: 30000,

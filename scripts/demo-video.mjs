@@ -263,46 +263,48 @@ const actions = {
     await page.mouse.up();
   },
 
-  // Frame the pipeline panel at ~70% width with the Pipeline/Chat tab bar pinned
-  // to the top of the screen, click the Editor tab on camera so the panel
-  // visibly switches from Chat to the pipeline graph, then scroll the graph
-  // top→bottom so each node passes through in reading order (TB dagre layout).
+  // Switch to the Editor tab, then frame the pipeline panel at ~70% width with
+  // the Pipeline/Chat tab bar pinned to the top of the screen and scroll the
+  // graph top→bottom (TB dagre layout).
+  //
+  // The tab is clicked at IDENTITY (no #root transform) on purpose: ReactFlow
+  // runs fitView on the chat→editor switch, and if a CSS transform is active
+  // while it measures, the edges render offset from the node handles. We let
+  // fitView settle untransformed, then zoom/scroll with a pure uniform scale —
+  // which triggers no re-measure, so the edges stay connected.
   async clickPipelineTabAndScroll(page) {
     const topM = 24;
     const botM = 56;
-    // Size from the panel width and pin its top (the "Pipeline" title + tabs) to
-    // the top of the screen. Measure in local coords (camera may be mid-zoom).
-    const pbox = await page.locator(SEL.panelPipeline).first().boundingBox();
-    if (!pbox) return;
-    const plx = (pbox.x - current.tx) / current.s;
-    const ply = (pbox.y - current.ty) / current.s;
-    const plw = pbox.width / current.s;
-    const S = PIPELINE_WIDTH_FRACTION
-      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / plw
-      : PIPELINE_SCROLL_SCALE;
-    const tx = WIDTH / 2 - (plx + plw / 2) * S;
-    const tyTop = topM - ply * S;
 
-    // Move in with the tabs at the top, dwell so the click reads.
-    await setTransition(page, 1100);
-    await applyTransform(page, { tx, ty: tyTop, s: S });
-    await page.waitForTimeout(1100 + 700);
-
-    // Click the Editor tab (near the top, in frame) → switch chat → graph.
+    // Pull back to full view and switch tabs so fitView measures untransformed.
+    await zoomTo(page, "full", 900);
     await page
       .locator(SEL.editorTab)
       .first()
       .click()
       .catch((e) => console.log("  editor tab click failed:", e.message));
-    await page.waitForTimeout(1300); // show the switch chat → pipeline graph
+    await page.waitForTimeout(1500); // let fitView settle at identity
 
-    // Scroll down through the now-visible graph, keeping the same scale/centre.
+    // Now at identity, so on-screen boxes equal local coordinates. Size from the
+    // panel width and pin its top (the "Pipeline" title + tabs) to the top.
+    const pbox = await page.locator(SEL.panelPipeline).first().boundingBox();
+    if (!pbox) return;
+    const S = PIPELINE_WIDTH_FRACTION
+      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / pbox.width
+      : PIPELINE_SCROLL_SCALE;
+    const tx = WIDTH / 2 - (pbox.x + pbox.width / 2) * S;
+    const tyTop = topM - pbox.y * S;
+
+    // Ease in with the tabs at the top.
+    await setTransition(page, 1100);
+    await applyTransform(page, { tx, ty: tyTop, s: S });
+    await page.waitForTimeout(1100 + 700);
+
+    // Scroll down through the graph, keeping the same scale/centre.
     const rf = await page.locator(SEL.reactFlow).first().boundingBox();
     if (!rf) return;
-    const rly = (rf.y - current.ty) / current.s;
-    const rlh = rf.height / current.s;
-    const tyBottom = HEIGHT - botM - (rly + rlh) * S;
-    if (rlh * S > HEIGHT - topM - botM) {
+    const tyBottom = HEIGHT - botM - (rf.y + rf.height) * S;
+    if (rf.height * S > HEIGHT - topM - botM) {
       await setTransition(page, PIPELINE_SCROLL_MS, "linear");
       await applyTransform(page, { tx, ty: tyBottom, s: S });
       await page.waitForTimeout(PIPELINE_SCROLL_MS);
