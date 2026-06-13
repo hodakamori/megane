@@ -54,3 +54,6 @@ coverage/
 .coverage
 lcov.info
 coverage.xml
+
+# megane LLM benchmark generated results
+bench/llm/results/
