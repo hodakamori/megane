@@ -25,6 +25,17 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
     },
   },
+  {
+    // Plain Node CLI scripts (e.g. CI helper scripts) run outside the
+    // browser/Vite environment, so `process`/`console` need Node globals.
+    files: ["bench/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+      },
+    },
+  },
   eslintConfigPrettier,
   {
     rules: {

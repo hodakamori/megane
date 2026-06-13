@@ -91,6 +91,19 @@ When invoking Playwright directly (`npx playwright test ...`), prefix with `PATH
 | `node scripts/dev-preview.mjs --screenshot` | Dev preview screenshots |
 | `node scripts/capture-screenshots.mjs` | Hero screenshot for docs |
 
+## LLM Prompt-Eval CI (bench/llm)
+
+`bench/llm/` is a prompt-suite + scorer that grades megane's LLM pipeline
+generator (`src/ai/prompt.ts` + skills) on a fixed dataset of requests. Adding
+the **`llm-eval`** label to a PR runs `.github/workflows/llm-prompt-eval.yml`,
+which scores the PR branch and its base branch via OpenRouter
+(`OPENROUTER_API_KEY` repository secret, model defaults to
+`anthropic/claude-haiku-4.5`, overridable via the `MEGANE_LLM_BENCH_MODEL`
+repository variable) and posts a before/after score comparison as a PR
+comment. It is opt-in (real, paid API calls) and only runs for PRs from
+branches within this repository (forks don't get secrets). See
+`bench/llm/README.md` for the full rubric and local usage.
+
 ## Skills
 
 Project-specific skills are defined in `.claude/skills/`. Each skill provides instructions for a specific workflow. Always follow the skill's instructions when performing the corresponding task.
