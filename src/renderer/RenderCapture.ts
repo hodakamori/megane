@@ -173,6 +173,41 @@ export async function captureSnapshot(
   return pngBlob;
 }
 
+/**
+ * Resolve the gif.js worker script into a same-origin `blob:` URL.
+ *
+ * gif.js spawns Web Workers from its `workerScript` URL during `render()`.
+ * When that URL resolves to a cross-origin or otherwise unfetchable path — as
+ * happens inside the JupyterLab labextension, where assets are served from a
+ * different base path than the document — the worker either fails to construct
+ * or loads a 404 HTML page and throws while parsing. gif.js does not listen for
+ * the worker's `onerror`, so the encode hangs silently forever: the GIF progress
+ * bar freezes at the frame-capture / encode boundary (80%). MP4 export is
+ * unaffected because MediaRecorder needs no worker.
+ *
+ * Fetching the script ourselves and handing gif.js a same-origin `blob:` URL
+ * sidesteps the cross-origin restriction. If the fetch fails we fall back to the
+ * raw URL so hosts where the direct path already worked do not regress. See
+ * issue #497.
+ */
+export async function resolveGifWorkerScript(): Promise<string> {
+  const workerUrl = new URL("gif.js/dist/gif.worker.js", import.meta.url).href;
+  try {
+    const response = await fetch(workerUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const source = await response.text();
+    const blob = new Blob([source], { type: "application/javascript" });
+    return URL.createObjectURL(blob);
+  } catch (err) {
+    console.warn(
+      `megane: could not fetch GIF worker script (${String(err)}); falling back to direct URL`,
+    );
+    return workerUrl;
+  }
+}
+
 /** Capture animation frames as GIF using gif.js. */
 export async function captureGif(
   renderer: MoleculeRenderer,
@@ -207,12 +242,13 @@ export async function captureGif(
 
   // Dynamically import gif.js
   const GIF = (await import("gif.js")).default;
+  const workerScript = await resolveGifWorkerScript();
   const gif = new GIF({
     workers: 2,
     quality: 10,
     width,
     height,
-    workerScript: new URL("gif.js/dist/gif.worker.js", import.meta.url).href,
+    workerScript,
   });
 
   // Capture each frame
@@ -241,11 +277,18 @@ export async function captureGif(
 
   // Render GIF
   return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      if (workerScript.startsWith("blob:")) {
+        URL.revokeObjectURL(workerScript);
+      }
+    };
     gif.on("finished", (blob: Blob) => {
+      cleanup();
       onProgress?.(1);
       resolve(blob);
     });
     gif.on("abort", () => {
+      cleanup();
       reject(new Error("GIF encoding was aborted"));
     });
     gif.on("progress", (p: number) => {
