@@ -57,13 +57,16 @@ export const scenes = [
     hold: 600,
   },
 
-  // 3. Settle on a FIXED frame with the Pipeline/Chat tab bar pinned to the top
-  //    of the screen, THEN submit, then dwell in place ~30s while the reply
-  //    streams in just below the tabs. The screen does not move and (with
-  //    scrollIntoView neutralised) the response stays put. Output may vary.
+  // 3. Pull back to the full view (identity) and submit, then dwell ~30s while
+  //    the reply streams in. This scene MUST stay unzoomed: the generated
+  //    pipeline mounts here, and ReactFlow measures node handle positions via
+  //    getBoundingClientRect — if a #root CSS zoom is active during that
+  //    measurement, the handle coords are scaled wrong and the pipeline edges
+  //    render detached from the nodes (and never re-measure). With identity the
+  //    handles are correct, so the later full-screen pipeline zoom stays clean.
   {
     id: "chat-generate",
-    zoom: { sel: '[data-testid="panel-pipeline"]', scale: 1.9, alignTop: true, topMargin: 24 },
+    zoom: "full",
     transitionMs: 1000,
     action: "submitPrompt",
     hold: config.chatResponseHoldMs, // ~30s fixed dwell
