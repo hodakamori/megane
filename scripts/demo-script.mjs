@@ -53,16 +53,17 @@ export const scenes = [
     hold: 600,
   },
 
-  // 3. Move further up to the top of the chat messages, where a short
-  //    conversation (prompt + streaming reply) sits, so the generation is
-  //    actually visible. With a live LLM this records the real generation;
-  //    without one it just dwells on the typed prompt. Output may vary.
+  // 3. Settle on a fixed frame with the Pipeline/Chat tab bar pinned to the top
+  //    of the screen, so the short conversation (prompt + streaming reply) is
+  //    visible just below it while the response generates. The camera does not
+  //    move during generation. With a live LLM this records the real
+  //    generation; without one it dwells on the typed prompt. Output may vary.
   {
     id: "chat-generate",
-    zoom: { sel: '[data-testid="pipeline-chat-messages"]', scale: 1.7, anchorY: 0.3 },
-    transitionMs: 900,
+    zoom: { sel: '[data-testid="panel-pipeline"]', scale: 1.9, alignTop: true, topMargin: 24 },
+    transitionMs: 1000,
     action: "waitGenerate",
-    hold: 1500,
+    hold: 2000,
   },
 
   // 4. Once generation completes, move over to the 3D molecule view and rotate.

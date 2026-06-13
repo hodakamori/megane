@@ -178,11 +178,14 @@ async function zoomTo(page, spec, ms = TRANSITION_MS) {
   // when the target is full-height (fit-to-bbox would compute ~1× and not zoom).
   // Otherwise fit the padded bbox to the viewport.
   const s = scale ?? Math.min(WIDTH / lw, HEIGHT / lh);
-  // anchorX/anchorY pick which point of the element maps to the viewport center
-  // (default the element centre). Biasing anchorY toward 1 frames lower content.
-  const cx = lx + lw * (spec.anchorX ?? 0.5);
-  const cy = ly + lh * (spec.anchorY ?? 0.5);
-  await applyTransform(page, { tx: WIDTH / 2 - cx * s, ty: HEIGHT / 2 - cy * s, s });
+  // Horizontal: anchorX picks which point maps to the viewport centre.
+  const tx = WIDTH / 2 - (lx + lw * (spec.anchorX ?? 0.5)) * s;
+  // Vertical: `alignTop` pins the element's top near the top of the screen
+  // (e.g. to keep the Pipeline/Chat tab bar up top); otherwise anchorY centres.
+  const ty = spec.alignTop
+    ? (spec.topMargin ?? 28) - ly * s
+    : HEIGHT / 2 - (ly + lh * (spec.anchorY ?? 0.5)) * s;
+  await applyTransform(page, { tx, ty, s });
   await page.waitForTimeout(ms);
 }
 
@@ -196,6 +199,7 @@ const SEL = {
   cancelBtn: 'button:has-text("Cancel")',
   chatMessages: '[data-testid="pipeline-chat-messages"]',
   appliedNotice: '[data-testid="pipeline-editor-applied-notice"]',
+  panelPipeline: '[data-testid="panel-pipeline"]',
   viewer: '[data-testid="viewer-root"]',
   reactFlow: ".react-flow",
 };
@@ -271,14 +275,32 @@ const actions = {
     await page.mouse.up();
   },
 
-  // Zoom into the top of the sidebar (the "Pipeline" panel header + Editor tab),
-  // click the Editor tab on camera so the panel visibly switches from Chat to
-  // the pipeline graph, then frame the graph at ~70% width and scroll it
+  // Frame the pipeline panel at ~70% width with the Pipeline/Chat tab bar pinned
+  // to the top of the screen, click the Editor tab on camera so the panel
+  // visibly switches from Chat to the pipeline graph, then scroll the graph
   // top→bottom so each node passes through in reading order (TB dagre layout).
   async clickPipelineTabAndScroll(page) {
-    // Move the camera onto the Editor tab and dwell so the click reads.
-    await zoomTo(page, { sel: SEL.editorTab, scale: 2.6 }, 1100);
-    await page.waitForTimeout(700);
+    const topM = 24;
+    const botM = 56;
+    // Size from the panel width and pin its top (the "Pipeline" title + tabs) to
+    // the top of the screen. Measure in local coords (camera may be mid-zoom).
+    const pbox = await page.locator(SEL.panelPipeline).first().boundingBox();
+    if (!pbox) return;
+    const plx = (pbox.x - current.tx) / current.s;
+    const ply = (pbox.y - current.ty) / current.s;
+    const plw = pbox.width / current.s;
+    const S = PIPELINE_WIDTH_FRACTION
+      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / plw
+      : PIPELINE_SCROLL_SCALE;
+    const tx = WIDTH / 2 - (plx + plw / 2) * S;
+    const tyTop = topM - ply * S;
+
+    // Move in with the tabs at the top, dwell so the click reads.
+    await setTransition(page, 1100);
+    await applyTransform(page, { tx, ty: tyTop, s: S });
+    await page.waitForTimeout(1100 + 700);
+
+    // Click the Editor tab (near the top, in frame) → switch chat → graph.
     await page
       .locator(SEL.editorTab)
       .first()
@@ -286,30 +308,13 @@ const actions = {
       .catch((e) => console.log("  editor tab click failed:", e.message));
     await page.waitForTimeout(1300); // show the switch chat → pipeline graph
 
-    // Frame the whole graph at ~70% width, aligned to the top. Measure in local
-    // coordinates (the camera is mid-zoom on the tab, not at identity).
-    const box = await page.locator(SEL.reactFlow).first().boundingBox();
-    if (!box) return;
-    const lx = (box.x - current.tx) / current.s;
-    const ly = (box.y - current.ty) / current.s;
-    const lw = box.width / current.s;
-    const lh = box.height / current.s;
-    const S = PIPELINE_WIDTH_FRACTION
-      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / lw
-      : PIPELINE_SCROLL_SCALE;
-    const topM = 56;
-    const botM = 56;
-    const tx = WIDTH / 2 - (lx + lw / 2) * S;
-    const tyTop = topM - ly * S;
-    const tyBottom = HEIGHT - botM - (ly + lh) * S;
-
-    // Ease into the top of the pipeline.
-    await setTransition(page, TRANSITION_MS);
-    await applyTransform(page, { tx, ty: tyTop, s: S });
-    await page.waitForTimeout(TRANSITION_MS + 600);
-
-    // Scroll down to the bottom when the scaled graph is taller than the view.
-    if (lh * S > HEIGHT - topM - botM) {
+    // Scroll down through the now-visible graph, keeping the same scale/centre.
+    const rf = await page.locator(SEL.reactFlow).first().boundingBox();
+    if (!rf) return;
+    const rly = (rf.y - current.ty) / current.s;
+    const rlh = rf.height / current.s;
+    const tyBottom = HEIGHT - botM - (rly + rlh) * S;
+    if (rlh * S > HEIGHT - topM - botM) {
       await setTransition(page, PIPELINE_SCROLL_MS, "linear");
       await applyTransform(page, { tx, ty: tyBottom, s: S });
       await page.waitForTimeout(PIPELINE_SCROLL_MS);
