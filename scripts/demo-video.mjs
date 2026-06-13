@@ -31,15 +31,16 @@ import { spawn, execSync } from "child_process";
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "fs";
 import { join, dirname, isAbsolute } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { createRequire } from "module";
+import { getChromium } from "../tests/e2e/utils/playwright.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const OUT_DIR = join(ROOT, "demo", "out");
 
-// Resolve Playwright from the global install (same pattern as dev-preview.mjs).
-const _require = createRequire("/opt/node22/lib/node_modules/");
-const { chromium } = _require("playwright");
+// Resolve Playwright via the shared helper, which prefers the project's own
+// node_modules and falls back to common global install paths — so this works
+// both in the hosted sandbox and on a local checkout.
+const chromium = getChromium();
 
 // ---- CLI parsing ----
 const args = process.argv.slice(2);

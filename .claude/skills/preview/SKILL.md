@@ -77,7 +77,16 @@ npm run demo:video -- --url https://<demo-site>/megane/app/
   `transitionMs` overrides the tween speed.
 - **Output:** `demo/out/megane-demo-<timestamp>.webm` (gitignored).
 - **Options:** `--out <path>`, `--prompt "<text>"`, `--width/--height`, `--dpr`,
-  `--no-generate`, `--clean`.
+  `--no-generate`, `--generate-timeout <ms>`, `--clean`.
+- **Run locally:** the script resolves Playwright via the shared
+  `tests/e2e/utils/playwright.mjs` helper (prefers the project's own
+  `node_modules`), so on a local checkout you only need `npm ci` plus
+  `npx playwright install chromium` for the browser. The easiest path is to
+  record the live demo site (no WASM build, no API key):
+  `npm run demo:video -- --url https://megane.tech-office-mori.com/`.
+  To record a local build instead, omit `--url` (it builds WASM and starts Vite);
+  live generation there needs `ANTHROPIC_API_KEY` since the local build has no
+  LLM proxy.
 - **Notes:** `deviceScaleFactor: 2` keeps CSS-zoomed pixels reasonably crisp.
   The pipeline panel defaults to the **Chat** tab, so `.react-flow` mounts
   hidden until the Editor tab is selected (the `pipeline` scene handles this via
