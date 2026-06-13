@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { webcrypto } from "crypto";
 
 interface FakeProvider {
   openCustomDocument: (
@@ -448,6 +449,26 @@ describe("MeganeEditorProvider — structureViewer", () => {
     }
     // Random — collisions across 4 picks of 32-char strings should be effectively impossible.
     expect(seen.size).toBe(4);
+  });
+
+  it("derives the CSP nonce from a CSPRNG, not Math.random", async () => {
+    const getRandomValuesSpy = vi.spyOn(webcrypto, "getRandomValues");
+    const mathRandomSpy = vi.spyOn(Math, "random");
+
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array());
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    const nonce = panel.webview.html.match(/nonce-([A-Za-z0-9]+)/)?.[1];
+    expect(nonce).toHaveLength(32);
+    expect(getRandomValuesSpy).toHaveBeenCalled();
+    expect(mathRandomSpy).not.toHaveBeenCalled();
+
+    getRandomValuesSpy.mockRestore();
+    mathRandomSpy.mockRestore();
   });
 });
 
