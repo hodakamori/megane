@@ -292,4 +292,89 @@ export const DATASET: BenchCase[] = [
       ],
     },
   },
+
+  // ── Supercells, coloring, representation, surfaces, volumetric ───────
+  {
+    id: "solid-supercell",
+    prompt: "Show a 2x2x2 supercell of my crystal structure.",
+    tags: ["solid", "replicate", "params"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "replicate", "viewport"],
+      paramChecks: [
+        {
+          label: "replicate.nx/ny/nz === 2",
+          nodeType: "replicate",
+          test: (n) => num(n, "nx") === 2 && num(n, "ny") === 2 && num(n, "nz") === 2,
+        },
+      ],
+    },
+  },
+  {
+    id: "color-by-element",
+    prompt: "Color the atoms by their element.",
+    tags: ["color", "params"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "color", "viewport"],
+      paramChecks: [
+        {
+          label: 'color.mode === "byElement"',
+          nodeType: "color",
+          test: (n) => str(n, "mode") === "byElement",
+        },
+      ],
+    },
+  },
+  {
+    id: "representation-cartoon",
+    prompt: "Show my protein as a cartoon.",
+    tags: ["representation", "params"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "representation", "viewport"],
+      paramChecks: [
+        {
+          label: 'representation.mode === "cartoon" or "both"',
+          nodeType: "representation",
+          test: (n) => ["cartoon", "both"].includes(str(n, "mode")),
+        },
+      ],
+    },
+  },
+  {
+    id: "surface-molecular",
+    prompt: "Show the molecular surface of my structure.",
+    tags: ["surface_mesh"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "surface_mesh", "viewport"],
+      requiredConnections: [
+        {
+          sourceType: "surface_mesh",
+          targetType: "viewport",
+          sourceHandle: "mesh",
+          targetHandle: "mesh",
+        },
+      ],
+    },
+  },
+  {
+    id: "volumetric-isosurface",
+    prompt: "Load a cube file and render its isosurface.",
+    tags: ["volumetric", "isosurface"],
+    rubric: {
+      requiredNodeTypes: ["load_volumetric", "isosurface", "viewport"],
+      requiredConnections: [
+        {
+          sourceType: "load_volumetric",
+          targetType: "isosurface",
+          sourceHandle: "volumetric",
+          targetHandle: "volumetric",
+        },
+        {
+          sourceType: "isosurface",
+          targetType: "viewport",
+          sourceHandle: "mesh",
+          targetHandle: "mesh",
+        },
+      ],
+    },
+  },
 ];
