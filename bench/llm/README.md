@@ -37,6 +37,11 @@ MEGANE_LLM_BENCH=1 OPENAI_API_KEY=sk-... \
   MEGANE_LLM_PROVIDER=openai MEGANE_LLM_MODEL=gpt-4o \
   npx vitest run tests/ts/bench/llm.bench.test.ts
 
+# OpenRouter
+MEGANE_LLM_BENCH=1 OPENROUTER_API_KEY=sk-or-... \
+  MEGANE_LLM_PROVIDER=openrouter MEGANE_LLM_MODEL=anthropic/claude-haiku-4.5 \
+  npx vitest run tests/ts/bench/llm.bench.test.ts
+
 # Demo proxy (no key; picks the model server-side)
 MEGANE_LLM_BENCH=1 MEGANE_LLM_PROVIDER=demo \
   MEGANE_LLM_PROXY_URL=https://proxy.example.com/chat \
@@ -81,10 +86,10 @@ For PRs that change the system prompt, skills, or dataset/rubrics, add the
    and per-case score deltas, plus any cases that regressed by >= 5
    percentage points.
 
-It requires the `ANTHROPIC_API_KEY` repository secret and makes real, paid API
-calls (32 generations per run: 16 cases x before/after), so it is opt-in via
-the label rather than running on every PR. The model defaults to
-`claude-haiku-4-5-20251001`; override it with the `MEGANE_LLM_BENCH_MODEL`
-repository variable. Because GitHub withholds secrets from `pull_request`
-workflows triggered by forks, this only runs for PRs from branches within the
-repository.
+It requires the `OPENROUTER_API_KEY` repository secret and makes real, paid API
+calls via OpenRouter (32 generations per run: 16 cases x before/after), so it
+is opt-in via the label rather than running on every PR. The model defaults to
+`anthropic/claude-haiku-4.5`; override it with the `MEGANE_LLM_BENCH_MODEL`
+repository variable (use any OpenRouter model slug). Because GitHub withholds
+secrets from `pull_request` workflows triggered by forks, this only runs for
+PRs from branches within the repository.
