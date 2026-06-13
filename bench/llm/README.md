@@ -67,3 +67,24 @@ rubrics referencing only node types/params the system prompt documents, so a
 perfect model can reach 1.0. Deterministic logic (scorer, extract, skills,
 dataset shape) is covered by `tests/ts/bench/bench-unit.test.ts`, which runs in
 the normal `npm test` suite.
+
+## CI: before/after prompt comparison
+
+For PRs that change the system prompt, skills, or dataset/rubrics, add the
+**`llm-eval`** label to run `.github/workflows/llm-prompt-eval.yml`. It:
+
+1. Runs the live benchmark on the PR branch ("after") and on the PR's base
+   commit ("before"), both with the same model.
+2. Diffs the two `bench/llm/results/*.json` reports with
+   `bench/llm/compare-results.mjs`.
+3. Posts (and updates, on subsequent pushes) a PR comment with the aggregate
+   and per-case score deltas, plus any cases that regressed by >= 5
+   percentage points.
+
+It requires the `ANTHROPIC_API_KEY` repository secret and makes real, paid API
+calls (32 generations per run: 16 cases x before/after), so it is opt-in via
+the label rather than running on every PR. The model defaults to
+`claude-haiku-4-5-20251001`; override it with the `MEGANE_LLM_BENCH_MODEL`
+repository variable. Because GitHub withholds secrets from `pull_request`
+workflows triggered by forks, this only runs for PRs from branches within the
+repository.

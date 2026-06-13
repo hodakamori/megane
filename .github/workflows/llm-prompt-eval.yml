@@ -1,0 +1,114 @@
+name: LLM Prompt Eval
+
+# Opt-in benchmark: makes real, paid Anthropic API calls to score the LLM
+# pipeline-generator (`bench/llm/`) on the PR branch ("after") and the PR's
+# base branch ("before"), then posts a before/after comparison as a PR
+# comment. Add the `llm-eval` label to a PR to run it.
+#
+# Requires the `ANTHROPIC_API_KEY` repository secret. Note: GitHub does not
+# expose repository secrets to `pull_request` workflows triggered from forks,
+# so this only runs for PRs from branches within this repository.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  llm-prompt-eval:
+    name: LLM prompt before/after eval
+    if: contains(github.event.pull_request.labels.*.name, 'llm-eval')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout PR head (after)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: after
+
+      - name: Checkout PR base (before)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: before
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies (after)
+        working-directory: after
+        run: npm ci
+
+      - name: Install dependencies (before)
+        working-directory: before
+        run: npm ci
+
+      - name: Run benchmark (after = PR branch)
+        working-directory: after
+        env:
+          MEGANE_LLM_BENCH: "1"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MEGANE_LLM_PROVIDER: anthropic
+          MEGANE_LLM_MODEL: ${{ vars.MEGANE_LLM_BENCH_MODEL || 'claude-haiku-4-5-20251001' }}
+        run: |
+          npx vitest run tests/ts/bench/llm.bench.test.ts
+          cp "$(ls -t bench/llm/results/*.json | head -1)" "$GITHUB_WORKSPACE/after.json"
+
+      - name: Run benchmark (before = base branch)
+        working-directory: before
+        env:
+          MEGANE_LLM_BENCH: "1"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MEGANE_LLM_PROVIDER: anthropic
+          MEGANE_LLM_MODEL: ${{ vars.MEGANE_LLM_BENCH_MODEL || 'claude-haiku-4-5-20251001' }}
+        run: |
+          npx vitest run tests/ts/bench/llm.bench.test.ts
+          cp "$(ls -t bench/llm/results/*.json | head -1)" "$GITHUB_WORKSPACE/before.json"
+
+      - name: Compare results
+        run: node after/bench/llm/compare-results.mjs before.json after.json comparison.md
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: llm-prompt-eval-reports
+          path: |
+            before.json
+            after.json
+            comparison.md
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const body = fs.readFileSync("comparison.md", "utf-8");
+            const marker = "<!-- llm-prompt-eval -->";
+            const comment = `${marker}\n${body}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }
