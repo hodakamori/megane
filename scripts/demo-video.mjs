@@ -392,6 +392,13 @@ try {
 
   await setupApiKey(page);
 
+  // Ensure the panel is on the Chat tab so the prompt box is visible. The
+  // current source defaults to Chat, but the deployed build may default to the
+  // Editor tab (which keeps the chat textarea visibility:hidden). Done at full
+  // view, before any zoom, so the tab is on-screen and clickable.
+  await page.locator(SEL.chatTab).first().click().catch(() => {});
+  await page.waitForTimeout(500);
+
   for (const scene of scenes) {
     console.log(`Scene: ${scene.id}`);
     const runAction = async () => {
