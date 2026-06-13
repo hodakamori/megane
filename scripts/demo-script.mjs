@@ -74,14 +74,14 @@ export const scenes = [
     hold: 1500,
   },
 
-  // 5. Show the whole pipeline (Editor tab fitView), then scroll it top→bottom
-  //    so every node passes through in order. The verb drives its own zoom, so
-  //    the scene zoom is "keep".
+  // 5. Zoom into the sidebar's "Pipeline"/Editor tab, click it on camera so the
+  //    panel switches from Chat to the pipeline graph, then scroll the graph
+  //    top→bottom (at ~70% screen width) to reveal its contents. The verb drives
+  //    its own camera, so the scene zoom is "keep".
   {
     id: "pipeline",
     zoom: "keep",
-    action: "showAndScrollPipeline",
-    actionFirst: true,
+    action: "clickPipelineTabAndScroll",
     hold: 1500,
   },
 ];

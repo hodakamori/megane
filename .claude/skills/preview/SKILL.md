@@ -65,9 +65,10 @@ npm run demo:video -- --url https://<demo-site>/megane/app/
 - **Director (engine):** `scripts/demo-video.mjs` — starts Vite, records a webm
   via Playwright `recordVideo`, and zooms by tweening a CSS `transform` on
   `#root`. Verbs: `askChat` (type + submit), `waitGenerate` (dwell on the chat
-  messages while the reply streams), `rotate`, `showAndScrollPipeline`
-  (Editor-tab fitView shows the whole pipeline, then a linear top→bottom scroll —
-  tune via `config.pipelineScrollScale` / `pipelineScrollMs`).
+  messages while the reply streams), `rotate`, `clickPipelineTabAndScroll`
+  (zoom the Editor tab, click it on camera to switch Chat→pipeline, then a linear
+  top→bottom scroll at ~70% width — tune via `config.pipelineWidthFraction` /
+  `pipelineScrollMs`).
 - **Zoom control:** scene `zoom` is `"full"`, `"keep"`, or
   `{ sel, scale?, pad?, anchorX?, anchorY? }`. Use `scale` for full-height targets
   like the side panel (fit-to-bbox there is ~1×); `anchorY` (0..1) biases the

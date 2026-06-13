@@ -271,34 +271,45 @@ const actions = {
     await page.mouse.up();
   },
 
-  // Reveal the whole pipeline (Editor tab fitView frames every node), then
-  // scroll the graph top→bottom so each node passes through in reading order.
-  // The TB dagre layout makes a vertical scroll the natural traversal.
-  async showAndScrollPipeline(page) {
-    await page.locator(SEL.editorTab).first().click();
-    await page.waitForTimeout(1100); // let fitView settle: whole pipeline visible
+  // Zoom into the top of the sidebar (the "Pipeline" panel header + Editor tab),
+  // click the Editor tab on camera so the panel visibly switches from Chat to
+  // the pipeline graph, then frame the graph at ~70% width and scroll it
+  // top→bottom so each node passes through in reading order (TB dagre layout).
+  async clickPipelineTabAndScroll(page) {
+    // Move the camera onto the Editor tab and dwell so the click reads.
+    await zoomTo(page, { sel: SEL.editorTab, scale: 2.6 }, 1100);
+    await page.waitForTimeout(700);
+    await page
+      .locator(SEL.editorTab)
+      .first()
+      .click()
+      .catch((e) => console.log("  editor tab click failed:", e.message));
+    await page.waitForTimeout(1300); // show the switch chat → pipeline graph
+
+    // Frame the whole graph at ~70% width, aligned to the top. Measure in local
+    // coordinates (the camera is mid-zoom on the tab, not at identity).
     const box = await page.locator(SEL.reactFlow).first().boundingBox();
     if (!box) return;
-    // Size the graph to a fraction of the screen width (≈70%) when configured,
-    // else fall back to the fixed scale.
+    const lx = (box.x - current.tx) / current.s;
+    const ly = (box.y - current.ty) / current.s;
+    const lw = box.width / current.s;
+    const lh = box.height / current.s;
     const S = PIPELINE_WIDTH_FRACTION
-      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / box.width
+      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / lw
       : PIPELINE_SCROLL_SCALE;
     const topM = 56;
     const botM = 56;
-    // Measured at identity (actionFirst reset to full), so screen == local.
-    const tx = WIDTH / 2 - (box.x + box.width / 2) * S;
-    const tyTop = topM - box.y * S;
-    const tyBottom = HEIGHT - botM - (box.y + box.height) * S;
+    const tx = WIDTH / 2 - (lx + lw / 2) * S;
+    const tyTop = topM - ly * S;
+    const tyBottom = HEIGHT - botM - (ly + lh) * S;
 
     // Ease into the top of the pipeline.
     await setTransition(page, TRANSITION_MS);
     await applyTransform(page, { tx, ty: tyTop, s: S });
     await page.waitForTimeout(TRANSITION_MS + 600);
 
-    // Only scroll if the scaled graph is taller than the viewport; otherwise it
-    // already fits and we just dwell on it.
-    if (box.height * S > HEIGHT - topM - botM) {
+    // Scroll down to the bottom when the scaled graph is taller than the view.
+    if (lh * S > HEIGHT - topM - botM) {
       await setTransition(page, PIPELINE_SCROLL_MS, "linear");
       await applyTransform(page, { tx, ty: tyBottom, s: S });
       await page.waitForTimeout(PIPELINE_SCROLL_MS);
