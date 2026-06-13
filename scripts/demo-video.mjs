@@ -364,6 +364,9 @@ try {
     viewport: { width: WIDTH, height: HEIGHT },
     deviceScaleFactor: DPR,
     recordVideo: { dir: tmpDir, size: { width: WIDTH, height: HEIGHT } },
+    // Some networks (e.g. a TLS-intercepting egress proxy) present a cert
+    // Chromium doesn't trust; tolerate it so --url can reach remote sites.
+    ignoreHTTPSErrors: true,
   });
   // Suppress the first-run tour overlay.
   await context.addInitScript(() => {
