@@ -32,6 +32,9 @@ export const config = {
   transitionMs: 900, // default zoom tween duration (CSS transition on #root)
   // The prompt typed into the Chat tab. Keep it short so it reads on screen.
   prompt: "Show the protein as cartoon colored by chain",
+  // After generation finishes, dwell this long on the fixed chat frame so the
+  // LLM response is clearly readable before the camera moves to the molecule.
+  chatResponseHoldMs: 10000,
   // Pipeline scroll-through (TB layout). `pipelineWidthFraction` sizes the graph
   // to a fraction of the screen width (0.7 ≈ 70%); it overrides the fixed
   // `pipelineScrollScale` fallback. `pipelineScrollMs` is the linear scroll time.
@@ -64,7 +67,9 @@ export const scenes = [
     zoom: { sel: '[data-testid="panel-pipeline"]', scale: 1.9, alignTop: true, topMargin: 24 },
     transitionMs: 1000,
     action: "submitAndWait",
-    hold: 2000,
+    // Stay fixed for ~10s after generation so the response is clearly visible
+    // before the camera moves on.
+    hold: config.chatResponseHoldMs,
   },
 
   // 4. Once generation completes, move over to the 3D molecule view and rotate.
