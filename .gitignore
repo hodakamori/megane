@@ -49,6 +49,7 @@ docs/docs/api/typescript/
 docs/notebooks/
 docs/public/notebooks/
 dev-preview/
+demo/
 coverage/
 .coverage
 lcov.info
