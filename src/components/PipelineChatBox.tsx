@@ -16,6 +16,7 @@ import {
   RateLimitError,
 } from "../ai/client";
 import { usePipelineStore } from "../pipeline/store";
+import { summarizeStructure } from "../ai/structureSummary";
 import type { NodeSnapshotData } from "../pipeline/execute";
 import type { LoadStructureParams, SerializedPipeline } from "../pipeline/types";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
@@ -339,6 +340,11 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
       onPipelineApplied?.();
     };
 
+    // Summarize the currently loaded structure so the model can build filter
+    // queries from the real elements/resnames present rather than guessing.
+    const { snapshot, atomLabels } = usePipelineStore.getState();
+    const structureSummary = summarizeStructure(snapshot, atomLabels);
+
     try {
       let streamBuffer = "";
       const fullResponse = await generatePipeline(
@@ -369,6 +375,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
           }
         },
         abort.signal,
+        structureSummary,
       );
 
       // Fallback: the JSON may only have closed in the final, non-streamed text

@@ -6,6 +6,7 @@
 import type { AIConfig } from "./config";
 import type { SerializedPipeline } from "../pipeline/types";
 import { buildSystemPrompt } from "./prompt";
+import { collectPipelineErrors, buildRepairPrompt } from "./validatePipeline";
 import {
   getSkills,
   buildToolDefinitions,
@@ -52,39 +53,63 @@ interface AnthropicStreamResult {
 /**
  * Generate a pipeline by calling the LLM API with streaming.
  * Returns the full response text.
+ *
+ * When `structureSummary` is provided it is appended to the system prompt so
+ * the model can reference the real elements/resnames present when building
+ * filter queries. After generation, the resulting pipeline's selection queries
+ * are validated; if any are invalid, one repair round trip is performed asking
+ * the model to fix them.
  */
 export async function generatePipeline(
   config: AIConfig,
   userMessage: string,
   onChunk: (text: string) => void,
   signal?: AbortSignal,
+  structureSummary?: string | null,
 ): Promise<string> {
-  const systemPrompt = buildSystemPrompt();
+  const systemPrompt = buildSystemPrompt(structureSummary);
   const skills = getSkills();
 
-  if (config.provider === "anthropic") {
-    const tools = buildToolDefinitions(skills);
-    return streamAnthropicWithSkills(
-      config,
-      systemPrompt,
-      userMessage,
-      skills,
-      tools,
-      onChunk,
-      signal,
-    );
-  }
+  // Dispatch one streamed generation for a given user message. Reused for the
+  // optional repair pass with a different (correction) message.
+  const runProvider = (message: string): Promise<string> => {
+    if (config.provider === "anthropic") {
+      const tools = buildToolDefinitions(skills);
+      return streamAnthropicWithSkills(
+        config,
+        systemPrompt,
+        message,
+        skills,
+        tools,
+        onChunk,
+        signal,
+      );
+    }
 
-  // OpenAI-compatible providers (and the OpenRouter-backed demo proxy)
-  // speak the OpenAI tool-calling protocol, so the model fetches skill
-  // templates on demand via function calls — the same on-demand behaviour
-  // as the Anthropic path, no inlining required.
-  const tools = buildOpenAITools(skills);
+    // OpenAI-compatible providers (and the OpenRouter-backed demo proxy)
+    // speak the OpenAI tool-calling protocol, so the model fetches skill
+    // templates on demand via function calls — the same on-demand behaviour
+    // as the Anthropic path, no inlining required.
+    const tools = buildOpenAITools(skills);
+    if (config.provider === "demo") {
+      return streamDemoProxy(systemPrompt, message, skills, tools, onChunk, signal);
+    }
+    return streamOpenAI(config, systemPrompt, message, skills, tools, onChunk, signal);
+  };
 
-  if (config.provider === "demo") {
-    return streamDemoProxy(systemPrompt, userMessage, skills, tools, onChunk, signal);
+  const text = await runProvider(userMessage);
+
+  // Validate the generated pipeline (structure + selection queries) and, if any
+  // problems are found, ask the model once to repair them. Only fires when a
+  // pipeline was actually produced, so plain text responses are unaffected.
+  const pipeline = tryExtractPipeline(text);
+  if (pipeline) {
+    const errors = collectPipelineErrors(pipeline);
+    if (errors.length > 0) {
+      return runProvider(buildRepairPrompt(userMessage, pipeline, errors));
+    }
   }
-  return streamOpenAI(config, systemPrompt, userMessage, skills, tools, onChunk, signal);
+  return text;
 }
 
 // ─── Anthropic with tool_use ─────────────────────────────────────────

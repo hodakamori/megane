@@ -256,7 +256,7 @@ class Parser {
 // --- Evaluator ---
 
 /** Extract residue name from atom label (e.g., "ALA42" → "ALA"). */
-function parseResname(label: string): string {
+export function parseResname(label: string): string {
   const match = label.match(/^([A-Za-z]+)/);
   return match ? match[1] : label;
 }

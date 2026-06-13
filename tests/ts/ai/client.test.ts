@@ -554,6 +554,121 @@ describe("generatePipeline (demo proxy)", () => {
   });
 });
 
+describe("generatePipeline — structure summary + query repair", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Schema-valid pipelines (one viewport, edges reference real nodes) so the
+  // filter query is the only variable the repair check reacts to.
+  const VALID_FILTER_PIPELINE = JSON.stringify({
+    version: 3,
+    nodes: [
+      { id: "f1", type: "filter", position: { x: 0, y: 0 }, query: 'element == "C"' },
+      { id: "v1", type: "viewport", position: { x: 0, y: 310 } },
+    ],
+    edges: [{ source: "f1", target: "v1", sourceHandle: "out", targetHandle: "particle" }],
+  });
+  const INVALID_FILTER_PIPELINE = JSON.stringify({
+    version: 3,
+    nodes: [
+      { id: "f1", type: "filter", position: { x: 0, y: 0 }, query: "chain A" },
+      { id: "v1", type: "viewport", position: { x: 0, y: 310 } },
+    ],
+    edges: [{ source: "f1", target: "v1", sourceHandle: "out", targetHandle: "particle" }],
+  });
+  // Structurally invalid: references an unknown node type and has no viewport.
+  const INVALID_SCHEMA_PIPELINE = JSON.stringify({
+    version: 3,
+    nodes: [{ id: "x1", type: "not_a_real_node", position: { x: 0, y: 0 } }],
+    edges: [],
+  });
+
+  function anthropicTextResponse(text: string): Response {
+    return makeSSEResponse([
+      { event: "content_block_delta", data: { delta: { type: "text_delta", text } } },
+      { event: "message_delta", data: { delta: { stop_reason: "end_turn" } } },
+    ]);
+  }
+
+  it("appends the structure summary to the system prompt", async () => {
+    fetchMock.mockResolvedValueOnce(anthropicTextResponse("hi"));
+    await generatePipeline(
+      ANTHROPIC_CONFIG,
+      "msg",
+      () => {},
+      undefined,
+      "STRUCTURE_SUMMARY_MARKER",
+    );
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.system).toContain("STRUCTURE_SUMMARY_MARKER");
+    expect(body.system).toContain("Currently Loaded Structure");
+  });
+
+  it("does not repair when the generated filter queries are valid", async () => {
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + VALID_FILTER_PIPELINE + "\n```\nDone."),
+    );
+    const result = await generatePipeline(ANTHROPIC_CONFIG, "show carbons", () => {});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toContain("Done.");
+  });
+
+  it("runs one repair round trip when a filter query is invalid", async () => {
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + INVALID_FILTER_PIPELINE + "\n```\nHere."),
+    );
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + VALID_FILTER_PIPELINE + "\n```\nFixed."),
+    );
+
+    const result = await generatePipeline(ANTHROPIC_CONFIG, "show chain A", () => {});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The repair request's user message should reference the invalid query.
+    const repairBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    const userMsg = repairBody.messages[repairBody.messages.length - 1];
+    expect(userMsg.role).toBe("user");
+    expect(userMsg.content).toContain("The pipeline you generated is invalid");
+    expect(userMsg.content).toContain("chain A");
+    expect(result).toContain("Fixed.");
+  });
+
+  it("runs one repair round trip when the pipeline structure is invalid", async () => {
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + INVALID_SCHEMA_PIPELINE + "\n```\nHere."),
+    );
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + VALID_FILTER_PIPELINE + "\n```\nFixed."),
+    );
+
+    const result = await generatePipeline(ANTHROPIC_CONFIG, "build something", () => {});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const repairBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    const userMsg = repairBody.messages[repairBody.messages.length - 1];
+    expect(userMsg.content).toContain("not_a_real_node");
+    expect(userMsg.content).toContain("viewport");
+    expect(result).toContain("Fixed.");
+  });
+
+  it("repairs at most once even if the repair is still invalid", async () => {
+    // Build a fresh Response each call — a stream body can only be read once.
+    fetchMock.mockImplementation(async () =>
+      anthropicTextResponse("```json\n" + INVALID_FILTER_PIPELINE + "\n```\nStill bad."),
+    );
+    const result = await generatePipeline(ANTHROPIC_CONFIG, "show chain A", () => {});
+    // One initial + one repair = 2; no further attempts.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toContain("Still bad.");
+  });
+});
+
 describe("formatActionSummary", () => {
   it("returns singular phrasing for a single node", () => {
     expect(formatActionSummary(1)).toBe("Pipeline applied — 1 node added to the editor.");
