@@ -14,5 +14,8 @@
     "typescript": "^5.7.0",
     "vitest": "^4.1.8",
     "wrangler": "^4.99.0"
+  },
+  "overrides": {
+    "esbuild": ">=0.28.1"
   }
 }
