@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { webcrypto } from "crypto";
 
 interface SerializedPipelineNode {
   id: string;
@@ -320,10 +321,14 @@ function getHtmlForWebview(webview: vscode.Webview, mediaDir: vscode.Uri): strin
 }
 
 function getNonce(): string {
-  let text = "";
+  // The nonce backs the webview CSP (`script-src 'nonce-...'`), so it must be
+  // unpredictable. Use a CSPRNG (webcrypto) rather than Math.random().
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  const bytes = new Uint8Array(32);
+  webcrypto.getRandomValues(bytes);
+  let text = "";
+  for (let i = 0; i < bytes.length; i++) {
+    text += chars.charAt(bytes[i] % chars.length);
   }
   return text;
 }
