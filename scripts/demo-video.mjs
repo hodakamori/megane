@@ -205,8 +205,9 @@ const SEL = {
 };
 
 const actions = {
-  // Type the prompt into the Chat input, then submit it (when generation is on).
-  async askChat(page) {
+  // Type the prompt into the Chat input — but do NOT submit yet, so generation
+  // only starts once the next scene has settled on a fixed frame.
+  async typePrompt(page) {
     // The panel defaults to the Chat tab, so the textarea is already present.
     await page.locator(SEL.promptBox).first().waitFor({ state: "visible", timeout: 10000 });
     // Typewriter effect driven entirely in-page: set the value via React's
@@ -229,23 +230,21 @@ const actions = {
       );
       await page.waitForTimeout(45);
     }
-    if (!RUN_GENERATE) {
-      console.log("  askChat: typed prompt; generation off (no key / no site LLM / --no-generate)");
-      return;
-    }
-    // Submit while the input row (and Generate button) is still framed.
-    await page
-      .locator(SEL.generateBtn)
-      .first()
-      .click()
-      .catch((e) => console.log("  askChat: submit click failed:", e.message));
   },
 
-  // Wait for the streamed response to finish. While streaming the submit button
-  // reads "Cancel"; it returns to "Generate" once the response (and pipeline
-  // apply) completes — a host-agnostic signal that also covers the demo proxy.
-  async waitGenerate(page) {
-    if (!RUN_GENERATE) return;
+  // Submit the typed prompt and wait for the streamed reply to finish. Called
+  // only after the camera has settled on the fixed response frame, so the screen
+  // stays still while the response is visible. Submits via Enter (the textarea's
+  // own handler) so the off-screen Generate button isn't required. While
+  // streaming the submit button reads "Cancel"; it returns to "Generate" once
+  // the response (and pipeline apply) completes — host-agnostic, covers the proxy.
+  async submitAndWait(page) {
+    if (!RUN_GENERATE) {
+      console.log("  generation off (no key / no site LLM / --no-generate); prompt left in box");
+      return;
+    }
+    await page.evaluate((sel) => document.querySelector(sel)?.focus(), SEL.promptBox);
+    await page.keyboard.press("Enter");
     await page
       .locator(SEL.cancelBtn)
       .first()
@@ -255,7 +254,7 @@ const actions = {
       .locator(SEL.generateBtn)
       .first()
       .waitFor({ state: "visible", timeout: GENERATE_TIMEOUT_MS })
-      .catch(() => console.log("  waitGenerate: still streaming at timeout (recording current state)"));
+      .catch(() => console.log("  submitAndWait: still streaming at timeout (recording current state)"));
   },
 
   async rotate(page) {

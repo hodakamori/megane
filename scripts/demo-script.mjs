@@ -44,25 +44,26 @@ export const scenes = [
   // 1. Whole app — let the viewer take in the full UI.
   { id: "overview", zoom: "full", hold: 2200 },
 
-  // 2. Go straight from the full view into the Chat input, type, and submit.
+  // 2. Go straight from the full view into the Chat input and type the prompt
+  //    (submission happens in the next scene, after the camera has settled).
   {
     id: "chat-input",
     zoom: { sel: 'textarea[placeholder="Describe the pipeline you want..."]', scale: 2.2 },
     transitionMs: 950,
-    action: "askChat",
+    action: "typePrompt",
     hold: 600,
   },
 
-  // 3. Settle on a fixed frame with the Pipeline/Chat tab bar pinned to the top
-  //    of the screen, so the short conversation (prompt + streaming reply) is
-  //    visible just below it while the response generates. The camera does not
-  //    move during generation. With a live LLM this records the real
+  // 3. Settle on a FIXED frame with the Pipeline/Chat tab bar pinned to the top
+  //    of the screen, THEN submit — so the camera is already still by the time
+  //    the response streams in just below the tabs. The screen does not move
+  //    while the reply is visible. With a live LLM this records the real
   //    generation; without one it dwells on the typed prompt. Output may vary.
   {
     id: "chat-generate",
     zoom: { sel: '[data-testid="panel-pipeline"]', scale: 1.9, alignTop: true, topMargin: 24 },
     transitionMs: 1000,
-    action: "waitGenerate",
+    action: "submitAndWait",
     hold: 2000,
   },
 
