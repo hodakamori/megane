@@ -44,51 +44,20 @@ export const config = {
 };
 
 export const scenes = [
-  // 1. Whole app — let the viewer take in the full UI.
-  { id: "overview", zoom: "full", hold: 2200 },
+  // Recorded entirely at the full (un-zoomed) view so the #root transform never
+  // moves: ReactFlow then always measures node handles at identity and the
+  // pipeline edges stay attached. Zoom/pan into each region in post.
+  { id: "overview", zoom: "full", hold: 2500 },
 
-  // 2. Go straight from the full view into the Chat input and type the prompt
-  //    (submission happens in the next scene, after the camera has settled).
-  {
-    id: "chat-input",
-    zoom: { sel: 'textarea[placeholder="Describe the pipeline you want..."]', scale: 2.2 },
-    transitionMs: 950,
-    action: "typePrompt",
-    hold: 600,
-  },
+  // Type the prompt into the Chat input.
+  { id: "chat-input", zoom: "full", action: "typePrompt", hold: 1200 },
 
-  // 3. Pull back to the full view (identity) and submit, then dwell ~30s while
-  //    the reply streams in. This scene MUST stay unzoomed: the generated
-  //    pipeline mounts here, and ReactFlow measures node handle positions via
-  //    getBoundingClientRect — if a #root CSS zoom is active during that
-  //    measurement, the handle coords are scaled wrong and the pipeline edges
-  //    render detached from the nodes (and never re-measure). With identity the
-  //    handles are correct, so the later full-screen pipeline zoom stays clean.
-  {
-    id: "chat-generate",
-    zoom: "full",
-    transitionMs: 1000,
-    action: "submitPrompt",
-    hold: config.chatResponseHoldMs, // ~30s fixed dwell
-  },
+  // Submit and dwell while the reply streams in (output may vary).
+  { id: "chat-generate", zoom: "full", action: "submitPrompt", hold: config.chatResponseHoldMs },
 
-  // 4. Once generation completes, move over to the 3D molecule view and rotate.
-  {
-    id: "molecule",
-    zoom: { sel: '[data-testid="viewer-root"]', scale: 1.5 },
-    transitionMs: 1200,
-    action: "rotate",
-    hold: 1500,
-  },
+  // Rotate the molecule (its look reflects the applied pipeline).
+  { id: "molecule", zoom: "full", action: "rotate", hold: 2500 },
 
-  // 5. Zoom into the sidebar's "Pipeline"/Editor tab, click it on camera so the
-  //    panel switches from Chat to the pipeline graph, then scroll the graph
-  //    top→bottom (at ~70% screen width) to reveal its contents. The verb drives
-  //    its own camera, so the scene zoom is "keep".
-  {
-    id: "pipeline",
-    zoom: "keep",
-    action: "clickPipelineTabAndScroll",
-    hold: 1500,
-  },
+  // Switch to the Editor tab to reveal the generated pipeline graph.
+  { id: "pipeline", zoom: "full", action: "showPipeline", hold: 6000 },
 ];

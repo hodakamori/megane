@@ -45,10 +45,14 @@ This script does NOT require WASM (uses pre-parsed JSON data).
 
 ## Scripted Zoom Demo Video (storyboard-as-code)
 
-Produces a single continuous webm that walks the live app through a scripted
-flow while zooming into UI regions:
-**full screen → zoom Chat panel + type a prompt → (live AI generate) → rotate
-the molecule → zoom the pipeline graph.**
+Produces a single continuous **full-frame** webm that walks the live app through
+a scripted flow: **show the app → type a prompt → (live AI generate) → rotate the
+molecule → switch to the Editor tab to reveal the generated pipeline.** It is
+recorded un-zoomed on purpose (zoom/pan/crop in post): a #root CSS zoom while the
+pipeline mounts makes ReactFlow mis-measure node handles and the pipeline edges
+detach from the nodes, so the recorder stays at the full view to keep them
+attached. (The director still supports zoom verbs/`alignTop`/scroll for other
+storyboards, but the default storyboard does not use them.)
 
 ```
 npm run demo:video                                   # no key → prompt typed, generate skipped
@@ -64,17 +68,13 @@ npm run demo:video -- --url https://<demo-site>/megane/app/
   touch the engine.
 - **Director (engine):** `scripts/demo-video.mjs` — starts Vite, records a webm
   via Playwright `recordVideo`, and zooms by tweening a CSS `transform` on
-  `#root`. Verbs: `typePrompt` (type only), `submitPrompt` (submit via Enter
-  after the camera settles; the scene's hold then dwells ~30s while the reply
-  streams), `rotate`, `clickPipelineTabAndScroll`
-  (zoom the Editor tab, click it on camera to switch Chat→pipeline, then a linear
-  top→bottom scroll at ~70% width — tune via `config.pipelineWidthFraction` /
-  `pipelineScrollMs`).
+  `#root`. Verbs: `typePrompt` (type only), `submitPrompt` (submit via Enter,
+  then the scene's hold dwells ~30s while the reply streams), `rotate`,
+  `showPipeline` (click the Editor tab to reveal the graph).
 - **Zoom control:** scene `zoom` is `"full"`, `"keep"`, or
-  `{ sel, scale?, pad?, anchorX?, anchorY? }`. Use `scale` for full-height targets
-  like the side panel (fit-to-bbox there is ~1×); `anchorY` (0..1) biases the
-  framing (e.g. 0.72 toward the lower, streaming part of the chat). Per-scene
-  `transitionMs` overrides the tween speed.
+  `{ sel, scale?, pad?, anchorX?, anchorY?, alignTop?, topMargin? }`. The default
+  storyboard uses `"full"` everywhere (full-frame recording); the zoom options
+  remain available for custom storyboards.
 - **Output:** `demo/out/megane-demo-<timestamp>.webm` (gitignored).
 - **Options:** `--out <path>`, `--prompt "<text>"`, `--width/--height`, `--dpr`,
   `--no-generate`, `--generate-timeout <ms>`, `--clean`.
