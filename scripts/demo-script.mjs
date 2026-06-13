@@ -32,9 +32,9 @@ export const config = {
   transitionMs: 900, // default zoom tween duration (CSS transition on #root)
   // The prompt typed into the Chat tab. Keep it short so it reads on screen.
   prompt: "Show the protein as cartoon colored by chain",
-  // After generation finishes, dwell this long on the fixed chat frame so the
-  // LLM response is clearly readable before the camera moves to the molecule.
-  chatResponseHoldMs: 10000,
+  // After submitting, dwell this long on the fixed chat frame (the screen does
+  // not move) while the reply streams in and the response becomes readable.
+  chatResponseHoldMs: 30000,
   // Pipeline scroll-through (TB layout). `pipelineWidthFraction` sizes the graph
   // to a fraction of the screen width (0.7 ≈ 70%); it overrides the fixed
   // `pipelineScrollScale` fallback. `pipelineScrollMs` is the linear scroll time.
@@ -58,18 +58,15 @@ export const scenes = [
   },
 
   // 3. Settle on a FIXED frame with the Pipeline/Chat tab bar pinned to the top
-  //    of the screen, THEN submit — so the camera is already still by the time
-  //    the response streams in just below the tabs. The screen does not move
-  //    while the reply is visible. With a live LLM this records the real
-  //    generation; without one it dwells on the typed prompt. Output may vary.
+  //    of the screen, THEN submit, then dwell in place ~30s while the reply
+  //    streams in just below the tabs. The screen does not move and (with
+  //    scrollIntoView neutralised) the response stays put. Output may vary.
   {
     id: "chat-generate",
     zoom: { sel: '[data-testid="panel-pipeline"]', scale: 1.9, alignTop: true, topMargin: 24 },
     transitionMs: 1000,
-    action: "submitAndWait",
-    // Stay fixed for ~10s after generation so the response is clearly visible
-    // before the camera moves on.
-    hold: config.chatResponseHoldMs,
+    action: "submitPrompt",
+    hold: config.chatResponseHoldMs, // ~30s fixed dwell
   },
 
   // 4. Once generation completes, move over to the 3D molecule view and rotate.

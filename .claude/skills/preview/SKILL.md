@@ -64,9 +64,9 @@ npm run demo:video -- --url https://<demo-site>/megane/app/
   touch the engine.
 - **Director (engine):** `scripts/demo-video.mjs` — starts Vite, records a webm
   via Playwright `recordVideo`, and zooms by tweening a CSS `transform` on
-  `#root`. Verbs: `typePrompt` (type only), `submitAndWait` (submit via Enter
-  after the camera settles, then dwell fixed while the reply streams), `rotate`,
-  `clickPipelineTabAndScroll`
+  `#root`. Verbs: `typePrompt` (type only), `submitPrompt` (submit via Enter
+  after the camera settles; the scene's hold then dwells ~30s while the reply
+  streams), `rotate`, `clickPipelineTabAndScroll`
   (zoom the Editor tab, click it on camera to switch Chat→pipeline, then a linear
   top→bottom scroll at ~70% width — tune via `config.pipelineWidthFraction` /
   `pipelineScrollMs`).

@@ -232,29 +232,18 @@ const actions = {
     }
   },
 
-  // Submit the typed prompt and wait for the streamed reply to finish. Called
-  // only after the camera has settled on the fixed response frame, so the screen
-  // stays still while the response is visible. Submits via Enter (the textarea's
-  // own handler) so the off-screen Generate button isn't required. While
-  // streaming the submit button reads "Cancel"; it returns to "Generate" once
-  // the response (and pipeline apply) completes — host-agnostic, covers the proxy.
-  async submitAndWait(page) {
+  // Submit the typed prompt (fire-and-forget). Called after the camera has
+  // settled on the fixed response frame; the scene's `hold` then dwells in place
+  // (~30s) while the reply streams in and the pipeline applies — the screen does
+  // not move. Submits via Enter (the textarea's own handler) so the off-screen
+  // Generate button isn't required.
+  async submitPrompt(page) {
     if (!RUN_GENERATE) {
       console.log("  generation off (no key / no site LLM / --no-generate); prompt left in box");
       return;
     }
     await page.evaluate((sel) => document.querySelector(sel)?.focus(), SEL.promptBox);
     await page.keyboard.press("Enter");
-    await page
-      .locator(SEL.cancelBtn)
-      .first()
-      .waitFor({ state: "visible", timeout: 12000 })
-      .catch(() => {});
-    await page
-      .locator(SEL.generateBtn)
-      .first()
-      .waitFor({ state: "visible", timeout: GENERATE_TIMEOUT_MS })
-      .catch(() => console.log("  submitAndWait: still streaming at timeout (recording current state)"));
   },
 
   async rotate(page) {
@@ -398,6 +387,12 @@ try {
     } catch {
       /* noop */
     }
+    // The chat auto-scrolls to the latest message via scrollIntoView on every
+    // streamed chunk; with a verbose reply this scrolls the response out of our
+    // fixed top-aligned frame mid-generation. Neutralise it for the recording so
+    // the response stays put (the only scrollIntoView caller is the chat; the
+    // pipeline editor pans via ReactFlow's own transform, not scrollIntoView).
+    window.Element.prototype.scrollIntoView = function () {};
   });
 
   const page = await context.newPage();
