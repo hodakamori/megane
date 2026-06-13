@@ -6,7 +6,7 @@
 import type { AIConfig } from "./config";
 import type { SerializedPipeline } from "../pipeline/types";
 import { buildSystemPrompt } from "./prompt";
-import { collectQueryErrors, buildRepairPrompt } from "./validatePipeline";
+import { collectPipelineErrors, buildRepairPrompt } from "./validatePipeline";
 import {
   getSkills,
   buildToolDefinitions,
@@ -99,12 +99,12 @@ export async function generatePipeline(
 
   const text = await runProvider(userMessage);
 
-  // Validate the selection queries and, if any are invalid, ask the model once
-  // to repair them. Only fires when a pipeline with broken filter queries was
-  // actually produced, so plain text responses are unaffected.
+  // Validate the generated pipeline (structure + selection queries) and, if any
+  // problems are found, ask the model once to repair them. Only fires when a
+  // pipeline was actually produced, so plain text responses are unaffected.
   const pipeline = tryExtractPipeline(text);
   if (pipeline) {
-    const errors = collectQueryErrors(pipeline);
+    const errors = collectPipelineErrors(pipeline);
     if (errors.length > 0) {
       return runProvider(buildRepairPrompt(userMessage, pipeline, errors));
     }

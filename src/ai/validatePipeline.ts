@@ -9,6 +9,7 @@
 
 import type { SerializedPipeline } from "../pipeline/types";
 import { validateQuery, validateBondQuery } from "../pipeline/selection";
+import { collectSchemaErrors } from "./pipelineSchema";
 
 /**
  * Validate every `filter` node's `query` / `bond_query` against the selection
@@ -41,9 +42,21 @@ export function collectQueryErrors(pipeline: SerializedPipeline): string[] {
 }
 
 /**
- * Build a follow-up user message asking the model to fix the invalid selection
- * queries it just produced. Includes the original request, the broken pipeline,
- * and the specific errors so the model can correct only what's wrong.
+ * Collect every correctness problem with a generated pipeline: structural
+ * schema errors (unknown node types, malformed positions, missing/duplicate
+ * viewport, dangling edges) plus invalid selection queries. This is the single
+ * gate the repair round trip checks — a non-empty result means the model should
+ * be asked to fix the pipeline.
+ */
+export function collectPipelineErrors(pipeline: SerializedPipeline): string[] {
+  return [...collectSchemaErrors(pipeline), ...collectQueryErrors(pipeline)];
+}
+
+/**
+ * Build a follow-up user message asking the model to fix the problems found in
+ * the pipeline it just produced (invalid selection queries and/or structural
+ * schema errors). Includes the original request, the broken pipeline, and the
+ * specific errors so the model can correct only what's wrong.
  */
 export function buildRepairPrompt(
   originalRequest: string,
@@ -51,9 +64,11 @@ export function buildRepairPrompt(
   errors: string[],
 ): string {
   return [
-    "The pipeline you generated has invalid filter selection queries.",
-    "Only the megane selection DSL documented in the system prompt is supported",
-    "(fields element/index/x/y/z/resname/mass, quoted string values, and/or/not).",
+    "The pipeline you generated is invalid. Fix the problems listed below.",
+    "Follow the schema and the selection DSL documented in the system prompt",
+    "(filter queries may only use fields element/index/x/y/z/resname/mass with",
+    "quoted string values and and/or/not; every pipeline needs exactly one",
+    "viewport and edges must reference existing nodes).",
     "",
     "Errors:",
     ...errors.map((e) => `- ${e}`),
@@ -65,8 +80,7 @@ export function buildRepairPrompt(
     JSON.stringify(brokenPipeline),
     "```",
     "",
-    "Return the corrected pipeline as a single JSON code block first, fixing the",
-    "invalid queries (rewrite them using only the supported DSL), then one short",
-    "sentence describing what it does.",
+    "Return the corrected pipeline as a single JSON code block first, then one",
+    "short sentence describing what it does.",
   ].join("\n");
 }

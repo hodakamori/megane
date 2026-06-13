@@ -566,14 +566,28 @@ describe("generatePipeline — structure summary + query repair", () => {
     vi.unstubAllGlobals();
   });
 
+  // Schema-valid pipelines (one viewport, edges reference real nodes) so the
+  // filter query is the only variable the repair check reacts to.
   const VALID_FILTER_PIPELINE = JSON.stringify({
     version: 3,
-    nodes: [{ id: "f1", type: "filter", position: { x: 0, y: 0 }, query: 'element == "C"' }],
-    edges: [],
+    nodes: [
+      { id: "f1", type: "filter", position: { x: 0, y: 0 }, query: 'element == "C"' },
+      { id: "v1", type: "viewport", position: { x: 0, y: 310 } },
+    ],
+    edges: [{ source: "f1", target: "v1", sourceHandle: "out", targetHandle: "particle" }],
   });
   const INVALID_FILTER_PIPELINE = JSON.stringify({
     version: 3,
-    nodes: [{ id: "f1", type: "filter", position: { x: 0, y: 0 }, query: "chain A" }],
+    nodes: [
+      { id: "f1", type: "filter", position: { x: 0, y: 0 }, query: "chain A" },
+      { id: "v1", type: "viewport", position: { x: 0, y: 310 } },
+    ],
+    edges: [{ source: "f1", target: "v1", sourceHandle: "out", targetHandle: "particle" }],
+  });
+  // Structurally invalid: references an unknown node type and has no viewport.
+  const INVALID_SCHEMA_PIPELINE = JSON.stringify({
+    version: 3,
+    nodes: [{ id: "x1", type: "not_a_real_node", position: { x: 0, y: 0 } }],
     edges: [],
   });
 
@@ -621,8 +635,25 @@ describe("generatePipeline — structure summary + query repair", () => {
     const repairBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
     const userMsg = repairBody.messages[repairBody.messages.length - 1];
     expect(userMsg.role).toBe("user");
-    expect(userMsg.content).toContain("invalid filter selection queries");
+    expect(userMsg.content).toContain("The pipeline you generated is invalid");
     expect(userMsg.content).toContain("chain A");
+    expect(result).toContain("Fixed.");
+  });
+
+  it("runs one repair round trip when the pipeline structure is invalid", async () => {
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + INVALID_SCHEMA_PIPELINE + "\n```\nHere."),
+    );
+    fetchMock.mockResolvedValueOnce(
+      anthropicTextResponse("```json\n" + VALID_FILTER_PIPELINE + "\n```\nFixed."),
+    );
+
+    const result = await generatePipeline(ANTHROPIC_CONFIG, "build something", () => {});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const repairBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
+    const userMsg = repairBody.messages[repairBody.messages.length - 1];
+    expect(userMsg.content).toContain("not_a_real_node");
+    expect(userMsg.content).toContain("viewport");
     expect(result).toContain("Fixed.");
   });
 

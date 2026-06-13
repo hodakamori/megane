@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { collectQueryErrors, buildRepairPrompt } from "@/ai/validatePipeline";
+import {
+  collectQueryErrors,
+  collectPipelineErrors,
+  buildRepairPrompt,
+} from "@/ai/validatePipeline";
 import type { SerializedPipeline } from "@/pipeline/types";
 
 function pipeline(nodes: SerializedPipeline["nodes"]): SerializedPipeline {
@@ -63,6 +67,27 @@ describe("collectQueryErrors", () => {
       { id: "f2", type: "filter", position: { x: 0, y: 0 }, query: "name CA" },
     ] as SerializedPipeline["nodes"]);
     expect(collectQueryErrors(p)).toHaveLength(2);
+  });
+});
+
+describe("collectPipelineErrors", () => {
+  it("returns no errors for a structurally valid pipeline with valid queries", () => {
+    const p = pipeline([
+      { id: "f1", type: "filter", position: { x: 0, y: 0 }, query: 'element == "C"' },
+      { id: "v1", type: "viewport", position: { x: 0, y: 310 } },
+    ] as SerializedPipeline["nodes"]);
+    p.edges = [{ source: "f1", target: "v1", sourceHandle: "out", targetHandle: "particle" }];
+    expect(collectPipelineErrors(p)).toEqual([]);
+  });
+
+  it("combines schema errors and query errors", () => {
+    // No viewport (schema error) AND an invalid query (query error).
+    const p = pipeline([
+      { id: "f1", type: "filter", position: { x: 0, y: 0 }, query: "chain A" },
+    ] as SerializedPipeline["nodes"]);
+    const errors = collectPipelineErrors(p);
+    expect(errors.some((e) => e.includes("viewport"))).toBe(true);
+    expect(errors.some((e) => e.includes("chain A"))).toBe(true);
   });
 });
 
