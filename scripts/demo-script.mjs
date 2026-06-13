@@ -32,9 +32,12 @@ export const config = {
   transitionMs: 900, // default zoom tween duration (CSS transition on #root)
   // The prompt typed into the Chat tab. Keep it short so it reads on screen.
   prompt: "Show the protein as cartoon colored by chain",
-  // Pipeline scroll-through (TB layout): zoom level + linear scroll duration.
+  // Pipeline scroll-through (TB layout). `pipelineWidthFraction` sizes the graph
+  // to a fraction of the screen width (0.7 ≈ 70%); it overrides the fixed
+  // `pipelineScrollScale` fallback. `pipelineScrollMs` is the linear scroll time.
+  pipelineWidthFraction: 0.7,
   pipelineScrollScale: 1.6,
-  pipelineScrollMs: 4800,
+  pipelineScrollMs: 5200,
 };
 
 export const scenes = [
@@ -50,13 +53,13 @@ export const scenes = [
     hold: 600,
   },
 
-  // 3. Move up to the chat messages area to watch the response generate
-  //    (anchored low so the streaming reply, which auto-scrolls down, stays in
-  //    frame). With a live LLM this records the real generation; without one it
-  //    just dwells on the typed prompt. Output may vary.
+  // 3. Move further up to the top of the chat messages, where a short
+  //    conversation (prompt + streaming reply) sits, so the generation is
+  //    actually visible. With a live LLM this records the real generation;
+  //    without one it just dwells on the typed prompt. Output may vary.
   {
     id: "chat-generate",
-    zoom: { sel: '[data-testid="pipeline-chat-messages"]', scale: 1.7, anchorY: 0.72 },
+    zoom: { sel: '[data-testid="pipeline-chat-messages"]', scale: 1.7, anchorY: 0.3 },
     transitionMs: 900,
     action: "waitGenerate",
     hold: 1500,

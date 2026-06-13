@@ -66,6 +66,7 @@ const HEIGHT = parseInt(getFlag("--height", String(config.height)), 10);
 const DPR = parseFloat(getFlag("--dpr", String(config.dpr)));
 const TRANSITION_MS = config.transitionMs ?? 900;
 const PIPELINE_SCROLL_SCALE = config.pipelineScrollScale ?? 1.6;
+const PIPELINE_WIDTH_FRACTION = config.pipelineWidthFraction ?? 0;
 const PIPELINE_SCROLL_MS = config.pipelineScrollMs ?? 4800;
 const PROMPT = getFlag("--prompt", config.prompt);
 const NO_GENERATE = hasFlag("--no-generate");
@@ -278,7 +279,11 @@ const actions = {
     await page.waitForTimeout(1100); // let fitView settle: whole pipeline visible
     const box = await page.locator(SEL.reactFlow).first().boundingBox();
     if (!box) return;
-    const S = PIPELINE_SCROLL_SCALE;
+    // Size the graph to a fraction of the screen width (≈70%) when configured,
+    // else fall back to the fixed scale.
+    const S = PIPELINE_WIDTH_FRACTION
+      ? (PIPELINE_WIDTH_FRACTION * WIDTH) / box.width
+      : PIPELINE_SCROLL_SCALE;
     const topM = 56;
     const botM = 56;
     // Measured at identity (actionFirst reset to full), so screen == local.
@@ -368,10 +373,13 @@ try {
     // Chromium doesn't trust; tolerate it so --url can reach remote sites.
     ignoreHTTPSErrors: true,
   });
-  // Suppress the first-run tour overlay.
+  // Suppress the first-run tour overlay, and boot the pipeline panel on the Chat
+  // tab so the opening frame shows Chat by default (the deployed build may
+  // otherwise default to the Editor tab). Set before the app's scripts run.
   await context.addInitScript(() => {
     try {
       localStorage.setItem("megane-tour-prefs", JSON.stringify({ dontShowAgain: true }));
+      sessionStorage.setItem("megane-pipeline-ui", JSON.stringify({ mode: "chat" }));
     } catch {
       /* noop */
     }
