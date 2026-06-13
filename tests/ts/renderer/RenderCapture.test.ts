@@ -21,6 +21,31 @@ vi.mock("three/examples/jsm/exporters/OBJExporter.js", () => ({
   },
 }));
 
+// Mock gif.js so captureGif can run headlessly. The fake GIF records the
+// constructor options (so tests can inspect the workerScript) and fires the
+// "finished" handler synchronously when render() is called.
+const gifInstances: FakeGif[] = [];
+class FakeGif {
+  options: Record<string, unknown>;
+  handlers: Record<string, (arg?: unknown) => void> = {};
+  frames: unknown[] = [];
+  constructor(options: Record<string, unknown>) {
+    this.options = options;
+    gifInstances.push(this);
+  }
+  addFrame(frame: unknown) {
+    this.frames.push(frame);
+  }
+  on(event: string, cb: (arg?: unknown) => void) {
+    this.handlers[event] = cb;
+  }
+  render() {
+    this.handlers["finished"]?.(new Blob([new Uint8Array([71, 73, 70])], { type: "image/gif" }));
+  }
+  abort() {}
+}
+vi.mock("gif.js", () => ({ default: FakeGif }));
+
 import {
   compositeCanvases,
   downloadBlob,
@@ -28,6 +53,8 @@ import {
   captureObj,
   wrapInSVG,
   captureSnapshot,
+  captureGif,
+  resolveGifWorkerScript,
 } from "@/renderer/RenderCapture";
 import type { MoleculeRenderer } from "@/renderer/MoleculeRenderer";
 
@@ -289,5 +316,157 @@ describe("captureObj", () => {
     const getScene = vi.spyOn(renderer, "getScene");
     captureObj(renderer);
     expect(getScene).toHaveBeenCalledOnce();
+  });
+});
+
+// Regression coverage for issue #497: GIF export freezes at 80% in JupyterLab
+// because gif.js cannot load its Web Worker from the raw workerScript URL and
+// hangs silently during encode. The fix fetches the worker source and hands
+// gif.js a same-origin blob: URL instead.
+describe("resolveGifWorkerScript (issue #497)", () => {
+  let createObjectURL: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    createObjectURL = vi.fn().mockReturnValue("blob:gif-worker-url");
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("fetches the worker script and returns a same-origin blob: URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve("self.onmessage = () => {};"),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const script = await resolveGifWorkerScript();
+
+    // The bug: the old code passed the raw worker URL straight to gif.js without
+    // ever fetching it. A correct implementation must fetch and wrap it.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toContain("gif.worker.js");
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(script).toBe("blob:gif-worker-url");
+    expect(script.startsWith("blob:")).toBe(true);
+  });
+
+  it("falls back to the direct URL when the fetch fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve("") });
+    vi.stubGlobal("fetch", fetchMock);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const script = await resolveGifWorkerScript();
+
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(script.startsWith("blob:")).toBe(false);
+    expect(script).toContain("gif.worker.js");
+    expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe("captureGif (issue #497)", () => {
+  let createObjectURL: ReturnType<typeof vi.fn>;
+  let revokeObjectURL: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    gifInstances.length = 0;
+
+    // Composite step draws onto a 2D context — stub it out for jsdom.
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
+    );
+
+    // requestAnimationFrame: run the callback on the next microtask so the
+    // per-frame awaits resolve quickly.
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      (cb: FrameRequestCallback) => {
+        Promise.resolve().then(() => cb(0));
+        return 0;
+      },
+    );
+
+    createObjectURL = vi.fn().mockReturnValue("blob:gif-worker-url");
+    revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: revokeObjectURL, configurable: true });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve("self.onmessage = () => {};"),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  function makeGifRenderer(): MoleculeRenderer {
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 16;
+    return {
+      ...makeMockRenderer(),
+      getCanvas: () => canvas,
+    } as unknown as MoleculeRenderer;
+  }
+
+  it("hands gif.js a blob: worker script rather than the raw URL", async () => {
+    const blob = await captureGif(makeGifRenderer(), {
+      width: 16,
+      height: 16,
+      transparent: false,
+      startFrame: 0,
+      endFrame: 1,
+      fps: 10,
+      seekFrame: vi.fn(),
+    });
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(gifInstances).toHaveLength(1);
+    expect(gifInstances[0].options.workerScript).toBe("blob:gif-worker-url");
+  });
+
+  it("reports progress through 0.8 (frame capture) up to 1 (encode done)", async () => {
+    const progress: number[] = [];
+    await captureGif(makeGifRenderer(), {
+      width: 16,
+      height: 16,
+      transparent: false,
+      startFrame: 0,
+      endFrame: 1,
+      fps: 10,
+      seekFrame: vi.fn(),
+      onProgress: (p) => progress.push(p),
+    });
+
+    // Frame-capture phase tops out at 0.8, and the encode resolves to 1.
+    expect(progress).toContain(0.8);
+    expect(progress[progress.length - 1]).toBe(1);
+  });
+
+  it("revokes the worker blob URL once encoding finishes", async () => {
+    await captureGif(makeGifRenderer(), {
+      width: 16,
+      height: 16,
+      transparent: false,
+      startFrame: 0,
+      endFrame: 0,
+      fps: 10,
+      seekFrame: vi.fn(),
+    });
+
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:gif-worker-url");
   });
 });
