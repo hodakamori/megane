@@ -572,6 +572,147 @@ describe("executePipeline", () => {
     });
   });
 
+  // Regression: `resname` selections must work using the structure's parsed
+  // residue labels (stored per load_structure node in ctx.nodeSnapshots) even
+  // when no display label source is active (ctx.atomLabels is null). Before the
+  // fix, `resname == "HOH"` matched nothing and `resname != "HOH"` matched all
+  // atoms, so "make the water semi-transparent" left the water fully opaque.
+  describe("resname filter + opacity (regression)", () => {
+    // 5 atoms: first three are water (HOH), last two are caffeine (CAF).
+    const labels = ["HOH", "HOH", "HOH", "CAF", "CAF"];
+    const nodeSnapshots = {
+      ls: { snapshot: fiveAtomSnapshot, frames: null, meta: null, labels },
+    };
+
+    it('resname == "HOH" + opacity applies only to the water atoms', () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("f", "filter", { query: 'resname == "HOH"' }),
+        makeNode("m", "modify", { scale: 1.0, opacity: 0.25 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "f", "in"),
+        makeEdge("f", "out", "m", "in"),
+        makeEdge("m", "out", "vp", "particle"),
+      ];
+
+      // Note: ctx.atomLabels is intentionally NOT set — this mirrors the real
+      // default (display label source = "none").
+      const { viewportState: result } = executePipeline(nodes, edges, { nodeSnapshots });
+      const p = result.particles[0];
+
+      // Filter selects only the water atoms.
+      expect(Array.from(p.indices!)).toEqual([0, 1, 2]);
+      // Water faded to 0.25, caffeine untouched at 1.0.
+      expect(p.opacityOverrides![0]).toBeCloseTo(0.25);
+      expect(p.opacityOverrides![1]).toBeCloseTo(0.25);
+      expect(p.opacityOverrides![2]).toBeCloseTo(0.25);
+      expect(p.opacityOverrides![3]).toBeCloseTo(1.0);
+      expect(p.opacityOverrides![4]).toBeCloseTo(1.0);
+    });
+
+    it('resname != "HOH" selects only the caffeine atoms', () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("f", "filter", { query: 'resname != "HOH"' }),
+        makeNode("m", "modify", { scale: 1.0, opacity: 0.25 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "f", "in"),
+        makeEdge("f", "out", "m", "in"),
+        makeEdge("m", "out", "vp", "particle"),
+      ];
+
+      const { viewportState: result } = executePipeline(nodes, edges, { nodeSnapshots });
+      const p = result.particles[0];
+
+      expect(Array.from(p.indices!)).toEqual([3, 4]);
+      expect(p.opacityOverrides![3]).toBeCloseTo(0.25);
+      expect(p.opacityOverrides![4]).toBeCloseTo(0.25);
+      expect(p.opacityOverrides![0]).toBeCloseTo(1.0);
+    });
+
+    it("explicit ctx.atomLabels (display label source) take priority over structure labels", () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("f", "filter", { query: 'resname == "HOH"' }),
+        makeNode("m", "modify", { scale: 1.0, opacity: 0.25 }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "f", "in"),
+        makeEdge("f", "out", "m", "in"),
+        makeEdge("m", "out", "vp", "particle"),
+      ];
+
+      // Display labels say everything is CAF; with these taking priority,
+      // `resname == "HOH"` should match nothing — proving the structure-label
+      // fallback only kicks in when no display source is active.
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        nodeSnapshots,
+        atomLabels: ["CAF", "CAF", "CAF", "CAF", "CAF"],
+      });
+      const p = result.particles[0];
+      expect(Array.from(p.indices!)).toEqual([]);
+    });
+  });
+
+  // Regression: color-by-residue must likewise resolve residue names from the
+  // structure's parsed labels without an active display label source.
+  describe("color byResidue uses structure labels by default", () => {
+    const threeAtom = makeSnapshot({
+      nAtoms: 3,
+      positions: [0, 0, 0, 1, 0, 0, 2, 0, 0],
+      elements: [6, 6, 7],
+    });
+
+    function run(ctx: Parameters<typeof executePipeline>[2]) {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("c", "color", { mode: "byResidue", uniformColor: "#ffffff" }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "c", "in"),
+        makeEdge("c", "out", "vp", "particle"),
+      ];
+      return executePipeline(nodes, edges, ctx).viewportState.particles[0];
+    }
+
+    it("paints distinct residue colors from node-snapshot labels", () => {
+      const p = run({
+        nodeSnapshots: {
+          ls: { snapshot: threeAtom, frames: null, meta: null, labels: ["ALA", "ALA", "GLY"] },
+        },
+      });
+      const co = p.colorOverrides!;
+      // ALA shapely color and GLY shapely color (stable constants).
+      expect([co[0], co[1], co[2]]).toEqual([
+        expect.closeTo(0.78),
+        expect.closeTo(0.78),
+        expect.closeTo(0.78),
+      ]);
+      expect([co[6], co[7], co[8]]).toEqual([
+        expect.closeTo(1.0),
+        expect.closeTo(1.0),
+        expect.closeTo(1.0),
+      ]);
+    });
+
+    it("falls back to the default residue color when no labels are available", () => {
+      // No nodeSnapshots labels and no atomLabels → resname unknown → default.
+      const p = run({ snapshot: threeAtom });
+      const co = p.colorOverrides!;
+      expect([co[0], co[1], co[2]]).toEqual([
+        expect.closeTo(0.65),
+        expect.closeTo(0.65),
+        expect.closeTo(0.65),
+      ]);
+    });
+  });
+
   describe("SurfaceMesh node", () => {
     it("produces a mesh output when connected to a particle source", () => {
       const nodes = [
