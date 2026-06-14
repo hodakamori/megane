@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import worker from "../src/index";
 import {
   isAllowedOrigin,
@@ -641,5 +642,51 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(503);
     const json = (await res.json()) as { error: string };
     expect(json.error).toContain("boom");
+  });
+});
+
+describe("wrangler.toml model configuration", () => {
+  // Read the deployed config the Worker ships with so a bad model slug can't
+  // pass CI and silently break every demo prompt once deployed.
+  // vitest runs with cwd at the worker package root (where vitest.config.ts
+  // and wrangler.toml live), so a cwd-relative read keeps this independent of
+  // @types/node's import.meta typings.
+  const toml = readFileSync(`${process.cwd()}/wrangler.toml`, "utf8");
+
+  function tomlVar(name: string): string | null {
+    const m = toml.match(new RegExp(`^${name}\\s*=\\s*"([^"]*)"`, "m"));
+    return m ? m[1] : null;
+  }
+
+  /**
+   * Every Anthropic slug carrying a version must spell its minor version with
+   * a DOT (claude-sonnet-4.6), never a hyphen (claude-sonnet-4-6). A
+   * hyphenated version is an unknown OpenRouter model id and gets the whole
+   * request rejected with a 400 — the root cause of the demo failing on even
+   * the shortest prompt. Guard against that exact regression.
+   */
+  function assertNoHyphenatedVersion(slug: string) {
+    expect(
+      /-\d+-\d+(?:$|:)/.test(slug),
+      `model slug "${slug}" uses a hyphenated version; OpenRouter expects a dotted minor version (e.g. claude-sonnet-4.6)`,
+    ).toBe(false);
+  }
+
+  it("sets the primary OpenRouter model to a valid dotted slug", () => {
+    const model = tomlVar("OPENROUTER_MODEL");
+    expect(model).toBeTruthy();
+    expect(model!.startsWith("anthropic/")).toBe(true);
+    assertNoHyphenatedVersion(model!);
+  });
+
+  it("uses valid slugs for every configured fallback model", () => {
+    const fallbacks = (tomlVar("OPENROUTER_FALLBACK_MODELS") ?? "")
+      .split(",")
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0);
+    expect(fallbacks.length).toBeGreaterThan(0);
+    for (const slug of fallbacks) {
+      assertNoHyphenatedVersion(slug);
+    }
   });
 });
