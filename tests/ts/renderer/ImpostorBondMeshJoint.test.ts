@@ -18,14 +18,23 @@ interface JointInternals {
   jointMesh: object;
   jointGeo: { instanceCount: number; dispose: () => void };
   jointMaterial: {
-    uniforms: { uScaleMultiplier: { value: number }; uOpacity: { value: number } };
+    uniforms: {
+      uBondScaleMultiplier: { value: number };
+      uOpacity: { value: number };
+      uJointRadius: { value: number };
+    };
     transparent: boolean;
     depthWrite: boolean;
     dispose: () => void;
   };
-  jointCenterBuf: Float32Array;
+  jointAtomABuf: Float32Array;
+  jointAtomBBuf: Float32Array;
+  jointOffsetXBuf: Float32Array;
+  jointOffsetYBuf: Float32Array;
   jointColorBuf: Float32Array;
   jointRadiusBuf: Float32Array;
+  jointEndBuf: Float32Array;
+  positionTexData: Float32Array;
 }
 
 function joint(mesh: ImpostorBondMesh): JointInternals {
@@ -39,33 +48,44 @@ describe("ImpostorBondMesh joint sphere mesh", () => {
     expect(mesh.mesh.children).toContain(j.jointMesh);
   });
 
-  it("loadSnapshot populates one joint sphere per atom at the atom's position with BOND_RADIUS", () => {
+  it("loadSnapshot populates two joint caps per bond instance, one per clipped end", () => {
     const mesh = new ImpostorBondMesh(16);
     mesh.loadSnapshot(makeSnapshot());
 
     const j = joint(mesh);
+    // One visual instance (single bond) -> 2 joint caps.
     expect(j.jointGeo.instanceCount).toBe(2);
-    expect(Array.from(j.jointCenterBuf.subarray(0, 6))).toEqual([0, 0, 0, 1, 0, 0]);
+    // Both caps reference the same bond's atom pair.
+    expect(Array.from(j.jointAtomABuf.subarray(0, 2))).toEqual([0, 0]);
+    expect(Array.from(j.jointAtomBBuf.subarray(0, 2))).toEqual([1, 1]);
+    expect(Array.from(j.jointOffsetXBuf.subarray(0, 2))).toEqual([0, 0]);
+    expect(Array.from(j.jointOffsetYBuf.subarray(0, 2))).toEqual([0, 0]);
+    // Cap radius matches this instance's own cylinder radius (tangent-continuous).
     expect(j.jointRadiusBuf[0]).toBeCloseTo(BOND_RADIUS, 6);
     expect(j.jointRadiusBuf[1]).toBeCloseTo(BOND_RADIUS, 6);
+    // instanceEnd alternates: cap 0 is the "A" end, cap 1 the "B" end.
+    expect(j.jointEndBuf[0]).toBe(0);
+    expect(j.jointEndBuf[1]).toBe(1);
   });
 
-  it("loadSnapshot colors each joint sphere by its atom's element color (no color context)", () => {
+  it("loadSnapshot colors each joint cap by its endpoint atom's element color (no color context)", () => {
     const mesh = new ImpostorBondMesh(16);
     mesh.loadSnapshot(makeSnapshot());
 
     const j = joint(mesh);
     const carbon = getColor(6);
     const oxygen = getColor(8);
+    // Cap 0 ("A" end, atom 0 = carbon)
     expect(j.jointColorBuf[0]).toBeCloseTo(carbon[0], 6);
     expect(j.jointColorBuf[1]).toBeCloseTo(carbon[1], 6);
     expect(j.jointColorBuf[2]).toBeCloseTo(carbon[2], 6);
+    // Cap 1 ("B" end, atom 1 = oxygen)
     expect(j.jointColorBuf[3]).toBeCloseTo(oxygen[0], 6);
     expect(j.jointColorBuf[4]).toBeCloseTo(oxygen[1], 6);
     expect(j.jointColorBuf[5]).toBeCloseTo(oxygen[2], 6);
   });
 
-  it("updatePositions moves joint sphere centers to the new frame's positions", () => {
+  it("updatePositions refreshes the shared position texture used by joint caps", () => {
     const mesh = new ImpostorBondMesh(16);
     const snapshot = makeSnapshot();
     mesh.loadSnapshot(snapshot);
@@ -74,17 +94,18 @@ describe("ImpostorBondMesh joint sphere mesh", () => {
     mesh.updatePositions(newPositions, snapshot.bonds, snapshot.nBonds);
 
     const j = joint(mesh);
-    expect(Array.from(j.jointCenterBuf.subarray(0, 6))).toEqual([5, 6, 7, 8, 9, 10]);
+    expect(Array.from(j.positionTexData.subarray(0, 3))).toEqual([5, 6, 7]);
+    expect(Array.from(j.positionTexData.subarray(4, 7))).toEqual([8, 9, 10]);
   });
 
-  it("setScale updates the joint material's scale multiplier", () => {
+  it("setScale updates both the bond and joint material's scale multiplier", () => {
     const mesh = new ImpostorBondMesh(16);
     mesh.loadSnapshot(makeSnapshot());
 
     mesh.setScale(2.5);
 
     const j = joint(mesh);
-    expect(j.jointMaterial.uniforms.uScaleMultiplier.value).toBe(2.5);
+    expect(j.jointMaterial.uniforms.uBondScaleMultiplier.value).toBe(2.5);
   });
 
   it("setOpacity mirrors opacity/transparency onto the joint material", () => {
@@ -103,7 +124,7 @@ describe("ImpostorBondMesh joint sphere mesh", () => {
     expect(j.jointMaterial.depthWrite).toBe(true);
   });
 
-  it("recomputeColorsFromAtomBuffer rewrites joint colors from the atom color buffer", () => {
+  it("recomputeColorsFromAtomBuffer rewrites joint cap colors from the atom color buffer", () => {
     const mesh = new ImpostorBondMesh(16);
     const snapshot = makeSnapshot();
     mesh.loadSnapshot(snapshot);
@@ -135,10 +156,11 @@ describe("ImpostorBondMesh joint sphere mesh", () => {
 
     const j = joint(mesh);
     const carbon = getColor(6);
-    expect(j.jointColorBuf[6]).toBeCloseTo(carbon[0], 6);
-    expect(j.jointColorBuf[7]).toBeCloseTo(carbon[1], 6);
-    expect(j.jointColorBuf[8]).toBeCloseTo(carbon[2], 6);
-    expect(Number.isNaN(j.jointColorBuf[6])).toBe(false);
+    // Cap 1 ("B" end, atom 2 = ghost carbon, out of range of atomColors)
+    expect(j.jointColorBuf[3]).toBeCloseTo(carbon[0], 6);
+    expect(j.jointColorBuf[4]).toBeCloseTo(carbon[1], 6);
+    expect(j.jointColorBuf[5]).toBeCloseTo(carbon[2], 6);
+    expect(Number.isNaN(j.jointColorBuf[3])).toBe(false);
   });
 
   it("dispose disposes the joint geometry and material without throwing", () => {
