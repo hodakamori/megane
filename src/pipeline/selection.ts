@@ -9,13 +9,83 @@
  *   NotExpr    := "not" NotExpr | Atom
  *   Atom       := Comparison | "(" OrExpr ")" | "all" | "none"
  *   Comparison := Field Op Value
- *   Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass"
+ *   Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass" | "molecule_id"
  *   Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
  *   Value      := QuotedString | Number
+ *
+ * Field semantics:
+ *   "molecule_id": 0-based ID of the connected component (via bond
+ *   connectivity) that the atom belongs to. Atoms with no bonds form their
+ *   own single-atom molecule. IDs are assigned in order of the smallest atom
+ *   index in each component (the component containing atom 0 gets 0, etc.).
  */
 
 import type { Snapshot } from "../types";
 import { getElementSymbol, getAtomicMass } from "../constants";
+
+// --- Molecule (connected-component) IDs ---
+
+const moleculeIdCache = new WeakMap<Uint32Array, Int32Array>();
+
+/** Find the largest atom index referenced by a flat bond-pair array, or -1 if empty. */
+function maxAtomIndex(bondPairs: Uint32Array): number {
+  let max = -1;
+  for (let i = 0; i < bondPairs.length; i++) {
+    if (bondPairs[i] > max) max = bondPairs[i];
+  }
+  return max;
+}
+
+/**
+ * Compute a stable 0-based "molecule ID" (connected-component index) for
+ * each index 0..n-1, based on the bond graph `bondPairs` (pairs
+ * [a0,b0,a1,b1,...]).
+ *
+ * IDs are assigned in order of the smallest index in each component: the
+ * component containing index 0 gets molecule_id 0, the component containing
+ * the next-lowest unvisited index gets 1, etc. Indices with no bonds are
+ * each their own single-element molecule.
+ *
+ * Results are memoized per `bondPairs` array identity, since `snapshot.bonds`
+ * / `bond.bondIndices` are typically stable across trajectory frames (only
+ * positions change) and selection queries may be evaluated every frame.
+ */
+export function computeMoleculeIds(bondPairs: Uint32Array, n: number): Int32Array {
+  const cached = moleculeIdCache.get(bondPairs);
+  if (cached && cached.length === n) return cached;
+
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+
+  const find = (x: number): number => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  };
+
+  for (let i = 0; i < bondPairs.length; i += 2) {
+    const a = bondPairs[i];
+    const b = bondPairs[i + 1];
+    if (a >= n || b >= n) continue;
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb);
+  }
+
+  const idMap = new Int32Array(n).fill(-1);
+  const result = new Int32Array(n);
+  let nextId = 0;
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (idMap[root] === -1) idMap[root] = nextId++;
+    result[i] = idMap[root];
+  }
+
+  moleculeIdCache.set(bondPairs, result);
+  return result;
+}
 
 // --- Tokenizer ---
 
@@ -38,7 +108,7 @@ interface Token {
   value: string;
 }
 
-const FIELDS = new Set(["element", "index", "x", "y", "z", "resname", "mass"]);
+const FIELDS = new Set(["element", "index", "x", "y", "z", "resname", "mass", "molecule_id"]);
 
 function tokenize(query: string): Token[] {
   const tokens: Token[] = [];
@@ -287,6 +357,7 @@ function compileAST(
     }
     case "comparison": {
       const { field, op, value } = ast;
+      let moleculeIds: Int32Array | null = null;
       return (i) => {
         let fieldValue: string | number;
         switch (field) {
@@ -310,6 +381,12 @@ function compileAST(
             break;
           case "mass":
             fieldValue = getAtomicMass(snapshot.elements[i]);
+            break;
+          case "molecule_id":
+            if (moleculeIds === null) {
+              moleculeIds = computeMoleculeIds(snapshot.bonds, snapshot.nAtoms);
+            }
+            fieldValue = moleculeIds[i];
             break;
           default:
             return false;
@@ -392,7 +469,7 @@ export function validateQuery(query: string): { valid: boolean; error?: string }
 //   NotExpr    := "not" NotExpr | Atom
 //   Atom       := "both" Comparison | Comparison | "(" OrExpr ")" | "all" | "none"
 //   Comparison := Field Op Value
-//   Field      := "bond_index" | "atom_index" | "element"
+//   Field      := "bond_index" | "atom_index" | "element" | "molecule_id"
 //   Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
 //   Value      := QuotedString | Number
 //
@@ -402,8 +479,15 @@ export function validateQuery(query: string): { valid: boolean; error?: string }
 //   "bond_index": the 0-based sequential index of the bond
 //   "atom_index": index of an atom endpoint
 //   "element": element symbol of an atom endpoint
+//   "molecule_id": 0-based ID of the connected component (via bond
+//   connectivity, including this bond) that the bond's endpoints belong to.
+//   Both endpoints of a bond are always in the same component, so
+//   "both molecule_id == N" and "molecule_id == N" are equivalent; "both" is
+//   accepted for grammar consistency but has no additional effect. Numbering
+//   matches the atom query's molecule_id for the same underlying atoms (the
+//   component containing atom 0 gets molecule_id 0, etc.).
 
-const BOND_FIELDS = new Set(["bond_index", "atom_index", "element"]);
+const BOND_FIELDS = new Set(["bond_index", "atom_index", "element", "molecule_id"]);
 
 type BondTokenType =
   | "bond_field"
@@ -641,6 +725,7 @@ function compileBondAST(
   ast: BondASTNode,
   bondIndices: Uint32Array,
   elements: Uint8Array,
+  nAtoms: number,
 ): (bondIdx: number) => boolean {
   switch (ast.kind) {
     case "all":
@@ -648,21 +733,22 @@ function compileBondAST(
     case "none":
       return () => false;
     case "not": {
-      const fn = compileBondAST(ast.operand, bondIndices, elements);
+      const fn = compileBondAST(ast.operand, bondIndices, elements, nAtoms);
       return (i) => !fn(i);
     }
     case "and": {
-      const left = compileBondAST(ast.left, bondIndices, elements);
-      const right = compileBondAST(ast.right, bondIndices, elements);
+      const left = compileBondAST(ast.left, bondIndices, elements, nAtoms);
+      const right = compileBondAST(ast.right, bondIndices, elements, nAtoms);
       return (i) => left(i) && right(i);
     }
     case "or": {
-      const left = compileBondAST(ast.left, bondIndices, elements);
-      const right = compileBondAST(ast.right, bondIndices, elements);
+      const left = compileBondAST(ast.left, bondIndices, elements, nAtoms);
+      const right = compileBondAST(ast.right, bondIndices, elements, nAtoms);
       return (i) => left(i) || right(i);
     }
     case "comparison": {
       const { field, op, value, both } = ast;
+      let moleculeIds: Int32Array | null = null;
       return (i) => {
         const atomA = bondIndices[i * 2];
         const atomB = bondIndices[i * 2 + 1];
@@ -677,6 +763,15 @@ function compileBondAST(
             const elemB = getElementSymbol(elements[atomB] ?? 0);
             if (both) return applyOp(elemA, op, value) && applyOp(elemB, op, value);
             return applyOp(elemA, op, value) || applyOp(elemB, op, value);
+          }
+          case "molecule_id": {
+            if (moleculeIds === null) {
+              const n = nAtoms > 0 ? nAtoms : maxAtomIndex(bondIndices) + 1;
+              moleculeIds = computeMoleculeIds(bondIndices, n);
+            }
+            // atomA and atomB are always in the same component (they're
+            // directly connected by this bond), so "both" is a no-op here.
+            return applyOp(moleculeIds[atomA], op, value);
           }
           default:
             return false;
@@ -696,6 +791,7 @@ export function evaluateBondSelection(
   bondIndices: Uint32Array,
   elements: Uint8Array,
   nBonds: number,
+  nAtoms?: number,
 ): Set<number> | null {
   const trimmed = query.trim();
   if (trimmed === "" || trimmed === "all") return null;
@@ -707,7 +803,7 @@ export function evaluateBondSelection(
   if (ast.kind === "all") return null;
   if (ast.kind === "none") return new Set();
 
-  const predicate = compileBondAST(ast, bondIndices, elements);
+  const predicate = compileBondAST(ast, bondIndices, elements, nAtoms ?? 0);
   const result = new Set<number>();
   for (let i = 0; i < nBonds; i++) {
     if (predicate(i)) result.add(i);

@@ -23,6 +23,16 @@ function generateSnapshot(nAtoms: number): Snapshot {
   };
 }
 
+/** Snapshot with bonds forming many small "water-like" 3-atom molecules. */
+function generateSnapshotWithBonds(nAtoms: number): Snapshot {
+  const snapshot = generateSnapshot(nAtoms);
+  const bondPairs: number[] = [];
+  for (let i = 0; i + 2 < nAtoms; i += 3) {
+    bondPairs.push(i, i + 1, i, i + 2);
+  }
+  return { ...snapshot, bonds: new Uint32Array(bondPairs), nBonds: bondPairs.length / 2 };
+}
+
 function benchmark(fn: () => void, iterations: number = 5): number {
   const times: number[] = [];
   fn(); // warmup
@@ -64,5 +74,28 @@ describe("performance: evaluateSelection", () => {
     });
     console.log(`  selection index range 100k: ${time.toFixed(1)}ms`);
     expect(time).toBeLessThan(500);
+  });
+});
+
+describe("performance: molecule_id", () => {
+  it("molecule_id query on 100k atoms with a fresh bonds array completes under 1000ms", () => {
+    // A new Uint32Array each call defeats memoization, exercising the cold
+    // connected-component computation (union-find over 100k atoms).
+    const time = benchmark(() => {
+      const snapshot = generateSnapshotWithBonds(100_000);
+      evaluateSelection("molecule_id == 0", snapshot, null);
+    });
+    console.log(`  molecule_id cold (100k): ${time.toFixed(1)}ms`);
+    expect(time).toBeLessThan(1000);
+  });
+
+  it("molecule_id query on 100k atoms with a shared bonds array (repeated frames) completes under 50ms", () => {
+    const snapshot = generateSnapshotWithBonds(100_000);
+    evaluateSelection("molecule_id == 0", snapshot, null); // warm the cache
+    const time = benchmark(() => {
+      evaluateSelection("molecule_id == 0", snapshot, null);
+    });
+    console.log(`  molecule_id memoized (100k): ${time.toFixed(1)}ms`);
+    expect(time).toBeLessThan(50);
   });
 });

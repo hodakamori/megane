@@ -210,15 +210,17 @@ AndExpr    := NotExpr ("and" NotExpr)*
 NotExpr    := "not" NotExpr | Atom
 Atom       := Comparison | "(" OrExpr ")" | "all" | "none"
 Comparison := Field Op Value
-Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass"
+Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass" | "molecule_id"
 Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
 Value      := QuotedString | Number
 \`\`\`
-- Fields are ONLY: \`element\`, \`index\`, \`x\`, \`y\`, \`z\`, \`resname\`, \`mass\`. No other field exists.
+- Fields are ONLY: \`element\`, \`index\`, \`x\`, \`y\`, \`z\`, \`resname\`, \`mass\`, \`molecule_id\`. No other field exists.
 - String values MUST be double-quoted: \`element == "C"\` (NOT \`element == C\`).
   This applies to \`element\` and \`resname\`.
 - \`element\` compares the element symbol ("C", "Fe", …). \`index\` is the 0-based
   atom index. \`x\`/\`y\`/\`z\` are Cartesian coordinates (Å). \`mass\` is atomic mass.
+  \`molecule_id\` is the 0-based connected-component (molecule) ID derived from
+  bond connectivity — the molecule containing atom 0 is \`molecule_id == 0\`.
 - An empty query or \`all\` selects every atom; \`none\` selects nothing.
 - Combine with \`and\`, \`or\`, \`not\`, and parentheses.
 
@@ -230,17 +232,20 @@ Valid examples:
 - \`element == "O" or element == "N"\` — oxygens or nitrogens
 - \`(x > 0 and x < 10) and element == "C"\` — carbons in an x-slab
 - \`mass > 32\` — atoms heavier than sulfur
+- \`not molecule_id == 0\` — every molecule except the first one
 
 ### Bond query grammar
 \`\`\`
 Atom := "both" Comparison | Comparison | "(" OrExpr ")" | "all" | "none"
-Field := "bond_index" | "atom_index" | "element"
+Field := "bond_index" | "atom_index" | "element" | "molecule_id"
 \`\`\`
-- Fields are ONLY: \`bond_index\`, \`atom_index\`, \`element\`.
+- Fields are ONLY: \`bond_index\`, \`atom_index\`, \`element\`, \`molecule_id\`.
 - Prefix with \`both\` to require BOTH bonded atoms to satisfy the condition;
-  without \`both\` a bond matches if EITHER endpoint does.
+  without \`both\` a bond matches if EITHER endpoint does. \`both\` has no extra
+  effect on \`molecule_id\` (both endpoints of a bond always share one molecule).
 - Examples: \`both element != "H"\` (bonds between two heavy atoms),
-  \`atom_index >= 24\` (bonds touching atom 24+), \`bond_index < 10\` (first 10 bonds).
+  \`atom_index >= 24\` (bonds touching atom 24+), \`bond_index < 10\` (first 10 bonds),
+  \`molecule_id == 0\` (bonds within the first molecule).
 
 ### Common mistakes — DO NOT use these (left), use the megane DSL (right)
 | Other-tool / natural phrasing | megane DSL |

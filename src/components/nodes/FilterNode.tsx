@@ -99,7 +99,9 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
         style={error ? inputErrorStyle : inputStyle}
       />
       {error && <div style={errorStyle}>{error}</div>}
-      {!error && !localQuery && <div style={hintStyle}>element, index, x, y, z, resname, mass</div>}
+      {!error && !localQuery && (
+        <div style={hintStyle}>element, index, x, y, z, resname, mass, molecule_id</div>
+      )}
       <input
         value={localBondQuery}
         onChange={(e) => setLocalBondQuery(e.target.value)}
@@ -110,7 +112,7 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
       />
       {bondError && <div style={errorStyle}>{bondError}</div>}
       {!bondError && !localBondQuery && (
-        <div style={hintStyle}>bond_index, atom_index, element · "both" for AND</div>
+        <div style={hintStyle}>bond_index, atom_index, element, molecule_id · "both" for AND</div>
       )}
     </NodeShell>
   );
