@@ -8,6 +8,13 @@ name: LLM Prompt Eval
 # Requires the `OPENROUTER_API_KEY` repository secret. Note: GitHub does not
 # expose repository secrets to `pull_request` workflows triggered from forks,
 # so this only runs for PRs from branches within this repository.
+#
+# Because every run makes paid API calls, the job also checks the actor who
+# triggered it (whoever applied the label, or opened/pushed the PR while the
+# label was present) against an allowlist. Configure the allowlist with the
+# `LLM_EVAL_ALLOWED_USERS` repository variable (Settings > Secrets and
+# variables > Actions > Variables), a JSON array of GitHub usernames, e.g.
+# `["alice","bob"]`. Defaults to `["hodakamori"]` if unset.
 
 on:
   pull_request:
@@ -21,7 +28,9 @@ permissions:
 jobs:
   llm-prompt-eval:
     name: LLM prompt before/after eval
-    if: contains(github.event.pull_request.labels.*.name, 'llm-eval')
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'llm-eval') &&
+      contains(fromJSON(vars.LLM_EVAL_ALLOWED_USERS || '["hodakamori"]'), github.actor)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

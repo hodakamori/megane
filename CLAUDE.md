@@ -101,8 +101,11 @@ which scores the PR branch and its base branch via OpenRouter
 `anthropic/claude-haiku-4.5`, overridable via the `MEGANE_LLM_BENCH_MODEL`
 repository variable) and posts a before/after score comparison as a PR
 comment. It is opt-in (real, paid API calls) and only runs for PRs from
-branches within this repository (forks don't get secrets). See
-`bench/llm/README.md` for the full rubric and local usage.
+branches within this repository (forks don't get secrets). The job also only
+runs for actors listed in the `LLM_EVAL_ALLOWED_USERS` repository variable (a
+JSON array of usernames, defaults to `["hodakamori"]`), so applying the label
+as another user is a no-op. See `bench/llm/README.md` for the full rubric and
+local usage.
 
 ## Skills
 
