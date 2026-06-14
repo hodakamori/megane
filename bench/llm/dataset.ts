@@ -264,6 +264,37 @@ export const DATASET: BenchCase[] = [
       minNodes: 5,
     },
   },
+  {
+    id: "multistep-water-transparent",
+    prompt:
+      "I have a caffeine molecule dissolved in water, where the water residues are named HOH. Keep the caffeine fully visible, but make the water molecules semi-transparent.",
+    tags: ["multistep", "filter", "modify", "params"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "filter", "modify", "viewport"],
+      requiredConnections: [
+        { sourceType: "filter", targetType: "modify", sourceHandle: "out", targetHandle: "in" },
+        {
+          sourceType: "modify",
+          targetType: "viewport",
+          sourceHandle: "out",
+          targetHandle: "particle",
+        },
+      ],
+      paramChecks: [
+        {
+          label: 'filter.query selects water (resname == "HOH")',
+          nodeType: "filter",
+          test: (n) => /resname\s*==\s*["']?HOH["']?/i.test(str(n, "query")),
+        },
+        {
+          label: "modify.opacity is below 1 (transparent)",
+          nodeType: "modify",
+          test: (n) => num(n, "opacity") < 1 && num(n, "opacity") > 0,
+        },
+      ],
+      minNodes: 4,
+    },
+  },
 
   // ── Multilingual robustness (Japanese) ───────────────────────────────
   {
