@@ -90,6 +90,35 @@ export interface PipelineExecutionResult {
   nodeErrors: Map<string, NodeError[]>;
 }
 
+/**
+ * Resolve the atom labels used for selection / coloring (e.g. `resname == "HOH"`,
+ * color-by-residue). The user-selected *display* label source wins when set
+ * (`ctx.atomLabels`); otherwise we fall back to the residue labels parsed from
+ * the structure file and stored per load_structure node in `ctx.nodeSnapshots`.
+ *
+ * This keeps `resname` selections and residue coloring working out of the box
+ * without forcing the user to switch the display label source — and without
+ * turning on on-screen atom text labels, which are driven by a separate path
+ * (the label_generator node / `LabelData`), not by these labels.
+ *
+ * Keying off the stream's `sourceNodeId` means multi-loader graphs each resolve
+ * to their own structure's labels.
+ */
+function resolveEffectiveLabels(
+  ctx: PipelineExecutionContext,
+  sourceNodeId: string | undefined,
+): string[] | null {
+  if (ctx.atomLabels) return ctx.atomLabels;
+  if (sourceNodeId) return ctx.nodeSnapshots?.[sourceNodeId]?.labels ?? null;
+  return null;
+}
+
+/** Read the source load_structure node id from a node's incoming particle stream. */
+function particleSourceNodeId(inputs: Map<string, PipelineData[]>): string | undefined {
+  const inData = inputs.get("in")?.[0];
+  return inData?.type === "particle" ? (inData as ParticleData).sourceNodeId : undefined;
+}
+
 export function executePipeline(
   nodes: Node<PipelineNodeData>[],
   edges: Edge[],
@@ -190,7 +219,8 @@ export function executePipeline(
         break;
       }
       case "filter": {
-        const outputs = executeFilter(data.params as FilterParams, inputs, ctx.atomLabels ?? null);
+        const labels = resolveEffectiveLabels(ctx, particleSourceNodeId(inputs));
+        const outputs = executeFilter(data.params as FilterParams, inputs, labels);
         edgeOutputs.set(id, outputs);
         const outData = outputs.get("out");
         if (!inputs.get("in")?.length) {
@@ -226,7 +256,8 @@ export function executePipeline(
         break;
       }
       case "color": {
-        const outputs = executeColor(data.params as ColorParams, inputs, ctx.atomLabels ?? null);
+        const labels = resolveEffectiveLabels(ctx, particleSourceNodeId(inputs));
+        const outputs = executeColor(data.params as ColorParams, inputs, labels);
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
