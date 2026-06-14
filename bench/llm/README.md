@@ -93,3 +93,9 @@ is opt-in via the label rather than running on every PR. The model defaults to
 repository variable (use any OpenRouter model slug). Because GitHub withholds
 secrets from `pull_request` workflows triggered by forks, this only runs for
 PRs from branches within the repository.
+
+To limit who can trigger these paid runs, the job also checks the triggering
+actor against the `LLM_EVAL_ALLOWED_USERS` repository variable — a JSON array
+of GitHub usernames (e.g. `["alice","bob"]`), defaulting to `["hodakamori"]`
+if the variable is unset. Applying the `llm-eval` label as a user not in this
+list does not run the job.

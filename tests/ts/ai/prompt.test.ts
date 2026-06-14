@@ -14,12 +14,18 @@ describe("buildSystemPrompt", () => {
       "load_structure",
       "load_trajectory",
       "load_vector",
+      "load_volumetric",
       "add_bond",
       "filter",
       "modify",
+      "replicate",
+      "color",
+      "representation",
       "label_generator",
       "polyhedron_generator",
+      "surface_mesh",
       "vector_overlay",
+      "isosurface",
       "viewport",
     ];
     for (const t of nodeTypes) {

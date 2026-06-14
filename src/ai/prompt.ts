@@ -64,6 +64,13 @@ Loads per-atom vector data (forces, velocities).
 - Outputs: \`vector\` (vector data type)
 - No inputs
 
+### load_volumetric
+Loads volumetric scalar-field data (e.g. a Gaussian/VASP CUBE file with
+electron density or electrostatic potential).
+- Parameters: \`{ type: "load_volumetric", fileName: string | null }\`
+- Outputs: \`volumetric\` (volumetric data type)
+- No inputs
+
 ### add_bond
 Detects or infers bonds between atoms.
 - Parameters: \`{ type: "add_bond", bondSource: "structure" | "file" | "distance" | "none" }\`
@@ -92,6 +99,35 @@ Modifies visual properties (scale, opacity).
 - Inputs: \`in\` (accepts particle or bond data type)
 - Outputs: \`out\` (same type as input)
 
+### replicate
+Builds an OVITO/VESTA-style supercell by copying every atom (and its bonds)
+into an \`nx × ny × nz\` grid of cell images and enlarging the simulation cell
+to match. Requires a unit cell on the input.
+- Parameters: \`{ type: "replicate", nx: number, ny: number, nz: number }\`
+  - Each of nx/ny/nz is an integer >= 1 (default 1) — number of repeats along
+    the a/b/c lattice vectors.
+- Inputs: \`particle\`, \`cell\`, \`trajectory\`
+- Outputs: \`particle\`, \`cell\`, \`trajectory\` (replicated)
+
+### color
+Recolors atoms using a palette mode, overriding the default per-element coloring.
+- Parameters: \`{ type: "color", mode: "uniform" | "byElement" | "byResidue" | "byChain" | "byBFactor" | "byProperty", uniformColor: string, range?: [number, number] }\`
+  - "uniform": every atom gets \`uniformColor\` (hex string, e.g. "#ff8800")
+  - "byElement" / "byResidue" / "byChain": categorical palette by that property
+  - "byBFactor" / "byProperty": continuous palette over \`range\` (auto-computed if omitted)
+- Inputs: \`in\` (particle only — NOT bond)
+- Outputs: \`out\` (particle)
+
+### representation
+Switches the rendering style for the connected particle stream.
+- Parameters: \`{ type: "representation", mode: "atoms" | "cartoon" | "both" | "surface" }\`
+  - "atoms": ball-and-stick / van der Waals spheres (default)
+  - "cartoon": protein backbone cartoon (secondary structure)
+  - "both": atoms and cartoon overlaid
+  - "surface": molecular surface
+- Inputs: \`in\` (particle only — NOT bond)
+- Outputs: \`out\` (particle)
+
 ### label_generator
 Generates text labels for atoms.
 - Parameters: \`{ type: "label_generator", source: "element" | "resname" | "index" }\`
@@ -119,11 +155,30 @@ elements via \`excludedCenters\` / \`excludedLigands\`.
 - Inputs: \`particle\` (particle data type)
 - Outputs: \`mesh\` (mesh data type)
 
+### surface_mesh
+Computes an OVITO-style alpha-shape surface envelope around the atoms.
+- Parameters: \`{ type: "surface_mesh", alphaRadius: number, color: string, opacity: number }\`
+  - alphaRadius: probe sphere radius in Å — larger is smoother/coarser,
+    smaller is more detailed (default 3.0)
+  - color: hex color string, e.g. "#4488ff"
+  - opacity: 0-1
+- Inputs: \`particle\` (particle data type)
+- Outputs: \`mesh\` (mesh data type)
+
 ### vector_overlay
 Visualizes per-atom vectors (forces, velocities) as arrows.
 - Parameters: \`{ type: "vector_overlay", scale: number }\`
 - Inputs: \`vector\` (vector data type)
 - Outputs: \`vector\` (vector data type)
+
+### isosurface
+Renders an isosurface (contour) of volumetric scalar-field data.
+- Parameters: \`{ type: "isosurface", isoLevel: number, color: string, opacity: number, showNegative: boolean, negativeColor: string }\`
+  - isoLevel: contour level for the positive surface (default 0.05)
+  - showNegative: also draw a second surface at -isoLevel (e.g. for
+    electrostatic potential maps), colored with \`negativeColor\`
+- Inputs: \`volumetric\` (volumetric data type)
+- Outputs: \`mesh\` (mesh data type)
 
 ### viewport
 The final rendering sink. Every pipeline MUST have exactly one viewport node. All data flows into this node.
@@ -135,9 +190,10 @@ The final rendering sink. Every pipeline MUST have exactly one viewport node. Al
 
 1. Edges connect an output port of one node to an input port of another node.
 2. The data type of the source output port MUST match the data type of the target input port.
-3. Data types: particle, bond, cell, label, mesh, trajectory, vector.
+3. Data types: particle, bond, cell, label, mesh, trajectory, vector, volumetric.
 4. Filter and Modify nodes accept both \`particle\` and \`bond\` types on their \`in\` port.
-5. Multiple edges can connect to the same viewport input port (data is collected).
+5. Color and Representation nodes accept only \`particle\` (not \`bond\`) on their \`in\` port.
+6. Multiple edges can connect to the same viewport input port (data is collected).
 
 ## Atom & Bond Selection Query Language
 
@@ -256,6 +312,49 @@ User request: "Show a molecule with bonds and trajectory"
 }
 \`\`\`
 
+## Example: Volumetric Pipeline
+
+User request: "Load a cube file and show its isosurface"
+
+\`\`\`json
+{
+  "version": 3,
+  "nodes": [
+    {
+      "id": "volumetric-1",
+      "type": "load_volumetric",
+      "position": { "x": 425, "y": 0 },
+      "fileName": null,
+      "enabled": true
+    },
+    {
+      "id": "isosurface-1",
+      "type": "isosurface",
+      "position": { "x": 425, "y": 310 },
+      "isoLevel": 0.05,
+      "color": "#4488ff",
+      "opacity": 0.7,
+      "showNegative": false,
+      "negativeColor": "#ff4444",
+      "enabled": true
+    },
+    {
+      "id": "viewport-1",
+      "type": "viewport",
+      "position": { "x": 425, "y": 615 },
+      "perspective": false,
+      "cellAxesVisible": true,
+      "pivotMarkerVisible": true,
+      "enabled": true
+    }
+  ],
+  "edges": [
+    { "source": "volumetric-1", "target": "isosurface-1", "sourceHandle": "volumetric", "targetHandle": "volumetric" },
+    { "source": "isosurface-1", "target": "viewport-1", "sourceHandle": "mesh", "targetHandle": "mesh" }
+  ]
+}
+\`\`\`
+
 ## Guidelines
 
 - Always include a \`load_structure\` node as the data source.
@@ -267,6 +366,15 @@ User request: "Show a molecule with bonds and trajectory"
 - For typical molecular visualization: load_structure → add_bond → viewport (plus particle and cell connections to viewport).
 - For filtered views: add filter nodes between load_structure and viewport.
 - For modified appearance: add modify nodes to change scale/opacity.
+- For supercells: add a \`replicate\` node between load_structure and viewport
+  (and add_bond, if present), forwarding its \`particle\`/\`cell\`/\`trajectory\`
+  outputs downstream.
+- For recoloring or changing display style ("cartoon", "surface", etc.): add
+  \`color\` and/or \`representation\` nodes between load_structure (or add_bond)
+  and viewport; both only accept \`particle\`.
+- For volumetric data (cube files, electron density, ESP maps): use
+  load_volumetric → isosurface → viewport (mesh), independent of
+  load_structure unless the request also wants the atoms shown.
 - You have access to pipeline skill tools. Use them to retrieve base templates and domain knowledge when relevant, then customize the result for the user's specific request.
 - If no skill matches the request, generate the pipeline from scratch using the schema above.`;
 
