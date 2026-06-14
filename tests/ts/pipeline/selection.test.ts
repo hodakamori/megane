@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { evaluateSelection, validateQuery } from "@/pipeline/selection";
+import {
+  evaluateSelection,
+  evaluateBondSelection,
+  validateQuery,
+  computeMoleculeIds,
+} from "@/pipeline/selection";
 import type { Snapshot } from "@/types";
 
 /** Helper to build a small Snapshot for testing. */
@@ -32,6 +37,15 @@ const testSnapshot = makeSnapshot({
 });
 
 const testLabels = ["ALA1", "ALA1", "GLY2", "GLY2", "GLY2"];
+
+// Two water molecules plus one isolated Na ion (no bonds), 7 atoms total.
+// Layout: 0=O,1=H,2=H (mol A); 3=O,4=H,5=H (mol B); 6=Na (isolated)
+const moleculeSnapshot = makeSnapshot({
+  nAtoms: 7,
+  positions: [0, 0, 0, 1, 0, 0, -1, 0, 0, 5, 0, 0, 6, 0, 0, 4, 0, 0, 10, 0, 0],
+  elements: [8, 1, 1, 8, 1, 1, 11], // O, H, H, O, H, H, Na
+  bonds: [0, 1, 0, 2, 3, 4, 3, 5],
+});
 
 describe("evaluateSelection", () => {
   it("returns null for empty query", () => {
@@ -121,6 +135,66 @@ describe("evaluateSelection", () => {
   });
 });
 
+describe("evaluateSelection: molecule_id field", () => {
+  it("assigns molecule_id 0 to the component containing atom 0", () => {
+    const result = evaluateSelection("molecule_id == 0", moleculeSnapshot, null);
+    expect(result).toEqual(new Set([0, 1, 2]));
+  });
+
+  it("assigns molecule_id 1 to the second water molecule", () => {
+    const result = evaluateSelection("molecule_id == 1", moleculeSnapshot, null);
+    expect(result).toEqual(new Set([3, 4, 5]));
+  });
+
+  it("gives an isolated atom its own molecule_id", () => {
+    const result = evaluateSelection("molecule_id == 2", moleculeSnapshot, null);
+    expect(result).toEqual(new Set([6]));
+  });
+
+  it("supports 'not' on molecule_id", () => {
+    const result = evaluateSelection("not molecule_id == 0", moleculeSnapshot, null);
+    expect(result).toEqual(new Set([3, 4, 5, 6]));
+  });
+
+  it("supports 'or' across molecule_id values", () => {
+    const result = evaluateSelection(
+      "molecule_id == 0 or molecule_id == 2",
+      moleculeSnapshot,
+      null,
+    );
+    expect(result).toEqual(new Set([0, 1, 2, 6]));
+  });
+
+  it("treats every atom as its own molecule when there are no bonds", () => {
+    const result = evaluateSelection("molecule_id == 3", testSnapshot, null);
+    expect(result).toEqual(new Set([3]));
+  });
+});
+
+describe("computeMoleculeIds", () => {
+  it("numbers components by smallest contained atom index", () => {
+    const ids = computeMoleculeIds(moleculeSnapshot.bonds, moleculeSnapshot.nAtoms);
+    expect([...ids]).toEqual([0, 0, 0, 1, 1, 1, 2]);
+  });
+
+  it("assigns a unique molecule id per atom when there are no bonds", () => {
+    const ids = computeMoleculeIds(testSnapshot.bonds, testSnapshot.nAtoms);
+    expect([...ids]).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("memoizes results per bond-array identity", () => {
+    const bonds = new Uint32Array([0, 1, 0, 2, 3, 4, 3, 5]);
+    const a = computeMoleculeIds(bonds, 7);
+    const b = computeMoleculeIds(bonds, 7);
+    expect(a).toBe(b); // same instance: cache hit
+
+    const bondsCopy = new Uint32Array(bonds); // same content, different identity
+    const c = computeMoleculeIds(bondsCopy, 7);
+    expect(c).not.toBe(a);
+    expect([...c]).toEqual([...a]);
+  });
+});
+
 describe("validateQuery", () => {
   it("returns valid for empty query", () => {
     expect(validateQuery("")).toEqual({ valid: true });
@@ -158,5 +232,42 @@ describe("validateQuery", () => {
   it("returns invalid for unexpected character", () => {
     const result = validateQuery("element == @");
     expect(result.valid).toBe(false);
+  });
+
+  it("returns valid for molecule_id query", () => {
+    expect(validateQuery("molecule_id == 0")).toEqual({ valid: true });
+  });
+});
+
+// Bond connectivity for moleculeSnapshot: bonds 0,1 -> mol A; bonds 2,3 -> mol B
+const bondIndices = new Uint32Array([0, 1, 0, 2, 3, 4, 3, 5]);
+const bondElements = new Uint8Array([8, 1, 1, 8, 1, 1, 11]); // O,H,H,O,H,H,Na
+
+describe("evaluateBondSelection: molecule_id field", () => {
+  it("selects bonds within the first molecule", () => {
+    const result = evaluateBondSelection("molecule_id == 0", bondIndices, bondElements, 4, 7);
+    expect(result).toEqual(new Set([0, 1]));
+  });
+
+  it("selects bonds within the second molecule", () => {
+    const result = evaluateBondSelection("molecule_id == 1", bondIndices, bondElements, 4, 7);
+    expect(result).toEqual(new Set([2, 3]));
+  });
+
+  it("treats 'both molecule_id == N' the same as without 'both'", () => {
+    const withBoth = evaluateBondSelection(
+      "both molecule_id == 0",
+      bondIndices,
+      bondElements,
+      4,
+      7,
+    );
+    const withoutBoth = evaluateBondSelection("molecule_id == 0", bondIndices, bondElements, 4, 7);
+    expect(withBoth).toEqual(withoutBoth);
+  });
+
+  it("falls back to deriving atom count from bondIndices when nAtoms is omitted", () => {
+    const result = evaluateBondSelection("molecule_id == 0", bondIndices, bondElements, 4);
+    expect(result).toEqual(new Set([0, 1]));
   });
 });

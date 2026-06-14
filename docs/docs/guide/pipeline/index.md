@@ -255,6 +255,7 @@ The Filter node accepts Python-like query expressions to select atoms.
 | `x`, `y`, `z` | number | Cartesian coordinates |
 | `resname` | string | Residue name (e.g., `"ALA"`, `"HOH"`) |
 | `mass` | number | Atomic mass |
+| `molecule_id` | number | 0-based connected-component (molecule) ID, derived from bond connectivity. Atoms with no bonds form their own single-atom molecule |
 
 ### Operators
 
@@ -278,6 +279,8 @@ not element == "H"                     # Non-hydrogen atoms
 element == "O" or element == "N"       # Oxygen or nitrogen
 (x > 0 and x < 10) and element == "C" # Carbons in x range
 mass > 32                              # Atoms heavier than sulfur
+molecule_id == 0                       # Atoms belonging to the first molecule
+not molecule_id == 0                   # Everything except the first molecule
 ```
 
 ## Bond Selection DSL
@@ -291,6 +294,7 @@ The **Bond query** field in the Filter node accepts expressions to select bonds.
 | `bond_index` | number | 0-based sequential bond index |
 | `atom_index` | number | Atom endpoint index |
 | `element` | string | Element symbol of an atom endpoint (e.g., `"C"`, `"O"`) |
+| `molecule_id` | number | 0-based molecule ID of the bond's endpoints (both endpoints always share the same ID) |
 
 ### Operators
 
@@ -304,7 +308,7 @@ The **Bond query** field in the Filter node accepts expressions to select bonds.
 
 - `all` — select all bonds (default when query is empty)
 - `none` — select no bonds
-- `both` — prefix on a comparison involving `atom_index` or `element` to require **both** atoms of the bond to satisfy the condition (default: either atom, OR semantics). Has no effect on `bond_index` comparisons.
+- `both` — prefix on a comparison involving `atom_index` or `element` to require **both** atoms of the bond to satisfy the condition (default: either atom, OR semantics). Has no effect on `bond_index` comparisons, and is redundant (but harmless) for `molecule_id`, since both endpoints of a bond always share the same molecule ID.
 
 ### Examples
 
@@ -314,6 +318,7 @@ both element != "H"                    # Bonds where neither atom is hydrogen
 atom_index >= 24                       # Bonds involving atom 24 or higher
 bond_index < 10                        # First 10 bonds only
 both atom_index >= 0 and bond_index < 50  # First 50 bonds (all-atom filter)
+molecule_id == 0                       # Bonds within the first molecule
 ```
 
 The bond query selects which bonds a downstream **Modify** node applies opacity overrides to. This lets you selectively fade specific bonds without removing them from the scene.
@@ -341,6 +346,27 @@ Use Filter + Modify nodes to fade out water molecules while keeping the protein 
 5. Connect the original `LoadStructure.particle → Viewport.particle` as well (for the protein)
 
 The viewport renders both streams — the protein at full opacity, and the water as translucent small spheres.
+
+### Modify a Single Molecule (Atoms + Bonds Together)
+
+`molecule_id` lets you target one molecule (a connected component of the bond
+graph) and fade its atoms and bonds together, using the same query on both
+streams.
+
+1. Add a `LoadStructure` node and load a structure with multiple molecules (e.g. `caffeine_water.pdb`)
+2. Add an `AddBond` node and connect `LoadStructure.particle → AddBond.particle` to produce a bond stream
+3. Add two `Filter` nodes:
+   - Filter A (atoms): query `not molecule_id == 0`
+   - Filter B (bonds): bond query `not molecule_id == 0`
+4. Add two `Modify` nodes and set opacity to 0.15 on each
+5. Connect:
+   - `LoadStructure.particle → FilterA.in → ModifyA.in → Viewport.particle`
+   - `AddBond.bond → FilterB.in → ModifyB.in → Viewport.bond`
+   - `LoadStructure.particle → Viewport.particle` and `AddBond.bond → Viewport.bond` (original full-opacity streams)
+
+Molecule 0 (the component containing atom 0) stays fully opaque, while every
+other molecule's atoms and bonds fade together — both Filter nodes derive
+`molecule_id` from the same underlying bond connectivity.
 
 ### Multiple Structure Layers
 
