@@ -62,6 +62,21 @@ describe("RepresentationNode", () => {
     expect(updateNodeParams).toHaveBeenCalledWith("r1", { mode: "surface" });
   });
 
+  it("offers a 'Stick' option and selects it via updateNodeParams", () => {
+    const updateNodeParams = vi.fn();
+    const seeded = seedPipelineStore("representation", { id: "r1" });
+    usePipelineStore.setState({ updateNodeParams });
+
+    render(
+      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
+    );
+    const select = screen.getByTestId("representation-node-mode") as HTMLSelectElement;
+    expect(screen.getByRole("option", { name: "Stick" })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: "stick" } });
+    expect(updateNodeParams).toHaveBeenCalledWith("r1", { mode: "stick" });
+  });
+
   it("renders inside a NodeShell with the Representation title", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
     render(

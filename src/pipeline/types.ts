@@ -432,7 +432,7 @@ export interface AddBondParams {
  * Visual representation mode applied per-stream by the Representation node and
  * read by the Viewport when collecting incoming particle data.
  */
-export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface";
+export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface" | "stick";
 
 export interface ViewportParams {
   type: "viewport";

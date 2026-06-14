@@ -144,6 +144,8 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   out vec2 vCylUv;
   out float vDashed;
   out float vBondOpacity;
+  out vec3 vSide;
+  out vec3 vDepthDir;
 
   vec3 getAtomPos(int idx) {
     int tx = idx % uPositionTexWidth;
@@ -189,12 +191,128 @@ export const bondVertexShader = /* glsl */ `precision highp float;
     vec3 dir = axis / max(len, 0.0001);
 
     vec3 side = normalize(cross(dir, vec3(0.0, 0.0, 1.0)));
+    // Third basis vector spanning the cylinder's circular cross-section,
+    // oriented so vDepthDir.z >= 0 (matching the sphere impostors' z >= 0
+    // convention) so the cross-section normal can be expressed in view
+    // space the same way as a sphere's normal.
+    vec3 depthDir = normalize(cross(side, dir));
+    vSide = side;
+    vDepthDir = depthDir;
 
     vec3 viewPos = viewMid
       + dir * (position.y * len * 0.5)
       + side * (position.x * instanceRadius * uBondScaleMultiplier);
 
     gl_Position = projectionMatrix * vec4(viewPos, 1.0);
+  }
+`;
+
+/**
+ * Joint sphere shader: draws one small sphere of radius `uJointRadius *
+ * uBondScaleMultiplier` centered at each ATOM (not at bond endpoints).
+ * Bond cylinders (`bondVertexShader`) are unclipped, running the full
+ * atom-to-atom distance, so for any bond whose cylinder radius equals
+ * `uJointRadius` (the common single-bond case), the cylinder's circular
+ * cross-section at the atom center lies exactly on this sphere's surface —
+ * tangent-continuous, with no step or ring. Because it is a single shared
+ * sphere per atom, any number of bonds meeting at that atom (at any angles)
+ * blend into one smooth Licorice-style joint, matching VMD/PyMOL. Reuses
+ * `atomFragmentShader` for the actual sphere shading/depth.
+ */
+export const jointVertexShader = /* glsl */ `precision highp float;
+  precision highp int;
+
+  uniform mat4 modelViewMatrix;
+  uniform mat4 projectionMatrix;
+  uniform float uBondScaleMultiplier;
+  uniform float uJointRadius;
+
+  in vec3 position;
+  in vec3 instanceCenter;
+  in vec3 instanceColor;
+
+  out vec3 vColor;
+  out vec2 vUv;
+  out float vRadius;
+  out vec3 vViewCenter;
+
+  void main() {
+    vColor = instanceColor;
+    vUv = position.xy;
+
+    float scaledRadius = uJointRadius * uBondScaleMultiplier;
+    vRadius = scaledRadius;
+
+    vec4 viewCenter = modelViewMatrix * vec4(instanceCenter, 1.0);
+    vViewCenter = viewCenter.xyz;
+
+    vec3 viewPos = viewCenter.xyz;
+    viewPos.xy += position.xy * scaledRadius;
+
+    gl_Position = projectionMatrix * vec4(viewPos, 1.0);
+  }
+`;
+
+/**
+ * Joint sphere fragment shader: same ray-sphere normal/depth derivation as
+ * `atomFragmentShader`, but shaded with `bondFragmentShader`'s exact
+ * coefficients (no edge-darkening, weaker specular/fresnel). The joint
+ * sphere and the bond cylinder it caps share the same surface normal along
+ * their tangent boundary circle, so matching the shading formula too makes
+ * the two pieces blend into one continuous stick instead of a ball glued
+ * onto a rod.
+ */
+export const jointFragmentShader = /* glsl */ `precision highp float;
+  precision highp int;
+
+  in vec3 vColor;
+  in vec2 vUv;
+  in float vRadius;
+  in vec3 vViewCenter;
+
+  uniform mat4 projectionMatrix;
+  uniform float uOpacity;
+
+  out vec4 fragColor;
+
+  void main() {
+    float dist2 = dot(vUv, vUv);
+    if (dist2 > 1.0) discard;
+
+    float z = sqrt(1.0 - dist2);
+    vec3 normal = vec3(vUv, z);
+
+    // Correct depth
+    vec3 fragViewPos = vViewCenter + normal * vRadius;
+    vec4 clipPos = projectionMatrix * vec4(fragViewPos, 1.0);
+    float ndcDepth = clipPos.z / clipPos.w;
+    gl_FragDepth = ndcDepth * 0.5 + 0.5;
+
+    // Hemisphere ambient: sky blue on top, warm brown on bottom
+    vec3 skyColor = vec3(0.87, 0.92, 1.0);
+    vec3 groundColor = vec3(0.6, 0.47, 0.27);
+    float hemiMix = normal.y * 0.5 + 0.5;
+    vec3 ambient = mix(groundColor, skyColor, hemiMix) * 0.35;
+
+    // Dual-light diffuse
+    vec3 lightDir1 = normalize(vec3(0.5, 0.5, 1.0));
+    vec3 lightDir2 = normalize(vec3(-0.3, 0.3, 0.8));
+    float diffuse1 = max(dot(normal, lightDir1), 0.0);
+    float diffuse2 = max(dot(normal, lightDir2), 0.0);
+    float diffuse = diffuse1 * 0.55 + diffuse2 * 0.2;
+
+    // Specular (Blinn-Phong)
+    vec3 viewDir = vec3(0.0, 0.0, 1.0);
+    vec3 halfDir = normalize(lightDir1 + viewDir);
+    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
+
+    // Fresnel rim
+    float fresnel = pow(1.0 - z, 3.0) * 0.1;
+
+    vec3 color = vColor * (ambient + diffuse)
+               + vec3(1.0) * spec * 0.2
+               + vec3(0.1) * fresnel;
+    fragColor = vec4(color, uOpacity);
   }
 `;
 
@@ -205,6 +323,8 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
   in vec2 vCylUv;
   in float vDashed;
   in float vBondOpacity;
+  in vec3 vSide;
+  in vec3 vDepthDir;
 
   uniform float uOpacity;
   uniform int uUsePerBondOverrides;
@@ -223,7 +343,11 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
 
     float nx = vCylUv.x;
     float nz = sqrt(max(0.0, 1.0 - nx * nx));
-    vec3 normal = vec3(nx, 0.0, nz);
+    // Express the cylinder cross-section normal in view space (same frame
+    // as the joint spheres' normals) so lighting is continuous across the
+    // bond/joint tangent boundary instead of being computed in a
+    // per-cylinder local frame.
+    vec3 normal = normalize(nx * vSide + nz * vDepthDir);
 
     // Hemisphere ambient
     vec3 skyColor = vec3(0.87, 0.92, 1.0);
@@ -244,7 +368,7 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
     // Fresnel rim
-    float fresnel = pow(1.0 - nz, 3.0) * 0.1;
+    float fresnel = pow(1.0 - normal.z, 3.0) * 0.1;
 
     vec3 color = baseColor * (ambient + diffuse)
                + vec3(1.0) * spec * 0.2
