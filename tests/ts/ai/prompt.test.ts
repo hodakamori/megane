@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { buildSystemPrompt } from "@/ai/prompt";
+import { collectPipelineErrors } from "@/ai/validatePipeline";
+import type { SerializedPipeline } from "@/pipeline/types";
+
+/** Extract the first ```json fenced block that follows a section heading. */
+function exampleAfter(prompt: string, heading: string): SerializedPipeline {
+  const idx = prompt.indexOf(heading);
+  expect(idx).toBeGreaterThan(-1);
+  const match = prompt.slice(idx).match(/```json\s*\n([\s\S]*?)```/);
+  expect(match).not.toBeNull();
+  return JSON.parse(match![1].trim()) as SerializedPipeline;
+}
 
 describe("buildSystemPrompt", () => {
   const prompt = buildSystemPrompt();
@@ -67,6 +78,25 @@ describe("buildSystemPrompt", () => {
     for (const idiom of ["name CA", "chain A", "within 5 of"]) {
       expect(prompt).toContain(idiom);
     }
+  });
+
+  it("documents the selective visual property (subset) pattern", () => {
+    expect(prompt).toContain("Selective Visual Property");
+    // The guideline should steer the model away from double-rendering the
+    // same atoms (full structure + filtered copy) into the viewport.
+    expect(prompt).toContain("disjoint");
+  });
+
+  it("ships a valid selective-property example pipeline", () => {
+    const pipeline = exampleAfter(prompt, "## Example: Selective Visual Property");
+    // The documented example must itself pass the same schema + query
+    // validators the repair round trip uses, so the model has a correct
+    // template to follow.
+    expect(collectPipelineErrors(pipeline)).toEqual([]);
+    // Two disjoint filter branches (water vs. the rest), only one modified.
+    const filters = pipeline.nodes.filter((n) => n.type === "filter");
+    expect(filters).toHaveLength(2);
+    expect(pipeline.nodes.filter((n) => n.type === "modify")).toHaveLength(1);
   });
 });
 

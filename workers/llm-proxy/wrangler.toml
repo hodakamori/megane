@@ -2,6 +2,16 @@ name = "megane-llm-proxy"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
+# Persist runtime logs (console.log/error from src/proxy.ts) to Workers Logs
+# so past upstream errors — e.g. an OpenRouter 400 for a bad model slug — can
+# be inspected in the dashboard, not just via a live `wrangler tail`. This
+# demo is rate-limited to 30 requests/IP/day, so log volume sits far under
+# the free allowance (200k events/day); head_sampling_rate=1 keeps 100% of
+# the handful of events for full visibility.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 # Origins allowed to call this proxy (comma-separated). CORS and the
 # explicit Origin check in src/index.ts both key off this list. The first
 # entry is the GitHub Pages docs demo; the second is the custom-domain S3
@@ -11,10 +21,15 @@ ALLOWED_ORIGIN = "https://hodakamori.github.io,https://megane.tech-office-mori.c
 
 # OpenRouter model slug. Set to Anthropic Claude Sonnet 4.6 (latest) for
 # strong instruction-following and pipeline generation quality.
+# IMPORTANT: OpenRouter spells minor versions with a DOT, not a hyphen
+# (e.g. "anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.8"). A
+# hyphenated slug like "...-4-6" is an unknown model id and OpenRouter
+# rejects the whole request with a 400, breaking *every* demo prompt
+# regardless of length. Verify the exact slug at https://openrouter.ai/<id>.
 # To downgrade to claude-3.5-haiku (~0.5c) or a free model, just change
 # this value — no code change needed. Leave unset to use the default in
 # src/proxy.ts.
-OPENROUTER_MODEL = "anthropic/claude-sonnet-4-6"
+OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"
 
 # Comma-separated fallback models, used only if the primary errors. Falls
 # back to Haiku (cheap but reliable) then a free model as a last resort.

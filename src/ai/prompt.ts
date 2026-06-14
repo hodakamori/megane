@@ -355,6 +355,75 @@ User request: "Load a cube file and show its isosurface"
 }
 \`\`\`
 
+## Example: Selective Visual Property (subset)
+
+When the user wants a visual property (opacity, scale, color) applied to ONLY
+part of the structure while the rest stays at its default appearance, split the
+stream into disjoint branches with \`filter\` nodes and apply the property to one
+branch. A \`modify\`/\`color\` node only affects the atoms in its branch, so the
+unmodified branch keeps its default look. Do NOT route the full structure AND a
+filtered copy of the same atoms to the viewport — the overlap renders twice.
+
+User request: "Keep the solute fully visible but make the water (resname HOH)
+semi-transparent."
+
+\`\`\`json
+{
+  "version": 3,
+  "nodes": [
+    {
+      "id": "loader-1",
+      "type": "load_structure",
+      "position": { "x": 425, "y": 0 },
+      "fileName": null,
+      "hasTrajectory": false,
+      "hasCell": false,
+      "enabled": true
+    },
+    {
+      "id": "filter-water",
+      "type": "filter",
+      "position": { "x": 250, "y": 310 },
+      "query": "resname == \\"HOH\\"",
+      "enabled": true
+    },
+    {
+      "id": "modify-water",
+      "type": "modify",
+      "position": { "x": 250, "y": 460 },
+      "scale": 1.0,
+      "opacity": 0.3,
+      "enabled": true
+    },
+    {
+      "id": "filter-solute",
+      "type": "filter",
+      "position": { "x": 600, "y": 310 },
+      "query": "resname != \\"HOH\\"",
+      "enabled": true
+    },
+    {
+      "id": "viewport-1",
+      "type": "viewport",
+      "position": { "x": 425, "y": 615 },
+      "perspective": false,
+      "cellAxesVisible": true,
+      "pivotMarkerVisible": true,
+      "enabled": true
+    }
+  ],
+  "edges": [
+    { "source": "loader-1", "target": "filter-water", "sourceHandle": "particle", "targetHandle": "in" },
+    { "source": "filter-water", "target": "modify-water", "sourceHandle": "out", "targetHandle": "in" },
+    { "source": "modify-water", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" },
+    { "source": "loader-1", "target": "filter-solute", "sourceHandle": "particle", "targetHandle": "in" },
+    { "source": "filter-solute", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" }
+  ]
+}
+\`\`\`
+
+Filters the water into its own branch, makes only it semi-transparent, and shows the rest of the structure at full opacity.
+
 ## Guidelines
 
 - Always include a \`load_structure\` node as the data source.
@@ -366,6 +435,11 @@ User request: "Load a cube file and show its isosurface"
 - For typical molecular visualization: load_structure → add_bond → viewport (plus particle and cell connections to viewport).
 - For filtered views: add filter nodes between load_structure and viewport.
 - For modified appearance: add modify nodes to change scale/opacity.
+- To change a property for only PART of the structure (e.g. "make only the
+  water transparent", "color just the protein"), split into disjoint \`filter\`
+  branches and apply the \`modify\`/\`color\` node to the target branch only — see
+  the "Selective Visual Property" example. Never send both the full structure
+  and a filtered subset of the same atoms to the viewport.
 - For supercells: add a \`replicate\` node between load_structure and viewport
   (and add_bond, if present), forwarding its \`particle\`/\`cell\`/\`trajectory\`
   outputs downstream.
