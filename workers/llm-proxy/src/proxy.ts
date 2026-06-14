@@ -74,7 +74,15 @@ export function buildModelList(env: Env): string[] {
       : DEFAULT_FALLBACK_MODELS;
   return [...new Set([primary, ...fallbacks])].slice(0, MAX_MODELS);
 }
-export const MAX_TOKENS = 2048;
+/**
+ * Upstream completion cap. Matches the direct-provider paths in the
+ * frontend client (`src/ai/client.ts` sends `max_tokens: 4096`): a
+ * smaller cap here silently truncated larger completions — e.g. the
+ * multi-branch pipelines produced for "make only the water transparent"
+ * style requests — leaving an unterminated JSON fence that the frontend
+ * could not parse, surfacing only a generic "Something went wrong".
+ */
+export const MAX_TOKENS = 4096;
 export const MAX_MESSAGES = 12;
 /**
  * Length cap for user/assistant messages — these carry untrusted input

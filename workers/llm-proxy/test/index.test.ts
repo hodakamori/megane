@@ -492,6 +492,9 @@ describe("worker fetch handler", () => {
       expect(sentBody.models.length).toBeGreaterThan(1);
       expect(sentBody.model).toBeUndefined();
       expect(sentBody.stream).toBe(true);
+      // The completion cap must match the direct-provider client (4096); a
+      // smaller value truncated larger multi-branch pipelines mid-JSON.
+      expect(sentBody.max_tokens).toBe(4096);
       expect(sentBody.messages).toEqual([{ role: "user", content: "hi" }]);
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe(`Bearer ${env.OPENROUTER_API_KEY}`);
