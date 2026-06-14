@@ -77,32 +77,22 @@ export class ImpostorBondMesh {
   private positionTexHeight: number = 1;
   private nAtoms: number = 0;
 
-  // Joint sphere mesh: two small spheres per bond-cylinder instance, capping
-  // each (clipped) cylinder end so cylinder + caps form gap-free
-  // Licorice-style capsules. Each cap is centered exactly at its cylinder's
-  // clipped end point (computed in-shader from the same topology, using that
-  // instance's own radius), so sphere and cylinder cross-sections coincide
-  // there with no step — see `jointVertexShader`. Added as a child of
-  // `this.mesh` so it inherits visibility/scene placement automatically.
+  // Joint sphere mesh: one small sphere of radius BOND_RADIUS centered at
+  // each ATOM. Bond cylinders are unclipped (full atom-to-atom length), so
+  // for same-radius (single) bonds the cylinder's cross-section at the atom
+  // center lies exactly on this sphere's surface — tangent-continuous, and
+  // since it's a single shared sphere, any number of bonds meeting at that
+  // atom blend into one smooth Licorice-style joint (see jointVertexShader).
+  // Added as a child of `this.mesh` so it inherits visibility/scene
+  // placement automatically.
   private jointMesh: THREE.Mesh;
   private jointGeo: THREE.InstancedBufferGeometry;
   private jointMaterial: THREE.RawShaderMaterial;
-  private jointAtomABuf: Float32Array;
-  private jointAtomBBuf: Float32Array;
-  private jointOffsetXBuf: Float32Array;
-  private jointOffsetYBuf: Float32Array;
+  private jointCenterBuf: Float32Array;
   private jointColorBuf: Float32Array;
-  private jointRadiusBuf: Float32Array;
-  private jointOpacityBuf: Float32Array;
-  private jointEndBuf: Float32Array;
-  private jointAtomAAttr!: THREE.InstancedBufferAttribute;
-  private jointAtomBAttr!: THREE.InstancedBufferAttribute;
-  private jointOffsetXAttr!: THREE.InstancedBufferAttribute;
-  private jointOffsetYAttr!: THREE.InstancedBufferAttribute;
+  private jointCenterAttr!: THREE.InstancedBufferAttribute;
   private jointColorAttr!: THREE.InstancedBufferAttribute;
-  private jointRadiusAttr!: THREE.InstancedBufferAttribute;
-  private jointOpacityAttr!: THREE.InstancedBufferAttribute;
-  private jointEndAttr!: THREE.InstancedBufferAttribute;
+  private jointCapacity: number;
 
   private capacity: number;
 
@@ -155,7 +145,6 @@ export class ImpostorBondMesh {
       uniforms: {
         uOpacity: { value: 1.0 },
         uBondScaleMultiplier: { value: 1.0 },
-        uJointRadius: { value: BOND_RADIUS },
         uPositionTex: { value: this.positionTex },
         uPositionTexWidth: { value: 1 },
         uUsePerBondOverrides: { value: 0 },
@@ -168,8 +157,7 @@ export class ImpostorBondMesh {
     this.mesh.frustumCulled = false;
 
     // Joint sphere mesh: billboard quad geometry/material, same pattern as
-    // ImpostorAtomMesh, sized by 2x the bond-instance capacity (one cap per
-    // cylinder end).
+    // ImpostorAtomMesh, one instance per atom.
     this.jointGeo = new THREE.InstancedBufferGeometry();
     const jointVerts = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
     const jointIndices = new Uint16Array([0, 1, 2, 0, 2, 3]);
@@ -177,14 +165,9 @@ export class ImpostorBondMesh {
     this.jointGeo.setIndex(new THREE.BufferAttribute(jointIndices, 1));
     this.jointGeo.instanceCount = 0;
 
-    this.jointAtomABuf = new Float32Array(this.capacity * 2);
-    this.jointAtomBBuf = new Float32Array(this.capacity * 2);
-    this.jointOffsetXBuf = new Float32Array(this.capacity * 2);
-    this.jointOffsetYBuf = new Float32Array(this.capacity * 2);
-    this.jointColorBuf = new Float32Array(this.capacity * 2 * 3);
-    this.jointRadiusBuf = new Float32Array(this.capacity * 2);
-    this.jointOpacityBuf = new Float32Array(this.capacity * 2).fill(1.0);
-    this.jointEndBuf = ImpostorBondMesh.makeJointEndBuffer(this.capacity * 2);
+    this.jointCapacity = 1_000_000;
+    this.jointCenterBuf = new Float32Array(this.jointCapacity * 3);
+    this.jointColorBuf = new Float32Array(this.jointCapacity * 3);
     this.registerJointAttributes();
 
     this.jointMaterial = new THREE.RawShaderMaterial({
@@ -195,8 +178,6 @@ export class ImpostorBondMesh {
         uOpacity: { value: 1.0 },
         uBondScaleMultiplier: { value: 1.0 },
         uJointRadius: { value: BOND_RADIUS },
-        uPositionTex: { value: this.positionTex },
-        uPositionTexWidth: { value: 1 },
         uUsePerAtomOverrides: { value: 0 },
       },
       depthWrite: true,
@@ -206,13 +187,6 @@ export class ImpostorBondMesh {
     this.jointMesh = new THREE.Mesh(this.jointGeo, this.jointMaterial);
     this.jointMesh.frustumCulled = false;
     this.mesh.add(this.jointMesh);
-  }
-
-  /** Alternating 0,1,0,1,... — instance N caps the "A" end, N+1 the "B" end. */
-  private static makeJointEndBuffer(size: number): Float32Array {
-    const buf = new Float32Array(size);
-    for (let i = 1; i < size; i += 2) buf[i] = 1.0;
-    return buf;
   }
 
   loadSnapshot(snapshot: Snapshot, colorCtx?: ColorContext): void {
@@ -239,8 +213,25 @@ export class ImpostorBondMesh {
     this.positionTex.needsUpdate = true;
     this.bondMaterial.uniforms.uPositionTex.value = this.positionTex;
     this.bondMaterial.uniforms.uPositionTexWidth.value = this.positionTexWidth;
-    this.jointMaterial.uniforms.uPositionTex.value = this.positionTex;
-    this.jointMaterial.uniforms.uPositionTexWidth.value = this.positionTexWidth;
+
+    // One joint sphere per atom, centered at the atom position.
+    if (nAtoms > this.jointCapacity) {
+      this.growJoints(nAtoms);
+    }
+    for (let i = 0; i < nAtoms; i++) {
+      const i3 = i * 3;
+      this.jointCenterBuf[i3] = positions[i3];
+      this.jointCenterBuf[i3 + 1] = positions[i3 + 1];
+      this.jointCenterBuf[i3 + 2] = positions[i3 + 2];
+      const [r, g, b] = colorCtx
+        ? getAtomColorForScheme(i, snapshot, colorCtx)
+        : getColor(elements[i]);
+      this.jointColorBuf[i3] = r;
+      this.jointColorBuf[i3 + 1] = g;
+      this.jointColorBuf[i3 + 2] = b;
+    }
+    this.markJointAttributesDirty();
+    this.jointGeo.instanceCount = nAtoms;
 
     // Count total visual instances
     let totalInstances = 0;
@@ -346,14 +337,15 @@ export class ImpostorBondMesh {
     // exhausted GPU memory and triggered WebGL context loss.
     this.markAttributesDirty();
     this.geo.instanceCount = idx;
-
-    this.markJointAttributesDirty();
-    this.jointGeo.instanceCount = idx * 2;
   }
 
   updatePositions(positions: Float32Array, _bonds: Uint32Array, _nBonds: number): void {
     this.copyPositionsToTexData(positions);
     this.positionTex.needsUpdate = true;
+
+    const n3 = this.nAtoms * 3;
+    this.jointCenterBuf.set(positions.subarray(0, n3));
+    this.jointCenterAttr.needsUpdate = true;
   }
 
   /**
@@ -367,7 +359,7 @@ export class ImpostorBondMesh {
    * topology buffers.
    */
   recomputeColorsFromAtomBuffer(atomColors: Float32Array, snapshot: Snapshot): void {
-    const { nBonds, bonds, bondOrders, elements } = snapshot;
+    const { nAtoms, nBonds, bonds, bondOrders, elements } = snapshot;
     // The atom color buffer only covers real atoms. PBC half-bonds reference
     // ghost atoms appended past that range (index >= nRealAtoms); reading them
     // from `atomColors` yields undefined → NaN → black. Fall back to the ghost
@@ -402,24 +394,20 @@ export class ImpostorBondMesh {
         this.colorBBuf[j3] = br;
         this.colorBBuf[j3 + 1] = bg;
         this.colorBBuf[j3 + 2] = bb;
-
-        // Joint caps: end 0 (A side) and end 1 (B side) of this instance.
-        const j0 = idx * 2;
-        const j1 = j0 + 1;
-        const j03 = j0 * 3;
-        const j13 = j1 * 3;
-        this.jointColorBuf[j03] = ar;
-        this.jointColorBuf[j03 + 1] = ag;
-        this.jointColorBuf[j03 + 2] = ab;
-        this.jointColorBuf[j13] = br;
-        this.jointColorBuf[j13 + 1] = bg;
-        this.jointColorBuf[j13 + 2] = bb;
-
         idx++;
       }
     }
     this.colorAAttr.needsUpdate = true;
     this.colorBAttr.needsUpdate = true;
+
+    // Joint spheres: one per atom.
+    for (let i = 0; i < nAtoms; i++) {
+      const [r, g, b] = endpointColor(i);
+      const i3 = i * 3;
+      this.jointColorBuf[i3] = r;
+      this.jointColorBuf[i3 + 1] = g;
+      this.jointColorBuf[i3 + 2] = b;
+    }
     this.jointColorAttr.needsUpdate = true;
   }
 
@@ -453,29 +441,6 @@ export class ImpostorBondMesh {
 
     this.radiusBuf[idx] = radius;
     this.dashedBuf[idx] = dashed;
-
-    // Joint caps: two per instance, one for each clipped cylinder end.
-    const j0 = idx * 2;
-    const j1 = j0 + 1;
-    this.jointAtomABuf[j0] = ai;
-    this.jointAtomABuf[j1] = ai;
-    this.jointAtomBBuf[j0] = bi;
-    this.jointAtomBBuf[j1] = bi;
-    this.jointOffsetXBuf[j0] = offsetX;
-    this.jointOffsetXBuf[j1] = offsetX;
-    this.jointOffsetYBuf[j0] = offsetY;
-    this.jointOffsetYBuf[j1] = offsetY;
-    this.jointRadiusBuf[j0] = radius;
-    this.jointRadiusBuf[j1] = radius;
-
-    const j03 = j0 * 3;
-    const j13 = j1 * 3;
-    this.jointColorBuf[j03] = ar;
-    this.jointColorBuf[j03 + 1] = ag;
-    this.jointColorBuf[j03 + 2] = ab;
-    this.jointColorBuf[j13] = br;
-    this.jointColorBuf[j13 + 1] = bg;
-    this.jointColorBuf[j13 + 2] = bb;
   }
 
   private copyPositionsToTexData(positions: Float32Array): void {
@@ -566,23 +531,11 @@ export class ImpostorBondMesh {
   private registerJointAttributes(): void {
     this.disposeJointAttributes();
 
-    this.jointAtomAAttr = new THREE.InstancedBufferAttribute(this.jointAtomABuf, 1);
-    this.jointAtomBAttr = new THREE.InstancedBufferAttribute(this.jointAtomBBuf, 1);
-    this.jointOffsetXAttr = new THREE.InstancedBufferAttribute(this.jointOffsetXBuf, 1);
-    this.jointOffsetYAttr = new THREE.InstancedBufferAttribute(this.jointOffsetYBuf, 1);
+    this.jointCenterAttr = new THREE.InstancedBufferAttribute(this.jointCenterBuf, 3);
     this.jointColorAttr = new THREE.InstancedBufferAttribute(this.jointColorBuf, 3);
-    this.jointRadiusAttr = new THREE.InstancedBufferAttribute(this.jointRadiusBuf, 1);
-    this.jointOpacityAttr = new THREE.InstancedBufferAttribute(this.jointOpacityBuf, 1);
-    this.jointEndAttr = new THREE.InstancedBufferAttribute(this.jointEndBuf, 1);
 
-    this.jointGeo.setAttribute("instanceAtomA", this.jointAtomAAttr);
-    this.jointGeo.setAttribute("instanceAtomB", this.jointAtomBAttr);
-    this.jointGeo.setAttribute("instanceOffsetX", this.jointOffsetXAttr);
-    this.jointGeo.setAttribute("instanceOffsetY", this.jointOffsetYAttr);
+    this.jointGeo.setAttribute("instanceCenter", this.jointCenterAttr);
     this.jointGeo.setAttribute("instanceColor", this.jointColorAttr);
-    this.jointGeo.setAttribute("instanceRadius", this.jointRadiusAttr);
-    this.jointGeo.setAttribute("instanceBondOpacity", this.jointOpacityAttr);
-    this.jointGeo.setAttribute("instanceEnd", this.jointEndAttr);
   }
 
   private disposeJointAttributes(): void {
@@ -596,25 +549,13 @@ export class ImpostorBondMesh {
       if (typeof d.dispose === "function") d.dispose();
       else d.dispatchEvent?.({ type: "dispose" });
     };
-    dispose(this.jointAtomAAttr);
-    dispose(this.jointAtomBAttr);
-    dispose(this.jointOffsetXAttr);
-    dispose(this.jointOffsetYAttr);
+    dispose(this.jointCenterAttr);
     dispose(this.jointColorAttr);
-    dispose(this.jointRadiusAttr);
-    dispose(this.jointOpacityAttr);
-    dispose(this.jointEndAttr);
   }
 
   private markJointAttributesDirty(): void {
-    this.jointAtomAAttr.needsUpdate = true;
-    this.jointAtomBAttr.needsUpdate = true;
-    this.jointOffsetXAttr.needsUpdate = true;
-    this.jointOffsetYAttr.needsUpdate = true;
+    this.jointCenterAttr.needsUpdate = true;
     this.jointColorAttr.needsUpdate = true;
-    this.jointRadiusAttr.needsUpdate = true;
-    this.jointOpacityAttr.needsUpdate = true;
-    this.jointEndAttr.needsUpdate = true;
   }
 
   private grow(needed: number): void {
@@ -654,38 +595,20 @@ export class ImpostorBondMesh {
     this.logicalBondIdx = newLogical;
 
     this.registerAttributes();
-    this.growJoints();
   }
 
-  /** Resize the joint-cap buffers to 2x the (already-grown) bond capacity. */
-  private growJoints(): void {
-    const jointCapacity = this.capacity * 2;
+  /** Resize the per-atom joint sphere buffers to fit `needed` atoms. */
+  private growJoints(needed: number): void {
+    this.jointCapacity = Math.max(needed, this.jointCapacity * 2);
 
-    const newAtomA = new Float32Array(jointCapacity);
-    const newAtomB = new Float32Array(jointCapacity);
-    const newOffsetX = new Float32Array(jointCapacity);
-    const newOffsetY = new Float32Array(jointCapacity);
-    const newColor = new Float32Array(jointCapacity * 3);
-    const newRadius = new Float32Array(jointCapacity);
-    const newOpacity = new Float32Array(jointCapacity).fill(1.0);
-    const newEnd = ImpostorBondMesh.makeJointEndBuffer(jointCapacity);
+    const newCenter = new Float32Array(this.jointCapacity * 3);
+    const newColor = new Float32Array(this.jointCapacity * 3);
 
-    newAtomA.set(this.jointAtomABuf);
-    newAtomB.set(this.jointAtomBBuf);
-    newOffsetX.set(this.jointOffsetXBuf);
-    newOffsetY.set(this.jointOffsetYBuf);
+    newCenter.set(this.jointCenterBuf);
     newColor.set(this.jointColorBuf);
-    newRadius.set(this.jointRadiusBuf);
-    newOpacity.set(this.jointOpacityBuf);
 
-    this.jointAtomABuf = newAtomA;
-    this.jointAtomBBuf = newAtomB;
-    this.jointOffsetXBuf = newOffsetX;
-    this.jointOffsetYBuf = newOffsetY;
+    this.jointCenterBuf = newCenter;
     this.jointColorBuf = newColor;
-    this.jointRadiusBuf = newRadius;
-    this.jointOpacityBuf = newOpacity;
-    this.jointEndBuf = newEnd;
 
     this.registerJointAttributes();
   }

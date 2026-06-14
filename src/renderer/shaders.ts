@@ -123,7 +123,6 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
   uniform float uBondScaleMultiplier;
-  uniform float uJointRadius;
   uniform sampler2D uPositionTex;
   uniform int uPositionTexWidth;
 
@@ -186,13 +185,8 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 
     vec3 viewMid = (viewStart.xyz + viewEnd.xyz) * 0.5;
     vec3 axis = viewEnd.xyz - viewStart.xyz;
-    float lenFull = length(axis);
-    vec3 dir = axis / max(lenFull, 0.0001);
-
-    // Symmetric Licorice-style clip: shorten the cylinder at both ends so a
-    // joint sphere of the same radius can cap each end, forming a capsule.
-    float clip = uJointRadius * uBondScaleMultiplier;
-    float len = max(lenFull - 2.0 * clip, 0.0);
+    float len = length(axis);
+    vec3 dir = axis / max(len, 0.0001);
 
     vec3 side = normalize(cross(dir, vec3(0.0, 0.0, 1.0)));
 
@@ -205,12 +199,15 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 `;
 
 /**
- * Joint sphere shader: caps each (clipped) bond cylinder end with a small
- * sphere of the *same radius as that cylinder instance*, centered exactly at
- * the cylinder's clipped end point (not the atom center). At that point both
- * the sphere's and the cylinder's cross-sections equal `instanceRadius *
- * uBondScaleMultiplier`, so they are tangent-continuous — cylinder + two end
- * caps form a smooth, gap-free Licorice-style capsule. Reuses
+ * Joint sphere shader: draws one small sphere of radius `uJointRadius *
+ * uBondScaleMultiplier` centered at each ATOM (not at bond endpoints).
+ * Bond cylinders (`bondVertexShader`) are unclipped, running the full
+ * atom-to-atom distance, so for any bond whose cylinder radius equals
+ * `uJointRadius` (the common single-bond case), the cylinder's circular
+ * cross-section at the atom center lies exactly on this sphere's surface —
+ * tangent-continuous, with no step or ring. Because it is a single shared
+ * sphere per atom, any number of bonds meeting at that atom (at any angles)
+ * blend into one smooth Licorice-style joint, matching VMD/PyMOL. Reuses
  * `atomFragmentShader` for the actual sphere shading/depth.
  */
 export const jointVertexShader = /* glsl */ `precision highp float;
@@ -220,19 +217,10 @@ export const jointVertexShader = /* glsl */ `precision highp float;
   uniform mat4 projectionMatrix;
   uniform float uBondScaleMultiplier;
   uniform float uJointRadius;
-  uniform sampler2D uPositionTex;
-  uniform int uPositionTexWidth;
 
   in vec3 position;
-
-  in float instanceAtomA;
-  in float instanceAtomB;
-  in float instanceOffsetX;
-  in float instanceOffsetY;
+  in vec3 instanceCenter;
   in vec3 instanceColor;
-  in float instanceRadius;
-  in float instanceBondOpacity;
-  in float instanceEnd;
 
   out vec3 vColor;
   out vec2 vUv;
@@ -240,56 +228,18 @@ export const jointVertexShader = /* glsl */ `precision highp float;
   out vec3 vViewCenter;
   out float vOpacityOverride;
 
-  vec3 getAtomPos(int idx) {
-    int tx = idx % uPositionTexWidth;
-    int ty = idx / uPositionTexWidth;
-    return texelFetch(uPositionTex, ivec2(tx, ty), 0).rgb;
-  }
-
   void main() {
-    vUv = position.xy;
-    vOpacityOverride = instanceBondOpacity;
-
-    int atomA = int(instanceAtomA + 0.5);
-    int atomB = int(instanceAtomB + 0.5);
-    vec3 posA = getAtomPos(atomA);
-    vec3 posB = getAtomPos(atomB);
-
-    vec3 start = posA;
-    vec3 end = posB;
-
-    if (instanceOffsetX != 0.0 || instanceOffsetY != 0.0) {
-      vec3 bdir = normalize(posB - posA);
-      vec3 perpX = cross(bdir, vec3(0.0, 1.0, 0.0));
-      if (dot(perpX, perpX) < 0.001) {
-        perpX = cross(bdir, vec3(1.0, 0.0, 0.0));
-      }
-      perpX = normalize(perpX);
-      vec3 perpY = normalize(cross(bdir, perpX));
-      vec3 offset = perpX * instanceOffsetX + perpY * instanceOffsetY;
-      start += offset;
-      end += offset;
-    }
-
-    vec4 viewStart = modelViewMatrix * vec4(start, 1.0);
-    vec4 viewEnd = modelViewMatrix * vec4(end, 1.0);
-
-    vec3 axis = viewEnd.xyz - viewStart.xyz;
-    float lenFull = length(axis);
-    vec3 dir = axis / max(lenFull, 0.0001);
-
-    float clip = uJointRadius * uBondScaleMultiplier;
-    float scaledRadius = instanceRadius * uBondScaleMultiplier;
-
-    vec3 center = instanceEnd < 0.5
-      ? viewStart.xyz + dir * clip
-      : viewEnd.xyz - dir * clip;
-
     vColor = instanceColor;
-    vRadius = scaledRadius;
-    vViewCenter = center;
+    vUv = position.xy;
+    vOpacityOverride = 1.0;
 
-    vec3 viewPos = center;
+    float scaledRadius = uJointRadius * uBondScaleMultiplier;
+    vRadius = scaledRadius;
+
+    vec4 viewCenter = modelViewMatrix * vec4(instanceCenter, 1.0);
+    vViewCenter = viewCenter.xyz;
+
+    vec3 viewPos = viewCenter.xyz;
     viewPos.xy += position.xy * scaledRadius;
 
     gl_Position = projectionMatrix * vec4(viewPos, 1.0);
