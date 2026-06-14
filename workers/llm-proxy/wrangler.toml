@@ -2,6 +2,16 @@ name = "megane-llm-proxy"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
+# Persist runtime logs (console.log/error from src/proxy.ts) to Workers Logs
+# so past upstream errors — e.g. an OpenRouter 400 for a bad model slug — can
+# be inspected in the dashboard, not just via a live `wrangler tail`. This
+# demo is rate-limited to 30 requests/IP/day, so log volume sits far under
+# the free allowance (200k events/day); head_sampling_rate=1 keeps 100% of
+# the handful of events for full visibility.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 # Origins allowed to call this proxy (comma-separated). CORS and the
 # explicit Origin check in src/index.ts both key off this list. The first
 # entry is the GitHub Pages docs demo; the second is the custom-domain S3
