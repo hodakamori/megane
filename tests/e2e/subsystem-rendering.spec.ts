@@ -32,7 +32,7 @@ import {
   getReadyState,
 } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
-import { connectEdge, findNodeIdByType, insertNode } from "./lib/pipeline";
+import { connectEdge, findNodeIdByType, insertNode, setNodeParam } from "./lib/pipeline";
 import { getVisibleSubsystems } from "./lib/render-utils";
 
 const PLATFORM = "subsystem-rendering";
@@ -95,6 +95,27 @@ test("subsystems: inserting label_generator turns on labels", async () => {
   expect(v.labels).toBe(true);
   await stabilizeUi(boot!.scope);
   await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-labels`);
+});
+
+test("subsystems: 'stick' representation hides atoms but keeps bonds visible", async () => {
+  if (!boot) test.skip(true, "boot not initialised");
+  const before = await getReadyState(boot!.scope);
+  const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
+  const viewportId = await findNodeIdByType(boot!.scope, "viewport");
+  const id = await insertNode(boot!.scope, "representation");
+  await setNodeParam(boot!.scope, id, { mode: "stick" });
+  await connectEdge(boot!.scope, loaderId, id, "particle", "in");
+  await connectEdge(boot!.scope, id, viewportId, "out", "particle");
+  await waitForReady(boot!.scope, { untilEpoch: before.renderEpoch + 1, timeout: 10_000 }).catch(
+    () => {
+      /* fine if no new frame */
+    },
+  );
+  const v = await getVisibleSubsystems(boot!.scope);
+  expect(v.atoms).toBe(false);
+  expect(v.bonds).toBe(true);
+  await stabilizeUi(boot!.scope);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-stick`);
 });
 
 test("subsystems: inserting polyhedron_generator wires the polyhedra subsystem", async () => {

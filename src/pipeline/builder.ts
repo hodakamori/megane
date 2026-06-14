@@ -324,7 +324,7 @@ export class Color extends PipelineNode {
  *   inp.particle — atom data in
  *   out.particle — atom data tagged with the representation override
  */
-export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface";
+export type RepresentationMode = "atoms" | "cartoon" | "both" | "surface" | "stick";
 
 export class Representation extends PipelineNode {
   readonly nodeType = "representation";

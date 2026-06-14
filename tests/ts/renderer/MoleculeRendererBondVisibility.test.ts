@@ -92,4 +92,36 @@ describe("MoleculeRenderer — bond visibility composition", () => {
     renderer.setRepresentationType("both");
     expect(bond.mesh.visible).toBe(false);
   });
+
+  it("'stick' hides the atom mesh but keeps bonds (and joint spheres) visible when bonds are available", () => {
+    const { renderer, atom, bond } = makeRendererWithMeshes();
+    renderer.setBondsVisible(true);
+    renderer.setRepresentationType("stick");
+    expect(atom.mesh.visible).toBe(false);
+    expect(bond.mesh.visible).toBe(true);
+  });
+
+  it("'stick' hides bonds when the pipeline reports no bonds", () => {
+    const { renderer, atom, bond } = makeRendererWithMeshes();
+    renderer.setBondsVisible(false);
+    renderer.setRepresentationType("stick");
+    expect(atom.mesh.visible).toBe(false);
+    expect(bond.mesh.visible).toBe(false);
+  });
+
+  it("setBondsVisible keeps bonds visible in 'stick' mode after switching from 'atoms'", () => {
+    const { renderer, bond } = makeRendererWithMeshes();
+    renderer.setBondsVisible(true);
+    renderer.setRepresentationType("atoms");
+    expect(bond.mesh.visible).toBe(true);
+
+    renderer.setRepresentationType("stick");
+    expect(bond.mesh.visible).toBe(true);
+
+    renderer.setBondsVisible(false);
+    expect(bond.mesh.visible).toBe(false);
+
+    renderer.setBondsVisible(true);
+    expect(bond.mesh.visible).toBe(true);
+  });
 });

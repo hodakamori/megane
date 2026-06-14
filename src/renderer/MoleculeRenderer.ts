@@ -104,7 +104,7 @@ export interface MeganeSubsystemVisibility {
 }
 
 /** Representation mode for the viewer. */
-export type RepresentationType = "atoms" | "cartoon" | "both" | "surface";
+export type RepresentationType = "atoms" | "cartoon" | "both" | "surface" | "stick";
 
 export interface MeganeRendererMemory {
   geometries: number;
@@ -790,17 +790,21 @@ export class MoleculeRenderer {
    * "atoms"  – classic ball-and-stick (default)
    * "cartoon" – Cα backbone only; atoms/bonds hidden
    * "both"   – cartoon overlaid on atoms/bonds
+   * "stick"  – Licorice-style sticks only; big atom spheres hidden
    */
   setRepresentationType(type: RepresentationType): void {
     this.representationType = type;
     const showAtoms = type === "atoms" || type === "both";
     const showCartoon = type === "cartoon" || type === "both";
     const showSurface = type === "surface";
+    // "stick" hides the big per-element atom spheres but still shows the
+    // Licorice-style bond/joint mesh (ImpostorBondMesh draws both).
+    const showBonds = (showAtoms || type === "stick") && this.bondsAvailable;
 
     if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
     // Bonds also depend on whether the pipeline emits any bonds; otherwise
     // stale geometry from a previous structure would resurface here.
-    if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms && this.bondsAvailable;
+    if (this.bondRenderer) this.bondRenderer.mesh.visible = showBonds;
     if (this.cartoonRenderer) {
       // Only show cartoon when it has backbone data
       const hasBackbone = this.snapshot?.caIndices != null && this.snapshot.caIndices.length > 0;
@@ -824,8 +828,11 @@ export class MoleculeRenderer {
   setBondsVisible(visible: boolean): void {
     this.bondsAvailable = visible;
     if (this.bondRenderer) {
-      const showAtoms = this.representationType === "atoms" || this.representationType === "both";
-      this.bondRenderer.mesh.visible = visible && showAtoms;
+      const showBonds =
+        this.representationType === "atoms" ||
+        this.representationType === "both" ||
+        this.representationType === "stick";
+      this.bondRenderer.mesh.visible = visible && showBonds;
     }
   }
 

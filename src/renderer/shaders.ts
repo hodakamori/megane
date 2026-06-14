@@ -123,6 +123,7 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   uniform mat4 modelViewMatrix;
   uniform mat4 projectionMatrix;
   uniform float uBondScaleMultiplier;
+  uniform float uJointRadius;
   uniform sampler2D uPositionTex;
   uniform int uPositionTexWidth;
 
@@ -185,8 +186,13 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 
     vec3 viewMid = (viewStart.xyz + viewEnd.xyz) * 0.5;
     vec3 axis = viewEnd.xyz - viewStart.xyz;
-    float len = length(axis);
-    vec3 dir = axis / max(len, 0.0001);
+    float lenFull = length(axis);
+    vec3 dir = axis / max(lenFull, 0.0001);
+
+    // Symmetric Licorice-style clip: shorten the cylinder at both ends so a
+    // joint sphere of the same radius can cap each end, forming a capsule.
+    float clip = uJointRadius * uBondScaleMultiplier;
+    float len = max(lenFull - 2.0 * clip, 0.0);
 
     vec3 side = normalize(cross(dir, vec3(0.0, 0.0, 1.0)));
 
