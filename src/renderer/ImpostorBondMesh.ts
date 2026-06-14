@@ -32,7 +32,7 @@ import {
   bondVertexShader,
   bondFragmentShader,
   jointVertexShader,
-  atomFragmentShader,
+  jointFragmentShader,
 } from "./shaders";
 
 const TEX_MAX_WIDTH = 4096;
@@ -173,12 +173,11 @@ export class ImpostorBondMesh {
     this.jointMaterial = new THREE.RawShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader: jointVertexShader,
-      fragmentShader: atomFragmentShader,
+      fragmentShader: jointFragmentShader,
       uniforms: {
         uOpacity: { value: 1.0 },
         uBondScaleMultiplier: { value: 1.0 },
         uJointRadius: { value: BOND_RADIUS },
-        uUsePerAtomOverrides: { value: 0 },
       },
       depthWrite: true,
       depthTest: true,
