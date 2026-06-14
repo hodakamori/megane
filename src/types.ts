@@ -86,6 +86,7 @@ export interface AtomRenderer {
   setScaleOverrides?(overrides: Float32Array): void;
   setOpacityOverrides?(overrides: Float32Array): void;
   clearOverrides?(): void;
+  setLicoriceMode?(enabled: boolean): void;
   dispose(): void;
 }
 
@@ -98,6 +99,7 @@ export interface BondRenderer {
   setScale?(scale: number, snapshot: Snapshot): void;
   setBondOpacityOverrides?(overrides: Float32Array): void;
   clearBondOpacityOverrides?(): void;
+  setLicoriceMode?(enabled: boolean): void;
   dispose(): void;
 }
 

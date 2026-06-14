@@ -104,7 +104,7 @@ export interface MeganeSubsystemVisibility {
 }
 
 /** Representation mode for the viewer. */
-export type RepresentationType = "atoms" | "cartoon" | "both" | "surface";
+export type RepresentationType = "atoms" | "cartoon" | "both" | "surface" | "licorice";
 
 export interface MeganeRendererMemory {
   geometries: number;
@@ -787,13 +787,14 @@ export class MoleculeRenderer {
 
   /**
    * Switch between atom/bond and cartoon representation modes.
-   * "atoms"  – classic ball-and-stick (default)
-   * "cartoon" – Cα backbone only; atoms/bonds hidden
-   * "both"   – cartoon overlaid on atoms/bonds
+   * "atoms"    – classic ball-and-stick (default)
+   * "cartoon"  – Cα backbone only; atoms/bonds hidden
+   * "both"     – cartoon overlaid on atoms/bonds
+   * "licorice" – continuous tube: atoms and bonds share the same radius
    */
   setRepresentationType(type: RepresentationType): void {
     this.representationType = type;
-    const showAtoms = type === "atoms" || type === "both";
+    const showAtoms = type === "atoms" || type === "both" || type === "licorice";
     const showCartoon = type === "cartoon" || type === "both";
     const showSurface = type === "surface";
 
@@ -812,6 +813,10 @@ export class MoleculeRenderer {
       }
       this.surfaceRenderer.setVisible(showSurface);
     }
+
+    const licorice = type === "licorice";
+    this.atomRenderer?.setLicoriceMode?.(licorice);
+    this.bondRenderer?.setLicoriceMode?.(licorice);
   }
 
   /**
@@ -926,6 +931,10 @@ export class MoleculeRenderer {
     }
     if (this.bondOpacity !== 1.0) {
       this.bondRenderer.setOpacity?.(this.bondOpacity);
+    }
+    if (this.representationType === "licorice") {
+      this.atomRenderer.setLicoriceMode?.(true);
+      this.bondRenderer.setLicoriceMode?.(true);
     }
   }
 

@@ -459,6 +459,11 @@ export const TRIPLE_BOND_RADIUS = 0.08;
 export const AROMATIC_BOND_RADIUS = 0.1;
 export const AROMATIC_DASH_RADIUS = 0.06;
 
+/** Licorice atom/bond radius in Angstroms (VMD default). */
+export const LICORICE_RADIUS = 0.3;
+/** Scale factor applied to standard bond-order radii for licorice mode. */
+export const LICORICE_BOND_SCALE = LICORICE_RADIUS / BOND_RADIUS;
+
 // Element symbols indexed by atomic number (Z=1-92)
 export const ELEMENT_SYMBOLS: Record<number, string> = {
   1: "H",

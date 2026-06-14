@@ -32,18 +32,14 @@ describe("RepresentationNode", () => {
       id: "r1",
       params: { mode: "cartoon" },
     });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     const select = screen.getByTestId("representation-node-mode") as HTMLSelectElement;
     expect(select.value).toBe("cartoon");
   });
 
   it("defaults to atoms when no value is supplied", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     const select = screen.getByTestId("representation-node-mode") as HTMLSelectElement;
     expect(select.value).toBe("atoms");
   });
@@ -53,28 +49,36 @@ describe("RepresentationNode", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
     usePipelineStore.setState({ updateNodeParams });
 
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     fireEvent.change(screen.getByTestId("representation-node-mode"), {
       target: { value: "surface" },
     });
     expect(updateNodeParams).toHaveBeenCalledWith("r1", { mode: "surface" });
   });
 
+  it("offers a Licorice option and reports it on selection", () => {
+    const updateNodeParams = vi.fn();
+    const seeded = seedPipelineStore("representation", { id: "r1" });
+    usePipelineStore.setState({ updateNodeParams });
+
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
+    const select = screen.getByTestId("representation-node-mode") as HTMLSelectElement;
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toContain("licorice");
+
+    fireEvent.change(select, { target: { value: "licorice" } });
+    expect(updateNodeParams).toHaveBeenCalledWith("r1", { mode: "licorice" });
+  });
+
   it("renders inside a NodeShell with the Representation title", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     expect(screen.getByText("Representation")).toBeInTheDocument();
   });
 
   it("dropdown carries the 'nodrag' class so xyflow does not start a node drag", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     expect(screen.getByTestId("representation-node-mode").className).toContain("nodrag");
   });
 });

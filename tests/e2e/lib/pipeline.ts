@@ -105,6 +105,50 @@ export async function setNodeParam(
   );
 }
 
+/**
+ * Disconnect an existing edge between two nodes. Optional handle names
+ * narrow the match when a node pair has more than one edge between them.
+ * Re-runs the pipeline afterwards via the store's `onEdgesChange`, mirroring
+ * how React Flow removes edges interactively.
+ */
+export async function disconnectEdge(
+  scope: Scope,
+  sourceId: string,
+  targetId: string,
+  sourceHandle?: string,
+  targetHandle?: string,
+): Promise<void> {
+  await scope.evaluate(
+    ({ s, t, sh, th }) => {
+      const w = window as Window & {
+        __megane_test_pipeline_store?: {
+          getState: () => {
+            edges: Array<{
+              id: string;
+              source: string;
+              target: string;
+              sourceHandle?: string | null;
+              targetHandle?: string | null;
+            }>;
+            onEdgesChange: (changes: Array<{ id: string; type: "remove" }>) => void;
+          };
+        };
+      };
+      const store = w.__megane_test_pipeline_store;
+      if (!store) throw new Error("__megane_test_pipeline_store not exposed; testMode off?");
+      const { edges, onEdgesChange } = store.getState();
+      const toRemove = edges.filter((e) => {
+        if (e.source !== s || e.target !== t) return false;
+        if (sh && e.sourceHandle !== sh) return false;
+        if (th && e.targetHandle !== th) return false;
+        return true;
+      });
+      onEdgesChange(toRemove.map((e) => ({ id: e.id, type: "remove" as const })));
+    },
+    { s: sourceId, t: targetId, sh: sourceHandle, th: targetHandle },
+  );
+}
+
 /** Remove a node by id. Edges connected to it are dropped automatically. */
 export async function removeNode(scope: Scope, id: string): Promise<void> {
   await scope.evaluate(

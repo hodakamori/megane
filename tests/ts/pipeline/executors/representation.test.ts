@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { executeRepresentation } from "@/pipeline/executors/representation";
-import type {
-  ParticleData,
-  PipelineData,
-  RepresentationParams,
-} from "@/pipeline/types";
+import type { ParticleData, PipelineData, RepresentationParams } from "@/pipeline/types";
 import type { Snapshot } from "@/types";
 
 function makeSnapshot(): Snapshot {
@@ -56,6 +52,13 @@ describe("executeRepresentation", () => {
     const out = executeRepresentation(params, inputs(upstream));
     const result = out.get("out") as ParticleData;
     expect(result.representationOverride).toBe("surface");
+  });
+
+  it("tags the outgoing particle with licorice mode", () => {
+    const params: RepresentationParams = { type: "representation", mode: "licorice" };
+    const out = executeRepresentation(params, inputs(makeParticle()));
+    const result = out.get("out") as ParticleData;
+    expect(result.representationOverride).toBe("licorice");
   });
 
   it("does not mutate the upstream particle", () => {

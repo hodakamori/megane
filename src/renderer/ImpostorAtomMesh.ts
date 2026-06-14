@@ -12,7 +12,7 @@
 
 import * as THREE from "three";
 import type { Snapshot } from "../types";
-import { getColor, getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
+import { getColor, getRadius, BALL_STICK_ATOM_SCALE, LICORICE_RADIUS } from "../constants";
 import { atomVertexShader, atomFragmentShader } from "./shaders";
 import { type ColorContext, getAtomColorForScheme } from "../colorSchemes";
 
@@ -34,6 +34,8 @@ export class ImpostorAtomMesh {
   private opacityOverrideBuf: Float32Array;
   private nAtoms = 0;
   private capacity: number;
+  private elements: Uint8Array | null = null;
+  private licoriceMode = false;
 
   constructor(maxAtoms: number = 1_000_000) {
     this.capacity = maxAtoms;
@@ -92,6 +94,7 @@ export class ImpostorAtomMesh {
   loadSnapshot(snapshot: Snapshot, colorCtx?: ColorContext): void {
     const { nAtoms, positions, elements } = snapshot;
     this.nAtoms = nAtoms;
+    this.elements = elements;
 
     // Grow buffers if needed
     if (nAtoms > this.capacity) {
@@ -105,7 +108,9 @@ export class ImpostorAtomMesh {
       this.centerBuf[i3 + 1] = positions[i3 + 1];
       this.centerBuf[i3 + 2] = positions[i3 + 2];
 
-      this.radiusBuf[i] = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
+      this.radiusBuf[i] = this.licoriceMode
+        ? LICORICE_RADIUS
+        : getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
 
       const [r, g, b] = colorCtx
         ? getAtomColorForScheme(i, snapshot, colorCtx)
@@ -136,6 +141,30 @@ export class ImpostorAtomMesh {
   /** Update atom radius scale (O(1) via shader uniform). */
   setScale(_scale: number, _snapshot: Snapshot): void {
     this.material.uniforms.uScaleMultiplier.value = _scale;
+  }
+
+  /**
+   * Toggle licorice mode: when enabled, every atom is given a fixed
+   * `LICORICE_RADIUS` (matching the licorice bond radius) instead of its
+   * van-der-Waals-scaled ball-and-stick radius, producing a continuous tube.
+   */
+  setLicoriceMode(enabled: boolean): void {
+    if (this.licoriceMode === enabled || !this.elements) {
+      this.licoriceMode = enabled;
+      return;
+    }
+    this.licoriceMode = enabled;
+    for (let i = 0; i < this.nAtoms; i++) {
+      this.radiusBuf[i] = enabled
+        ? LICORICE_RADIUS
+        : getRadius(this.elements[i]) * BALL_STICK_ATOM_SCALE;
+    }
+    this.radiusAttr.needsUpdate = true;
+  }
+
+  /** Read-only view of the per-atom radius buffer (length `nAtoms`). */
+  getRadiusBuffer(): Float32Array {
+    return this.radiusBuf.subarray(0, this.nAtoms);
   }
 
   /** Set global atom opacity. */

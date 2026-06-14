@@ -27,6 +27,7 @@ import {
   TRIPLE_BOND_RADIUS,
   AROMATIC_BOND_RADIUS,
   AROMATIC_DASH_RADIUS,
+  LICORICE_BOND_SCALE,
 } from "../constants";
 import { bondVertexShader, bondFragmentShader } from "./shaders";
 
@@ -48,6 +49,10 @@ export class ImpostorBondMesh {
   private colorABuf: Float32Array;
   private colorBBuf: Float32Array;
   private radiusBuf: Float32Array;
+  // CPU-only: standard (non-licorice) radius per visual instance, used to
+  // recompute radiusBuf when licorice mode is toggled without re-running
+  // loadSnapshot.
+  private baseRadiusBuf: Float32Array;
   private dashedBuf: Float32Array;
   private opacityBuf: Float32Array; // per-visual-instance opacity override
   private logicalBondIdx: Float32Array; // CPU-only: maps visual instance → logical bond index
@@ -73,6 +78,7 @@ export class ImpostorBondMesh {
   private nAtoms: number = 0;
 
   private capacity: number;
+  private licoriceMode = false;
 
   constructor(maxBonds: number = 3_000_000) {
     this.capacity = maxBonds;
@@ -95,6 +101,7 @@ export class ImpostorBondMesh {
     this.colorABuf = new Float32Array(maxBonds * 3);
     this.colorBBuf = new Float32Array(maxBonds * 3);
     this.radiusBuf = new Float32Array(maxBonds);
+    this.baseRadiusBuf = new Float32Array(maxBonds);
     this.dashedBuf = new Float32Array(maxBonds);
     this.opacityBuf = new Float32Array(maxBonds).fill(1.0);
     this.logicalBondIdx = new Float32Array(maxBonds);
@@ -352,7 +359,8 @@ export class ImpostorBondMesh {
     this.colorBBuf[i3 + 1] = bg;
     this.colorBBuf[i3 + 2] = bb;
 
-    this.radiusBuf[idx] = radius;
+    this.baseRadiusBuf[idx] = radius;
+    this.radiusBuf[idx] = this.licoriceMode ? radius * LICORICE_BOND_SCALE : radius;
     this.dashedBuf[idx] = dashed;
   }
 
@@ -450,6 +458,7 @@ export class ImpostorBondMesh {
     const newColorA = new Float32Array(this.capacity * 3);
     const newColorB = new Float32Array(this.capacity * 3);
     const newRadius = new Float32Array(this.capacity);
+    const newBaseRadius = new Float32Array(this.capacity);
     const newDashed = new Float32Array(this.capacity);
     const newOpacity = new Float32Array(this.capacity).fill(1.0);
     const newLogical = new Float32Array(this.capacity);
@@ -461,6 +470,7 @@ export class ImpostorBondMesh {
     newColorA.set(this.colorABuf);
     newColorB.set(this.colorBBuf);
     newRadius.set(this.radiusBuf);
+    newBaseRadius.set(this.baseRadiusBuf);
     newDashed.set(this.dashedBuf);
     newOpacity.set(this.opacityBuf);
     newLogical.set(this.logicalBondIdx);
@@ -472,6 +482,7 @@ export class ImpostorBondMesh {
     this.colorABuf = newColorA;
     this.colorBBuf = newColorB;
     this.radiusBuf = newRadius;
+    this.baseRadiusBuf = newBaseRadius;
     this.dashedBuf = newDashed;
     this.opacityBuf = newOpacity;
     this.logicalBondIdx = newLogical;
@@ -517,6 +528,28 @@ export class ImpostorBondMesh {
   /** Set bond radius scale multiplier (O(1) via shader uniform). */
   setScale(scale: number, _snapshot?: Snapshot): void {
     this.bondMaterial.uniforms.uBondScaleMultiplier.value = scale;
+  }
+
+  /**
+   * Toggle licorice mode: when enabled, every bond radius is scaled by
+   * `LICORICE_BOND_SCALE` from its standard bond-order radius, producing
+   * thick continuous tubes that match the licorice atom radius.
+   */
+  setLicoriceMode(enabled: boolean): void {
+    if (this.licoriceMode === enabled) return;
+    this.licoriceMode = enabled;
+    const count = this.geo.instanceCount;
+    for (let i = 0; i < count; i++) {
+      this.radiusBuf[i] = enabled
+        ? this.baseRadiusBuf[i] * LICORICE_BOND_SCALE
+        : this.baseRadiusBuf[i];
+    }
+    this.radiusAttr.needsUpdate = true;
+  }
+
+  /** Read-only view of the per-instance radius buffer (length `instanceCount`). */
+  getRadiusBuffer(): Float32Array {
+    return this.radiusBuf.subarray(0, this.geo.instanceCount);
   }
 
   dispose(): void {
