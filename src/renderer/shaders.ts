@@ -141,17 +141,17 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 
   out vec3 vColorA;
   out vec3 vColorB;
-  out vec2 vCylUv;
   out float vDashed;
   out float vBondOpacity;
-  // View-space cylinder frame, used by the fragment shader to reconstruct the
-  // surface point and write a correct gl_FragDepth (so the cylinder bulges
-  // toward the camera and joins the atom spheres without a visible seam).
+  // View-space cylinder description + this fragment's billboard position. The
+  // fragment shader ray-casts the analytic cylinder (correct for any viewing
+  // angle), unlike a flat billboard parameterization which is only accurate for
+  // bonds perpendicular to the camera.
   out vec3 vViewMid;
   out vec3 vAxisDir;
-  out vec3 vSideDir;
   out float vRadius;
   out float vHalfLen;
+  out vec3 vViewRayPos;
 
   vec3 getAtomPos(int idx) {
     int tx = idx % uPositionTexWidth;
@@ -162,7 +162,6 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   void main() {
     vColorA = instanceColorA;
     vColorB = instanceColorB;
-    vCylUv = uv;
     vDashed = instanceDashed;
     vBondOpacity = instanceBondOpacity;
 
@@ -200,17 +199,20 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 
     float radius = instanceRadius * uBondScaleMultiplier;
 
-    // Expose the view-space cylinder frame to the fragment shader.
+    // Expose the view-space cylinder to the fragment shader.
     vViewMid = viewMid;
     vAxisDir = dir;
-    vSideDir = side;
     vRadius = radius;
     vHalfLen = len * 0.5;
 
+    // Billboard that conservatively covers the cylinder's screen silhouette.
+    // Extend the half-length by the radius so the rounded ends are covered, and
+    // span the full radius along the screen-perpendicular side axis.
     vec3 viewPos = viewMid
-      + dir * (position.y * len * 0.5)
+      + dir * (position.y * (len * 0.5 + radius))
       + side * (position.x * radius);
 
+    vViewRayPos = viewPos;
     gl_Position = projectionMatrix * vec4(viewPos, 1.0);
   }
 `;
@@ -219,14 +221,13 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
 
   in vec3 vColorA;
   in vec3 vColorB;
-  in vec2 vCylUv;
   in float vDashed;
   in float vBondOpacity;
   in vec3 vViewMid;
   in vec3 vAxisDir;
-  in vec3 vSideDir;
   in float vRadius;
   in float vHalfLen;
+  in vec3 vViewRayPos;
 
   uniform mat4 projectionMatrix;
   uniform float uOpacity;
@@ -235,31 +236,48 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
   out vec4 fragColor;
 
   void main() {
-    // Dashed bond: discard alternate segments along bond length
+    // Analytic ray-cylinder intersection in view space. A flat billboard
+    // parameterization mis-places the surface (and thus gl_FragDepth) for bonds
+    // tilted toward/away from the camera, so the cylinder fails to occlude the
+    // atom sphere's inner hemisphere and the sphere looks like a ball sitting on
+    // top of the stick. Casting the real cylinder fixes the depth at any angle.
+    bool isOrtho = projectionMatrix[2][3] == 0.0;
+    vec3 ro = isOrtho ? vec3(vViewRayPos.xy, 0.0) : vec3(0.0);
+    vec3 rd = isOrtho ? vec3(0.0, 0.0, -1.0) : normalize(vViewRayPos);
+
+    vec3 d = vAxisDir;
+    vec3 oc = ro - vViewMid;
+    // Components of the ray and offset perpendicular to the cylinder axis.
+    vec3 rdPerp = rd - dot(rd, d) * d;
+    vec3 ocPerp = oc - dot(oc, d) * d;
+    float a = dot(rdPerp, rdPerp);
+    float b = 2.0 * dot(rdPerp, ocPerp);
+    float c = dot(ocPerp, ocPerp) - vRadius * vRadius;
+    float disc = b * b - 4.0 * a * c;
+    if (disc < 0.0 || a < 1e-8) discard;
+    float sq = sqrt(disc);
+    // Near (entry) root first; fall back to the far root if the camera is inside.
+    float t = (-b - sq) / (2.0 * a);
+    if (t < 0.0) t = (-b + sq) / (2.0 * a);
+    if (t < 0.0) discard;
+
+    vec3 hit = ro + t * rd;
+    float axial = dot(hit - vViewMid, d);
+    if (abs(axial) > vHalfLen) discard; // beyond the stick ends; the spheres cap it
+
+    vec3 normal = normalize((hit - vViewMid) - axial * d);
+    if (dot(normal, rd) > 0.0) normal = -normal; // face the camera
+
+    // Split coloring at the midpoint, computed from the true axial position.
+    float tAxial = axial / vHalfLen; // -1 at atom A, +1 at atom B
     if (vDashed > 0.5) {
-      if (sin(vCylUv.y * 30.0) < 0.0) discard;
+      if (sin(tAxial * 30.0) < 0.0) discard;
     }
+    vec3 baseColor = tAxial < 0.0 ? vColorA : vColorB;
 
-    // vCylUv.y runs from -1 at atom A to +1 at atom B; split the bond at its
-    // midpoint so each half takes its endpoint atom's color.
-    vec3 baseColor = vCylUv.y < 0.0 ? vColorA : vColorB;
-
-    float nx = vCylUv.x;
-    float nz = sqrt(max(0.0, 1.0 - nx * nx));
-    vec3 normal = vec3(nx, 0.0, nz);
-
-    // Reconstruct the cylinder surface point in view space and write a correct
-    // depth, mirroring the atom shader. Without this the cylinder sits on the
-    // flat billboard plane while spheres bulge toward the camera, producing a
-    // hard seam at the sphere/cylinder joint. (0,0,1) is the view-space camera
-    // direction, matching the side vector chosen in the vertex shader.
-    vec3 axisPoint = vViewMid + vAxisDir * (vCylUv.y * vHalfLen);
-    vec3 surfaceViewPos = axisPoint
-      + vSideDir * (nx * vRadius)
-      + vec3(0.0, 0.0, 1.0) * (nz * vRadius);
-    vec4 clipPos = projectionMatrix * vec4(surfaceViewPos, 1.0);
-    float ndcDepth = clipPos.z / clipPos.w;
-    gl_FragDepth = ndcDepth * 0.5 + 0.5;
+    // Correct per-fragment depth from the real surface hit.
+    vec4 clipPos = projectionMatrix * vec4(hit, 1.0);
+    gl_FragDepth = (clipPos.z / clipPos.w) * 0.5 + 0.5;
 
     // Hemisphere ambient: sky blue on top, warm brown on bottom
     vec3 skyColor = vec3(0.87, 0.92, 1.0);
@@ -279,11 +297,11 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     vec3 halfDir = normalize(lightDir1 + viewDir);
     float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
-    // Fresnel rim
-    float fresnel = pow(1.0 - nz, 3.0) * 0.15;
-
-    // Edge darkening (unified with the atom shader so the joint matches)
-    float edgeFactor = mix(0.7, 1.0, nz);
+    // Fresnel rim + edge darkening, unified with the atom shader so the
+    // sphere/cylinder joint has no shading discontinuity.
+    float facing = max(normal.z, 0.0);
+    float fresnel = pow(1.0 - facing, 3.0) * 0.15;
+    float edgeFactor = mix(0.7, 1.0, facing);
 
     vec3 color = baseColor * (ambient + diffuse) * edgeFactor
                + vec3(1.0) * spec * 0.3
