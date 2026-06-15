@@ -150,13 +150,15 @@ fn parse_header(lines: &[&str]) -> HeaderData {
 /// Parse the Masses section and return a map from type_id → mass.
 fn parse_masses_section(lines: &[&str], start: usize) -> HashMap<u32, f32> {
     let mut type_to_mass: HashMap<u32, f32> = HashMap::new();
+    let mut tokens: Vec<&str> = Vec::new();
 
     for line in lines.iter().skip(start + 1) {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        tokens.clear();
+        tokens.extend(trimmed.split_whitespace());
         if tokens.is_empty() {
             continue;
         }
@@ -174,6 +176,50 @@ fn parse_masses_section(lines: &[&str], start: usize) -> HashMap<u32, f32> {
     type_to_mass
 }
 
+// ── Atom ID → index map ─────────────────────────────────────────────────────
+
+/// Sentinel marking an empty slot in the dense atom-ID table.
+const ID_SENTINEL: u32 = u32::MAX;
+
+/// Maps LAMMPS 1-based atom IDs to 0-based atom indices.
+///
+/// The common case — atom IDs spanning `1..=n_atoms` — is served by a dense
+/// `Vec` lookup (no hashing). IDs outside that range fall back to a `HashMap`,
+/// so behaviour is identical to a plain `HashMap<u32, usize>` while avoiding
+/// per-atom hashing for typical files.
+struct IdToIndex {
+    /// `table[id] == ID_SENTINEL` means "not present"; otherwise the index.
+    table: Vec<u32>,
+    overflow: HashMap<u32, usize>,
+}
+
+impl IdToIndex {
+    fn with_capacity(n_atoms: usize) -> Self {
+        Self {
+            table: vec![ID_SENTINEL; n_atoms + 1],
+            overflow: HashMap::new(),
+        }
+    }
+
+    fn insert(&mut self, id: u32, index: usize) {
+        if (id as usize) < self.table.len() {
+            self.table[id as usize] = index as u32;
+        } else {
+            self.overflow.insert(id, index);
+        }
+    }
+
+    fn get(&self, id: u32) -> Option<usize> {
+        if (id as usize) < self.table.len() {
+            let v = self.table[id as usize];
+            if v != ID_SENTINEL {
+                return Some(v as usize);
+            }
+        }
+        self.overflow.get(&id).copied()
+    }
+}
+
 // ── Atoms section ─────────────────────────────────────────────────────────
 
 /// Data extracted from the Atoms section.
@@ -182,7 +228,7 @@ struct AtomsData {
     elements: Vec<u8>,
     labels: Vec<String>,
     /// Maps LAMMPS 1-based atom IDs to 0-based indices.
-    id_to_index: HashMap<u32, usize>,
+    id_to_index: IdToIndex,
     count: usize,
 }
 
@@ -206,8 +252,8 @@ fn parse_atoms_section(
     let style = if let Some(hint) = style_hint {
         hint
     } else if data_start < lines.len() {
-        let first_tokens: Vec<&str> = lines[data_start].split_whitespace().collect();
-        detect_style_from_fields(first_tokens.len())
+        let field_count = lines[data_start].split_whitespace().count();
+        detect_style_from_fields(field_count)
             .ok_or("Cannot detect atom_style: unexpected number of fields")?
     } else {
         return Err("Atoms section is empty".into());
@@ -216,15 +262,17 @@ fn parse_atoms_section(
     let mut positions = Vec::with_capacity(n_atoms * 3);
     let mut elements = Vec::with_capacity(n_atoms);
     let mut labels = Vec::with_capacity(n_atoms);
-    let mut id_to_index: HashMap<u32, usize> = HashMap::new();
+    let mut id_to_index = IdToIndex::with_capacity(n_atoms);
     let mut count = 0usize;
+    let mut tokens: Vec<&str> = Vec::new();
 
     for line in lines.iter().skip(data_start) {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        tokens.clear();
+        tokens.extend(trimmed.split_whitespace());
         if tokens.is_empty() {
             continue;
         }
@@ -301,14 +349,16 @@ fn parse_atoms_section(
 
 // ── Bonds section ─────────────────────────────────────────────────────────
 
-/// Parse the Bonds section and return unique (a, b) index pairs (0-based).
-fn parse_bonds_section(
-    lines: &[&str],
-    start: usize,
-    id_to_index: &HashMap<u32, usize>,
-) -> Vec<(u32, u32)> {
+/// Unique file bonds (0-based index pairs) paired with their deduplication set.
+type FileBonds = (Vec<(u32, u32)>, HashSet<(u32, u32)>);
+
+/// Parse the Bonds section and return unique (a, b) index pairs (0-based)
+/// together with the deduplication set, so callers can reuse it for bond
+/// inference without rebuilding it.
+fn parse_bonds_section(lines: &[&str], start: usize, id_to_index: &IdToIndex) -> FileBonds {
     let mut file_bonds: Vec<(u32, u32)> = Vec::new();
     let mut bond_set: HashSet<(u32, u32)> = HashSet::new();
+    let mut tokens: Vec<&str> = Vec::new();
 
     let mut bond_data_start = start + 1;
     while bond_data_start < lines.len() && lines[bond_data_start].trim().is_empty() {
@@ -320,7 +370,8 @@ fn parse_bonds_section(
         if trimmed.is_empty() {
             continue;
         }
-        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        tokens.clear();
+        tokens.extend(trimmed.split_whitespace());
         if tokens.is_empty() {
             continue;
         }
@@ -340,12 +391,12 @@ fn parse_bonds_section(
             Err(_) => continue,
         };
         // Convert from LAMMPS 1-based IDs to 0-based indices
-        let idx_i = match id_to_index.get(&ai) {
-            Some(&idx) => idx as u32,
+        let idx_i = match id_to_index.get(ai) {
+            Some(idx) => idx as u32,
             None => continue,
         };
-        let idx_j = match id_to_index.get(&aj) {
-            Some(&idx) => idx as u32,
+        let idx_j = match id_to_index.get(aj) {
+            Some(idx) => idx as u32,
             None => continue,
         };
         let a = idx_i.min(idx_j);
@@ -355,7 +406,7 @@ fn parse_bonds_section(
         }
     }
 
-    file_bonds
+    (file_bonds, bond_set)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────
@@ -389,13 +440,12 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         return Err("No atoms parsed from Atoms section".into());
     }
 
-    let mut file_bonds = hd
+    let (mut file_bonds, bond_set) = hd
         .bonds_start
         .map(|s| parse_bonds_section(&lines, s, &atoms.id_to_index))
         .unwrap_or_default();
 
     let n_file_bonds = file_bonds.len();
-    let bond_set: HashSet<(u32, u32)> = file_bonds.iter().copied().collect();
     let inferred = bonds::infer_bonds(&atoms.positions, &atoms.elements, atoms.count, &bond_set);
     file_bonds.extend(inferred);
 
@@ -650,5 +700,58 @@ LAMMPS data file
         }
         let result = parse(&text.unwrap()).expect("parse failed");
         assert!(result.n_atoms > 0);
+    }
+
+    #[test]
+    fn test_id_to_index_dense_and_overflow() {
+        let mut map = IdToIndex::with_capacity(3);
+        // Dense path: ids within 1..=n_atoms.
+        map.insert(1, 0);
+        map.insert(3, 2);
+        // Overflow path: id outside the dense table range.
+        map.insert(100, 5);
+
+        assert_eq!(map.get(1), Some(0));
+        assert_eq!(map.get(3), Some(2));
+        assert_eq!(map.get(100), Some(5));
+        // Unset dense slot and unknown id both return None.
+        assert_eq!(map.get(2), None);
+        assert_eq!(map.get(7), None);
+    }
+
+    #[test]
+    fn test_parse_sparse_atom_ids() {
+        // Non-contiguous atom IDs (10, 25) exercise the overflow HashMap path
+        // while still producing identical 0-based bond indices.
+        let data = "\
+LAMMPS data file
+
+2 atoms
+2 atom types
+1 bonds
+1 bond types
+
+0.0 20.0 xlo xhi
+0.0 20.0 ylo yhi
+0.0 20.0 zlo zhi
+
+Masses
+
+1 15.999
+2 1.008
+
+Atoms # full
+
+10 1 1 -0.8476 10.0 10.0 10.0
+25 1 2 0.4238 10.757 10.587 10.0
+
+Bonds
+
+1 1 10 25
+";
+        let result = parse(data).expect("parse failed");
+        assert_eq!(result.n_atoms, 2);
+        assert_eq!(result.n_file_bonds, 1);
+        assert!(result.bonds.contains(&(0, 1)));
     }
 }
