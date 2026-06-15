@@ -156,12 +156,6 @@ pub fn infer_bonds(
     let cell_size: f32 = 2.5;
 
     cell_list_scan(positions, n_atoms, cell_size, |i, j| {
-        let a = i.min(j) as u32;
-        let b = i.max(j) as u32;
-        if existing_bonds.contains(&(a, b)) {
-            return None;
-        }
-
         let ri = covalent_radius(elements[i]);
         let rj = covalent_radius(elements[j]);
         let threshold = (ri + rj) * BOND_TOLERANCE;
@@ -172,7 +166,17 @@ pub fn infer_bonds(
 
         let dist_sq = dx * dx + dy * dy + dz * dz;
         if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
-            Some((a, b))
+            let a = i.min(j) as u32;
+            let b = i.max(j) as u32;
+            // Skip pairs already supplied by the file. The lookup runs only
+            // after the (cheap) distance test passes — i.e. for the few real
+            // hits rather than every candidate pair — which is a large win on
+            // topologies carrying many explicit bonds (e.g. LAMMPS full).
+            if existing_bonds.contains(&(a, b)) {
+                None
+            } else {
+                Some((a, b))
+            }
         } else {
             None
         }
@@ -311,5 +315,60 @@ mod tests {
         let elements = vec![6, 6, 6, 6];
         let bonds = infer_bonds(&positions, &elements, 4, &HashSet::new());
         assert_eq!(bonds, vec![(0, 1), (1, 2), (2, 3)]);
+    }
+
+    /// Brute-force O(n²) covalent reference, mirroring the scan predicate.
+    fn brute_force_covalent(positions: &[f32], elements: &[u8], n: usize) -> HashSet<(u32, u32)> {
+        let mut set = HashSet::new();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let dx = positions[j * 3] - positions[i * 3];
+                let dy = positions[j * 3 + 1] - positions[i * 3 + 1];
+                let dz = positions[j * 3 + 2] - positions[i * 3 + 2];
+                let d_sq = dx * dx + dy * dy + dz * dz;
+                let thr =
+                    (covalent_radius(elements[i]) + covalent_radius(elements[j])) * BOND_TOLERANCE;
+                if d_sq > MIN_BOND_DIST * MIN_BOND_DIST && d_sq <= thr * thr {
+                    set.insert((i as u32, j as u32));
+                }
+            }
+        }
+        set
+    }
+
+    #[test]
+    fn test_infer_bonds_matches_brute_force_grid() {
+        // A 3-D grid straddling many cells: the cell-list scan must find
+        // exactly the same (duplicate-free) bond set as the naive all-pairs
+        // reference, including when some pairs are pre-supplied as existing.
+        let side = 6usize;
+        let spacing = 1.4f32;
+        let n = side * side * side;
+        let mut positions = Vec::with_capacity(n * 3);
+        for x in 0..side {
+            for y in 0..side {
+                for z in 0..side {
+                    positions.push(x as f32 * spacing + y as f32 * 0.01);
+                    positions.push(y as f32 * spacing);
+                    positions.push(z as f32 * spacing);
+                }
+            }
+        }
+        let elements = vec![6u8; n];
+        let bonds = infer_bonds(&positions, &elements, n, &HashSet::new());
+
+        let set: HashSet<(u32, u32)> = bonds.iter().copied().collect();
+        assert_eq!(set.len(), bonds.len(), "bond list must be duplicate-free");
+        let reference = brute_force_covalent(&positions, &elements, n);
+        assert_eq!(set, reference);
+
+        // Pre-supplying an existing bond must drop exactly that pair.
+        let some = *reference.iter().next().unwrap();
+        let mut existing = HashSet::new();
+        existing.insert(some);
+        let filtered: HashSet<(u32, u32)> =
+            infer_bonds(&positions, &elements, n, &existing).into_iter().collect();
+        assert!(!filtered.contains(&some));
+        assert_eq!(filtered.len(), reference.len() - 1);
     }
 }
