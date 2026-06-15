@@ -90,6 +90,11 @@ class TestNodeClasses:
         n = Representation(mode="cartoon")
         assert n.mode == "cartoon"
 
+    def test_representation_licorice(self):
+        n = Representation(mode="licorice")
+        assert n.mode == "licorice"
+        assert n._node_type == "representation"
+
     def test_add_bonds_default(self):
         n = AddBonds()
         assert n.source == "distance"

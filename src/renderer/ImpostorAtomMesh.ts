@@ -34,6 +34,9 @@ export class ImpostorAtomMesh {
   private opacityOverrideBuf: Float32Array;
   private nAtoms = 0;
   private capacity: number;
+  // When non-null, every atom renders at this fixed radius (licorice mode);
+  // when null, radii fall back to per-element vdW * BALL_STICK_ATOM_SCALE.
+  private uniformRadius: number | null = null;
 
   constructor(maxAtoms: number = 1_000_000) {
     this.capacity = maxAtoms;
@@ -105,7 +108,7 @@ export class ImpostorAtomMesh {
       this.centerBuf[i3 + 1] = positions[i3 + 1];
       this.centerBuf[i3 + 2] = positions[i3 + 2];
 
-      this.radiusBuf[i] = getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
+      this.radiusBuf[i] = this.uniformRadius ?? getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
 
       const [r, g, b] = colorCtx
         ? getAtomColorForScheme(i, snapshot, colorCtx)
@@ -136,6 +139,20 @@ export class ImpostorAtomMesh {
   /** Update atom radius scale (O(1) via shader uniform). */
   setScale(_scale: number, _snapshot: Snapshot): void {
     this.material.uniforms.uScaleMultiplier.value = _scale;
+  }
+
+  /**
+   * Render every atom at a single fixed radius (licorice mode), or revert to
+   * per-element vdW radii when `radius` is null. Only the radius buffer is
+   * rewritten — colors, positions and per-atom overrides are untouched.
+   */
+  setUniformRadius(radius: number | null, snapshot: Snapshot): void {
+    this.uniformRadius = radius;
+    const { elements } = snapshot;
+    for (let i = 0; i < this.nAtoms; i++) {
+      this.radiusBuf[i] = radius ?? getRadius(elements[i]) * BALL_STICK_ATOM_SCALE;
+    }
+    this.radiusAttr.needsUpdate = true;
   }
 
   /** Set global atom opacity. */

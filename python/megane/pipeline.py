@@ -324,8 +324,9 @@ class Representation(PipelineNode):
     wins over an upstream one on the same chain.
 
     Args:
-        mode: One of ``"atoms"`` (default), ``"cartoon"``, ``"both"``,
-              ``"surface"``.
+        mode: One of ``"atoms"`` (default), ``"licorice"``, ``"cartoon"``,
+              ``"both"``, ``"surface"``. ``"licorice"`` draws atoms and bonds
+              at one equal radius as a continuous stick/tube (PyMOL licorice).
 
     Ports:
         inp.particle — atom data in
@@ -339,7 +340,7 @@ class Representation(PipelineNode):
     def __init__(
         self,
         *,
-        mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms",
+        mode: Literal["atoms", "licorice", "cartoon", "both", "surface"] = "atoms",
     ) -> None:
         super().__init__()
         self.mode = mode

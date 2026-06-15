@@ -144,6 +144,14 @@ export const bondVertexShader = /* glsl */ `precision highp float;
   out vec2 vCylUv;
   out float vDashed;
   out float vBondOpacity;
+  // View-space cylinder frame, used by the fragment shader to reconstruct the
+  // surface point and write a correct gl_FragDepth (so the cylinder bulges
+  // toward the camera and joins the atom spheres without a visible seam).
+  out vec3 vViewMid;
+  out vec3 vAxisDir;
+  out vec3 vSideDir;
+  out float vRadius;
+  out float vHalfLen;
 
   vec3 getAtomPos(int idx) {
     int tx = idx % uPositionTexWidth;
@@ -190,9 +198,18 @@ export const bondVertexShader = /* glsl */ `precision highp float;
 
     vec3 side = normalize(cross(dir, vec3(0.0, 0.0, 1.0)));
 
+    float radius = instanceRadius * uBondScaleMultiplier;
+
+    // Expose the view-space cylinder frame to the fragment shader.
+    vViewMid = viewMid;
+    vAxisDir = dir;
+    vSideDir = side;
+    vRadius = radius;
+    vHalfLen = len * 0.5;
+
     vec3 viewPos = viewMid
       + dir * (position.y * len * 0.5)
-      + side * (position.x * instanceRadius * uBondScaleMultiplier);
+      + side * (position.x * radius);
 
     gl_Position = projectionMatrix * vec4(viewPos, 1.0);
   }
@@ -205,7 +222,13 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
   in vec2 vCylUv;
   in float vDashed;
   in float vBondOpacity;
+  in vec3 vViewMid;
+  in vec3 vAxisDir;
+  in vec3 vSideDir;
+  in float vRadius;
+  in float vHalfLen;
 
+  uniform mat4 projectionMatrix;
   uniform float uOpacity;
   uniform int uUsePerBondOverrides;
 
@@ -225,7 +248,20 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     float nz = sqrt(max(0.0, 1.0 - nx * nx));
     vec3 normal = vec3(nx, 0.0, nz);
 
-    // Hemisphere ambient
+    // Reconstruct the cylinder surface point in view space and write a correct
+    // depth, mirroring the atom shader. Without this the cylinder sits on the
+    // flat billboard plane while spheres bulge toward the camera, producing a
+    // hard seam at the sphere/cylinder joint. (0,0,1) is the view-space camera
+    // direction, matching the side vector chosen in the vertex shader.
+    vec3 axisPoint = vViewMid + vAxisDir * (vCylUv.y * vHalfLen);
+    vec3 surfaceViewPos = axisPoint
+      + vSideDir * (nx * vRadius)
+      + vec3(0.0, 0.0, 1.0) * (nz * vRadius);
+    vec4 clipPos = projectionMatrix * vec4(surfaceViewPos, 1.0);
+    float ndcDepth = clipPos.z / clipPos.w;
+    gl_FragDepth = ndcDepth * 0.5 + 0.5;
+
+    // Hemisphere ambient: sky blue on top, warm brown on bottom
     vec3 skyColor = vec3(0.87, 0.92, 1.0);
     vec3 groundColor = vec3(0.6, 0.47, 0.27);
     float hemiMix = normal.y * 0.5 + 0.5;
@@ -238,17 +274,20 @@ export const bondFragmentShader = /* glsl */ `precision highp float;
     float diffuse2 = max(dot(normal, lightDir2), 0.0);
     float diffuse = diffuse1 * 0.55 + diffuse2 * 0.2;
 
-    // Specular
+    // Specular (Blinn-Phong)
     vec3 viewDir = vec3(0.0, 0.0, 1.0);
     vec3 halfDir = normalize(lightDir1 + viewDir);
     float spec = pow(max(dot(normal, halfDir), 0.0), 64.0);
 
     // Fresnel rim
-    float fresnel = pow(1.0 - nz, 3.0) * 0.1;
+    float fresnel = pow(1.0 - nz, 3.0) * 0.15;
 
-    vec3 color = baseColor * (ambient + diffuse)
-               + vec3(1.0) * spec * 0.2
-               + vec3(0.1) * fresnel;
+    // Edge darkening (unified with the atom shader so the joint matches)
+    float edgeFactor = mix(0.7, 1.0, nz);
+
+    vec3 color = baseColor * (ambient + diffuse) * edgeFactor
+               + vec3(1.0) * spec * 0.3
+               + vec3(0.15) * fresnel;
     float finalOpacity = uOpacity;
     if (uUsePerBondOverrides == 1) {
       finalOpacity *= vBondOpacity;

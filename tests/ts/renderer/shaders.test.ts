@@ -119,4 +119,20 @@ describe("bond shaders", () => {
   it("fragment shader respects per-bond opacity gating on uUsePerBondOverrides", () => {
     expect(bondFragmentShader).toMatch(/uUsePerBondOverrides\s*==\s*1/);
   });
+
+  it("fragment shader writes gl_FragDepth so cylinders join atom spheres seamlessly", () => {
+    // Without per-fragment depth the cylinder sits on the flat billboard plane
+    // while spheres bulge toward the camera, producing a hard seam at the joint.
+    expect(bondFragmentShader).toMatch(/gl_FragDepth\s*=/);
+  });
+
+  it("passes the view-space cylinder frame to the fragment shader for depth reconstruction", () => {
+    const frameVaryings = ["vViewMid", "vAxisDir", "vSideDir", "vRadius", "vHalfLen"];
+    for (const v of frameVaryings) {
+      expect(bondVertexShader, `${v} out`).toMatch(new RegExp(`\\bout\\b[^;]*\\b${v}\\b`));
+      expect(bondFragmentShader, `${v} in`).toMatch(new RegExp(`\\bin\\b[^;]*\\b${v}\\b`));
+    }
+    // The fragment must declare projectionMatrix to project the surface point.
+    expect(bondFragmentShader).toMatch(/uniform\s+mat4\s+projectionMatrix/);
+  });
 });

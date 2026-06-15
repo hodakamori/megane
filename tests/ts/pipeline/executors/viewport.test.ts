@@ -72,4 +72,9 @@ describe("executeViewport — representation pickup", () => {
     const state = executeViewport(baseParams, new Map());
     expect(state.representationMode).toBe("atoms");
   });
+
+  it("passes the licorice override through to the viewport state", () => {
+    const state = executeViewport(baseParams, inputs([makeParticle("a", "licorice")]));
+    expect(state.representationMode).toBe("licorice");
+  });
 });
