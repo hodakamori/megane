@@ -120,8 +120,9 @@ Recolors atoms using a palette mode, overriding the default per-element coloring
 
 ### representation
 Switches the rendering style for the connected particle stream.
-- Parameters: \`{ type: "representation", mode: "atoms" | "cartoon" | "both" | "surface" }\`
+- Parameters: \`{ type: "representation", mode: "atoms" | "licorice" | "cartoon" | "both" | "surface" }\`
   - "atoms": ball-and-stick / van der Waals spheres (default)
+  - "licorice": equal-radius atoms and bonds drawn as one continuous stick/tube (PyMOL licorice / sticks)
   - "cartoon": protein backbone cartoon (secondary structure)
   - "both": atoms and cartoon overlaid
   - "surface": molecular surface

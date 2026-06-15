@@ -243,12 +243,12 @@ wins over an upstream one on the same chain. When no chain has an override,
 the Viewport falls back to `"atoms"`.
 
 ```python
-Representation(*, mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms")
+Representation(*, mode: Literal["atoms", "licorice", "cartoon", "both", "surface"] = "atoms")
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `mode` | `str` | `"atoms"` | Visual representation: `"atoms"`, `"cartoon"`, `"both"`, or `"surface"` |
+| `mode` | `str` | `"atoms"` | Visual representation: `"atoms"` (ball-and-stick), `"licorice"` (equal-radius continuous sticks), `"cartoon"`, `"both"`, or `"surface"` |
 
 **Ports:** `inp.particle`, `out.particle`
 

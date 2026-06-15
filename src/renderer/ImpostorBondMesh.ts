@@ -48,9 +48,16 @@ export class ImpostorBondMesh {
   private colorABuf: Float32Array;
   private colorBBuf: Float32Array;
   private radiusBuf: Float32Array;
+  // CPU-only mirror of the per-order default radius for each visual instance.
+  // Lets setUniformRadius(null) restore licorice → ball-and-stick without
+  // re-walking bond topology.
+  private baseRadiusBuf: Float32Array;
   private dashedBuf: Float32Array;
   private opacityBuf: Float32Array; // per-visual-instance opacity override
   private logicalBondIdx: Float32Array; // CPU-only: maps visual instance → logical bond index
+  // When non-null, every visual bond renders at this fixed radius (licorice
+  // mode); when null, radii fall back to the per-order defaults.
+  private uniformRadius: number | null = null;
 
   // Persistent InstancedBufferAttribute references. Recreated only when the
   // backing typed arrays are reallocated by grow(); otherwise we just flip
@@ -95,6 +102,7 @@ export class ImpostorBondMesh {
     this.colorABuf = new Float32Array(maxBonds * 3);
     this.colorBBuf = new Float32Array(maxBonds * 3);
     this.radiusBuf = new Float32Array(maxBonds);
+    this.baseRadiusBuf = new Float32Array(maxBonds);
     this.dashedBuf = new Float32Array(maxBonds);
     this.opacityBuf = new Float32Array(maxBonds).fill(1.0);
     this.logicalBondIdx = new Float32Array(maxBonds);
@@ -352,8 +360,23 @@ export class ImpostorBondMesh {
     this.colorBBuf[i3 + 1] = bg;
     this.colorBBuf[i3 + 2] = bb;
 
-    this.radiusBuf[idx] = radius;
+    this.baseRadiusBuf[idx] = radius;
+    this.radiusBuf[idx] = this.uniformRadius ?? radius;
     this.dashedBuf[idx] = dashed;
+  }
+
+  /**
+   * Render every visual bond at a single fixed radius (licorice mode), or
+   * revert to the per-order defaults when `radius` is null. Only the radius
+   * buffer is rewritten — topology and colors are untouched.
+   */
+  setUniformRadius(radius: number | null, _snapshot?: Snapshot): void {
+    this.uniformRadius = radius;
+    const count = this.geo.instanceCount;
+    for (let v = 0; v < count; v++) {
+      this.radiusBuf[v] = radius ?? this.baseRadiusBuf[v];
+    }
+    this.radiusAttr.needsUpdate = true;
   }
 
   private copyPositionsToTexData(positions: Float32Array): void {
@@ -450,6 +473,7 @@ export class ImpostorBondMesh {
     const newColorA = new Float32Array(this.capacity * 3);
     const newColorB = new Float32Array(this.capacity * 3);
     const newRadius = new Float32Array(this.capacity);
+    const newBaseRadius = new Float32Array(this.capacity);
     const newDashed = new Float32Array(this.capacity);
     const newOpacity = new Float32Array(this.capacity).fill(1.0);
     const newLogical = new Float32Array(this.capacity);
@@ -461,6 +485,7 @@ export class ImpostorBondMesh {
     newColorA.set(this.colorABuf);
     newColorB.set(this.colorBBuf);
     newRadius.set(this.radiusBuf);
+    newBaseRadius.set(this.baseRadiusBuf);
     newDashed.set(this.dashedBuf);
     newOpacity.set(this.opacityBuf);
     newLogical.set(this.logicalBondIdx);
@@ -472,6 +497,7 @@ export class ImpostorBondMesh {
     this.colorABuf = newColorA;
     this.colorBBuf = newColorB;
     this.radiusBuf = newRadius;
+    this.baseRadiusBuf = newBaseRadius;
     this.dashedBuf = newDashed;
     this.opacityBuf = newOpacity;
     this.logicalBondIdx = newLogical;
