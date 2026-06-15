@@ -366,8 +366,9 @@ mod tests {
         let some = *reference.iter().next().unwrap();
         let mut existing = HashSet::new();
         existing.insert(some);
-        let filtered: HashSet<(u32, u32)> =
-            infer_bonds(&positions, &elements, n, &existing).into_iter().collect();
+        let filtered: HashSet<(u32, u32)> = infer_bonds(&positions, &elements, n, &existing)
+            .into_iter()
+            .collect();
         assert!(!filtered.contains(&some));
         assert_eq!(filtered.len(), reference.len() - 1);
     }

@@ -291,7 +291,10 @@ pub(crate) fn element_from_atom_name(name: &str) -> u8 {
     // Two-character symbol first (e.g. "CL" → "Cl", "FE" → "Fe").
     if let Some(second) = second {
         let num = if first.is_ascii() && second.is_ascii() {
-            let buf = [first.to_ascii_uppercase() as u8, second.to_ascii_lowercase() as u8];
+            let buf = [
+                first.to_ascii_uppercase() as u8,
+                second.to_ascii_lowercase() as u8,
+            ];
             symbol_to_atomic_num(std::str::from_utf8(&buf).unwrap_or(""))
         } else {
             let two: String = first.to_uppercase().chain(second.to_lowercase()).collect();
