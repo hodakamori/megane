@@ -157,9 +157,9 @@ describe("FilterNode", () => {
       params: { query: "", bond_query: "" },
     });
     render(<FilterNode {...nodeProps("f1", seeded.data.params as FilterParams)} />);
-    expect(screen.getByText("element, index, x, y, z, resname, mass")).toBeInTheDocument();
+    expect(screen.getByText("element, index, x, y, z, resname, mass, molecule_id")).toBeInTheDocument();
     expect(
-      screen.getByText('bond_index, atom_index, element · "both" for AND'),
+      screen.getByText('bond_index, atom_index, element, molecule_id · "both" for AND'),
     ).toBeInTheDocument();
   });
 });

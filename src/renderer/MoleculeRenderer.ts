@@ -32,7 +32,7 @@ import { CartoonRenderer } from "./CartoonRenderer";
 import { SurfaceRenderer } from "./SurfaceRenderer";
 import { LineRenderer } from "./LineRenderer";
 import type { MeshData } from "../pipeline/types";
-import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
+import { getRadius, BALL_STICK_ATOM_SCALE, LICORICE_RADIUS } from "../constants";
 import { pickAtPixel, projectToScreen } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
@@ -106,7 +106,7 @@ export interface MeganeSubsystemVisibility {
 }
 
 /** Representation mode for the viewer. */
-export type RepresentationType = "atoms" | "cartoon" | "both" | "surface" | "line";
+export type RepresentationType = "atoms" | "licorice" | "cartoon" | "both" | "surface" | "line";
 
 export interface MeganeRendererMemory {
   geometries: number;
@@ -811,10 +811,20 @@ export class MoleculeRenderer {
    */
   setRepresentationType(type: RepresentationType): void {
     this.representationType = type;
-    const showAtoms = type === "atoms" || type === "both";
+    const showAtoms = type === "atoms" || type === "both" || type === "licorice";
     const showCartoon = type === "cartoon" || type === "both";
     const showSurface = type === "surface";
     const showLine = type === "line";
+
+    // Licorice: render atoms and bonds at a single equal radius so the spheres
+    // act as round caps on the sticks, producing a continuous tube. Reverting
+    // to ball-and-stick (atoms/both) restores per-element vdW atom radii and
+    // per-order bond radii. setUniformRadius only rewrites the radius buffers.
+    if (this.snapshot) {
+      const licoriceRadius = type === "licorice" ? LICORICE_RADIUS : null;
+      this.atomRenderer?.setUniformRadius?.(licoriceRadius, this.snapshot);
+      this.bondRenderer?.setUniformRadius?.(licoriceRadius, this.snapshot);
+    }
 
     if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
     // Bonds also depend on whether the pipeline emits any bonds; otherwise
@@ -846,7 +856,10 @@ export class MoleculeRenderer {
   setBondsVisible(visible: boolean): void {
     this.bondsAvailable = visible;
     if (this.bondRenderer) {
-      const showAtoms = this.representationType === "atoms" || this.representationType === "both";
+      const showAtoms =
+        this.representationType === "atoms" ||
+        this.representationType === "both" ||
+        this.representationType === "licorice";
       this.bondRenderer.mesh.visible = visible && showAtoms;
     }
   }

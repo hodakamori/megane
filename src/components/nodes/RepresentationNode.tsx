@@ -34,6 +34,7 @@ const selectStyle: React.CSSProperties = {
 
 const REPRESENTATION_OPTIONS: { value: RepresentationMode; label: string }[] = [
   { value: "atoms", label: "Atoms" },
+  { value: "licorice", label: "Licorice" },
   { value: "cartoon", label: "Cartoon" },
   { value: "both", label: "Both" },
   { value: "surface", label: "Surface" },

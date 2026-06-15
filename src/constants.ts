@@ -445,6 +445,13 @@ export const BALL_STICK_ATOM_SCALE = 0.3;
 /** Ball-and-stick bond radius in Angstroms. */
 export const BOND_RADIUS = 0.15;
 
+/**
+ * Licorice representation radius in Angstroms. Atom spheres and bond sticks are
+ * rendered at this single radius, producing a continuous equal-thickness tube
+ * (PyMOL/VMD licorice) rather than ball-and-stick.
+ */
+export const LICORICE_RADIUS = 0.3;
+
 /** Bond order constants (matches Python encoding). */
 export const BOND_SINGLE = 1;
 export const BOND_DOUBLE = 2;

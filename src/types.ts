@@ -82,6 +82,7 @@ export interface AtomRenderer {
   loadSnapshot(snapshot: Snapshot, colorCtx?: import("./colorSchemes").ColorContext): void;
   updatePositions(positions: Float32Array): void;
   setScale?(scale: number, snapshot: Snapshot): void;
+  setUniformRadius?(radius: number | null, snapshot: Snapshot): void;
   setOpacity?(opacity: number): void;
   setScaleOverrides?(overrides: Float32Array): void;
   setOpacityOverrides?(overrides: Float32Array): void;
@@ -96,6 +97,7 @@ export interface BondRenderer {
   updatePositions(positions: Float32Array, bonds: Uint32Array, nBonds: number): void;
   setOpacity?(opacity: number): void;
   setScale?(scale: number, snapshot: Snapshot): void;
+  setUniformRadius?(radius: number | null, snapshot?: Snapshot): void;
   setBondOpacityOverrides?(overrides: Float32Array): void;
   clearBondOpacityOverrides?(): void;
   dispose(): void;

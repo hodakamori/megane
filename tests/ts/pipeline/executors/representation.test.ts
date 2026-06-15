@@ -50,6 +50,13 @@ describe("executeRepresentation", () => {
     expect(result.representationOverride).toBe("cartoon");
   });
 
+  it("tags the outgoing particle with the licorice mode", () => {
+    const params: RepresentationParams = { type: "representation", mode: "licorice" };
+    const out = executeRepresentation(params, inputs(makeParticle()));
+    const result = out.get("out") as ParticleData;
+    expect(result.representationOverride).toBe("licorice");
+  });
+
   it("overwrites an existing upstream override (downstream wins)", () => {
     const params: RepresentationParams = { type: "representation", mode: "surface" };
     const upstream = makeParticle({ representationOverride: "atoms" });

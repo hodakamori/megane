@@ -101,8 +101,9 @@ describe("bond shaders", () => {
       expect(bondVertexShader, `${v} out`).toMatch(new RegExp(`\\bout\\b[^;]*\\b${v}\\b`));
       expect(bondFragmentShader, `${v} in`).toMatch(new RegExp(`\\bin\\b[^;]*\\b${v}\\b`));
     }
-    // The midpoint split decides which endpoint color a fragment uses.
-    expect(bondFragmentShader).toMatch(/vCylUv\.y\s*<\s*0\.0\s*\?\s*vColorA\s*:\s*vColorB/);
+    // The midpoint split (computed from the ray-cast hit's axial position)
+    // decides which endpoint color a fragment uses.
+    expect(bondFragmentShader).toMatch(/tAxial\s*<\s*0\.0\s*\?\s*vColorA\s*:\s*vColorB/);
   });
 
   it("vertex shader fetches atom positions from the position texture", () => {
@@ -118,5 +119,33 @@ describe("bond shaders", () => {
 
   it("fragment shader respects per-bond opacity gating on uUsePerBondOverrides", () => {
     expect(bondFragmentShader).toMatch(/uUsePerBondOverrides\s*==\s*1/);
+  });
+
+  it("fragment shader writes gl_FragDepth from the ray-cast hit so cylinders join spheres seamlessly", () => {
+    // Per-fragment depth from the real cylinder surface lets the stick occlude
+    // the atom sphere's inner hemisphere, so the sphere caps the tube instead of
+    // sitting on top of it.
+    expect(bondFragmentShader).toMatch(/gl_FragDepth\s*=/);
+  });
+
+  it("passes the view-space cylinder + billboard ray position to the fragment shader", () => {
+    const frameVaryings = ["vViewMid", "vAxisDir", "vRadius", "vHalfLen", "vViewRayPos"];
+    for (const v of frameVaryings) {
+      expect(bondVertexShader, `${v} out`).toMatch(new RegExp(`\\bout\\b[^;]*\\b${v}\\b`));
+      expect(bondFragmentShader, `${v} in`).toMatch(new RegExp(`\\bin\\b[^;]*\\b${v}\\b`));
+    }
+    // The fragment must declare projectionMatrix to project the hit point.
+    expect(bondFragmentShader).toMatch(/uniform\s+mat4\s+projectionMatrix/);
+  });
+
+  it("ray-casts the analytic cylinder (correct for tilted bonds) and handles ortho vs perspective", () => {
+    // A flat billboard parameterization mis-places the surface for tilted bonds.
+    // The fragment must solve a ray-cylinder quadratic (discriminant) and pick a
+    // camera ray per projection type.
+    expect(bondFragmentShader).toMatch(/disc\s*=\s*b\s*\*\s*b\s*-\s*4\.0\s*\*\s*a\s*\*\s*c/);
+    expect(bondFragmentShader).toMatch(/projectionMatrix\[2\]\[3\]\s*==\s*0\.0/);
+    // The old flat-billboard varyings must be gone.
+    expect(bondFragmentShader).not.toMatch(/vCylUv/);
+    expect(bondFragmentShader).not.toMatch(/vSideDir/);
   });
 });
