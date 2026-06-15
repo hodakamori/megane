@@ -87,12 +87,14 @@ fn parse_header(lines: &[&str]) -> HeaderData {
         bonds_start: None,
     };
 
+    let mut tokens: Vec<&str> = Vec::new();
     for (i, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+        tokens.clear();
+        tokens.extend(trimmed.split_whitespace());
 
         // "N atoms" header line
         if tokens.len() == 2 && tokens[1] == "atoms" {
