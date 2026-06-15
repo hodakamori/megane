@@ -370,5 +370,10 @@ mod tests {
         assert_eq!(element_from_atom_name("2HW"), 1); // Digit prefix, "Hw"→fallback "H"
         assert_eq!(element_from_atom_name("123"), 0); // No alphabetic chars
         assert_eq!(element_from_atom_name("Zz"), 0); // Unknown two-char, no single fallback
+
+        // Non-ASCII names exercise the Unicode-aware fallback paths (which can
+        // never match an ASCII element symbol, so they resolve to 0).
+        assert_eq!(element_from_atom_name("Ωz"), 0); // two-char + single-char Unicode fallback
+        assert_eq!(element_from_atom_name("Ω"), 0); // single-char Unicode fallback
     }
 }
