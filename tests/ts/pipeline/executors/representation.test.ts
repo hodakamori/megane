@@ -71,4 +71,11 @@ describe("executeRepresentation", () => {
     executeRepresentation(params, inputs(upstream));
     expect(upstream.representationOverride).toBeNull();
   });
+
+  it("tags the outgoing particle with the line mode", () => {
+    const params: RepresentationParams = { type: "representation", mode: "line" };
+    const out = executeRepresentation(params, inputs(makeParticle()));
+    const result = out.get("out") as ParticleData;
+    expect(result.representationOverride).toBe("line");
+  });
 });

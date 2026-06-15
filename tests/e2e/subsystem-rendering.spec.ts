@@ -32,7 +32,7 @@ import {
   getReadyState,
 } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
-import { connectEdge, findNodeIdByType, insertNode } from "./lib/pipeline";
+import { connectEdge, findNodeIdByType, insertNode, setNodeParam } from "./lib/pipeline";
 import { getVisibleSubsystems } from "./lib/render-utils";
 
 const PLATFORM = "subsystem-rendering";
@@ -121,4 +121,27 @@ test("subsystems: inserting polyhedron_generator wires the polyhedra subsystem",
   expect(typeof v.polyhedra).toBe("boolean");
   await stabilizeUi(boot!.scope);
   await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-polyhedra`);
+});
+
+test("subsystems: representation line mode shows lines and hides atoms/bonds", async () => {
+  if (!boot) test.skip(true, "boot not initialised");
+  const before = await getReadyState(boot!.scope);
+  const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
+  const viewportId = await findNodeIdByType(boot!.scope, "viewport");
+  const repId = await insertNode(boot!.scope, "representation");
+  await setNodeParam(boot!.scope, repId, { mode: "line" });
+  await connectEdge(boot!.scope, loaderId, repId, "particle", "in");
+  await connectEdge(boot!.scope, repId, viewportId, "out", "particle");
+  await waitForReady(boot!.scope, { untilEpoch: before.renderEpoch + 1, timeout: 10_000 }).catch(
+    () => {
+      /* fine if no new frame */
+    },
+  );
+  const v = await getVisibleSubsystems(boot!.scope);
+  expect(v.line).toBe(true);
+  // Line mode draws its own wireframe; the atom/bond meshes are hidden.
+  expect(v.atoms).toBe(false);
+  expect(v.bonds).toBe(false);
+  await stabilizeUi(boot!.scope);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-line`);
 });

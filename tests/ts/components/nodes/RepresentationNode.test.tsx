@@ -62,6 +62,21 @@ describe("RepresentationNode", () => {
     expect(updateNodeParams).toHaveBeenCalledWith("r1", { mode: "surface" });
   });
 
+  it("offers the Line option and selecting it calls updateNodeParams", () => {
+    const updateNodeParams = vi.fn();
+    const seeded = seedPipelineStore("representation", { id: "r1" });
+    usePipelineStore.setState({ updateNodeParams });
+
+    render(
+      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
+    );
+    expect(screen.getByRole("option", { name: "Line" })).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("representation-node-mode"), {
+      target: { value: "line" },
+    });
+    expect(updateNodeParams).toHaveBeenCalledWith("r1", { mode: "line" });
+  });
+
   it("renders inside a NodeShell with the Representation title", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
     render(

@@ -135,7 +135,7 @@ handle and emits the tagged particle stream on `out`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `mode` | `string` | `"atoms"` (default), `"licorice"`, `"cartoon"`, `"both"`, or `"surface"` |
+| `mode` | `string` | `"atoms"` (default), `"licorice"`, `"cartoon"`, `"both"`, `"surface"`, or `"line"` |
 
 #### `add_bond`
 
