@@ -325,7 +325,7 @@ class Representation(PipelineNode):
 
     Args:
         mode: One of ``"atoms"`` (default), ``"cartoon"``, ``"both"``,
-              ``"surface"``.
+              ``"surface"``, ``"line"``.
 
     Ports:
         inp.particle — atom data in
@@ -339,7 +339,7 @@ class Representation(PipelineNode):
     def __init__(
         self,
         *,
-        mode: Literal["atoms", "cartoon", "both", "surface"] = "atoms",
+        mode: Literal["atoms", "cartoon", "both", "surface", "line"] = "atoms",
     ) -> None:
         super().__init__()
         self.mode = mode

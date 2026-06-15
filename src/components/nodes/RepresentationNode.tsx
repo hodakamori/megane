@@ -37,6 +37,7 @@ const REPRESENTATION_OPTIONS: { value: RepresentationMode; label: string }[] = [
   { value: "cartoon", label: "Cartoon" },
   { value: "both", label: "Both" },
   { value: "surface", label: "Surface" },
+  { value: "line", label: "Line" },
 ];
 
 export function RepresentationNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {

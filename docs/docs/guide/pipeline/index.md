@@ -151,6 +151,7 @@ Requires a connection from a LoadStructure node. Frames are loaded lazily when `
 | | `cartoon` | — | Cartoon ribbon for proteins/nucleic acids |
 | | `both` | — | Atoms + cartoon simultaneously |
 | | `surface` | — | Solvent-accessible surface |
+| | `line` | — | Thin wireframe lines (VMD/PyMOL "lines" style) |
 
 ### Add Bond
 

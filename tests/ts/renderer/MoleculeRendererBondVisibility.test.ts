@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { MoleculeRenderer } from "@/renderer/MoleculeRenderer";
 import { ImpostorAtomMesh } from "@/renderer/ImpostorAtomMesh";
 import { ImpostorBondMesh } from "@/renderer/ImpostorBondMesh";
+import { LineRenderer } from "@/renderer/LineRenderer";
 import type { Snapshot } from "@/types";
 
 function makeSnapshot(): Snapshot {
@@ -91,5 +92,36 @@ describe("MoleculeRenderer — bond visibility composition", () => {
     // No setBondsVisible call yet; default bondsAvailable = false.
     renderer.setRepresentationType("both");
     expect(bond.mesh.visible).toBe(false);
+  });
+
+  it("shows the line renderer and hides atoms/bonds in line mode", () => {
+    const { renderer, atom, bond } = makeRendererWithMeshes();
+    const line = new LineRenderer();
+    line.loadSnapshot(makeSnapshot());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (renderer as any).lineRenderer = line;
+
+    renderer.setBondsVisible(true);
+    renderer.setRepresentationType("line");
+
+    expect(line.mesh.visible).toBe(true);
+    expect(atom.mesh.visible).toBe(false);
+    expect(bond.mesh.visible).toBe(false);
+  });
+
+  it("hides the line renderer when switching back to atoms", () => {
+    const { renderer, atom } = makeRendererWithMeshes();
+    const line = new LineRenderer();
+    line.loadSnapshot(makeSnapshot());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (renderer as any).lineRenderer = line;
+
+    renderer.setBondsVisible(true);
+    renderer.setRepresentationType("line");
+    expect(line.mesh.visible).toBe(true);
+
+    renderer.setRepresentationType("atoms");
+    expect(line.mesh.visible).toBe(false);
+    expect(atom.mesh.visible).toBe(true);
   });
 });

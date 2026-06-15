@@ -120,11 +120,12 @@ Recolors atoms using a palette mode, overriding the default per-element coloring
 
 ### representation
 Switches the rendering style for the connected particle stream.
-- Parameters: \`{ type: "representation", mode: "atoms" | "cartoon" | "both" | "surface" }\`
+- Parameters: \`{ type: "representation", mode: "atoms" | "cartoon" | "both" | "surface" | "line" }\`
   - "atoms": ball-and-stick / van der Waals spheres (default)
   - "cartoon": protein backbone cartoon (secondary structure)
   - "both": atoms and cartoon overlaid
   - "surface": molecular surface
+  - "line": thin wireframe lines (VMD/PyMOL "lines" style)
 - Inputs: \`in\` (particle only — NOT bond)
 - Outputs: \`out\` (particle)
 

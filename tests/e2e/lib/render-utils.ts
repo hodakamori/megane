@@ -38,6 +38,7 @@ export interface SubsystemVisibility {
   vectors: boolean;
   labels: boolean;
   polyhedra: boolean;
+  line: boolean;
 }
 
 interface TestApi {

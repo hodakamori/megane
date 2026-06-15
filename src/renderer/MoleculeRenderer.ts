@@ -30,6 +30,7 @@ import { StructureLayer } from "./StructureLayer";
 import { PivotMarker } from "./PivotMarker";
 import { CartoonRenderer } from "./CartoonRenderer";
 import { SurfaceRenderer } from "./SurfaceRenderer";
+import { LineRenderer } from "./LineRenderer";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 import { pickAtPixel, projectToScreen } from "./Picking";
@@ -101,10 +102,11 @@ export interface MeganeSubsystemVisibility {
   polyhedra: boolean;
   cartoon: boolean;
   surface: boolean;
+  line: boolean;
 }
 
 /** Representation mode for the viewer. */
-export type RepresentationType = "atoms" | "cartoon" | "both" | "surface";
+export type RepresentationType = "atoms" | "cartoon" | "both" | "surface" | "line";
 
 export interface MeganeRendererMemory {
   geometries: number;
@@ -148,6 +150,7 @@ function _setActiveRenderer(r: MoleculeRenderer | null): void {
               polyhedra: false,
               cartoon: false,
               surface: false,
+              line: false,
             },
       setCameraMode: (mode) => _activeRenderer?.setCameraMode(mode),
       resetCamera: () => _activeRenderer?.resetCamera(),
@@ -285,6 +288,8 @@ export class MoleculeRenderer {
   private cartoonRenderer: CartoonRenderer | null = null;
   /** Solvent-accessible surface renderer (lazy, created on first use). */
   private surfaceRenderer: SurfaceRenderer | null = null;
+  /** Line / wireframe renderer (lazy, created on first use). */
+  private lineRenderer: LineRenderer | null = null;
   private representationType: RepresentationType = "atoms";
 
   // (screen-space picking replaces Three.js raycasting)
@@ -474,6 +479,14 @@ export class MoleculeRenderer {
       this.surfaceRenderer.setVisible(false);
     }
 
+    // Update line renderer (lazy init, always available for line mode)
+    if (!this.lineRenderer) {
+      this.lineRenderer = new LineRenderer();
+      this.scene.add(this.lineRenderer.mesh);
+    }
+    this.lineRenderer.loadSnapshot(snapshot);
+    this.lineRenderer.setVisible(this.representationType === "line");
+
     // Update simulation cell
     if (snapshot.box) {
       const hasNonZero = snapshot.box.some((v) => v !== 0);
@@ -514,6 +527,9 @@ export class MoleculeRenderer {
     this.cartoonRenderer?.updatePositions(frame.positions);
     if (this.surfaceRenderer?.mesh.visible) {
       this.surfaceRenderer.updatePositions(frame.positions);
+    }
+    if (this.lineRenderer?.mesh.visible) {
+      this.lineRenderer.updatePositions(frame.positions);
     }
     if (this.selectedAtoms.length > 0) {
       this.updateSelectionVisuals();
@@ -790,12 +806,15 @@ export class MoleculeRenderer {
    * "atoms"  – classic ball-and-stick (default)
    * "cartoon" – Cα backbone only; atoms/bonds hidden
    * "both"   – cartoon overlaid on atoms/bonds
+   * "surface" – solvent-accessible surface only
+   * "line"   – VMD/PyMOL-style thin wireframe lines; atoms/bonds meshes hidden
    */
   setRepresentationType(type: RepresentationType): void {
     this.representationType = type;
     const showAtoms = type === "atoms" || type === "both";
     const showCartoon = type === "cartoon" || type === "both";
     const showSurface = type === "surface";
+    const showLine = type === "line";
 
     if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
     // Bonds also depend on whether the pipeline emits any bonds; otherwise
@@ -811,6 +830,9 @@ export class MoleculeRenderer {
         this.surfaceRenderer.loadSnapshot(this.snapshot);
       }
       this.surfaceRenderer.setVisible(showSurface);
+    }
+    if (this.lineRenderer) {
+      this.lineRenderer.setVisible(showLine);
     }
   }
 
@@ -1592,6 +1614,7 @@ export class MoleculeRenderer {
     if (this.polyhedronRenderer) this.polyhedronRenderer.dispose();
     if (this.cartoonRenderer) this.cartoonRenderer.dispose();
     if (this.surfaceRenderer) this.surfaceRenderer.dispose();
+    if (this.lineRenderer) this.lineRenderer.dispose();
     if (this.pivotMarker) this.pivotMarker.dispose();
     if (this.labelOverlay) this.labelOverlay.dispose();
     // Dispose all structure layers
@@ -1711,6 +1734,7 @@ export class MoleculeRenderer {
       polyhedra: this.polyhedronRenderer?.group.visible ?? false,
       cartoon: this.cartoonRenderer?.mesh.visible ?? false,
       surface: this.surfaceRenderer?.mesh.visible ?? false,
+      line: this.lineRenderer?.mesh.visible ?? false,
     };
   }
 
