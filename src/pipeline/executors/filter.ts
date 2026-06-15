@@ -54,6 +54,7 @@ export function executeFilter(
           bond.bondIndices,
           bond.atomElements,
           bond.nBonds,
+          bond.nAtoms,
         );
         if (selectedSet !== null) {
           outputs.set("out", {

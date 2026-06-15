@@ -81,3 +81,39 @@ test("resname-filter-opacity: water (resname == HOH) fades, caffeine stays opaqu
   await stabilizeUi(scope);
   await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-water-faded`);
 });
+
+test("resname-filter-opacity: molecule_id fades water atoms and bonds together, caffeine stays opaque", async () => {
+  if (!boot) test.skip(true, "boot not initialised");
+  const scope = boot!.scope;
+
+  // molecule_id == 0 is the connected component containing atom 0 (the
+  // caffeine molecule, atoms 0-23 — see CONECT records in
+  // caffeine_water.pdb). Every water molecule gets its own molecule_id >= 1.
+  // `not molecule_id == 0` therefore selects every water atom/bond, letting a
+  // single query fade both the particle and bond streams of the solvent.
+  const replicateId = await findNodeIdByType(scope, "replicate");
+  const addBondId = await findNodeIdByType(scope, "add_bond");
+  const viewportId = await findNodeIdByType(scope, "viewport");
+
+  const particleFilterId = await insertNode(scope, "filter");
+  const particleModifyId = await insertNode(scope, "modify");
+  const bondFilterId = await insertNode(scope, "filter");
+  const bondModifyId = await insertNode(scope, "modify");
+
+  await setNodeParam(scope, particleFilterId, { query: "not molecule_id == 0" });
+  await setNodeParam(scope, particleModifyId, { scale: 1.0, opacity: 0.2 });
+  await setNodeParam(scope, bondFilterId, { bond_query: "not molecule_id == 0" });
+  await setNodeParam(scope, bondModifyId, { scale: 1.0, opacity: 0.2 });
+
+  const before = await getReadyState(scope);
+  await connectEdge(scope, replicateId, particleFilterId, "particle", "in");
+  await connectEdge(scope, particleFilterId, particleModifyId, "out", "in");
+  await connectEdge(scope, particleModifyId, viewportId, "out", "particle");
+  await connectEdge(scope, addBondId, bondFilterId, "bond", "in");
+  await connectEdge(scope, bondFilterId, bondModifyId, "out", "in");
+  await connectEdge(scope, bondModifyId, viewportId, "out", "bond");
+  await waitForReady(scope, { untilEpoch: before.renderEpoch + 1, timeout: 10_000 });
+
+  await stabilizeUi(scope);
+  await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-molecule-id-faded`);
+});
