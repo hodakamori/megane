@@ -43,17 +43,43 @@ where
     let ny = ((max_y - min_y) / cell_size).ceil().max(1.0) as usize;
     let nz = ((max_z - min_z) / cell_size).ceil().max(1.0) as usize;
 
-    // Build cell lists
-    let mut cells: Vec<Vec<usize>> = vec![Vec::new(); nx * ny * nz];
+    let ncells = nx * ny * nz;
 
-    for i in 0..n_atoms {
+    // Compute each atom's flat cell index once.
+    let cell_of = |i: usize| -> usize {
         let cx = (((positions[i * 3] - min_x) / cell_size) as usize).min(nx - 1);
         let cy = (((positions[i * 3 + 1] - min_y) / cell_size) as usize).min(ny - 1);
         let cz = (((positions[i * 3 + 2] - min_z) / cell_size) as usize).min(nz - 1);
-        cells[cx * ny * nz + cy * nz + cz].push(i);
+        cx * ny * nz + cy * nz + cz
+    };
+
+    // Bucket atoms into a CSR (counting-sort) layout instead of a
+    // `Vec<Vec<usize>>` to avoid one heap allocation per spatial cell.
+    // `starts[c]..starts[c + 1]` is the slice of `cell_atoms` for cell `c`.
+    let mut atom_cell = vec![0u32; n_atoms];
+    let mut starts = vec![0u32; ncells + 1];
+    for (i, slot) in atom_cell.iter_mut().enumerate() {
+        let c = cell_of(i);
+        *slot = c as u32;
+        starts[c + 1] += 1;
+    }
+    for c in 0..ncells {
+        starts[c + 1] += starts[c];
+    }
+    // Fill in ascending atom index order so within-cell ordering matches the
+    // previous `Vec<Vec<usize>>` (each cell pushed atoms in `i` order), which
+    // keeps the emitted bond order byte-for-byte identical.
+    let mut cursor: Vec<u32> = starts[..ncells].to_vec();
+    let mut cell_atoms = vec![0u32; n_atoms];
+    for (i, &c) in atom_cell.iter().enumerate() {
+        let c = c as usize;
+        cell_atoms[cursor[c] as usize] = i as u32;
+        cursor[c] += 1;
     }
 
-    let mut bonds = Vec::new();
+    // Molecular systems carry roughly one bond per atom; reserve to avoid
+    // repeated reallocation of the output vector.
+    let mut bonds = Vec::with_capacity(n_atoms);
 
     // 13 neighbor offsets (half-shell to avoid double-counting)
     let offsets: [(isize, isize, isize); 13] = [
@@ -76,14 +102,14 @@ where
         for cy in 0..ny {
             for cz in 0..nz {
                 let cell_idx = cx * ny * nz + cy * nz + cz;
-                let cell = &cells[cell_idx];
+                let cell = &cell_atoms[starts[cell_idx] as usize..starts[cell_idx + 1] as usize];
 
                 // Pairs within the same cell
                 for ii in 0..cell.len() {
-                    let i = cell[ii];
+                    let i = cell[ii] as usize;
 
                     for &j in &cell[(ii + 1)..] {
-                        if let Some(bond) = check_pair(i, j) {
+                        if let Some(bond) = check_pair(i, j as usize) {
                             bonds.push(bond);
                         }
                     }
@@ -104,8 +130,10 @@ where
                         }
                         let neighbor_idx =
                             ncx as usize * ny * nz + ncy as usize * nz + ncz as usize;
-                        for &j in &cells[neighbor_idx] {
-                            if let Some(bond) = check_pair(i, j) {
+                        let neighbor = &cell_atoms
+                            [starts[neighbor_idx] as usize..starts[neighbor_idx + 1] as usize];
+                        for &j in neighbor {
+                            if let Some(bond) = check_pair(i, j as usize) {
                                 bonds.push(bond);
                             }
                         }
@@ -128,12 +156,6 @@ pub fn infer_bonds(
     let cell_size: f32 = 2.5;
 
     cell_list_scan(positions, n_atoms, cell_size, |i, j| {
-        let a = i.min(j) as u32;
-        let b = i.max(j) as u32;
-        if existing_bonds.contains(&(a, b)) {
-            return None;
-        }
-
         let ri = covalent_radius(elements[i]);
         let rj = covalent_radius(elements[j]);
         let threshold = (ri + rj) * BOND_TOLERANCE;
@@ -144,7 +166,17 @@ pub fn infer_bonds(
 
         let dist_sq = dx * dx + dy * dy + dz * dz;
         if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
-            Some((a, b))
+            let a = i.min(j) as u32;
+            let b = i.max(j) as u32;
+            // Skip pairs already supplied by the file. The lookup runs only
+            // after the (cheap) distance test passes — i.e. for the few real
+            // hits rather than every candidate pair — which is a large win on
+            // topologies carrying many explicit bonds (e.g. LAMMPS full).
+            if existing_bonds.contains(&(a, b)) {
+                None
+            } else {
+                Some((a, b))
+            }
         } else {
             None
         }
@@ -261,5 +293,83 @@ mod tests {
         let elements = vec![6, 6];
         let bonds = infer_bonds_vdw(&positions, &elements, 2);
         assert!(bonds.is_empty());
+    }
+
+    #[test]
+    fn test_infer_bonds_single_atom() {
+        let bonds = infer_bonds(&[1.0, 2.0, 3.0], &[6], 1, &HashSet::new());
+        assert!(bonds.is_empty());
+    }
+
+    #[test]
+    fn test_infer_bonds_chain_ordering() {
+        // A carbon chain spaced 1.5 Å along x spans several 2.5 Å cells.
+        // Each atom bonds only to its immediate neighbour, and the CSR cell
+        // list must emit the pairs in ascending (i, j) order.
+        let positions = vec![
+            0.0, 0.0, 0.0, // 0
+            1.5, 0.0, 0.0, // 1
+            3.0, 0.0, 0.0, // 2
+            4.5, 0.0, 0.0, // 3
+        ];
+        let elements = vec![6, 6, 6, 6];
+        let bonds = infer_bonds(&positions, &elements, 4, &HashSet::new());
+        assert_eq!(bonds, vec![(0, 1), (1, 2), (2, 3)]);
+    }
+
+    /// Brute-force O(n²) covalent reference, mirroring the scan predicate.
+    fn brute_force_covalent(positions: &[f32], elements: &[u8], n: usize) -> HashSet<(u32, u32)> {
+        let mut set = HashSet::new();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let dx = positions[j * 3] - positions[i * 3];
+                let dy = positions[j * 3 + 1] - positions[i * 3 + 1];
+                let dz = positions[j * 3 + 2] - positions[i * 3 + 2];
+                let d_sq = dx * dx + dy * dy + dz * dz;
+                let thr =
+                    (covalent_radius(elements[i]) + covalent_radius(elements[j])) * BOND_TOLERANCE;
+                if d_sq > MIN_BOND_DIST * MIN_BOND_DIST && d_sq <= thr * thr {
+                    set.insert((i as u32, j as u32));
+                }
+            }
+        }
+        set
+    }
+
+    #[test]
+    fn test_infer_bonds_matches_brute_force_grid() {
+        // A 3-D grid straddling many cells: the cell-list scan must find
+        // exactly the same (duplicate-free) bond set as the naive all-pairs
+        // reference, including when some pairs are pre-supplied as existing.
+        let side = 6usize;
+        let spacing = 1.4f32;
+        let n = side * side * side;
+        let mut positions = Vec::with_capacity(n * 3);
+        for x in 0..side {
+            for y in 0..side {
+                for z in 0..side {
+                    positions.push(x as f32 * spacing + y as f32 * 0.01);
+                    positions.push(y as f32 * spacing);
+                    positions.push(z as f32 * spacing);
+                }
+            }
+        }
+        let elements = vec![6u8; n];
+        let bonds = infer_bonds(&positions, &elements, n, &HashSet::new());
+
+        let set: HashSet<(u32, u32)> = bonds.iter().copied().collect();
+        assert_eq!(set.len(), bonds.len(), "bond list must be duplicate-free");
+        let reference = brute_force_covalent(&positions, &elements, n);
+        assert_eq!(set, reference);
+
+        // Pre-supplying an existing bond must drop exactly that pair.
+        let some = *reference.iter().next().unwrap();
+        let mut existing = HashSet::new();
+        existing.insert(some);
+        let filtered: HashSet<(u32, u32)> = infer_bonds(&positions, &elements, n, &existing)
+            .into_iter()
+            .collect();
+        assert!(!filtered.contains(&some));
+        assert_eq!(filtered.len(), reference.len() - 1);
     }
 }

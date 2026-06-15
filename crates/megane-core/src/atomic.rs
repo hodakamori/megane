@@ -273,34 +273,46 @@ pub(crate) fn mass_to_atomic_num(mass: f32) -> u8 {
 /// Tries a two-character symbol first (e.g. "Cl", "Fe"), then falls back to
 /// the first character.
 pub(crate) fn element_from_atom_name(name: &str) -> u8 {
-    let name = name.trim();
-    if name.is_empty() {
-        return 0;
-    }
-
-    let clean: String = name.chars().filter(|c| c.is_alphabetic()).collect();
-    if clean.is_empty() {
-        return 0;
-    }
-
-    let mut chars = clean.chars();
-    let first = match chars.next() {
+    // Take the first two alphabetic characters without allocating an
+    // intermediate "cleaned" string.
+    let mut alpha = name.chars().filter(|c| c.is_alphabetic());
+    let first = match alpha.next() {
         Some(c) => c,
         None => return 0,
     };
+    let second = alpha.next();
 
-    // Try two-character symbol first (e.g. "CL" → "Cl", "FE" → "Fe")
-    if let Some(second) = chars.next() {
-        let two: String = first.to_uppercase().chain(second.to_lowercase()).collect();
-        let num = symbol_to_atomic_num(&two);
+    // Element symbols are ASCII (1–2 letters), so for the overwhelmingly
+    // common ASCII case we case-fold into a small stack buffer and avoid the
+    // per-call heap allocations. Exotic non-ASCII names keep the original
+    // Unicode-aware path (they never match an ASCII symbol anyway), so the
+    // returned atomic number is identical for every input.
+
+    // Two-character symbol first (e.g. "CL" → "Cl", "FE" → "Fe").
+    if let Some(second) = second {
+        let num = if first.is_ascii() && second.is_ascii() {
+            let buf = [
+                first.to_ascii_uppercase() as u8,
+                second.to_ascii_lowercase() as u8,
+            ];
+            symbol_to_atomic_num(std::str::from_utf8(&buf).unwrap_or(""))
+        } else {
+            let two: String = first.to_uppercase().chain(second.to_lowercase()).collect();
+            symbol_to_atomic_num(&two)
+        };
         if num != 0 {
             return num;
         }
     }
 
-    // Fall back to single character
-    let one: String = first.to_uppercase().collect();
-    symbol_to_atomic_num(&one)
+    // Fall back to a single-character symbol.
+    if first.is_ascii() {
+        let buf = [first.to_ascii_uppercase() as u8];
+        symbol_to_atomic_num(std::str::from_utf8(&buf).unwrap_or(""))
+    } else {
+        let one: String = first.to_uppercase().collect();
+        symbol_to_atomic_num(&one)
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -353,5 +365,15 @@ mod tests {
         assert_eq!(element_from_atom_name("N"), 7); // Nitrogen
         assert_eq!(element_from_atom_name("  CL"), 17); // Chlorine
         assert_eq!(element_from_atom_name(""), 0); // Empty
+        assert_eq!(element_from_atom_name("C"), 6); // Single char
+        assert_eq!(element_from_atom_name("fe"), 26); // Lowercase two-char
+        assert_eq!(element_from_atom_name("2HW"), 1); // Digit prefix, "Hw"→fallback "H"
+        assert_eq!(element_from_atom_name("123"), 0); // No alphabetic chars
+        assert_eq!(element_from_atom_name("Zz"), 0); // Unknown two-char, no single fallback
+
+        // Non-ASCII names exercise the Unicode-aware fallback paths (which can
+        // never match an ASCII element symbol, so they resolve to 0).
+        assert_eq!(element_from_atom_name("Ωz"), 0); // two-char + single-char Unicode fallback
+        assert_eq!(element_from_atom_name("Ω"), 0); // single-char Unicode fallback
     }
 }
