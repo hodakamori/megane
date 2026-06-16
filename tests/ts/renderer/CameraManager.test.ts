@@ -5,6 +5,7 @@ import {
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,
+  updatePerspectiveClipping,
 } from "@/renderer/CameraManager";
 import type { Snapshot } from "@/types";
 
@@ -250,5 +251,88 @@ describe("createSwitchedCamera", () => {
     const persp = createSwitchedCamera(ortho, true, 100, 100);
     persp.position.set(99, 99, 99);
     expect(ortho.position.toArray()).toEqual([1, 2, 3]);
+  });
+});
+
+describe("updatePerspectiveClipping", () => {
+  /** Place a perspective camera `distance` units in front of the target. */
+  function makePerspectiveAt(distance: number) {
+    const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
+    const controls = makeMockControls();
+    controls.target.set(0, 0, 0);
+    cam.position.set(0, -distance, 0);
+    return { cam, controls };
+  }
+
+  it("grows far so a dollied-out model stays inside the frustum", () => {
+    const { cam, controls } = makePerspectiveAt(500);
+    const extent = { maxExtent: 10, extentX: 10, extentY: 10 };
+    const radius = 10 * 0.72;
+
+    const changed = updatePerspectiveClipping(cam, controls, extent);
+
+    expect(changed).toBe(true);
+    // Back of the model (distance + radius) must be in front of the far plane.
+    expect(cam.far).toBeGreaterThanOrEqual(500 + radius);
+  });
+
+  it("keeps near positive and above the precision floor when zoomed in close", () => {
+    // distance - radius - margin is strongly negative here.
+    const { cam, controls } = makePerspectiveAt(0.05);
+    const extent = { maxExtent: 100, extentX: 100, extentY: 100 };
+
+    updatePerspectiveClipping(cam, controls, extent);
+
+    expect(cam.near).toBeGreaterThan(0);
+    expect(cam.near).toBeGreaterThanOrEqual(cam.far * 1e-4);
+    expect(cam.near).toBeGreaterThanOrEqual(0.01);
+  });
+
+  it("brackets the model bounding sphere at a mid distance", () => {
+    const distance = 50;
+    const { cam, controls } = makePerspectiveAt(distance);
+    const extent = { maxExtent: 20, extentX: 20, extentY: 20 };
+    const radius = 20 * 0.72;
+
+    updatePerspectiveClipping(cam, controls, extent);
+
+    // The whole sphere of `radius` centered at the target lies within [near, far].
+    expect(cam.near).toBeLessThanOrEqual(distance - radius);
+    expect(cam.far).toBeGreaterThanOrEqual(distance + radius);
+  });
+
+  it("is a no-op for orthographic cameras", () => {
+    const ortho = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 1000);
+    ortho.position.set(0, -50, 0);
+    const controls = makeMockControls();
+    const before = ortho.projectionMatrix.clone();
+
+    const changed = updatePerspectiveClipping(ortho, controls, {
+      maxExtent: 10,
+      extentX: 10,
+      extentY: 10,
+    });
+
+    expect(changed).toBe(false);
+    expect(ortho.near).toBe(0.1);
+    expect(ortho.far).toBe(1000);
+    expect(ortho.projectionMatrix.equals(before)).toBe(true);
+  });
+
+  it("returns false when near/far are already up to date", () => {
+    const { cam, controls } = makePerspectiveAt(100);
+    const extent = { maxExtent: 15, extentX: 15, extentY: 15 };
+
+    expect(updatePerspectiveClipping(cam, controls, extent)).toBe(true);
+    expect(updatePerspectiveClipping(cam, controls, extent)).toBe(false);
+  });
+
+  it("bounds the far/near ratio for depth-buffer precision when deep-zoomed", () => {
+    const { cam, controls } = makePerspectiveAt(0.05);
+    const extent = { maxExtent: 100, extentX: 100, extentY: 100 };
+
+    updatePerspectiveClipping(cam, controls, extent);
+
+    expect(cam.far / cam.near).toBeLessThanOrEqual(1e4 + 1e-6);
   });
 });

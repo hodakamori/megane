@@ -40,6 +40,7 @@ import {
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,
+  updatePerspectiveClipping,
   type ViewExtent,
 } from "./CameraManager";
 
@@ -1564,6 +1565,10 @@ export class MoleculeRenderer {
     } else {
       this.controls.update();
     }
+
+    // Keep perspective near/far tracking the dolly distance so zooming out
+    // always brings the model back into the frustum (no-op for orthographic).
+    updatePerspectiveClipping(this.camera, this.controls, this.lastExtent);
 
     // Update pivot marker position and scale
     if (this.pivotMarker) {

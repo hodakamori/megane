@@ -121,6 +121,45 @@ export function fitCameraToView(
 }
 
 /**
+ * Keep a perspective camera's near/far planes tracking the current dolly
+ * distance so the model's bounding sphere always stays inside the frustum.
+ *
+ * Perspective wheel zoom is handled by OrbitControls' dolly, which moves the
+ * camera (changing its distance to the target) but never touches near/far.
+ * Without this, zooming out past the initial `far` (set once in
+ * fitCameraToView) pushes the whole model behind the far plane and nothing is
+ * drawn until "Reset view" re-fits. Recomputing per frame fixes that.
+ *
+ * No-op for orthographic cameras (their fixed slab never clips on zoom).
+ * Returns true if near/far changed (and the projection matrix was updated).
+ */
+export function updatePerspectiveClipping(
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
+  controls: Pick<OrbitControls, "target">,
+  extent: ViewExtent,
+): boolean {
+  if (!(camera instanceof THREE.PerspectiveCamera)) return false;
+
+  const distance = camera.position.distanceTo(controls.target);
+  // Bounding-sphere radius from the model extent, padded for rotation so a
+  // corner atom (space diagonal) never leaves the frustum.
+  const radius = Math.max(extent.maxExtent, 0.1) * 0.72;
+  const margin = radius * 0.5 + 0.1;
+
+  const far = distance + radius + margin;
+  // Keep near strictly positive and bounded away from zero for z-buffer
+  // precision: floor at far*1e-4 (caps the far/near ratio at 1e4) and an
+  // absolute 0.01 for the degenerate small/very-close case.
+  const near = Math.max(distance - radius - margin, far * 1e-4, 0.01);
+
+  if (camera.near === near && camera.far === far) return false;
+  camera.near = near;
+  camera.far = far;
+  camera.updateProjectionMatrix();
+  return true;
+}
+
+/**
  * Recalculate the orthographic frustum so the model fits within the
  * visible area (accounting for overlay insets) and appears centered.
  */
