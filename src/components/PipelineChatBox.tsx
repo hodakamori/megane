@@ -117,8 +117,8 @@ const textareaStyle: React.CSSProperties = {
   lineHeight: 1.5,
   outline: "none",
   background: "white",
-  minHeight: 32,
-  maxHeight: 64,
+  minHeight: 95,
+  maxHeight: 160,
 };
 
 const sendBtnStyle: React.CSSProperties = {
@@ -576,7 +576,7 @@ export function PipelineChatBox({ onPipelineApplied }: { onPipelineApplied?: () 
           onKeyDown={handleKeyDown}
           placeholder="Describe the pipeline you want..."
           style={textareaStyle}
-          rows={1}
+          rows={5}
           disabled={isStreaming}
         />
         {isStreaming ? (
