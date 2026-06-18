@@ -352,34 +352,31 @@ async function clearRootTransform(page) {
   current = { tx: 0, ty: 0, s: 1 };
 }
 
-// Shared rule body for the fullscreen pipeline overlay. We drive this through an
+// Rule body for the fullscreen pipeline overlay. We drive this through an
 // injected `!important` stylesheet rather than inline styles because
 // React/ReactFlow re-apply their own inline style on `.react-flow` and would
 // wipe direct mutations. The geometry is set in a single step (never animated):
 // animating the panel size makes ReactFlow's ResizeObserver fire mid-tween and
-// measure handles at an intermediate size, corrupting the edge geometry. We
-// fade opacity instead, which doesn't disturb layout.
-const PANEL_FS_BASE = (sel, fadeMs) =>
+// measure handles at an intermediate size, corrupting the edge geometry.
+const PANEL_FS_BASE = (sel) =>
   `${sel}{position:fixed!important;z-index:99999!important;margin:0!important;` +
   `left:0!important;top:0!important;width:100vw!important;height:100vh!important;` +
   `max-width:none!important;max-height:none!important;min-width:0!important;` +
-  `background:var(--megane-surface-solid,#fff)!important;` +
-  `transition:opacity ${fadeMs}ms ease!important;`;
+  `background:var(--megane-surface-solid,#fff)!important;opacity:1!important;}`;
 
-/** Snap the pipeline panel to a fullscreen overlay, starting transparent. */
-async function setPanelFullscreen(page, fadeMs = 450) {
+/** Snap the pipeline panel to a fullscreen overlay (opaque). */
+async function setPanelFullscreen(page) {
   await page.evaluate(
-    ({ sel, fadeMs, body }) => {
+    ({ sel, css }) => {
       let s = document.getElementById("promo-fs");
       if (!s) {
         s = document.createElement("style");
         s.id = "promo-fs";
         document.head.appendChild(s);
       }
-      s.dataset.body = body;
-      s.textContent = `${body}opacity:0!important;}`;
+      s.textContent = css;
     },
-    { sel: SEL.panelPipeline, fadeMs, body: PANEL_FS_BASE(SEL.panelPipeline, fadeMs) },
+    { sel: SEL.panelPipeline, css: PANEL_FS_BASE(SEL.panelPipeline) },
   );
   await page.waitForTimeout(150);
 }
@@ -389,8 +386,8 @@ async function setPanelFullscreen(page, fadeMs = 450) {
  * display off and on (a real layout teardown/rebuild). The handles were
  * registered while #root was CSS-scaled during the chat zoom, so their stored
  * offsets are wrong and the edges balloon off their handles; rebuilding the
- * layout at the current (identity) scale fixes them. Runs while the overlay is
- * still transparent, so the flicker is invisible.
+ * layout at the current (identity) scale fixes them. Runs behind the cover, so
+ * the flicker is invisible.
  */
 async function forceReactFlowRemeasure(page) {
   await page.evaluate((sel) => {
@@ -411,13 +408,35 @@ async function forceReactFlowRemeasure(page) {
   await page.waitForTimeout(900);
 }
 
-/** Fade the (already fullscreen) pipeline overlay in. */
-async function revealPanel(page, fadeMs = 450) {
-  await page.evaluate(() => {
-    const s = document.getElementById("promo-fs");
-    if (s) s.textContent = `${s.dataset.body}opacity:1!important;}`;
-  });
-  await page.waitForTimeout(fadeMs + 200);
+/**
+ * Fade a full-viewport solid cover in/out. Appended to <body> (NOT inside
+ * #root) so it stays viewport-fixed even while #root is CSS-transformed, and
+ * sits above the pipeline overlay. We raise it over the still-zoomed chat panel,
+ * swap to the clean fullscreen pipeline behind it, then fade it out — so the
+ * camera never visibly pulls back to the full view between scenes 6 and 7.
+ */
+async function fadeCover(page, show, ms = 350) {
+  await page.evaluate(
+    ({ show, ms }) => {
+      let c = document.getElementById("promo-cover");
+      if (!c) {
+        c = document.createElement("div");
+        c.id = "promo-cover";
+        c.style.position = "fixed";
+        c.style.inset = "0";
+        c.style.zIndex = "100000";
+        c.style.background = "var(--megane-surface-solid, #fff)";
+        c.style.opacity = "0";
+        c.style.pointerEvents = "none";
+        document.body.appendChild(c);
+        void c.offsetWidth;
+      }
+      c.style.transition = `opacity ${ms}ms ease`;
+      c.style.opacity = show ? "1" : "0";
+    },
+    { show, ms },
+  );
+  await page.waitForTimeout(ms + 80);
 }
 
 /** Drag the ReactFlow pane to scroll the viewport down through the graph. */
@@ -580,27 +599,27 @@ try {
   await zoomToSel(page, SEL.panelPipeline, { pad: 12, alignTop: true, topMargin: 56, scale: 1.9 });
   await page.waitForTimeout(2000);
 
-  // ── 7. Reveal the pipeline (ReactFlow-native — no #root CSS scaling) ────────
-  // Pull the #root camera back to full, then drop the transform entirely so the
-  // ReactFlow container can be grown to a fullscreen overlay. Because the graph
-  // is never under a CSS scale, the edges stay welded to their handles.
-  console.log("Scene 7: show pipeline");
-  await zoomFull(page);
-  await clearRootTransform(page);
+  // ── 7. Stay zoomed, click the Editor tab, reveal the pipeline ──────────────
+  // The camera stays zoomed into the top-right — we do NOT pull back to the full
+  // view. ReactFlow can't render under a #root CSS scale (its edges detach), so
+  // we hide the switch behind a brief cover fade: raise a full-viewport cover
+  // over the zoomed chat panel, and behind it switch to the Editor tab, drop the
+  // #root zoom, grow the panel to a fullscreen overlay at identity, re-measure
+  // the handles (fixing the scale-corrupted edges), and fit the graph. Fading the
+  // cover back out reveals the clean pipeline — still zoomed in, no pull-back.
+  console.log("Scene 7: show pipeline (stay zoomed)");
+  await fadeCover(page, true, 380);
   await page.locator(SEL.editorTab).first().click().catch((e) => console.log("  editor tab click failed:", e.message));
-  await page.waitForTimeout(1400); // let the editor's fitView (RAF + 300ms) settle
-
+  await page.waitForTimeout(300);
+  await clearRootTransform(page);
+  await setPanelFullscreen(page);
+  await forceReactFlowRemeasure(page);
   const rfBox = await boxOf(page, SEL.reactFlow);
   if (rfBox) {
-    // Snap the panel fullscreen (transparent), force a handle re-measure while
-    // it's still invisible (fixes edges corrupted by the chat-zoom CSS scale),
-    // fit the graph, then fade the clean pipeline in.
-    await setPanelFullscreen(page, 450);
-    await forceReactFlowRemeasure(page);
     await page.locator(SEL.rfFitView).first().click().catch(() => {});
-    await page.waitForTimeout(500);
-    await revealPanel(page, 450);
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(400);
+    await fadeCover(page, false, 450);
+    await page.waitForTimeout(1400);
 
     // ── 8. Zoom in and slowly scroll down through the pipeline graph ─────────
     console.log("Scene 8: scroll through pipeline");
@@ -616,6 +635,7 @@ try {
     await page.waitForTimeout(2500);
   } else {
     console.warn("  react-flow not found; skipping pipeline scroll");
+    await fadeCover(page, false, 450);
     await page.waitForTimeout(2500);
   }
 
