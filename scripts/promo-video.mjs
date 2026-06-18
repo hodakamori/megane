@@ -397,7 +397,7 @@ async function forceReactFlowRemeasure(page) {
       void rf.offsetWidth;
     }
   }, SEL.reactFlow);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(200);
   await page.evaluate((sel) => {
     const rf = document.querySelector(sel);
     if (rf) {
@@ -405,7 +405,7 @@ async function forceReactFlowRemeasure(page) {
       void rf.offsetWidth;
     }
   }, SEL.reactFlow);
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(550);
 }
 
 /**
@@ -437,6 +437,17 @@ async function fadeCover(page, show, ms = 350) {
     { show, ms },
   );
   await page.waitForTimeout(ms + 80);
+  if (!show) await page.evaluate(() => document.getElementById("promo-cover")?.remove());
+}
+
+/**
+ * Click a DOM element directly (bypassing Playwright's actionability checks).
+ * Used for clicks that happen *behind* the opaque cover — a normal locator
+ * click would stall on the "element receives pointer events" check until the
+ * action timeout, which is what made the cover linger for many seconds.
+ */
+async function domClick(page, sel) {
+  await page.evaluate((s) => document.querySelector(s)?.click(), sel);
 }
 
 /** Drag the ReactFlow pane to scroll the viewport down through the graph. */
@@ -608,25 +619,27 @@ try {
   // the handles (fixing the scale-corrupted edges), and fit the graph. Fading the
   // cover back out reveals the clean pipeline — still zoomed in, no pull-back.
   console.log("Scene 7: show pipeline (stay zoomed)");
-  await fadeCover(page, true, 380);
-  await page.locator(SEL.editorTab).first().click().catch((e) => console.log("  editor tab click failed:", e.message));
-  await page.waitForTimeout(300);
+  const haveFlow = (await boxOf(page, SEL.reactFlow)) !== null;
+  await fadeCover(page, true, 360);
+  // Everything below happens behind the opaque cover — use DOM clicks so the
+  // cover doesn't stall Playwright's actionability checks.
+  await domClick(page, SEL.editorTab);
+  await page.waitForTimeout(250);
   await clearRootTransform(page);
   await setPanelFullscreen(page);
   await forceReactFlowRemeasure(page);
-  const rfBox = await boxOf(page, SEL.reactFlow);
-  if (rfBox) {
-    await page.locator(SEL.rfFitView).first().click().catch(() => {});
-    await page.waitForTimeout(400);
-    await fadeCover(page, false, 450);
-    await page.waitForTimeout(1400);
+  await domClick(page, SEL.rfFitView);
+  await page.waitForTimeout(350);
+  await fadeCover(page, false, 450);
+  await page.waitForTimeout(1400);
 
+  if (haveFlow) {
     // ── 8. Zoom in and slowly scroll down through the pipeline graph ─────────
     console.log("Scene 8: scroll through pipeline");
     // Native zoom-in (centred) so the graph overflows vertically and there is
     // something to scroll through.
     for (let i = 0; i < 3; i++) {
-      await page.locator(SEL.rfZoomIn).first().click().catch(() => {});
+      await domClick(page, SEL.rfZoomIn);
       await page.waitForTimeout(450);
     }
     await page.waitForTimeout(800);
@@ -635,7 +648,6 @@ try {
     await page.waitForTimeout(2500);
   } else {
     console.warn("  react-flow not found; skipping pipeline scroll");
-    await fadeCover(page, false, 450);
     await page.waitForTimeout(2500);
   }
 
