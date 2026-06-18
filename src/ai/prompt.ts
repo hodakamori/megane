@@ -368,8 +368,10 @@ When the user wants a visual property (opacity, scale, color) applied to ONLY
 part of the structure while the rest stays at its default appearance, split the
 stream into disjoint branches with \`filter\` nodes and apply the property to one
 branch. A \`modify\`/\`color\` node only affects the atoms in its branch, so the
-unmodified branch keeps its default look. Do NOT route the full structure AND a
-filtered copy of the same atoms to the viewport — the overlap renders twice.
+unmodified branch keeps its default look. Define the filter for the species the
+user named FIRST, then the complementary filter for the rest. Do NOT route the
+full structure AND a filtered copy of the same atoms to the viewport — the
+overlap renders twice.
 
 User request: "Keep the solute fully visible but make the water (resname HOH)
 semi-transparent."
@@ -438,9 +440,10 @@ own branch. To draw ONE species in a different style (e.g. "show the water as
 lines") while the rest keeps its normal look, split into disjoint \`filter\`
 branches: route the target species through \`filter\` -> \`representation\` -> the
 viewport, and route the remainder through its own \`filter\` straight to the
-viewport. Do NOT apply the representation to the whole structure, and do NOT
-send both the full structure and a filtered subset of the same atoms to the
-viewport (the overlap renders twice).
+viewport. Define the filter for the species the user named FIRST, then the
+complementary filter for the rest. Do NOT apply the representation to the whole
+structure, and do NOT send both the full structure and a filtered subset of the
+same atoms to the viewport (the overlap renders twice).
 
 User request: "Render the water (resname HOH) as a line representation, but
 leave the rest of the structure in its normal style."
@@ -505,13 +508,17 @@ Draws only the water as lines while the rest of the structure keeps its default 
 
 There is no "delete" or "hide" node, and a \`filter\` on its own does NOT remove
 atoms from the view — it only selects a subset for a downstream node to act on.
-To HIDE or REMOVE a species (e.g. "hide the water", "remove the solvent"),
-filter it into its own branch and fade it out with a \`modify\` node set to
-\`opacity: 0\` (fully transparent = invisible) while the rest of the structure,
-routed straight to the viewport, keeps its default appearance. (To also drop the
-hidden atoms' bonds, send the bond stream through \`add_bond\` -> \`filter\`
-(\`bond_query\`) -> \`modify (opacity 0)\`.) Do NOT set \`enabled: false\` and do NOT
-invent a delete node.
+To HIDE or REMOVE a species (e.g. "hide the water", "remove the solvent"), use
+two disjoint \`filter\` branches: filter the species to hide into its own branch
+and fade it out with a \`modify\` node set to \`opacity: 0\` (fully transparent =
+invisible), and route the REST through a SECOND \`filter\` (the complementary
+query, e.g. \`resname != "HOH"\`) so it keeps its default appearance. Do NOT send
+the full, unfiltered structure to the viewport alongside the hidden branch — that
+re-draws the hidden species at full opacity through the unfiltered branch, so it
+is not hidden at all. List the filter for the species the user named FIRST. (To
+also drop the hidden atoms' bonds, send the bond stream through \`add_bond\` ->
+\`filter\` (\`bond_query\`) -> \`modify (opacity 0)\`.) Do NOT set \`enabled: false\`
+and do NOT invent a delete node.
 
 User request: "Hide the water (resname HOH) so only the rest of the structure
 shows."
@@ -545,6 +552,13 @@ shows."
       "enabled": true
     },
     {
+      "id": "filter-rest",
+      "type": "filter",
+      "position": { "x": 600, "y": 310 },
+      "query": "resname != \\"HOH\\"",
+      "enabled": true
+    },
+    {
       "id": "viewport-1",
       "type": "viewport",
       "position": { "x": 425, "y": 615 },
@@ -558,12 +572,13 @@ shows."
     { "source": "loader-1", "target": "filter-water", "sourceHandle": "particle", "targetHandle": "in" },
     { "source": "filter-water", "target": "hide-water", "sourceHandle": "out", "targetHandle": "in" },
     { "source": "hide-water", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" },
-    { "source": "loader-1", "target": "viewport-1", "sourceHandle": "particle", "targetHandle": "particle" }
+    { "source": "loader-1", "target": "filter-rest", "sourceHandle": "particle", "targetHandle": "in" },
+    { "source": "filter-rest", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" }
   ]
 }
 \`\`\`
 
-Fades the water to fully transparent so only the rest of the structure remains visible.
+Fades the water to fully transparent and shows the rest of the structure at its default appearance, so only the non-water atoms remain visible.
 
 ## Guidelines
 
@@ -593,10 +608,12 @@ Fades the water to fully transparent so only the rest of the structure remains v
   — see the "Selective Representation" example. \`representation\` affects just the
   atoms in its branch, exactly like \`modify\`/\`color\`.
 - To HIDE or REMOVE a species ("hide the water", "remove the solvent"), filter
-  it into its own branch and set a \`modify\` node's \`opacity\` to 0 (a bare
-  \`filter\` does NOT remove atoms; only a downstream modify/representation acts on
-  the selection) — see the "Hiding / removing a species" example. Never use a
-  delete node or \`enabled: false\` for this.
+  it into its own branch and set a \`modify\` node's \`opacity\` to 0, and route the
+  REST through a second \`filter\` (the complementary query) to the viewport (a
+  bare \`filter\` does NOT remove atoms; only a downstream modify/representation
+  acts on the selection) — see the "Hiding / removing a species" example. Do NOT
+  also send the full, unfiltered structure to the viewport (it would re-draw the
+  hidden species at full opacity). Never use a delete node or \`enabled: false\`.
 - For volumetric data (cube files, electron density, ESP maps): use
   load_volumetric → isosurface → viewport (mesh), independent of
   load_structure unless the request also wants the atoms shown.
