@@ -16,14 +16,16 @@
  *   7. Click the Editor tab to reveal the generated pipeline graph.
  *   8. Slowly scroll down through the pipeline graph.
  *
- * Why the Editor tab is clicked at the *full* (identity) view in step 7:
+ * Why the pipeline (steps 7-8) does NOT use the #root CSS camera:
  * ReactFlow measures node-handle positions with getBoundingClientRect and
  * divides only by its own internal zoom — it has no idea about an ancestor
- * CSS transform. If fitView/handle-measurement runs while `#root` is scaled,
- * every edge detaches from its node. So we always pull back to scale 1 before
- * the tab switch (fitView then measures correctly), and only afterwards
- * CSS-zoom into the already-rendered graph. A pure ancestor transform does not
- * re-trigger handle measurement, so the edges stay attached while we scroll.
+ * CSS transform. Any CSS scale on `#root` (even after the handles were measured
+ * at identity) corrupts the edge geometry: edges fly off their handles in wide
+ * arcs. So for the pipeline we drop the #root transform entirely and instead
+ * grow the ReactFlow container itself to a fullscreen overlay — a real layout
+ * resize, which ReactFlow's ResizeObserver picks up and re-measures correctly —
+ * then use ReactFlow's own fitView / zoom / pane-drag to frame and scroll. The
+ * graph is never under a CSS scale, so the edges stay welded to their handles.
  *
  * Generation is a real, paid LLM call, so it only runs when you provide a key
  * or point at a site that ships its own proxy:
@@ -84,8 +86,6 @@ const PROMPT = getFlag(
   "Render the water molecules as a line representation, but leave the caffeine in its normal style.",
 );
 const RESPONSE_WAIT_MS = parseInt(getFlag("--response-wait", "20000"), 10);
-// Fraction of viewport width the pipeline graph fills once we zoom into it.
-const PIPELINE_WIDTH_FRACTION = parseFloat(getFlag("--pipeline-fill", "0.6"));
 // Linear time spent scrolling down through the pipeline graph.
 const PIPELINE_SCROLL_MS = parseInt(getFlag("--pipeline-scroll", "5200"), 10);
 const NO_GENERATE = hasFlag("--no-generate");
@@ -108,6 +108,9 @@ const SEL = {
   panelPipeline: '[data-testid="panel-pipeline"]',
   viewer: '[data-testid="viewer-root"]',
   reactFlow: ".react-flow",
+  rfPane: ".react-flow__pane",
+  rfZoomIn: ".react-flow__controls-zoomin",
+  rfFitView: ".react-flow__controls-fitview",
 };
 
 // ---- Setup helpers ----
@@ -246,13 +249,6 @@ async function zoomToUnion(page, sels, opts = {}, ms = TRANSITION_MS) {
   await frameLocalRect(page, toLocalRect(u), opts, ms);
 }
 
-/** Pan (and optionally rescale) to an explicit target transform over `ms`. */
-async function panTo(page, target, ms = TRANSITION_MS, easing = "linear") {
-  await setTransition(page, ms, easing);
-  await applyTransform(page, { ...current, ...target });
-  await page.waitForTimeout(ms);
-}
-
 // ---- Chat actions ----
 
 async function typePrompt(page) {
@@ -333,6 +329,73 @@ async function setupApiKey(page) {
   } catch (e) {
     console.warn("  API key setup failed (will fall back to no-generate):", e.message);
   }
+}
+
+// ---- Pipeline display (ReactFlow-native, NOT the #root CSS camera) ----
+// ReactFlow measures node-handle positions with getBoundingClientRect and has
+// no knowledge of an ancestor CSS transform, so scaling #root corrupts the edge
+// geometry (edges fly off their handles). For the pipeline scenes we therefore
+// leave #root untransformed and instead grow the ReactFlow container itself to
+// fullscreen — a real layout resize, which ReactFlow's ResizeObserver picks up
+// and re-measures correctly — then use ReactFlow's own zoom/pan so the edges
+// always stay attached.
+
+/** Drop the #root camera transform entirely (so position:fixed is viewport-relative). */
+async function clearRootTransform(page) {
+  await page.evaluate(() => {
+    const root = document.getElementById("root");
+    if (root) {
+      root.style.transition = "none";
+      root.style.transform = "none";
+    }
+  });
+  current = { tx: 0, ty: 0, s: 1 };
+}
+
+/** Animate the ReactFlow container from its panel rect to a fullscreen overlay. */
+async function expandReactFlowFullscreen(page, box, ms = TRANSITION_MS) {
+  await page.evaluate(
+    ({ sel, rect, ms }) => {
+      const rf = document.querySelector(sel);
+      if (!rf) return;
+      rf.style.position = "fixed";
+      rf.style.zIndex = "9999";
+      rf.style.margin = "0";
+      rf.style.left = `${rect.x}px`;
+      rf.style.top = `${rect.y}px`;
+      rf.style.width = `${rect.width}px`;
+      rf.style.height = `${rect.height}px`;
+      rf.style.transition = "none";
+      void rf.offsetWidth; // force reflow so the start rect is committed
+      const ease = "cubic-bezier(0.4, 0, 0.2, 1)";
+      rf.style.transition = `left ${ms}ms ${ease}, top ${ms}ms ${ease}, width ${ms}ms ${ease}, height ${ms}ms ${ease}`;
+      rf.style.left = "0px";
+      rf.style.top = "0px";
+      rf.style.width = "100vw";
+      rf.style.height = "100vh";
+    },
+    { sel: SEL.reactFlow, rect: box, ms },
+  );
+  await page.waitForTimeout(ms + 150);
+}
+
+/** Drag the ReactFlow pane to scroll the viewport down through the graph. */
+async function rfScrollDown(page, totalDy, ms) {
+  const pane = await boxOf(page, SEL.rfPane);
+  if (!pane) return;
+  // Start the drag in an empty strip on the left so we grab the pane, not a node.
+  const x = pane.x + Math.min(140, pane.width * 0.12);
+  const yStart = pane.y + pane.height * 0.82;
+  const yEnd = yStart - totalDy; // dragging up scrolls the view downward
+  await page.mouse.move(x, yStart);
+  await page.mouse.down();
+  const steps = 48;
+  for (let i = 1; i <= steps; i++) {
+    const y = yStart + (yEnd - yStart) * (i / steps);
+    await page.mouse.move(x, y);
+    await page.waitForTimeout(ms / steps);
+  }
+  await page.mouse.up();
 }
 
 // ---- Main ----
@@ -476,34 +539,35 @@ try {
   await zoomToSel(page, SEL.panelPipeline, { pad: 12, alignTop: true, topMargin: 56, scale: 1.9 });
   await page.waitForTimeout(2000);
 
-  // ── 7. Reveal the pipeline: click Editor at identity, then zoom in ──────────
-  // Pull back to scale 1 *first* so ReactFlow's fitView and handle measurement
-  // run untransformed and the edges stay attached (see file header).
+  // ── 7. Reveal the pipeline (ReactFlow-native — no #root CSS scaling) ────────
+  // Pull the #root camera back to full, then drop the transform entirely so the
+  // ReactFlow container can be grown to a fullscreen overlay. Because the graph
+  // is never under a CSS scale, the edges stay welded to their handles.
   console.log("Scene 7: show pipeline");
   await zoomFull(page);
+  await clearRootTransform(page);
   await page.locator(SEL.editorTab).first().click().catch((e) => console.log("  editor tab click failed:", e.message));
-  await page.waitForTimeout(1400); // let fitView (RAF + 300ms) settle at identity
-  // Now CSS-zoom into the top of the graph. The handles were measured at
-  // identity, so this pure ancestor transform leaves the edges attached.
+  await page.waitForTimeout(1400); // let the editor's fitView (RAF + 300ms) settle
+
   const rfBox = await boxOf(page, SEL.reactFlow);
   if (rfBox) {
-    const rf = toLocalRect(rfBox);
-    const s = (PIPELINE_WIDTH_FRACTION * WIDTH) / rf.lw;
-    const tx = WIDTH / 2 - (rf.lx + rf.lw * 0.5) * s;
-    const tyTop = 56 - rf.ly * s; // pin graph top near the top of the screen
-    await panTo(page, { tx, ty: tyTop, s }, TRANSITION_MS, "cubic-bezier(0.4, 0, 0.2, 1)");
-    await page.waitForTimeout(2400);
+    await expandReactFlowFullscreen(page, rfBox, TRANSITION_MS);
+    // Re-fit at the new fullscreen size via ReactFlow's own control so the whole
+    // graph is framed and the handles are re-measured for the larger viewport.
+    await page.locator(SEL.rfFitView).first().click().catch(() => {});
+    await page.waitForTimeout(1400);
 
-    // ── 8. Slowly scroll down through the pipeline graph ────────────────────
+    // ── 8. Zoom in and slowly scroll down through the pipeline graph ─────────
     console.log("Scene 8: scroll through pipeline");
-    // Lowest ty that still keeps content on screen (graph bottom at viewport
-    // bottom). Clamp so we never pan into blank space past the graph.
-    const tyBottom = Math.min(tyTop, HEIGHT - (rf.ly + rf.lh) * s);
-    if (tyBottom < tyTop - 4) {
-      await panTo(page, { ty: tyBottom }, PIPELINE_SCROLL_MS, "linear");
-    } else {
-      console.log("  graph fits the frame; no vertical scroll needed");
+    // Native zoom-in (centred) so the graph overflows vertically and there is
+    // something to scroll through.
+    for (let i = 0; i < 3; i++) {
+      await page.locator(SEL.rfZoomIn).first().click().catch(() => {});
+      await page.waitForTimeout(450);
     }
+    await page.waitForTimeout(800);
+    // Native pane drag pans the ReactFlow viewport — edges follow natively.
+    await rfScrollDown(page, HEIGHT * 1.1, PIPELINE_SCROLL_MS);
     await page.waitForTimeout(2500);
   } else {
     console.warn("  react-flow not found; skipping pipeline scroll");
