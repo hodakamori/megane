@@ -269,8 +269,10 @@ Expected modifications: bump-my-version files (`pyproject.toml`,
 `package.json`, `package-lock.json`, the three `Cargo.toml`s,
 `python/megane/__init__.py`, both `vscode-megane/package*.json`, both
 `jupyterlab-megane/package*.json`), `Cargo.lock`, `CHANGELOG.md`.
-`python/megane/static/widget.js` may also appear because `npm run build`
-re-bundles it; include it in the release commit. Any unrelated
+`python/megane/static/widget.js` is **gitignored** (a generated bundle
+shipped in the wheel via the `[tool.maturin]` `python/megane/static/**`
+include, like `python/megane/static/app/`), so it must **not** appear in
+`git status` and is **not** part of the release commit. Any unrelated
 modifications should already have been split into separate commits (e.g.
 E2E baselines from Phase 3).
 
@@ -282,7 +284,6 @@ git add pyproject.toml package.json package-lock.json \
   crates/megane-wasm/Cargo.toml \
   Cargo.lock \
   python/megane/__init__.py \
-  python/megane/static/widget.js \
   vscode-megane/package.json vscode-megane/package-lock.json \
   jupyterlab-megane/package.json jupyterlab-megane/package-lock.json \
   CHANGELOG.md
