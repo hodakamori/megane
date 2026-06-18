@@ -1,0 +1,6 @@
+# Generated / bundled JS artifacts — exclude from GitHub Linguist language
+# stats, diff display, and CodeQL code-scanning analysis. These files are build
+# output (e.g. the anywidget bundle vendoring three.js / React), not
+# hand-written source, so CodeQL alerts in them (e.g. three.js
+# MathUtils.generateUUID using Math.random) are not actionable here.
+python/megane/static/*.js linguist-generated=true
