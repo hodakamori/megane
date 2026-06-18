@@ -60,6 +60,19 @@ describe("buildSystemPrompt", () => {
     expect(buildSystemPrompt()).toBe(buildSystemPrompt());
   });
 
+  it("stays under the demo-proxy system-message cap (with summary headroom)", () => {
+    // The demo Cloudflare Worker proxy rejects any system message longer than
+    // MAX_SYSTEM_MESSAGE_LENGTH (48000) with "Missing or invalid 'messages'
+    // array" — see workers/llm-proxy/src/proxy.ts. The base prompt is sent as
+    // the system message and a loaded-structure summary is appended on top, so
+    // the base must leave comfortable headroom. This guard catches prompt
+    // growth before it silently breaks the free demo (the proxy cap and this
+    // constant must be kept in sync).
+    const PROXY_SYSTEM_CAP = 48000;
+    const SUMMARY_HEADROOM = 8000;
+    expect(buildSystemPrompt().length).toBeLessThan(PROXY_SYSTEM_CAP - SUMMARY_HEADROOM);
+  });
+
   it("documents the atom selection query fields and operators", () => {
     expect(prompt).toContain("Atom & Bond Selection Query Language");
     for (const field of ["element", "index", "resname", "mass"]) {

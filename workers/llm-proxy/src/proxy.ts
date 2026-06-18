@@ -91,12 +91,16 @@ export const MAX_MESSAGES = 12;
 export const MAX_MESSAGE_LENGTH = 8000;
 /**
  * Length cap for system and tool messages. The system prompt carries the
- * full pipeline schema (~7.6k chars) and tool messages carry skill
- * templates the frontend feeds back during the tool-call round trip, so
- * both are app-generated and legitimately larger than untrusted
- * user/assistant input.
+ * full pipeline schema and worked examples (~24k chars and growing) plus an
+ * appended summary of the currently-loaded structure, and tool messages
+ * carry skill templates the frontend feeds back during the tool-call round
+ * trip. All of these are app-generated (not untrusted user input), so the
+ * cap is set well above the current prompt size to leave headroom for the
+ * structure summary and future prompt growth. A too-tight cap here silently
+ * rejected every demo-proxy request with "Missing or invalid 'messages'
+ * array" once the base prompt crossed the old 24000 limit.
  */
-export const MAX_SYSTEM_MESSAGE_LENGTH = 24000;
+export const MAX_SYSTEM_MESSAGE_LENGTH = 48000;
 /** Bounds on the optional OpenAI tool-calling fields forwarded upstream. */
 export const MAX_TOOLS = 16;
 export const MAX_TOOL_CALLS = 16;
