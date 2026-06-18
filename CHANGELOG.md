@@ -6,6 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-18
+
+### Added
+
+#### Representations / rendering
+
+- **Licorice representation** with seamless, ray-cast bond impostors so spheres cap the tube ends cleanly
+- **Line display mode** (VMD/PyMOL-style thin wireframe)
+- **Per-atom representation** overrides, letting individual atoms use a different style than the global representation
+
+#### AI chat / LLM pipeline
+
+- **Assistant prose in chat**, with the **Chat tab as the default** pipeline panel view
+- **Free demo LLM chat** backed by a Cloudflare Worker proxy, including a "use my own API key" toggle, request logging, and multi-model fallback routing to survive free-tier rate limits
+- **LLM pipeline-generation benchmark harness** (`bench/llm/`) and a label-gated `llm-eval` CI workflow that scores the PR branch against its base via OpenRouter
+- Documented the remaining pipeline node types in the LLM system prompt
+
+#### Pipeline / UI
+
+- **`molecule_id` selection field** for atom and bond pipeline queries
+
+### Changed
+
+- Improved LLM molecular-selection accuracy so prompts select species correctly
+- Generated pipelines are now validated and repaired via a JSON round-trip before being applied
+- The AI-generated pipeline is applied mid-stream to cut perceived latency
+- Skills use OpenAI tool-calling on OpenAI/OpenRouter providers, with pipeline-skill templates inlined for OpenAI-compatible endpoints
+
+### Fixed
+
+- Orthographic wheel zoom is now reversible
+- Perspective near/far planes are tracked on zoom so wheeling out restores atoms instead of clipping them
+- Resname labels are resolved from the structure by default
+- GROMACS topology bonds are replicated across molecule instances, and cross-boundary bonds render correctly after the Replicate node
+- The VSCode webview CSP nonce now uses a cryptographically secure RNG
+- GIF rendering no longer freezes at 80% (gif.js worker is loaded via a blob URL)
+- AI chat no longer gets stuck or flickers, and the loaded structure is preserved with raw JSON hidden
+- LLM error messages are sanitized and a pipeline action summary is shown
+
+### Performance
+
+- Removed per-atom/per-line allocations in GRO and LAMMPS parsing
+- Deferred the existing-bond lookup until after the distance test during bond inference
+- Faster LAMMPS data and GRO/`.top` loading
+
 ## [0.8.0] - 2026-06-07
 
 ### Added
