@@ -121,6 +121,82 @@ export function fitCameraToView(
 }
 
 /**
+ * Keep a perspective camera's near/far planes tracking the current dolly
+ * distance so the model's bounding sphere always stays inside the frustum.
+ *
+ * Perspective wheel zoom is handled by OrbitControls' dolly, which moves the
+ * camera (changing its distance to the target) but never touches near/far.
+ * Without this, zooming out past the initial `far` (set once in
+ * fitCameraToView) pushes the whole model behind the far plane and nothing is
+ * drawn until "Reset view" re-fits. Recomputing per frame fixes that.
+ *
+ * No-op for orthographic cameras (their fixed slab never clips on zoom).
+ * Returns true if near/far changed (and the projection matrix was updated).
+ */
+export function updatePerspectiveClipping(
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
+  controls: Pick<OrbitControls, "target">,
+  extent: ViewExtent,
+): boolean {
+  if (!(camera instanceof THREE.PerspectiveCamera)) return false;
+
+  const distance = camera.position.distanceTo(controls.target);
+  // Bounding-sphere radius from the model extent, padded for rotation so a
+  // corner atom (space diagonal) never leaves the frustum.
+  const radius = Math.max(extent.maxExtent, 0.1) * 0.72;
+  const margin = radius * 0.5 + 0.1;
+
+  const far = distance + radius + margin;
+  // Keep near strictly positive and bounded away from zero for z-buffer
+  // precision: floor at far*1e-4 (caps the far/near ratio at 1e4) and an
+  // absolute 0.01 for the degenerate small/very-close case.
+  const near = Math.max(distance - radius - margin, far * 1e-4, 0.01);
+
+  if (camera.near === near && camera.far === far) return false;
+  camera.near = near;
+  camera.far = far;
+  camera.updateProjectionMatrix();
+  return true;
+}
+
+/**
+ * Zoom an orthographic camera by `zoomFactor` while keeping `target`'s screen
+ * position fixed, mutating the camera in place. Returns the frustum shift (in
+ * world units) applied to keep the target anchored, so the caller can
+ * accumulate it into its pan bookkeeping.
+ *
+ * `project()` returns zoom-scaled NDC, so an NDC delta maps to a world-space
+ * frustum shift via the *visible* half-extent (right-left)/(2*zoom) — not
+ * (right-left)/2. Omitting the /zoom over-shifts at high zoom and accumulates
+ * irreversibly, stranding the model off-screen when zooming back out (only
+ * "Reset view" recovered it). With the /zoom factor the target's NDC is
+ * preserved across the call, making zoom fully reversible.
+ */
+export function zoomOrthographicAroundTarget(
+  camera: THREE.OrthographicCamera,
+  target: THREE.Vector3,
+  zoomFactor: number,
+): { shiftX: number; shiftY: number } {
+  const ndcBefore = target.clone().project(camera);
+
+  camera.zoom = Math.max(0.01, camera.zoom * zoomFactor);
+  camera.updateProjectionMatrix();
+
+  const ndcAfter = target.clone().project(camera);
+  const zoom = camera.zoom;
+  const shiftX = ((ndcAfter.x - ndcBefore.x) * (camera.right - camera.left)) / (2 * zoom);
+  const shiftY = ((ndcAfter.y - ndcBefore.y) * (camera.top - camera.bottom)) / (2 * zoom);
+  if (Math.abs(shiftX) > 1e-9 || Math.abs(shiftY) > 1e-9) {
+    camera.left += shiftX;
+    camera.right += shiftX;
+    camera.top += shiftY;
+    camera.bottom += shiftY;
+    camera.updateProjectionMatrix();
+  }
+  return { shiftX, shiftY };
+}
+
+/**
  * Recalculate the orthographic frustum so the model fits within the
  * visible area (accounting for overlay insets) and appears centered.
  */

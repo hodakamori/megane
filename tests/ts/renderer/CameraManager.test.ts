@@ -5,6 +5,8 @@ import {
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,
+  updatePerspectiveClipping,
+  zoomOrthographicAroundTarget,
 } from "@/renderer/CameraManager";
 import type { Snapshot } from "@/types";
 
@@ -250,5 +252,164 @@ describe("createSwitchedCamera", () => {
     const persp = createSwitchedCamera(ortho, true, 100, 100);
     persp.position.set(99, 99, 99);
     expect(ortho.position.toArray()).toEqual([1, 2, 3]);
+  });
+});
+
+describe("updatePerspectiveClipping", () => {
+  /** Place a perspective camera `distance` units in front of the target. */
+  function makePerspectiveAt(distance: number) {
+    const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
+    const controls = makeMockControls();
+    controls.target.set(0, 0, 0);
+    cam.position.set(0, -distance, 0);
+    return { cam, controls };
+  }
+
+  it("grows far so a dollied-out model stays inside the frustum", () => {
+    const { cam, controls } = makePerspectiveAt(500);
+    const extent = { maxExtent: 10, extentX: 10, extentY: 10 };
+    const radius = 10 * 0.72;
+
+    const changed = updatePerspectiveClipping(cam, controls, extent);
+
+    expect(changed).toBe(true);
+    // Back of the model (distance + radius) must be in front of the far plane.
+    expect(cam.far).toBeGreaterThanOrEqual(500 + radius);
+  });
+
+  it("keeps near positive and above the precision floor when zoomed in close", () => {
+    // distance - radius - margin is strongly negative here.
+    const { cam, controls } = makePerspectiveAt(0.05);
+    const extent = { maxExtent: 100, extentX: 100, extentY: 100 };
+
+    updatePerspectiveClipping(cam, controls, extent);
+
+    expect(cam.near).toBeGreaterThan(0);
+    expect(cam.near).toBeGreaterThanOrEqual(cam.far * 1e-4);
+    expect(cam.near).toBeGreaterThanOrEqual(0.01);
+  });
+
+  it("brackets the model bounding sphere at a mid distance", () => {
+    const distance = 50;
+    const { cam, controls } = makePerspectiveAt(distance);
+    const extent = { maxExtent: 20, extentX: 20, extentY: 20 };
+    const radius = 20 * 0.72;
+
+    updatePerspectiveClipping(cam, controls, extent);
+
+    // The whole sphere of `radius` centered at the target lies within [near, far].
+    expect(cam.near).toBeLessThanOrEqual(distance - radius);
+    expect(cam.far).toBeGreaterThanOrEqual(distance + radius);
+  });
+
+  it("is a no-op for orthographic cameras", () => {
+    const ortho = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 1000);
+    ortho.position.set(0, -50, 0);
+    const controls = makeMockControls();
+    const before = ortho.projectionMatrix.clone();
+
+    const changed = updatePerspectiveClipping(ortho, controls, {
+      maxExtent: 10,
+      extentX: 10,
+      extentY: 10,
+    });
+
+    expect(changed).toBe(false);
+    expect(ortho.near).toBe(0.1);
+    expect(ortho.far).toBe(1000);
+    expect(ortho.projectionMatrix.equals(before)).toBe(true);
+  });
+
+  it("returns false when near/far are already up to date", () => {
+    const { cam, controls } = makePerspectiveAt(100);
+    const extent = { maxExtent: 15, extentX: 15, extentY: 15 };
+
+    expect(updatePerspectiveClipping(cam, controls, extent)).toBe(true);
+    expect(updatePerspectiveClipping(cam, controls, extent)).toBe(false);
+  });
+
+  it("bounds the far/near ratio for depth-buffer precision when deep-zoomed", () => {
+    const { cam, controls } = makePerspectiveAt(0.05);
+    const extent = { maxExtent: 100, extentX: 100, extentY: 100 };
+
+    updatePerspectiveClipping(cam, controls, extent);
+
+    expect(cam.far / cam.near).toBeLessThanOrEqual(1e4 + 1e-6);
+  });
+});
+
+describe("zoomOrthographicAroundTarget", () => {
+  /**
+   * Build an orthographic camera looking at `target` from the -Y axis (the
+   * app's orientation: up = +Z). `cx`/`cy` offset the frustum center so the
+   * target projects off-screen-center, mimicking the sidebar inset shift that
+   * triggered the original drift bug.
+   */
+  function makeOrtho(target: THREE.Vector3, cx = 0, cy = 0) {
+    const half = 25;
+    const cam = new THREE.OrthographicCamera(
+      -half + cx,
+      half + cx,
+      half + cy,
+      -half + cy,
+      -1000,
+      1000,
+    );
+    cam.position.set(target.x, target.y - 50, target.z);
+    cam.up.set(0, 0, 1);
+    cam.lookAt(target);
+    cam.updateMatrixWorld(true);
+    cam.updateProjectionMatrix();
+    return cam;
+  }
+
+  it("keeps the target's screen position fixed across a zoom (anchor invariant)", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    // Frustum center offset by 5 in x so the target is off screen-center.
+    const cam = makeOrtho(target, 5);
+    const before = target.clone().project(cam);
+
+    zoomOrthographicAroundTarget(cam, target, 2.0);
+
+    const after = target.clone().project(cam);
+    expect(after.x).toBeCloseTo(before.x, 6);
+    expect(after.y).toBeCloseTo(before.y, 6);
+  });
+
+  it("is reversible: zoom in then out restores zoom and frustum bounds", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target, 5, -3);
+    const l0 = cam.left;
+    const r0 = cam.right;
+    const t0 = cam.top;
+    const b0 = cam.bottom;
+
+    for (let i = 0; i < 10; i++) zoomOrthographicAroundTarget(cam, target, 1.2);
+    for (let i = 0; i < 10; i++) zoomOrthographicAroundTarget(cam, target, 1 / 1.2);
+
+    expect(cam.zoom).toBeCloseTo(1, 5);
+    expect(cam.left).toBeCloseTo(l0, 4);
+    expect(cam.right).toBeCloseTo(r0, 4);
+    expect(cam.top).toBeCloseTo(t0, 4);
+    expect(cam.bottom).toBeCloseTo(b0, 4);
+  });
+
+  it("clamps zoom at the 0.01 minimum", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target);
+    zoomOrthographicAroundTarget(cam, target, 0.0001);
+    expect(cam.zoom).toBe(0.01);
+  });
+
+  it("applies no frustum shift when the target is already screen-centered", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target); // cx = cy = 0 → target at NDC origin
+    const { shiftX, shiftY } = zoomOrthographicAroundTarget(cam, target, 3.0);
+    expect(Math.abs(shiftX)).toBeLessThan(1e-9);
+    expect(Math.abs(shiftY)).toBeLessThan(1e-9);
+    // Frustum width unchanged; only zoom scales.
+    expect(cam.left).toBeCloseTo(-25, 9);
+    expect(cam.right).toBeCloseTo(25, 9);
+    expect(cam.zoom).toBeCloseTo(3, 9);
   });
 });

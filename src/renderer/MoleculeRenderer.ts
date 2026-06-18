@@ -40,6 +40,8 @@ import {
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,
+  updatePerspectiveClipping,
+  zoomOrthographicAroundTarget,
   type ViewExtent,
 } from "./CameraManager";
 
@@ -1127,29 +1129,16 @@ export class MoleculeRenderer {
       const scale = Math.pow(0.95, this.controls.zoomSpeed * Math.abs(delta) * 0.01);
       const zoomFactor = delta < 0 ? 1 / scale : scale;
 
-      // Project controls.target to NDC before the zoom change so we can
-      // compensate any drift afterward with a frustum shift.
-      const ndcBefore = this.controls.target.clone().project(this.camera);
-
-      this.camera.zoom = Math.max(0.01, this.camera.zoom * zoomFactor);
-      this.camera.updateProjectionMatrix();
-
-      // Re-project to find how much the target drifted in NDC space.
-      // In steady-state the camera looks directly at controls.target, so
-      // camera-space px = py = 0 and there is no drift.  This compensation
-      // handles edge cases (e.g. mid-animation) where px or py is non-zero.
-      const ndcAfter = this.controls.target.clone().project(this.camera);
-      const shiftX = ((ndcAfter.x - ndcBefore.x) * (this.camera.right - this.camera.left)) / 2;
-      const shiftY = ((ndcAfter.y - ndcBefore.y) * (this.camera.top - this.camera.bottom)) / 2;
-      if (Math.abs(shiftX) > 1e-9 || Math.abs(shiftY) > 1e-9) {
-        this.camera.left += shiftX;
-        this.camera.right += shiftX;
-        this.camera.top += shiftY;
-        this.camera.bottom += shiftY;
-        this._frustumPanX += shiftX;
-        this._frustumPanY += shiftY;
-        this.camera.updateProjectionMatrix();
-      }
+      // Zoom around controls.target, keeping it fixed on screen. The helper
+      // applies a reversible frustum shift; accumulate it into our pan
+      // bookkeeping so resize re-applies the same offset.
+      const { shiftX, shiftY } = zoomOrthographicAroundTarget(
+        this.camera,
+        this.controls.target,
+        zoomFactor,
+      );
+      this._frustumPanX += shiftX;
+      this._frustumPanY += shiftY;
     };
     el.addEventListener("wheel", this.wheelZoomHandler, { capture: true, passive: false });
   }
@@ -1618,6 +1607,10 @@ export class MoleculeRenderer {
     } else {
       this.controls.update();
     }
+
+    // Keep perspective near/far tracking the dolly distance so zooming out
+    // always brings the model back into the frustum (no-op for orthographic).
+    updatePerspectiveClipping(this.camera, this.controls, this.lastExtent);
 
     // Update pivot marker position and scale
     if (this.pivotMarker) {
