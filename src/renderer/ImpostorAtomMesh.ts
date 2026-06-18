@@ -32,6 +32,10 @@ export class ImpostorAtomMesh {
   private colorBuf: Float32Array;
   private scaleOverrideBuf: Float32Array;
   private opacityOverrideBuf: Float32Array;
+  /** Raw per-atom scale overrides before the hidden mask is composited in. */
+  private rawScaleBuf: Float32Array;
+  /** Per-atom hide flags (1 = hidden); composited into the scale override. */
+  private hiddenBuf: Uint8Array;
   private nAtoms = 0;
   private capacity: number;
   // When non-null, every atom renders at this fixed radius (licorice mode);
@@ -55,6 +59,8 @@ export class ImpostorAtomMesh {
     this.colorBuf = new Float32Array(maxAtoms * 3);
     this.scaleOverrideBuf = new Float32Array(maxAtoms).fill(1.0);
     this.opacityOverrideBuf = new Float32Array(maxAtoms).fill(1.0);
+    this.rawScaleBuf = new Float32Array(maxAtoms).fill(1.0);
+    this.hiddenBuf = new Uint8Array(maxAtoms);
 
     this.centerAttr = new THREE.InstancedBufferAttribute(this.centerBuf, 3);
     this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);
@@ -121,6 +127,8 @@ export class ImpostorAtomMesh {
     // Reset overrides on new snapshot
     this.scaleOverrideBuf.fill(1.0, 0, nAtoms);
     this.opacityOverrideBuf.fill(1.0, 0, nAtoms);
+    this.rawScaleBuf.fill(1.0, 0, nAtoms);
+    this.hiddenBuf.fill(0, 0, nAtoms);
 
     this.centerAttr.needsUpdate = true;
     this.radiusAttr.needsUpdate = true;
@@ -165,9 +173,36 @@ export class ImpostorAtomMesh {
 
   /** Set per-atom scale overrides. */
   setScaleOverrides(overrides: Float32Array): void {
-    this.scaleOverrideBuf.set(overrides.subarray(0, this.nAtoms));
+    this.rawScaleBuf.set(overrides.subarray(0, this.nAtoms));
+    this._compositeScale();
+  }
+
+  /**
+   * Hide a subset of atoms (e.g. atoms a per-atom representation draws as
+   * lines). Composites with scale overrides rather than clobbering them, and
+   * persists across subsequent scale-override writes so the hidden atoms stay
+   * hidden until explicitly cleared with `null`.
+   */
+  setHiddenMask(mask: Uint8Array | null): void {
+    if (mask) {
+      this.hiddenBuf.set(mask.subarray(0, this.nAtoms));
+      if (mask.length < this.nAtoms) this.hiddenBuf.fill(0, mask.length, this.nAtoms);
+    } else {
+      this.hiddenBuf.fill(0, 0, this.nAtoms);
+    }
+    this._compositeScale();
+  }
+
+  /** Recompute the effective scale buffer as raw * (hidden ? 0 : 1). */
+  private _compositeScale(): void {
+    let usePerAtom = false;
+    for (let i = 0; i < this.nAtoms; i++) {
+      const eff = this.hiddenBuf[i] ? 0 : this.rawScaleBuf[i];
+      this.scaleOverrideBuf[i] = eff;
+      if (eff !== 1) usePerAtom = true;
+    }
     this.scaleOverrideAttr.needsUpdate = true;
-    this.material.uniforms.uUsePerAtomOverrides.value = 1;
+    if (usePerAtom) this.material.uniforms.uUsePerAtomOverrides.value = 1;
   }
 
   /** Set per-atom opacity overrides. */
@@ -190,13 +225,25 @@ export class ImpostorAtomMesh {
     }
   }
 
-  /** Clear all per-atom overrides, reverting to global uniforms. */
+  /**
+   * Clear scale/opacity overrides, reverting to global uniforms. The hidden
+   * mask is intentionally preserved — it is owned by the representation layer,
+   * not the modify/scale layer — and re-composited so hidden atoms stay hidden
+   * even when the per-frame override pass resets scale/opacity.
+   */
   clearOverrides(): void {
-    this.scaleOverrideBuf.fill(1.0, 0, this.nAtoms);
+    this.rawScaleBuf.fill(1.0, 0, this.nAtoms);
     this.opacityOverrideBuf.fill(1.0, 0, this.nAtoms);
-    this.scaleOverrideAttr.needsUpdate = true;
     this.opacityOverrideAttr.needsUpdate = true;
-    this.material.uniforms.uUsePerAtomOverrides.value = 0;
+    let anyHidden = false;
+    for (let i = 0; i < this.nAtoms; i++) {
+      if (this.hiddenBuf[i]) {
+        anyHidden = true;
+        break;
+      }
+    }
+    this.material.uniforms.uUsePerAtomOverrides.value = anyHidden ? 1 : 0;
+    this._compositeScale();
   }
 
   /**
@@ -237,18 +284,24 @@ export class ImpostorAtomMesh {
     const newColor = new Float32Array(this.capacity * 3);
     const newScaleOverride = new Float32Array(this.capacity).fill(1.0);
     const newOpacityOverride = new Float32Array(this.capacity).fill(1.0);
+    const newRawScale = new Float32Array(this.capacity).fill(1.0);
+    const newHidden = new Uint8Array(this.capacity);
 
     newCenter.set(this.centerBuf);
     newRadius.set(this.radiusBuf);
     newColor.set(this.colorBuf);
     newScaleOverride.set(this.scaleOverrideBuf);
     newOpacityOverride.set(this.opacityOverrideBuf);
+    newRawScale.set(this.rawScaleBuf);
+    newHidden.set(this.hiddenBuf);
 
     this.centerBuf = newCenter;
     this.radiusBuf = newRadius;
     this.colorBuf = newColor;
     this.scaleOverrideBuf = newScaleOverride;
     this.opacityOverrideBuf = newOpacityOverride;
+    this.rawScaleBuf = newRawScale;
+    this.hiddenBuf = newHidden;
 
     this.centerAttr = new THREE.InstancedBufferAttribute(this.centerBuf, 3);
     this.radiusAttr = new THREE.InstancedBufferAttribute(this.radiusBuf, 1);

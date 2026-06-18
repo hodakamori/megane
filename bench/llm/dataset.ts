@@ -295,6 +295,68 @@ export const DATASET: BenchCase[] = [
       minNodes: 4,
     },
   },
+  {
+    id: "representation-water-line",
+    prompt:
+      "I have a caffeine molecule dissolved in water, where the water residues are named HOH. Render the water molecules as a line representation, but leave the caffeine in its normal style.",
+    tags: ["multistep", "filter", "representation", "params"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "filter", "representation", "viewport"],
+      requiredConnections: [
+        { sourceType: "filter", targetType: "representation", sourceHandle: "out", targetHandle: "in" },
+        {
+          sourceType: "representation",
+          targetType: "viewport",
+          sourceHandle: "out",
+          targetHandle: "particle",
+        },
+      ],
+      paramChecks: [
+        {
+          label: 'a filter selects water (resname == "HOH")',
+          nodeType: "filter",
+          test: (n) => /resname\s*==\s*["']?HOH["']?/i.test(str(n, "query")),
+        },
+        {
+          label: 'representation.mode === "line"',
+          nodeType: "representation",
+          test: (n) => str(n, "mode") === "line",
+        },
+      ],
+      minNodes: 4,
+    },
+  },
+  {
+    id: "hide-water",
+    prompt:
+      "I have a caffeine molecule dissolved in water, where the water residues are named HOH. Hide the water so only the caffeine is shown.",
+    tags: ["multistep", "filter", "modify", "params"],
+    rubric: {
+      requiredNodeTypes: ["load_structure", "filter", "modify", "viewport"],
+      requiredConnections: [
+        { sourceType: "filter", targetType: "modify", sourceHandle: "out", targetHandle: "in" },
+        {
+          sourceType: "modify",
+          targetType: "viewport",
+          sourceHandle: "out",
+          targetHandle: "particle",
+        },
+      ],
+      paramChecks: [
+        {
+          label: 'filter selects water (resname == "HOH")',
+          nodeType: "filter",
+          test: (n) => /resname\s*==\s*["']?HOH["']?/i.test(str(n, "query")),
+        },
+        {
+          label: "modify.opacity is 0 (water hidden)",
+          nodeType: "modify",
+          test: (n) => num(n, "opacity") === 0,
+        },
+      ],
+      minNodes: 4,
+    },
+  },
 
   // ── Multilingual robustness (Japanese) ───────────────────────────────
   {

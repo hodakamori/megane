@@ -87,6 +87,12 @@ export interface AtomRenderer {
   setScaleOverrides?(overrides: Float32Array): void;
   setOpacityOverrides?(overrides: Float32Array): void;
   clearOverrides?(): void;
+  /**
+   * Hide a subset of atoms (e.g. those rendered as lines by a separate
+   * renderer). `mask[i] === 1` hides atom `i`; `null` shows all. Composes with
+   * scale overrides without clobbering them.
+   */
+  setHiddenMask?(mask: Uint8Array | null): void;
   dispose(): void;
 }
 
@@ -100,6 +106,12 @@ export interface BondRenderer {
   setUniformRadius?(radius: number | null, snapshot?: Snapshot): void;
   setBondOpacityOverrides?(overrides: Float32Array): void;
   clearBondOpacityOverrides?(): void;
+  /**
+   * Hide every bond with at least one endpoint atom in `mask` (`mask[i] === 1`).
+   * `null` shows all bonds. Used to suppress the cylinder bonds of atoms that a
+   * per-atom representation draws as lines instead.
+   */
+  setHiddenMask?(mask: Uint8Array | null): void;
   dispose(): void;
 }
 

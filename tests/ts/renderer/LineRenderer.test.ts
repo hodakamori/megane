@@ -115,6 +115,41 @@ describe("LineRenderer", () => {
     expect(lr.mesh.geometry.getAttribute("position")).toBeUndefined();
   });
 
+  it("lineMask draws only bonds whose both endpoints are flagged", () => {
+    // Three atoms: bond 0-1 (both line), bond 1-2 (mixed) → only 0-1 drawn.
+    const snapshot = {
+      nAtoms: 3,
+      nBonds: 2,
+      nFileBonds: 2,
+      positions: new Float32Array([0, 0, 0, 2, 0, 0, 4, 0, 0]),
+      elements: new Uint8Array([8, 1, 6]), // O, H, C
+      bonds: new Uint32Array([0, 1, 1, 2]),
+      bondOrders: null,
+      box: null,
+    } as Snapshot;
+    const lr = new LineRenderer();
+    lr.loadSnapshot(snapshot, new Uint8Array([1, 1, 0]));
+    // Only the 0-1 bond is fully inside the mask → 1 bond → 2 segments → 4 verts.
+    expect(lr.mesh.geometry.getAttribute("position").count).toBe(4);
+  });
+
+  it("lineMask crosses only masked lone atoms", () => {
+    // Two bondless atoms; mask flags just one → one cross (6 verts).
+    const snapshot = {
+      nAtoms: 2,
+      nBonds: 0,
+      nFileBonds: 0,
+      positions: new Float32Array([0, 0, 0, 5, 0, 0]),
+      elements: new Uint8Array([11, 11]),
+      bonds: new Uint32Array(0),
+      bondOrders: null,
+      box: null,
+    } as Snapshot;
+    const lr = new LineRenderer();
+    lr.loadSnapshot(snapshot, new Uint8Array([1, 0]));
+    expect(lr.mesh.geometry.getAttribute("position").count).toBe(6);
+  });
+
   it("dispose frees geometry and material", () => {
     const lr = new LineRenderer();
     lr.loadSnapshot(makeBondedSnapshot());
