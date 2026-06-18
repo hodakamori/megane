@@ -353,44 +353,46 @@ async function clearRootTransform(page) {
 }
 
 /**
- * Grow the whole pipeline panel to a fullscreen overlay, animated from its
- * current rect. We drive this through an injected `!important` stylesheet rather
- * than inline styles because React/ReactFlow re-apply their own inline style on
- * `.react-flow` and would wipe direct mutations. Resizing the panel grows its
- * flex-child ReactFlow as a real layout change (ResizeObserver re-measures, so
- * edges stay attached), and a solid background hides the molecule behind it.
+ * Make the whole pipeline panel a fullscreen overlay, revealed with an opacity
+ * fade (NOT a size animation). We drive this through an injected `!important`
+ * stylesheet rather than inline styles because React/ReactFlow re-apply their
+ * own inline style on `.react-flow` and would wipe direct mutations.
+ *
+ * The geometry jumps to fullscreen in a single step on purpose: animating the
+ * panel's size makes ReactFlow's ResizeObserver fire mid-tween and the handle
+ * positions get measured at an intermediate size, which corrupts the edge
+ * geometry (edges balloon off their handles). Sizing straight to fullscreen
+ * lets ReactFlow measure once at the final size, so edges stay attached, and
+ * the opacity fade keeps the reveal from being a hard cut.
  */
 async function expandPanelFullscreen(page, ms = TRANSITION_MS) {
+  const fade = Math.min(ms, 450);
   await page.evaluate(
-    ({ sel, ms }) => {
-      const panel = document.querySelector(sel);
-      if (!panel) return;
-      const r = panel.getBoundingClientRect();
+    ({ sel, fade }) => {
       let s = document.getElementById("promo-fs");
       if (!s) {
         s = document.createElement("style");
         s.id = "promo-fs";
         document.head.appendChild(s);
       }
-      const ease = "cubic-bezier(0.4, 0, 0.2, 1)";
       const base =
         `${sel}{position:fixed!important;z-index:99999!important;margin:0!important;` +
+        `left:0!important;top:0!important;width:100vw!important;height:100vh!important;` +
         `max-width:none!important;max-height:none!important;min-width:0!important;` +
         `background:var(--megane-surface-solid,#fff)!important;` +
-        `transition:left ${ms}ms ${ease},top ${ms}ms ${ease},width ${ms}ms ${ease},height ${ms}ms ${ease}!important;`;
-      // Start at the panel's current on-screen rect (visually identical), then
-      // animate to fullscreen on the next frame.
-      s.textContent = `${base}left:${r.left}px!important;top:${r.top}px!important;width:${r.width}px!important;height:${r.height}px!important;}`;
-      void panel.offsetWidth;
+        `transition:opacity ${fade}ms ease!important;`;
+      s.textContent = `${base}opacity:0!important;}`;
+      const panel = document.querySelector(sel);
+      if (panel) void panel.offsetWidth; // commit the fullscreen layout first
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          s.textContent = `${base}left:0!important;top:0!important;width:100vw!important;height:100vh!important;}`;
+          s.textContent = `${base}opacity:1!important;}`;
         }),
       );
     },
-    { sel: SEL.panelPipeline, ms },
+    { sel: SEL.panelPipeline, fade },
   );
-  await page.waitForTimeout(ms + 250);
+  await page.waitForTimeout(fade + 250);
 }
 
 /** Drag the ReactFlow pane to scroll the viewport down through the graph. */
