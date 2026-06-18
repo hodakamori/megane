@@ -352,31 +352,45 @@ async function clearRootTransform(page) {
   current = { tx: 0, ty: 0, s: 1 };
 }
 
-/** Animate the ReactFlow container from its panel rect to a fullscreen overlay. */
-async function expandReactFlowFullscreen(page, box, ms = TRANSITION_MS) {
+/**
+ * Grow the whole pipeline panel to a fullscreen overlay, animated from its
+ * current rect. We drive this through an injected `!important` stylesheet rather
+ * than inline styles because React/ReactFlow re-apply their own inline style on
+ * `.react-flow` and would wipe direct mutations. Resizing the panel grows its
+ * flex-child ReactFlow as a real layout change (ResizeObserver re-measures, so
+ * edges stay attached), and a solid background hides the molecule behind it.
+ */
+async function expandPanelFullscreen(page, ms = TRANSITION_MS) {
   await page.evaluate(
-    ({ sel, rect, ms }) => {
-      const rf = document.querySelector(sel);
-      if (!rf) return;
-      rf.style.position = "fixed";
-      rf.style.zIndex = "9999";
-      rf.style.margin = "0";
-      rf.style.left = `${rect.x}px`;
-      rf.style.top = `${rect.y}px`;
-      rf.style.width = `${rect.width}px`;
-      rf.style.height = `${rect.height}px`;
-      rf.style.transition = "none";
-      void rf.offsetWidth; // force reflow so the start rect is committed
+    ({ sel, ms }) => {
+      const panel = document.querySelector(sel);
+      if (!panel) return;
+      const r = panel.getBoundingClientRect();
+      let s = document.getElementById("promo-fs");
+      if (!s) {
+        s = document.createElement("style");
+        s.id = "promo-fs";
+        document.head.appendChild(s);
+      }
       const ease = "cubic-bezier(0.4, 0, 0.2, 1)";
-      rf.style.transition = `left ${ms}ms ${ease}, top ${ms}ms ${ease}, width ${ms}ms ${ease}, height ${ms}ms ${ease}`;
-      rf.style.left = "0px";
-      rf.style.top = "0px";
-      rf.style.width = "100vw";
-      rf.style.height = "100vh";
+      const base =
+        `${sel}{position:fixed!important;z-index:99999!important;margin:0!important;` +
+        `max-width:none!important;max-height:none!important;min-width:0!important;` +
+        `background:var(--megane-surface-solid,#fff)!important;` +
+        `transition:left ${ms}ms ${ease},top ${ms}ms ${ease},width ${ms}ms ${ease},height ${ms}ms ${ease}!important;`;
+      // Start at the panel's current on-screen rect (visually identical), then
+      // animate to fullscreen on the next frame.
+      s.textContent = `${base}left:${r.left}px!important;top:${r.top}px!important;width:${r.width}px!important;height:${r.height}px!important;}`;
+      void panel.offsetWidth;
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          s.textContent = `${base}left:0!important;top:0!important;width:100vw!important;height:100vh!important;}`;
+        }),
+      );
     },
-    { sel: SEL.reactFlow, rect: box, ms },
+    { sel: SEL.panelPipeline, ms },
   );
-  await page.waitForTimeout(ms + 150);
+  await page.waitForTimeout(ms + 250);
 }
 
 /** Drag the ReactFlow pane to scroll the viewport down through the graph. */
@@ -551,7 +565,7 @@ try {
 
   const rfBox = await boxOf(page, SEL.reactFlow);
   if (rfBox) {
-    await expandReactFlowFullscreen(page, rfBox, TRANSITION_MS);
+    await expandPanelFullscreen(page, TRANSITION_MS);
     // Re-fit at the new fullscreen size via ReactFlow's own control so the whole
     // graph is framed and the handles are re-measured for the larger viewport.
     await page.locator(SEL.rfFitView).first().click().catch(() => {});
