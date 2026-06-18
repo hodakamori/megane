@@ -138,9 +138,25 @@ describe("buildSystemPrompt", () => {
     const modifies = pipeline.nodes.filter((n) => n.type === "modify");
     expect(modifies.length).toBeGreaterThanOrEqual(1);
     expect((modifies[0] as { opacity?: number }).opacity).toBe(0);
-    // The filter selects the species to hide (water).
+    // Two disjoint filter branches: the first selects the species to hide
+    // (water), the second keeps the rest. Routing the rest through its own
+    // filter — instead of re-sending the full structure — is what actually
+    // hides the species (an unfiltered branch would re-draw it at full opacity).
     const filters = pipeline.nodes.filter((n) => n.type === "filter");
-    expect(filters.length).toBeGreaterThanOrEqual(1);
+    expect(filters).toHaveLength(2);
+    expect((filters[0] as { query?: string }).query).toContain("HOH");
+    // No edge feeds the load_structure's particles straight to the viewport;
+    // every particle path into the viewport goes through a filter first.
+    const loaderId = pipeline.nodes.find((n) => n.type === "load_structure")!.id;
+    const viewportId = pipeline.nodes.find((n) => n.type === "viewport")!.id;
+    const directParticleEdge = pipeline.edges.find(
+      (e) =>
+        e.source === loaderId &&
+        e.target === viewportId &&
+        e.sourceHandle === "particle" &&
+        e.targetHandle === "particle",
+    );
+    expect(directParticleEdge).toBeUndefined();
   });
 });
 
