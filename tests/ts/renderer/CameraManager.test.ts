@@ -6,6 +6,7 @@ import {
   applyFrustumInsets,
   createSwitchedCamera,
   updatePerspectiveClipping,
+  zoomOrthographicAroundTarget,
 } from "@/renderer/CameraManager";
 import type { Snapshot } from "@/types";
 
@@ -334,5 +335,81 @@ describe("updatePerspectiveClipping", () => {
     updatePerspectiveClipping(cam, controls, extent);
 
     expect(cam.far / cam.near).toBeLessThanOrEqual(1e4 + 1e-6);
+  });
+});
+
+describe("zoomOrthographicAroundTarget", () => {
+  /**
+   * Build an orthographic camera looking at `target` from the -Y axis (the
+   * app's orientation: up = +Z). `cx`/`cy` offset the frustum center so the
+   * target projects off-screen-center, mimicking the sidebar inset shift that
+   * triggered the original drift bug.
+   */
+  function makeOrtho(target: THREE.Vector3, cx = 0, cy = 0) {
+    const half = 25;
+    const cam = new THREE.OrthographicCamera(
+      -half + cx,
+      half + cx,
+      half + cy,
+      -half + cy,
+      -1000,
+      1000,
+    );
+    cam.position.set(target.x, target.y - 50, target.z);
+    cam.up.set(0, 0, 1);
+    cam.lookAt(target);
+    cam.updateMatrixWorld(true);
+    cam.updateProjectionMatrix();
+    return cam;
+  }
+
+  it("keeps the target's screen position fixed across a zoom (anchor invariant)", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    // Frustum center offset by 5 in x so the target is off screen-center.
+    const cam = makeOrtho(target, 5);
+    const before = target.clone().project(cam);
+
+    zoomOrthographicAroundTarget(cam, target, 2.0);
+
+    const after = target.clone().project(cam);
+    expect(after.x).toBeCloseTo(before.x, 6);
+    expect(after.y).toBeCloseTo(before.y, 6);
+  });
+
+  it("is reversible: zoom in then out restores zoom and frustum bounds", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target, 5, -3);
+    const l0 = cam.left;
+    const r0 = cam.right;
+    const t0 = cam.top;
+    const b0 = cam.bottom;
+
+    for (let i = 0; i < 10; i++) zoomOrthographicAroundTarget(cam, target, 1.2);
+    for (let i = 0; i < 10; i++) zoomOrthographicAroundTarget(cam, target, 1 / 1.2);
+
+    expect(cam.zoom).toBeCloseTo(1, 5);
+    expect(cam.left).toBeCloseTo(l0, 4);
+    expect(cam.right).toBeCloseTo(r0, 4);
+    expect(cam.top).toBeCloseTo(t0, 4);
+    expect(cam.bottom).toBeCloseTo(b0, 4);
+  });
+
+  it("clamps zoom at the 0.01 minimum", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target);
+    zoomOrthographicAroundTarget(cam, target, 0.0001);
+    expect(cam.zoom).toBe(0.01);
+  });
+
+  it("applies no frustum shift when the target is already screen-centered", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target); // cx = cy = 0 → target at NDC origin
+    const { shiftX, shiftY } = zoomOrthographicAroundTarget(cam, target, 3.0);
+    expect(Math.abs(shiftX)).toBeLessThan(1e-9);
+    expect(Math.abs(shiftY)).toBeLessThan(1e-9);
+    // Frustum width unchanged; only zoom scales.
+    expect(cam.left).toBeCloseTo(-25, 9);
+    expect(cam.right).toBeCloseTo(25, 9);
+    expect(cam.zoom).toBeCloseTo(3, 9);
   });
 });

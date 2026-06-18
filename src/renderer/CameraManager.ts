@@ -160,6 +160,43 @@ export function updatePerspectiveClipping(
 }
 
 /**
+ * Zoom an orthographic camera by `zoomFactor` while keeping `target`'s screen
+ * position fixed, mutating the camera in place. Returns the frustum shift (in
+ * world units) applied to keep the target anchored, so the caller can
+ * accumulate it into its pan bookkeeping.
+ *
+ * `project()` returns zoom-scaled NDC, so an NDC delta maps to a world-space
+ * frustum shift via the *visible* half-extent (right-left)/(2*zoom) — not
+ * (right-left)/2. Omitting the /zoom over-shifts at high zoom and accumulates
+ * irreversibly, stranding the model off-screen when zooming back out (only
+ * "Reset view" recovered it). With the /zoom factor the target's NDC is
+ * preserved across the call, making zoom fully reversible.
+ */
+export function zoomOrthographicAroundTarget(
+  camera: THREE.OrthographicCamera,
+  target: THREE.Vector3,
+  zoomFactor: number,
+): { shiftX: number; shiftY: number } {
+  const ndcBefore = target.clone().project(camera);
+
+  camera.zoom = Math.max(0.01, camera.zoom * zoomFactor);
+  camera.updateProjectionMatrix();
+
+  const ndcAfter = target.clone().project(camera);
+  const zoom = camera.zoom;
+  const shiftX = ((ndcAfter.x - ndcBefore.x) * (camera.right - camera.left)) / (2 * zoom);
+  const shiftY = ((ndcAfter.y - ndcBefore.y) * (camera.top - camera.bottom)) / (2 * zoom);
+  if (Math.abs(shiftX) > 1e-9 || Math.abs(shiftY) > 1e-9) {
+    camera.left += shiftX;
+    camera.right += shiftX;
+    camera.top += shiftY;
+    camera.bottom += shiftY;
+    camera.updateProjectionMatrix();
+  }
+  return { shiftX, shiftY };
+}
+
+/**
  * Recalculate the orthographic frustum so the model fits within the
  * visible area (accounting for overlay insets) and appears centered.
  */

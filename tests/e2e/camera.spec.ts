@@ -28,11 +28,7 @@ import {
   getReadyState,
 } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
-import {
-  getCameraState,
-  resetCamera,
-  setCameraMode,
-} from "./lib/render-utils";
+import { getCameraState, getProjectedAtoms, resetCamera, setCameraMode } from "./lib/render-utils";
 
 const PLATFORM = "camera";
 const FIXTURE = "caffeine_water.pdb";
@@ -102,4 +98,68 @@ test("camera: resetCamera() restores fitted view", async () => {
   }
   await stabilizeUi(boot!.scope);
   await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-reset`);
+});
+
+/**
+ * Regression: zooming in then back out with the wheel must restore the model
+ * without pressing "Reset view". The orthographic wheel zoom previously
+ * over-shifted the frustum at high zoom and accumulated the offset
+ * irreversibly, stranding all atoms off-screen on zoom-out. We drive real
+ * WheelEvents (the OrbitControls dolly path Playwright's mouse.wheel takes
+ * doesn't reach the capture-phase handler) and assert the on-screen atom
+ * count recovers.
+ */
+test("camera: orthographic wheel zoom-out restores atoms (no reset needed)", async () => {
+  if (!boot) test.skip(true, "boot not initialised");
+  const scope = boot!.scope;
+
+  await setCameraMode(scope, "orthographic");
+  await resetCamera(scope);
+  await scope.waitForTimeout(200);
+
+  const dispatchWheel = (deltaY: number, n: number) =>
+    scope.evaluate(
+      ({ deltaY, n }) => {
+        const el = document.querySelector("canvas");
+        if (!el) throw new Error("no canvas");
+        const r = el.getBoundingClientRect();
+        for (let i = 0; i < n; i++) {
+          el.dispatchEvent(
+            new WheelEvent("wheel", {
+              deltaY,
+              clientX: r.left + r.width / 2,
+              clientY: r.top + r.height / 2,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        }
+      },
+      { deltaY, n },
+    );
+
+  const onScreen = async () => {
+    const atoms = await getProjectedAtoms(scope);
+    const box = await scope.locator("canvas").first().boundingBox();
+    const w = box?.width ?? 0;
+    const h = box?.height ?? 0;
+    return atoms.filter((a) => a.sx >= 0 && a.sx <= w && a.sy >= 0 && a.sy <= h).length;
+  };
+
+  const initial = await onScreen();
+  expect(initial).toBeGreaterThan(0);
+
+  // Zoom IN hard — most atoms leave the viewport (acceptable).
+  await dispatchWheel(-120, 60);
+  await scope.waitForTimeout(200);
+  expect(await onScreen()).toBeLessThan(initial);
+
+  // Zoom OUT the same amount — atoms must come back via the wheel alone.
+  await dispatchWheel(120, 60);
+  await scope.waitForTimeout(200);
+  const recovered = await onScreen();
+  expect(recovered).toBeGreaterThanOrEqual(initial * 0.95);
+
+  const state = await getCameraState(scope);
+  expect(state!.zoom).toBeCloseTo(1, 2);
 });
