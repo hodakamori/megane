@@ -442,6 +442,9 @@ try {
   // Frame the input box together with the Generate button so the click target
   // stays comfortably on screen.
   await zoomToUnion(page, [SEL.promptBox, SEL.generateBtn], { pad: 24, anchorY: 0.5 });
+  // Remember this magnification so the response scene (4) frames the chat at the
+  // exact same zoom level as the input — the camera only slides up, never rescales.
+  const inputScale = current.s;
   await page.waitForTimeout(700);
 
   // ── 3. Type the prompt and click Generate ──────────────────────────────────
@@ -452,8 +455,15 @@ try {
   await page.waitForTimeout(900);
 
   // ── 4. Pan up to the response area; dwell while the reply streams in ────────
+  // Keep the input's magnification (`inputScale`) and only slide the camera up to
+  // the messages area, so the zoom level matches scene 2/3 exactly.
   console.log(`Scene 4: response area, dwell ${RESPONSE_WAIT_MS}ms`);
-  await zoomToSel(page, SEL.chatMessages, { pad: 18, alignTop: true, topMargin: 64 });
+  await zoomToSel(page, SEL.chatMessages, {
+    pad: 18,
+    alignTop: true,
+    topMargin: 64,
+    scale: inputScale,
+  });
   await waitForApplied(page, RESPONSE_WAIT_MS);
 
   // ── 5. Frame the whole molecule (water now drawn as lines) ──────────────────
