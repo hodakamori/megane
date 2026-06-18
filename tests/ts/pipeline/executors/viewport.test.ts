@@ -22,12 +22,13 @@ function makeSnapshot(): Snapshot {
 function makeParticle(
   sourceNodeId: string,
   representationOverride: RepresentationMode | null = null,
+  indices: Uint32Array | null = null,
 ): ParticleData {
   return {
     type: "particle",
     source: makeSnapshot(),
     sourceNodeId,
-    indices: null,
+    indices,
     scaleOverrides: null,
     opacityOverrides: null,
     colorOverrides: null,
@@ -76,5 +77,29 @@ describe("executeViewport — representation pickup", () => {
   it("passes the licorice override through to the viewport state", () => {
     const state = executeViewport(baseParams, inputs([makeParticle("a", "licorice")]));
     expect(state.representationMode).toBe("licorice");
+  });
+
+  it("leaves representationByAtom null when the whole structure shares one mode", () => {
+    const state = executeViewport(baseParams, inputs([makeParticle("a", "line")]));
+    expect(state.representationMode).toBe("line");
+    expect(state.representationByAtom).toBeNull();
+  });
+
+  it("builds a per-atom array for disjoint branches (water as lines)", () => {
+    // 2-atom snapshot: atom 0 = line branch, atom 1 = plain (base "atoms").
+    const lineBranch = makeParticle("a", "line", new Uint32Array([0]));
+    const restBranch = makeParticle("a", null, new Uint32Array([1]));
+    const state = executeViewport(baseParams, inputs([lineBranch, restBranch]));
+    expect(state.representationByAtom).toEqual(["line", "atoms"]);
+    // Global mesh mode is the non-line base for the rest of the structure.
+    expect(state.representationMode).toBe("atoms");
+  });
+
+  it("uses the first non-line override as the base mesh mode in a mixed view", () => {
+    const lineBranch = makeParticle("a", "line", new Uint32Array([0]));
+    const licoriceBranch = makeParticle("a", "licorice", new Uint32Array([1]));
+    const state = executeViewport(baseParams, inputs([lineBranch, licoriceBranch]));
+    expect(state.representationMode).toBe("licorice");
+    expect(state.representationByAtom).toEqual(["line", "licorice"]);
   });
 });

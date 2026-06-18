@@ -58,6 +58,10 @@ export class ImpostorBondMesh {
   // When non-null, every visual bond renders at this fixed radius (licorice
   // mode); when null, radii fall back to the per-order defaults.
   private uniformRadius: number | null = null;
+  // Per-atom hide flags (1 = hidden). A bond with a hidden endpoint renders at
+  // radius 0 (the shader discards a degenerate cylinder) so atoms drawn as
+  // lines by a per-atom representation don't also show cylinder bonds.
+  private hiddenAtomMask: Uint8Array | null = null;
 
   // Persistent InstancedBufferAttribute references. Recreated only when the
   // backing typed arrays are reallocated by grow(); otherwise we just flip
@@ -272,6 +276,8 @@ export class ImpostorBondMesh {
     // exhausted GPU memory and triggered WebGL context loss.
     this.markAttributesDirty();
     this.geo.instanceCount = idx;
+    // Re-apply a persistent hide mask onto the freshly built topology.
+    this._compositeRadius();
   }
 
   updatePositions(positions: Float32Array, _bonds: Uint32Array, _nBonds: number): void {
@@ -372,9 +378,30 @@ export class ImpostorBondMesh {
    */
   setUniformRadius(radius: number | null, _snapshot?: Snapshot): void {
     this.uniformRadius = radius;
+    this._compositeRadius();
+  }
+
+  /**
+   * Hide every bond with at least one endpoint atom flagged in `mask`
+   * (`mask[i] === 1`); `null` shows all bonds. Persists across topology
+   * rebuilds and licorice radius changes.
+   */
+  setHiddenMask(mask: Uint8Array | null): void {
+    this.hiddenAtomMask = mask ? new Uint8Array(mask) : null;
+    this._compositeRadius();
+  }
+
+  /** Write the effective radius buffer, zeroing bonds with a hidden endpoint. */
+  private _compositeRadius(): void {
     const count = this.geo.instanceCount;
+    const mask = this.hiddenAtomMask;
     for (let v = 0; v < count; v++) {
-      this.radiusBuf[v] = radius ?? this.baseRadiusBuf[v];
+      const base = this.uniformRadius ?? this.baseRadiusBuf[v];
+      if (mask && (mask[this.atomABuf[v]] === 1 || mask[this.atomBBuf[v]] === 1)) {
+        this.radiusBuf[v] = 0;
+      } else {
+        this.radiusBuf[v] = base;
+      }
     }
     this.radiusAttr.needsUpdate = true;
   }

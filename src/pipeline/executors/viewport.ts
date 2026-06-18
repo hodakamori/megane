@@ -43,20 +43,63 @@ export function executeViewport(
     perspective: params.perspective,
     cellAxesVisible: params.cellAxesVisible,
     pivotMarkerVisible: params.pivotMarkerVisible ?? true,
-    representationMode: pickRepresentationMode(particles),
+    ...resolveRepresentation(particles),
   };
 }
 
 /**
- * Pick the effective representation mode from the incoming particle streams.
- * The first non-null `representationOverride` wins; if no upstream
- * Representation node is wired in, fall back to "atoms" (the prior default).
+ * Resolve the effective representation from the incoming particle streams.
+ *
+ * Each atom takes the override of the *first* stream (in stream order) that
+ * both carries a `representationOverride` and covers it — matching the prior
+ * "first non-null override wins" rule while extending it to disjoint branches.
+ * Atoms no override stream covers fall back to the base mode.
+ *
+ * When every atom ends up with the same mode we return it as the global
+ * `representationMode` with `representationByAtom: null` (the fast path that
+ * preserves the previous single-mode behavior). When branches disagree (e.g.
+ * "water as lines, the rest ball-and-stick") we return a per-atom array plus a
+ * global `representationMode` set to the base mesh mode for the non-line atoms.
  */
-function pickRepresentationMode(particles: ParticleData[]): RepresentationMode {
+function resolveRepresentation(particles: ParticleData[]): {
+  representationMode: RepresentationMode;
+  representationByAtom: RepresentationMode[] | null;
+} {
+  let nAtoms = 0;
+  for (const p of particles) nAtoms = Math.max(nAtoms, p.source?.nAtoms ?? 0);
+  if (nAtoms === 0) return { representationMode: "atoms", representationByAtom: null };
+
+  // The global mesh mode for atoms that no override or a non-"line" override
+  // covers: the first non-"line" override seen, else "atoms".
+  let base: RepresentationMode = "atoms";
   for (const p of particles) {
-    if (p.representationOverride) return p.representationOverride;
+    if (p.representationOverride && p.representationOverride !== "line") {
+      base = p.representationOverride;
+      break;
+    }
   }
-  return "atoms";
+
+  // First covering override wins per atom; undefined entries fall back to base.
+  const assigned: (RepresentationMode | undefined)[] = new Array(nAtoms);
+  for (const p of particles) {
+    const mode = p.representationOverride;
+    if (!mode) continue;
+    if (p.indices === null) {
+      for (let i = 0; i < nAtoms; i++) if (assigned[i] === undefined) assigned[i] = mode;
+    } else {
+      for (const i of p.indices) if (i < nAtoms && assigned[i] === undefined) assigned[i] = mode;
+    }
+  }
+
+  const byAtom: RepresentationMode[] = new Array(nAtoms);
+  let uniform = true;
+  for (let i = 0; i < nAtoms; i++) {
+    byAtom[i] = assigned[i] ?? base;
+    if (byAtom[i] !== byAtom[0]) uniform = false;
+  }
+
+  if (uniform) return { representationMode: byAtom[0], representationByAtom: null };
+  return { representationMode: base, representationByAtom: byAtom };
 }
 
 /**

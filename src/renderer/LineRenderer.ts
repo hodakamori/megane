@@ -31,6 +31,10 @@ export class LineRenderer {
    *  vertex it owns. We store, per vertex, the atom index it tracks so trajectory
    *  updates can recompute positions. -1 marks the midpoint of a bond. */
   private segmentSpec: SegmentVertex[] = [];
+  /** When set, only atoms flagged here (`mask[i] === 1`) are drawn as lines —
+   *  used by per-atom representation to render one species as lines while the
+   *  rest stays ball-and-stick. `null` draws the whole structure. */
+  private lineMask: Uint8Array | null = null;
 
   constructor() {
     const geometry = new THREE.BufferGeometry();
@@ -40,9 +44,14 @@ export class LineRenderer {
     this.mesh.frustumCulled = false;
   }
 
-  /** Load a new snapshot (topology). Allocates buffers and builds geometry. */
-  loadSnapshot(snapshot: Snapshot): void {
+  /**
+   * Load a new snapshot (topology). Allocates buffers and builds geometry.
+   * When `lineMask` is given, only atoms flagged in it (and bonds whose *both*
+   * endpoints are flagged) are drawn — the rest are left to the mesh renderers.
+   */
+  loadSnapshot(snapshot: Snapshot, lineMask: Uint8Array | null = null): void {
     this.snapshot = snapshot;
+    this.lineMask = lineMask;
     this._build(snapshot);
   }
 
@@ -67,19 +76,27 @@ export class LineRenderer {
 
   private _build(snapshot: Snapshot): void {
     const { nAtoms, nBonds, bonds, elements } = snapshot;
+    const mask = this.lineMask;
+    const inMask = (i: number): boolean => !mask || mask[i] === 1;
+    // Only bonds whose both endpoints are line atoms are drawn as lines.
+    const bondShown = (i: number): boolean => inMask(bonds[i * 2]) && inMask(bonds[i * 2 + 1]);
 
-    // Track which atoms have at least one bond so we can cross-mark the rest.
+    // Track which atoms have at least one *shown* bond so we can cross-mark the
+    // rest (only line atoms get a cross when masking is active).
     const bonded = new Uint8Array(nAtoms);
     for (let i = 0; i < nBonds; i++) {
+      if (!bondShown(i)) continue;
       bonded[bonds[i * 2]] = 1;
       bonded[bonds[i * 2 + 1]] = 1;
     }
     let nLone = 0;
-    for (let i = 0; i < nAtoms; i++) if (!bonded[i]) nLone++;
+    let nShownBonds = 0;
+    for (let i = 0; i < nBonds; i++) if (bondShown(i)) nShownBonds++;
+    for (let i = 0; i < nAtoms; i++) if (!bonded[i] && inMask(i)) nLone++;
 
-    // Vertex budget: each bond → 2 segments (4 verts); each lone atom → 3 crosses
-    // (6 verts).
-    const nVerts = nBonds * 4 + nLone * 6;
+    // Vertex budget: each shown bond → 2 segments (4 verts); each lone line atom
+    // → 3 crosses (6 verts).
+    const nVerts = nShownBonds * 4 + nLone * 6;
     const positionsArr = new Float32Array(nVerts * 3);
     const colorsArr = new Float32Array(nVerts * 3);
     const spec: SegmentVertex[] = new Array(nVerts);
@@ -93,6 +110,7 @@ export class LineRenderer {
 
     // Two-tone bond segments: a→mid (color a), mid→b (color b).
     for (let i = 0; i < nBonds; i++) {
+      if (!bondShown(i)) continue;
       const ai = bonds[i * 2];
       const bi = bonds[i * 2 + 1];
       const ca = getColor(elements[ai]);
@@ -115,7 +133,7 @@ export class LineRenderer {
 
     // Lone-atom crosses: 3 axis-aligned segments through the atom position.
     for (let i = 0; i < nAtoms; i++) {
-      if (bonded[i]) continue;
+      if (bonded[i] || !inMask(i)) continue;
       const c = getColor(elements[i]);
       for (const axis of [0, 1, 2] as const) {
         spec[v] = { atom: i, crossAxis: axis, crossSign: -1 };

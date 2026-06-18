@@ -291,6 +291,8 @@ export class MoleculeRenderer {
   /** Line / wireframe renderer (lazy, created on first use). */
   private lineRenderer: LineRenderer | null = null;
   private representationType: RepresentationType = "atoms";
+  /** Per-atom representation override (see setRepresentationByAtom). */
+  private representationByAtom: RepresentationType[] | null = null;
 
   // (screen-space picking replaces Three.js raycasting)
 
@@ -508,6 +510,13 @@ export class MoleculeRenderer {
           this.cellAxesRenderer = null;
         }
       }
+    }
+
+    // Re-establish any per-atom representation: loading a snapshot rebuilt the
+    // atom/line geometry from scratch and cleared the hide masks, so a mixed
+    // "water as lines" view would otherwise revert to uniform on reload.
+    if (this.representationByAtom) {
+      this.setRepresentationByAtom(this.representationByAtom);
     }
 
     this.fitToView(snapshot);
@@ -843,6 +852,51 @@ export class MoleculeRenderer {
     }
     if (this.lineRenderer) {
       this.lineRenderer.setVisible(showLine);
+    }
+  }
+
+  /**
+   * Apply a per-atom representation: atoms flagged `"line"` are drawn by the
+   * line renderer while every other atom keeps the global mesh representation
+   * (`setRepresentationType`). This enables mixed views such as "show the water
+   * as lines while the rest stays ball-and-stick". Pass `null` to revert to the
+   * uniform global representation.
+   *
+   * Must run *after* `setRepresentationType`, which establishes the base mesh
+   * mode and reloads the line geometry; this overlays the per-atom split on top.
+   */
+  setRepresentationByAtom(modes: RepresentationType[] | null): void {
+    this.representationByAtom = modes;
+
+    if (!modes) {
+      this.atomRenderer?.setHiddenMask?.(null);
+      this.bondRenderer?.setHiddenMask?.(null);
+      if (this.lineRenderer && this.snapshot) {
+        this.lineRenderer.loadSnapshot(this.snapshot);
+        this.lineRenderer.setVisible(this.representationType === "line");
+      }
+      return;
+    }
+
+    const n = this.snapshot?.nAtoms ?? modes.length;
+    const lineMask = new Uint8Array(n);
+    let anyLine = false;
+    for (let i = 0; i < n; i++) {
+      if (modes[i] === "line") {
+        lineMask[i] = 1;
+        anyLine = true;
+      }
+    }
+
+    // Hide the line atoms (and their bonds) from the mesh renderers; the line
+    // renderer draws just that subset instead.
+    this.atomRenderer?.setHiddenMask?.(anyLine ? lineMask : null);
+    this.bondRenderer?.setHiddenMask?.(anyLine ? lineMask : null);
+    if (this.lineRenderer && this.snapshot) {
+      this.lineRenderer.loadSnapshot(this.snapshot, anyLine ? lineMask : null);
+      // Keep lines visible for the subset even when the base mesh mode isn't
+      // "line"; if no atom is line-mode, defer to the global toggle.
+      this.lineRenderer.setVisible(anyLine || this.representationType === "line");
     }
   }
 

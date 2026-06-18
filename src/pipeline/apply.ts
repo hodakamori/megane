@@ -157,6 +157,16 @@ export function applyViewportState(
   if (!previous || current.representationMode !== previous.representationMode) {
     renderer.setRepresentationType(current.representationMode ?? "atoms");
   }
+  // Per-atom representation (e.g. "water as lines"). Re-apply whenever the
+  // global mode was just (re)set above, since setRepresentationType reloads the
+  // line geometry and would otherwise drop the per-atom split.
+  if (
+    !previous ||
+    current.representationMode !== previous.representationMode ||
+    !sameRepresentationByAtom(current.representationByAtom, previous.representationByAtom)
+  ) {
+    renderer.setRepresentationByAtom(current.representationByAtom);
+  }
 
   // ─── Labels (primary structure only for now) ───────────────
   applyLabels(renderer, current.labels, previous?.labels ?? null);
@@ -166,6 +176,17 @@ export function applyViewportState(
 
   // ─── Vectors (arrows, primary structure only for now) ──────
   applyVectors(renderer, current.vectors, previous?.vectors ?? null);
+}
+
+/** Value-equality for the per-atom representation arrays (cheap diff). */
+function sameRepresentationByAtom(
+  a: ViewportState["representationByAtom"],
+  b: ViewportState["representationByAtom"],
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 /** Collect unique source node IDs from all data in a ViewportState. */

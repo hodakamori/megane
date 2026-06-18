@@ -723,6 +723,16 @@ export interface ViewportState {
   cellAxesVisible: boolean;
   pivotMarkerVisible: boolean;
   representationMode: RepresentationMode;
+  /**
+   * Per-atom representation for the primary structure, length === nAtoms.
+   * `null` when every atom shares `representationMode` (the common case — keeps
+   * the global fast path). Populated only when disjoint particle branches ask
+   * for *different* representations (e.g. "show the water as lines while the
+   * rest stays ball-and-stick"). The renderer applies the global mesh mode
+   * (`representationMode`) to the non-`"line"` atoms and draws the `"line"`
+   * atoms with the line renderer.
+   */
+  representationByAtom: RepresentationMode[] | null;
 }
 
 export const DEFAULT_VIEWPORT_STATE: ViewportState = {
@@ -737,6 +747,7 @@ export const DEFAULT_VIEWPORT_STATE: ViewportState = {
   cellAxesVisible: true,
   pivotMarkerVisible: true,
   representationMode: "atoms",
+  representationByAtom: null,
 };
 
 // ─── Node Errors ──────────────────────────────────────────────────────

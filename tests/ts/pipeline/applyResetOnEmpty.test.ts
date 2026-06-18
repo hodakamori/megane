@@ -33,6 +33,7 @@ function makeRendererStub() {
     setCellAxesVisible: vi.fn(),
     setPivotMarkerVisible: vi.fn(),
     setRepresentationType: vi.fn(),
+    setRepresentationByAtom: vi.fn(),
     setLabels: vi.fn(),
     loadPolyhedra: vi.fn(),
     clearPolyhedra: vi.fn(),

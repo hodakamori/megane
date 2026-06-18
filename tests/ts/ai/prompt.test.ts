@@ -98,6 +98,50 @@ describe("buildSystemPrompt", () => {
     expect(filters).toHaveLength(2);
     expect(pipeline.nodes.filter((n) => n.type === "modify")).toHaveLength(1);
   });
+
+  it("documents the selective representation (style one species) pattern", () => {
+    expect(prompt).toContain("Selective Representation");
+    // Steer the model to put the representation on a filtered branch, not the
+    // whole structure — this is the caffeine-water "show the water as lines"
+    // failure mode.
+    expect(prompt).toContain("show the water as lines");
+  });
+
+  it("ships a valid selective-representation example with line on the water branch", () => {
+    const pipeline = exampleAfter(prompt, "## Example: Selective Representation");
+    expect(collectPipelineErrors(pipeline)).toEqual([]);
+    // Two disjoint filter branches; the representation styles only one of them.
+    const filters = pipeline.nodes.filter((n) => n.type === "filter");
+    expect(filters).toHaveLength(2);
+    const reps = pipeline.nodes.filter((n) => n.type === "representation");
+    expect(reps).toHaveLength(1);
+    expect((reps[0] as { mode?: string }).mode).toBe("line");
+    // The representation must sit downstream of a filter (water branch), not on
+    // the load_structure directly.
+    const repId = reps[0].id;
+    const feedsRep = pipeline.edges.find((e) => e.target === repId);
+    expect(feedsRep).toBeDefined();
+    const upstream = pipeline.nodes.find((n) => n.id === feedsRep!.source);
+    expect(upstream?.type).toBe("filter");
+  });
+
+  it("documents hiding/removing a species via a modify opacity-0 branch", () => {
+    expect(prompt).toContain("Hiding / removing a species");
+    // A bare filter does not remove atoms; hiding is done by fading to opacity 0.
+    expect(prompt).toContain("does NOT remove");
+    expect(prompt).toContain("opacity");
+  });
+
+  it("ships a valid hide-species example that fades the target to opacity 0", () => {
+    const pipeline = exampleAfter(prompt, "## Example: Hiding / removing a species");
+    expect(collectPipelineErrors(pipeline)).toEqual([]);
+    const modifies = pipeline.nodes.filter((n) => n.type === "modify");
+    expect(modifies.length).toBeGreaterThanOrEqual(1);
+    expect((modifies[0] as { opacity?: number }).opacity).toBe(0);
+    // The filter selects the species to hide (water).
+    const filters = pipeline.nodes.filter((n) => n.type === "filter");
+    expect(filters.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe("buildSystemPrompt with structure summary", () => {

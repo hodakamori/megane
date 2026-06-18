@@ -431,6 +431,140 @@ semi-transparent."
 
 Filters the water into its own branch, makes only it semi-transparent, and shows the rest of the structure at full opacity.
 
+## Example: Selective Representation (style one species only)
+
+A \`representation\` node, like \`modify\`/\`color\`, only restyles the atoms in its
+own branch. To draw ONE species in a different style (e.g. "show the water as
+lines") while the rest keeps its normal look, split into disjoint \`filter\`
+branches: route the target species through \`filter\` -> \`representation\` -> the
+viewport, and route the remainder through its own \`filter\` straight to the
+viewport. Do NOT apply the representation to the whole structure, and do NOT
+send both the full structure and a filtered subset of the same atoms to the
+viewport (the overlap renders twice).
+
+User request: "Render the water (resname HOH) as a line representation, but
+leave the rest of the structure in its normal style."
+
+\`\`\`json
+{
+  "version": 3,
+  "nodes": [
+    {
+      "id": "loader-1",
+      "type": "load_structure",
+      "position": { "x": 425, "y": 0 },
+      "fileName": null,
+      "hasTrajectory": false,
+      "hasCell": false,
+      "enabled": true
+    },
+    {
+      "id": "filter-water",
+      "type": "filter",
+      "position": { "x": 250, "y": 310 },
+      "query": "resname == \\"HOH\\"",
+      "enabled": true
+    },
+    {
+      "id": "repr-water-line",
+      "type": "representation",
+      "position": { "x": 250, "y": 460 },
+      "mode": "line",
+      "enabled": true
+    },
+    {
+      "id": "filter-rest",
+      "type": "filter",
+      "position": { "x": 600, "y": 310 },
+      "query": "resname != \\"HOH\\"",
+      "enabled": true
+    },
+    {
+      "id": "viewport-1",
+      "type": "viewport",
+      "position": { "x": 425, "y": 615 },
+      "perspective": false,
+      "cellAxesVisible": true,
+      "pivotMarkerVisible": true,
+      "enabled": true
+    }
+  ],
+  "edges": [
+    { "source": "loader-1", "target": "filter-water", "sourceHandle": "particle", "targetHandle": "in" },
+    { "source": "filter-water", "target": "repr-water-line", "sourceHandle": "out", "targetHandle": "in" },
+    { "source": "repr-water-line", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" },
+    { "source": "loader-1", "target": "filter-rest", "sourceHandle": "particle", "targetHandle": "in" },
+    { "source": "filter-rest", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" }
+  ]
+}
+\`\`\`
+
+Draws only the water as lines while the rest of the structure keeps its default style.
+
+## Example: Hiding / removing a species
+
+There is no "delete" or "hide" node, and a \`filter\` on its own does NOT remove
+atoms from the view — it only selects a subset for a downstream node to act on.
+To HIDE or REMOVE a species (e.g. "hide the water", "remove the solvent"),
+filter it into its own branch and fade it out with a \`modify\` node set to
+\`opacity: 0\` (fully transparent = invisible) while the rest of the structure,
+routed straight to the viewport, keeps its default appearance. (To also drop the
+hidden atoms' bonds, send the bond stream through \`add_bond\` -> \`filter\`
+(\`bond_query\`) -> \`modify (opacity 0)\`.) Do NOT set \`enabled: false\` and do NOT
+invent a delete node.
+
+User request: "Hide the water (resname HOH) so only the rest of the structure
+shows."
+
+\`\`\`json
+{
+  "version": 3,
+  "nodes": [
+    {
+      "id": "loader-1",
+      "type": "load_structure",
+      "position": { "x": 425, "y": 0 },
+      "fileName": null,
+      "hasTrajectory": false,
+      "hasCell": false,
+      "enabled": true
+    },
+    {
+      "id": "filter-water",
+      "type": "filter",
+      "position": { "x": 250, "y": 310 },
+      "query": "resname == \\"HOH\\"",
+      "enabled": true
+    },
+    {
+      "id": "hide-water",
+      "type": "modify",
+      "position": { "x": 250, "y": 460 },
+      "scale": 1.0,
+      "opacity": 0.0,
+      "enabled": true
+    },
+    {
+      "id": "viewport-1",
+      "type": "viewport",
+      "position": { "x": 425, "y": 615 },
+      "perspective": false,
+      "cellAxesVisible": true,
+      "pivotMarkerVisible": true,
+      "enabled": true
+    }
+  ],
+  "edges": [
+    { "source": "loader-1", "target": "filter-water", "sourceHandle": "particle", "targetHandle": "in" },
+    { "source": "filter-water", "target": "hide-water", "sourceHandle": "out", "targetHandle": "in" },
+    { "source": "hide-water", "target": "viewport-1", "sourceHandle": "out", "targetHandle": "particle" },
+    { "source": "loader-1", "target": "viewport-1", "sourceHandle": "particle", "targetHandle": "particle" }
+  ]
+}
+\`\`\`
+
+Fades the water to fully transparent so only the rest of the structure remains visible.
+
 ## Guidelines
 
 - Always include a \`load_structure\` node as the data source.
@@ -453,6 +587,16 @@ Filters the water into its own branch, makes only it semi-transparent, and shows
 - For recoloring or changing display style ("cartoon", "surface", etc.): add
   \`color\` and/or \`representation\` nodes between load_structure (or add_bond)
   and viewport; both only accept \`particle\`.
+- To restyle only ONE species (e.g. "show the water as lines", "draw the ligand
+  as licorice") while the rest keeps its normal look, split into disjoint
+  \`filter\` branches and put the \`representation\` node on the target branch only
+  — see the "Selective Representation" example. \`representation\` affects just the
+  atoms in its branch, exactly like \`modify\`/\`color\`.
+- To HIDE or REMOVE a species ("hide the water", "remove the solvent"), filter
+  it into its own branch and set a \`modify\` node's \`opacity\` to 0 (a bare
+  \`filter\` does NOT remove atoms; only a downstream modify/representation acts on
+  the selection) — see the "Hiding / removing a species" example. Never use a
+  delete node or \`enabled: false\` for this.
 - For volumetric data (cube files, electron density, ESP maps): use
   load_volumetric → isosurface → viewport (mesh), independent of
   load_structure unless the request also wants the atoms shown.
