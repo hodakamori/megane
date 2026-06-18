@@ -148,9 +148,10 @@ describe("sanitizeMessages", () => {
 
   it("allows a large system message but caps it at the system limit", () => {
     // A system prompt over the user limit (8000) but within the system
-    // limit (24000) must be accepted — the inlined skill templates push
-    // the generated prompt to ~13k chars.
-    const bigSystem = "s".repeat(13000);
+    // limit (48000) must be accepted. The real frontend prompt
+    // (buildSystemPrompt) is ~24k chars before the loaded-structure summary
+    // is appended, so the cap must comfortably clear that.
+    const bigSystem = "s".repeat(30000);
     const ok = sanitizeMessages({
       messages: [
         { role: "system", content: bigSystem },
@@ -158,10 +159,25 @@ describe("sanitizeMessages", () => {
       ],
     });
     expect(ok).not.toBeNull();
-    expect(ok?.[0].content).toHaveLength(13000);
+    expect(ok?.[0].content).toHaveLength(30000);
 
-    const tooBigSystem = "s".repeat(24001);
+    const tooBigSystem = "s".repeat(48001);
     expect(sanitizeMessages({ messages: [{ role: "system", content: tooBigSystem }] })).toBeNull();
+  });
+
+  it("accepts a system message at the real frontend prompt size (~24k)", () => {
+    // Regression: the base system prompt grew past the old 24000 cap, which
+    // made sanitizeMessages reject every demo-proxy request with "Missing or
+    // invalid 'messages' array". A ~24k system message plus a structure
+    // summary must stay under the limit.
+    const realisticSystem = "s".repeat(24108) + "\n## Currently Loaded Structure\n" + "x".repeat(2000);
+    const ok = sanitizeMessages({
+      messages: [
+        { role: "system", content: realisticSystem },
+        { role: "user", content: "show carbons" },
+      ],
+    });
+    expect(ok).not.toBeNull();
   });
 
   it("rejects malformed message entries", () => {
