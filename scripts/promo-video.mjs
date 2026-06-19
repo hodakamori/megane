@@ -85,6 +85,9 @@ const PROMPT = getFlag(
   "Render the water molecules as a line representation, but leave the caffeine in its normal style.",
 );
 const RESPONSE_WAIT_MS = parseInt(getFlag("--response-wait", "20000"), 10);
+// Typewriter delay between keystroke ticks (ms). Default is fast (~20x the old
+// feel); raise it for a slower, more deliberate typing effect.
+const TYPE_MS = parseInt(getFlag("--type-ms", "6"), 10);
 // Linear time spent scrolling down through the pipeline graph.
 const PIPELINE_SCROLL_MS = parseInt(getFlag("--pipeline-scroll", "5200"), 10);
 const NO_GENERATE = hasFlag("--no-generate");
@@ -272,15 +275,16 @@ async function screenScrollDown(page, sel, ms) {
 
 async function typePrompt(page) {
   await page.locator(SEL.promptBox).first().waitFor({ state: "visible", timeout: 10000 });
-  const perChar = 45;
   // The whole typewriter loop runs in-page (a single evaluate), so there's no
   // per-key Playwright roundtrip — in dev mode that latency otherwise stretches
   // typing to tens of seconds. We drive React's controlled textarea via its
   // native value setter + an `input` event so the state (and Generate enabled
   // state) updates. It doesn't depend on the element's screen position, so it
-  // stays correct while the camera is zoomed into the input.
+  // stays correct while the camera is zoomed into the input. Several characters
+  // are committed per tick so the browser's ~4ms setTimeout floor doesn't cap
+  // the speed.
   await page.evaluate(
-    async ({ sel, text, perChar }) => {
+    async ({ sel, text, perTick }) => {
       const el = document.querySelector(sel);
       if (!el) return;
       const setter = Object.getOwnPropertyDescriptor(
@@ -288,13 +292,14 @@ async function typePrompt(page) {
         "value",
       ).set;
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-      for (let i = 1; i <= text.length; i++) {
-        setter.call(el, text.slice(0, i));
+      const step = 3; // characters revealed per tick
+      for (let i = step; i < text.length + step; i += step) {
+        setter.call(el, text.slice(0, Math.min(i, text.length)));
         el.dispatchEvent(new Event("input", { bubbles: true }));
-        await sleep(perChar);
+        await sleep(perTick);
       }
     },
-    { sel: SEL.promptBox, text: PROMPT, perChar },
+    { sel: SEL.promptBox, text: PROMPT, perTick: TYPE_MS },
   );
 }
 
