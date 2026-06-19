@@ -85,9 +85,11 @@ const PROMPT = getFlag(
   "Render the water molecules as a line representation, but leave the caffeine in its normal style.",
 );
 const RESPONSE_WAIT_MS = parseInt(getFlag("--response-wait", "20000"), 10);
-// Typewriter delay between keystroke ticks (ms). Default is fast (~20x the old
-// feel); raise it for a slower, more deliberate typing effect.
-const TYPE_MS = parseInt(getFlag("--type-ms", "6"), 10);
+// Number of reveal steps for the prompt "typewriter". The viewer renders the
+// heavy 3D scene at only a few fps, so every awaited frame costs ~0.5s — a
+// smooth per-character effect is impossible and would take ~50s. We instead
+// reveal the prompt in a few chunks (~0.5s each). Lower = faster (1 = instant).
+const TYPE_STEPS = Math.max(1, parseInt(getFlag("--type-steps", "6"), 10));
 // Linear time spent scrolling down through the pipeline graph.
 const PIPELINE_SCROLL_MS = parseInt(getFlag("--pipeline-scroll", "5200"), 10);
 const NO_GENERATE = hasFlag("--no-generate");
@@ -275,31 +277,30 @@ async function screenScrollDown(page, sel, ms) {
 
 async function typePrompt(page) {
   await page.locator(SEL.promptBox).first().waitFor({ state: "visible", timeout: 10000 });
-  // The whole typewriter loop runs in-page (a single evaluate), so there's no
-  // per-key Playwright roundtrip — in dev mode that latency otherwise stretches
-  // typing to tens of seconds. We drive React's controlled textarea via its
-  // native value setter + an `input` event so the state (and Generate enabled
-  // state) updates. It doesn't depend on the element's screen position, so it
-  // stays correct while the camera is zoomed into the input. Several characters
-  // are committed per tick so the browser's ~4ms setTimeout floor doesn't cap
-  // the speed.
+  // The reveal runs entirely in-page (one evaluate). We drive React's controlled
+  // textarea via its native value setter + an `input` event so React keeps the
+  // value and the Generate button enables. The viewer's render loop hogs the main
+  // thread (~a few fps), so each awaited frame costs ~0.5s and the cost is
+  // dominated by the number of `input` events, NOT any sleep — hence we reveal in
+  // a small fixed number of chunks rather than per character. It's position-
+  // independent, so it stays correct while the camera is zoomed into the input.
   await page.evaluate(
-    async ({ sel, text, perTick }) => {
+    async ({ sel, text, steps }) => {
       const el = document.querySelector(sel);
       if (!el) return;
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLTextAreaElement.prototype,
         "value",
       ).set;
-      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-      const step = 3; // characters revealed per tick
-      for (let i = step; i < text.length + step; i += step) {
-        setter.call(el, text.slice(0, Math.min(i, text.length)));
+      const raf = () => new Promise((r) => requestAnimationFrame(r));
+      for (let k = 1; k <= steps; k++) {
+        const len = Math.round((text.length * k) / steps);
+        setter.call(el, text.slice(0, len));
         el.dispatchEvent(new Event("input", { bubbles: true }));
-        await sleep(perTick);
+        if (k < steps) await raf(); // one render per chunk paces the visible reveal
       }
     },
-    { sel: SEL.promptBox, text: PROMPT, perTick: TYPE_MS },
+    { sel: SEL.promptBox, text: PROMPT, steps: TYPE_STEPS },
   );
 }
 
