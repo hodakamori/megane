@@ -16,16 +16,15 @@
  *   7. Click the Editor tab to reveal the generated pipeline graph.
  *   8. Slowly scroll down through the pipeline graph.
  *
- * Why the pipeline (steps 7-8) does NOT use the #root CSS camera:
- * ReactFlow measures node-handle positions with getBoundingClientRect and
- * divides only by its own internal zoom — it has no idea about an ancestor
- * CSS transform. Any CSS scale on `#root` (even after the handles were measured
- * at identity) corrupts the edge geometry: edges fly off their handles in wide
- * arcs. So for the pipeline we drop the #root transform entirely and instead
- * grow the ReactFlow container itself to a fullscreen overlay — a real layout
- * resize, which ReactFlow's ResizeObserver picks up and re-measures correctly —
- * then use ReactFlow's own fitView / zoom / pane-drag to frame and scroll. The
- * graph is never under a CSS scale, so the edges stay welded to their handles.
+ * The pipeline (steps 6-8) is shown with the SAME #root screen-zoom camera as
+ * the rest of the video. ReactFlow measures node-handle positions with
+ * getBoundingClientRect and can't account for an ancestor CSS transform, so the
+ * generated graph's handles — registered while #root is scaled by the chat zoom
+ * — end up with corrupted offsets and the edges balloon off their handles. The
+ * fix is to re-measure the handles ONCE at identity (toggling the ReactFlow
+ * container's display) before zooming in; after that a pure #root scale just
+ * magnifies the whole graph uniformly, so the edges stay attached under the
+ * screen zoom.
  *
  * Generation is a real, paid LLM call, so it only runs when you provide a key
  * or point at a site that ships its own proxy:
@@ -108,9 +107,6 @@ const SEL = {
   panelPipeline: '[data-testid="panel-pipeline"]',
   viewer: '[data-testid="viewer-root"]',
   reactFlow: ".react-flow",
-  rfPane: ".react-flow__pane",
-  rfZoomIn: ".react-flow__controls-zoomin",
-  rfFitView: ".react-flow__controls-fitview",
 };
 
 // ---- Setup helpers ----
@@ -249,6 +245,29 @@ async function zoomToUnion(page, sels, opts = {}, ms = TRANSITION_MS) {
   await frameLocalRect(page, toLocalRect(u), opts, ms);
 }
 
+/** Pan the camera (keep scale) to an explicit target transform over `ms`. */
+async function panTo(page, target, ms = TRANSITION_MS, easing = "linear") {
+  await setTransition(page, ms, easing);
+  await applyTransform(page, { ...current, ...target });
+  await page.waitForTimeout(ms);
+}
+
+/**
+ * Scroll the screen-zoom camera down through an element (e.g. the pipeline
+ * graph): keep the current scale and pan vertically until the element's bottom
+ * reaches the bottom of the viewport. Pure #root pan, so ReactFlow never
+ * re-measures and the edges stay attached.
+ */
+async function screenScrollDown(page, sel, ms) {
+  const box = await boxOf(page, sel);
+  if (!box) return;
+  const { ly, lh } = toLocalRect(box);
+  const s = current.s;
+  const tyBottom = HEIGHT - (ly + lh) * s;
+  if (tyBottom < current.ty - 4) await panTo(page, { ty: tyBottom }, ms, "linear");
+  else console.log("  graph already fits; no scroll needed");
+}
+
 // ---- Chat actions ----
 
 async function typePrompt(page) {
@@ -331,78 +350,20 @@ async function setupApiKey(page) {
   }
 }
 
-// ---- Pipeline display (ReactFlow-native, NOT the #root CSS camera) ----
-// ReactFlow measures node-handle positions with getBoundingClientRect and has
-// no knowledge of an ancestor CSS transform, so scaling #root corrupts the edge
-// geometry (edges fly off their handles). For the pipeline scenes we therefore
-// leave #root untransformed and instead grow the ReactFlow container itself to
-// fullscreen — a real layout resize, which ReactFlow's ResizeObserver picks up
-// and re-measures correctly — then use ReactFlow's own zoom/pan so the edges
-// always stay attached.
-
-/** Drop the #root camera transform entirely (so position:fixed is viewport-relative). */
-async function clearRootTransform(page) {
-  await page.evaluate(() => {
-    const root = document.getElementById("root");
-    if (root) {
-      root.style.transition = "none";
-      root.style.transform = "none";
-    }
-  });
-  current = { tx: 0, ty: 0, s: 1 };
-}
-
-// Rule body for the fullscreen pipeline overlay. We drive this through an
-// injected `!important` stylesheet rather than inline styles because
-// React/ReactFlow re-apply their own inline style on `.react-flow` and would
-// wipe direct mutations.
-const PANEL_FS_HEAD = (sel) =>
-  `${sel}{position:fixed!important;z-index:99999!important;margin:0!important;` +
-  `max-width:none!important;max-height:none!important;min-width:0!important;` +
-  `background:var(--megane-surface-solid,#fff)!important;`;
-
-/**
- * Animate the pipeline panel from its docked rect to a fullscreen overlay.
- * Run on the Chat tab (ReactFlow hidden) so the size animation never disturbs
- * the graph's handle measurement; the caller re-measures afterward. Because the
- * panel is sized by real layout (not a #root CSS scale), the Editor tab shown
- * next is at this exact same magnification — the chat→pipeline switch is then a
- * plain tab click with no zoom change and no flash.
- */
-async function growPanelFullscreen(page, ms = TRANSITION_MS) {
-  await page.evaluate(
-    ({ sel, head, ms }) => {
-      const panel = document.querySelector(sel);
-      if (!panel) return;
-      const r = panel.getBoundingClientRect();
-      let s = document.getElementById("promo-fs");
-      if (!s) {
-        s = document.createElement("style");
-        s.id = "promo-fs";
-        document.head.appendChild(s);
-      }
-      const ease = "cubic-bezier(0.4, 0, 0.2, 1)";
-      const trans = `transition:left ${ms}ms ${ease},top ${ms}ms ${ease},width ${ms}ms ${ease},height ${ms}ms ${ease}!important;`;
-      s.textContent = `${head}${trans}left:${r.left}px!important;top:${r.top}px!important;width:${r.width}px!important;height:${r.height}px!important;}`;
-      void panel.offsetWidth;
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          s.textContent = `${head}${trans}left:0!important;top:0!important;width:100vw!important;height:100vh!important;}`;
-        }),
-      );
-    },
-    { sel: SEL.panelPipeline, head: PANEL_FS_HEAD(SEL.panelPipeline), ms },
-  );
-  await page.waitForTimeout(ms + 250);
-}
+// ---- Pipeline handle re-measure ----
+// ReactFlow measures node-handle positions with getBoundingClientRect and has no
+// knowledge of an ancestor CSS transform. The LLM-generated graph's handles get
+// registered while #root is CSS-scaled by the chat zoom, so their stored offsets
+// are wrong and the edges balloon off their handles. Re-measuring once at
+// identity fixes the offsets; afterwards a pure #root scale just magnifies the
+// whole graph uniformly (no re-measure), so the edges stay attached even under
+// the screen zoom.
 
 /**
  * Force ReactFlow to re-measure every node handle by toggling the container's
- * display off and on (a real layout teardown/rebuild). The handles were
- * registered while #root was CSS-scaled during the chat zoom, so their stored
- * offsets are wrong and the edges balloon off their handles; rebuilding the
- * layout at the current (identity) scale fixes them. Runs behind the cover, so
- * the flicker is invisible.
+ * display off and on (a real layout teardown/rebuild). Call it at #root identity
+ * (the editor may still be hidden on the Chat tab) so the handles are measured
+ * unscaled.
  */
 async function forceReactFlowRemeasure(page) {
   await page.evaluate((sel) => {
@@ -424,32 +385,11 @@ async function forceReactFlowRemeasure(page) {
 }
 
 /**
- * Click a DOM element directly (bypassing Playwright's actionability checks).
- * Used for clicks that happen *behind* the opaque cover — a normal locator
- * click would stall on the "element receives pointer events" check until the
- * action timeout, which is what made the cover linger for many seconds.
+ * Click a DOM element directly (bypassing Playwright's actionability checks) —
+ * robust when the target sits under the #root screen-zoom transform.
  */
 async function domClick(page, sel) {
   await page.evaluate((s) => document.querySelector(s)?.click(), sel);
-}
-
-/** Drag the ReactFlow pane to scroll the viewport down through the graph. */
-async function rfScrollDown(page, totalDy, ms) {
-  const pane = await boxOf(page, SEL.rfPane);
-  if (!pane) return;
-  // Start the drag in an empty strip on the left so we grab the pane, not a node.
-  const x = pane.x + Math.min(140, pane.width * 0.12);
-  const yStart = pane.y + pane.height * 0.82;
-  const yEnd = yStart - totalDy; // dragging up scrolls the view downward
-  await page.mouse.move(x, yStart);
-  await page.mouse.down();
-  const steps = 48;
-  for (let i = 1; i <= steps; i++) {
-    const y = yStart + (yEnd - yStart) * (i / steps);
-    await page.mouse.move(x, y);
-    await page.waitForTimeout(ms / steps);
-  }
-  await page.mouse.up();
 }
 
 // ---- Main ----
@@ -588,43 +528,33 @@ try {
   await zoomToSel(page, SEL.viewer, { pad: 8 });
   await page.waitForTimeout(4000);
 
-  // ── 6. Zoom into the pipeline panel (top-right), still on the Chat tab ──────
-  // Pull back from the molecule, drop the #root transform, then grow the panel
-  // itself to fullscreen — a real layout zoom (NOT a #root CSS scale), so the
-  // Editor tab shown next sits at this exact magnification. ReactFlow is hidden
-  // on the Chat tab, so the size animation can't disturb the graph; we then
-  // re-measure its handles (still hidden) to undo the corruption from the chat
-  // zoom, so the edges are already clean before the tab is ever shown.
-  console.log("Scene 6: zoom into the pipeline panel");
+  // ── 6. Screen-zoom into the top of the right sidebar (pipeline panel) ───────
+  // A true camera zoom (the #root CSS scale, same as the chat zoom) into the top
+  // of the sidebar — NOT a resize of the sidebar itself. ReactFlow's edges break
+  // if it re-measures handles under a CSS scale, and the generated graph's
+  // handles were registered under the chat zoom, so first — at identity, with the
+  // editor still hidden — we force a handle re-measure to fix them. After that a
+  // pure #root scale just magnifies the whole graph uniformly, leaving the edges
+  // attached.
+  console.log("Scene 6: screen-zoom into the sidebar");
   const haveFlow = (await boxOf(page, SEL.reactFlow)) !== null;
   await zoomFull(page);
-  await clearRootTransform(page);
-  await growPanelFullscreen(page, TRANSITION_MS);
-  await forceReactFlowRemeasure(page);
-  await page.waitForTimeout(1500);
+  await forceReactFlowRemeasure(page); // at identity, editor hidden → fixes handles
+  await zoomToSel(page, SEL.panelPipeline, { pad: 12, alignTop: true, topMargin: 48, scale: 2.0 });
+  await page.waitForTimeout(1800);
 
-  // ── 7. Click the Editor tab → pipeline at the same magnification ────────────
-  // Just a tab switch now: same fullscreen panel, identity scale, handles
-  // already re-measured — so the pipeline appears at the chat's magnification
-  // with clean edges, no flash, no re-render.
+  // ── 7. Click the Editor tab → pipeline appears within the same screen-zoom ──
+  // Switch tab under the screen zoom. fitView (mode-change effect) only moves
+  // ReactFlow's internal viewport, not the handle offsets, so the edges stay
+  // attached at the magnification set in scene 6.
   console.log("Scene 7: show pipeline");
   await domClick(page, SEL.editorTab);
-  await page.waitForTimeout(700);
-  await domClick(page, SEL.rfFitView);
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(1800);
 
   if (haveFlow) {
-    // ── 8. Zoom in and slowly scroll down through the pipeline graph ─────────
+    // ── 8. Scroll down through the pipeline (camera pan, screen-zoom kept) ────
     console.log("Scene 8: scroll through pipeline");
-    // Native zoom-in (centred) so the graph overflows vertically and there is
-    // something to scroll through.
-    for (let i = 0; i < 3; i++) {
-      await domClick(page, SEL.rfZoomIn);
-      await page.waitForTimeout(450);
-    }
-    await page.waitForTimeout(800);
-    // Native pane drag pans the ReactFlow viewport — edges follow natively.
-    await rfScrollDown(page, HEIGHT * 1.1, PIPELINE_SCROLL_MS);
+    await screenScrollDown(page, SEL.reactFlow, PIPELINE_SCROLL_MS);
     await page.waitForTimeout(2500);
   } else {
     console.warn("  react-flow not found; skipping pipeline scroll");
