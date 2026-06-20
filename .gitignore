@@ -57,3 +57,7 @@ coverage.xml
 
 # megane LLM benchmark generated results
 bench/llm/results/
+
+# Generated anywidget bundle (built by `npm run build:widget`, shipped in the
+# wheel via the maturin [tool.maturin] include of python/megane/static/**)
+python/megane/static/widget.js
