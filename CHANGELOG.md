@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Generated pipelines are now validated and repaired via a JSON round-trip before being applied
 - The AI-generated pipeline is applied mid-stream to cut perceived latency
 - Skills use OpenAI tool-calling on OpenAI/OpenRouter providers, with pipeline-skill templates inlined for OpenAI-compatible endpoints
+- Pipeline chat input box defaults to five rows tall
 
 ### Fixed
 
