@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/public/screenshots/pipeline-complex.png" alt="megane screenshot" width="640" />
+  <img src="docs/public/screenshots/megane-promo.gif" alt="megane demo" width="640" />
 </p>
 
 ---

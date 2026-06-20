@@ -143,6 +143,18 @@ describe("PipelineChatBox — use-own-key checkbox", () => {
   });
 });
 
+describe("PipelineChatBox — input box", () => {
+  it("renders the prompt textarea five rows tall by default", () => {
+    vi.stubEnv("VITE_LLM_PROXY_URL", "https://proxy.example.com/chat");
+    render(<PipelineChatBox />);
+
+    const textarea = screen.getByPlaceholderText(
+      "Describe the pipeline you want...",
+    ) as HTMLTextAreaElement;
+    expect(textarea.rows).toBe(5);
+  });
+});
+
 describe("PipelineChatBox — submission", () => {
   beforeEach(() => {
     (generatePipeline as ReturnType<typeof vi.fn>).mockImplementation(
