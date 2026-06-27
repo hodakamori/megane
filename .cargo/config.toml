@@ -1,0 +1,15 @@
+# Cargo configuration applied to every cargo invocation in this repo
+# (local builds, `wasm-pack build`, maturin wheel builds, and all CI/publish
+# workflows, since cargo reads this from the workspace root).
+#
+# Hardens crates.io access against transient download failures on hosted CI
+# runners. The `[55] Failed sending data to the peer (OpenSSL SSL_read:
+# SSL_ERROR_SYSCALL)` error seen while fetching crates during a release is a
+# well-known cargo/crates.io flake tied to HTTP/2 multiplexing. Forcing
+# HTTP/1.1 and raising the retry count makes `npm run build:wasm` and the
+# PyPI wheel build resilient so dry-runs and publishes don't fail randomly.
+[net]
+retry = 10
+
+[http]
+multiplexing = false
