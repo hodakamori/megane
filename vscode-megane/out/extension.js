@@ -40,6 +40,7 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
+const crypto_1 = require("crypto");
 class MeganePipelineEditorProvider {
     context;
     static viewType = "megane.pipelineViewer";
@@ -178,11 +179,29 @@ class MeganeEditorProvider {
             // Send raw bytes (not decoded text) so binary formats like .traj survive
             // the trip into the webview. The webview builds a File and the shared
             // parser dispatches by extension to either text() or arrayBuffer().
+            const filename = path.basename(document.uri.fsPath);
+            let topBytes = null;
+            let topFilename = null;
+            if (filename.toLowerCase().endsWith(".gro")) {
+                const stem = filename.slice(0, filename.lastIndexOf("."));
+                const topName = stem + ".top";
+                const topUri = vscode.Uri.file(path.join(path.dirname(document.uri.fsPath), topName));
+                try {
+                    const topData = await vscode.workspace.fs.readFile(topUri);
+                    topBytes = Array.from(topData);
+                    topFilename = topName;
+                }
+                catch {
+                    // .top file not found — proceed without topology bonds
+                }
+            }
             payload = {
                 type: "loadFile",
                 contentBytes: Array.from(fileData),
-                filename: path.basename(document.uri.fsPath),
+                filename,
                 wasmBytes: Array.from(wasmData),
+                topBytes,
+                topFilename,
             };
         }
         catch (err) {
@@ -283,10 +302,14 @@ function getHtmlForWebview(webview, mediaDir) {
 </html>`;
 }
 function getNonce() {
-    let text = "";
+    // The nonce backs the webview CSP (`script-src 'nonce-...'`), so it must be
+    // unpredictable. Use a CSPRNG (webcrypto) rather than Math.random().
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    for (let i = 0; i < 32; i++) {
-        text += chars.charAt(Math.floor(Math.random() * chars.length));
+    const bytes = new Uint8Array(32);
+    crypto_1.webcrypto.getRandomValues(bytes);
+    let text = "";
+    for (let i = 0; i < bytes.length; i++) {
+        text += chars.charAt(bytes[i] % chars.length);
     }
     return text;
 }

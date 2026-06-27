@@ -3,6 +3,7 @@ import type { DocumentRegistry } from "@jupyterlab/docregistry";
 import type { Contents } from "@jupyterlab/services";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
+import { ErrorBoundary } from "@megane/components/ErrorBoundary";
 import { usePipelineStore } from "@megane/pipeline/store";
 import {
   capturePipelineStore,
@@ -235,11 +236,13 @@ export class MeganePipelineReactView extends ReactWidget {
 
   protected render(): JSX.Element {
     return (
-      <DocBody
-        context={this.context}
-        contents={this.contents}
-        subscribeActivation={this.subscribeActivation}
-      />
+      <ErrorBoundary context="jupyterlab-pipeline">
+        <DocBody
+          context={this.context}
+          contents={this.contents}
+          subscribeActivation={this.subscribeActivation}
+        />
+      </ErrorBoundary>
     );
   }
 }

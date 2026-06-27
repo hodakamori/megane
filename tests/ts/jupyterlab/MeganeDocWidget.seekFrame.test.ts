@@ -111,11 +111,13 @@ describe("MeganeReactView.subscribeSelectionChange / subscribeMeasurementChange"
 
   it("render() wires the new selection/measurement handlers onto DocBody", () => {
     const view = new MeganeReactView(makeContext()) as unknown as {
-      render: () => { props: Record<string, unknown> };
+      render: () => { props: { children: { props: Record<string, unknown> } } };
     };
-    const element = view.render();
-    expect(typeof element.props.onSelectionChange).toBe("function");
-    expect(typeof element.props.onMeasurementChange).toBe("function");
+    // render() wraps DocBody in an <ErrorBoundary>; the DocBody element (with
+    // the wired callbacks) is the boundary's single child.
+    const docBody = view.render().props.children;
+    expect(typeof docBody.props.onSelectionChange).toBe("function");
+    expect(typeof docBody.props.onMeasurementChange).toBe("function");
   });
 
   it("returns an unsubscribe function from subscribeSelectionChange", () => {

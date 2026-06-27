@@ -26,6 +26,7 @@ import quartzXYZ from "../tests/fixtures/quartz_sio2_2x2x2.xyz?raw";
 import ubiquitinPDB from "../tests/fixtures/1ubq.pdb?raw";
 import "./styles/megane.css";
 import { useThemeStore } from "./stores/useThemeStore";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import type { DataMode } from "./types";
 export type { DataMode };
@@ -199,6 +200,8 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary context="webapp">
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

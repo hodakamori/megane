@@ -76,6 +76,18 @@ Confirm the extension version matches `X.Y.Z`.
 
 Verify that the published packages actually work in a clean environment — not just that they exist, but that molecular structures render correctly.
 
+> **Why this phase is mandatory, not optional.** v0.9.0 shipped a *blank* VSCode
+> webview because the release bumped Vite to 8 (rolldown), which produced a
+> bundle that crashed at runtime. It slipped through because (a) CI ran no
+> rendering check and (b) local verification used the developer's older,
+> working Vite — the artifact that shipped was never the artifact tested. The
+> `render-smoke` CI job (`.github/workflows/ci.yml`) now gates every PR by
+> building with the **locked** toolchain (`npm ci`) and asserting each Vite
+> bundle mounts and draws — run `npm run smoke:render` locally to reproduce it.
+> Phase 3.2 below (against the *published* Marketplace VSIX) is still required:
+> do not skip it, and do not substitute a locally-built VSIX, because a local
+> build can mask a toolchain-only regression.
+
 ### 3.1 Python + npm: widget rendering in fresh virtualenv
 
 Install from PyPI into an isolated virtualenv (no local source files), then run the Playwright `widget-jupyterlab` project against it. This covers both the Python package (PyO3 native extension, parsers) and the npm package (megane-viewer WASM loaded by anywidget in the browser).

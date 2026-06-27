@@ -3,6 +3,7 @@ import type { DocumentRegistry } from "@jupyterlab/docregistry";
 import type { Contents } from "@jupyterlab/services";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
+import { ErrorBoundary } from "@megane/components/ErrorBoundary";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
 import { usePipelineStore } from "@megane/pipeline/store";
 import {
@@ -303,14 +304,16 @@ export class MeganeReactView extends ReactWidget {
 
   protected render(): JSX.Element {
     return (
-      <DocBody
-        context={this.context}
-        contents={this.contents}
-        subscribeActivation={this.subscribeActivation}
-        onFrameChange={this._handleFrameChange}
-        onSelectionChange={this._handleSelectionChange}
-        onMeasurementChange={this._handleMeasurementChange}
-      />
+      <ErrorBoundary context="jupyterlab-doc">
+        <DocBody
+          context={this.context}
+          contents={this.contents}
+          subscribeActivation={this.subscribeActivation}
+          onFrameChange={this._handleFrameChange}
+          onSelectionChange={this._handleSelectionChange}
+          onMeasurementChange={this._handleMeasurementChange}
+        />
+      </ErrorBoundary>
     );
   }
 }
