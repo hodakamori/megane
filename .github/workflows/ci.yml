@@ -80,6 +80,42 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_on_error: true
 
+  render-smoke:
+    name: Bundle render smoke test
+    # Builds the Vite bundles with the EXACT locked toolchain (npm ci) and loads
+    # each one headless to assert the viewer mounts and the WebGL canvas draws.
+    # This catches "blank webview" regressions (e.g. the Vite 8 / rolldown bundle
+    # that shipped a blank VSCode extension in v0.9.0) that neither unit tests nor
+    # the local-only E2E suite see, because the artifact that ships (CI `npm ci`)
+    # is never the artifact the developer tested locally. Baseline-free, so it is
+    # safe on hosted runners where pixel diffs are flaky.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: |
+          for i in 1 2 3; do
+            curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+            echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+            sleep $((i*5))
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build:wasm
+      # Build the webapp bundle and the VSCode webview bundle with the locked deps.
+      - run: npm run build:app
+      - name: Build VSCode webview bundle
+        run: cd vscode-megane && npm ci && npm run build:webview
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - run: npm run smoke:render
+
   test-python:
     name: Python tests
     runs-on: ubuntu-latest

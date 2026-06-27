@@ -21,12 +21,18 @@ vi.mock("@/components/WidgetViewer", () => ({
 }));
 
 // react-dom/client.createRoot — return a stub Root that captures the rendered
-// element (we only care about the props passed into createElement).
+// element (we only care about the props passed into createElement). widget.ts
+// wraps the viewer in an <ErrorBoundary>, so unwrap to the inner WidgetViewer
+// element here and keep these tests asserting on the viewer props directly.
 const renderedElements: Array<{ type: unknown; props: Record<string, unknown> }> = [];
 vi.mock("react-dom/client", () => ({
   createRoot: vi.fn(() => ({
     render: vi.fn((el: { type: unknown; props: Record<string, unknown> }) => {
-      renderedElements.push(el);
+      const inner =
+        el && el.type === ErrorBoundary
+          ? (el.props.children as { type: unknown; props: Record<string, unknown> })
+          : el;
+      renderedElements.push(inner);
     }),
     unmount: vi.fn(),
   })),
@@ -50,6 +56,7 @@ vi.mock("@/protocol/protocol", () => ({
 
 import widgetEntry from "@/widget";
 import { WidgetViewer } from "@/components/WidgetViewer";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const mockedWidgetViewer = vi.mocked(WidgetViewer);
 

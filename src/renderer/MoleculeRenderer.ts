@@ -307,13 +307,24 @@ export class MoleculeRenderer {
     perfMark("megane:mount:start");
     this.container = container;
 
-    // Renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
-    });
+    // Renderer. Creating the WebGLRenderer throws if the host cannot give us a
+    // WebGL2 context (hardware acceleration disabled, blocklisted driver, a
+    // headless/remote GPU process, etc). Rethrow with an actionable message so
+    // the ErrorBoundary can explain it instead of leaving a blank panel.
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: true,
+      });
+    } catch (err) {
+      throw new Error(
+        "Failed to create a WebGL2 context. megane needs WebGL2 with hardware " +
+          "acceleration enabled. " +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight, false);
     this.renderer.setClearColor(0xffffff, 1);

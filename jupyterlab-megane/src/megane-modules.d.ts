@@ -12,6 +12,11 @@ declare module "@megane/components/MeganeViewer" {
   export const MeganeViewer: ComponentType<any>;
 }
 
+declare module "@megane/components/ErrorBoundary" {
+  import type { ComponentType, ReactNode } from "react";
+  export const ErrorBoundary: ComponentType<{ children?: ReactNode; context?: string }>;
+}
+
 declare module "@megane/hooks/useMeganeLocal" {
   export function useMeganeLocal(): any;
 }

@@ -10,6 +10,7 @@
 import { createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { WidgetViewer } from "./components/WidgetViewer";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { perfMark, perfMeasure } from "./perf";
 import { useThemeStore } from "./stores/useThemeStore";
 import {
@@ -131,20 +132,24 @@ function render({ model, el }: { model: AnyWidgetModel; el: HTMLElement }) {
     const nodeSnapshotsData = (model.get("_node_snapshots_data") as Record<string, DataView>) || {};
 
     root.render(
-      createElement(WidgetViewer, {
-        snapshot: currentSnapshot,
-        frame: currentFrame,
-        currentFrame: frameIndex,
-        totalFrames: totalFrames,
-        onSeek: handleSeek,
-        selectedAtoms: selectedAtoms,
-        onMeasurementChange: handleMeasurementChange,
-        pipelineJson: pipelineJson,
-        nodeSnapshotsData: nodeSnapshotsData,
-        onPipelineChange: handlePipelineChange,
-        initialCameraState: getInitialCameraState(),
-        onCameraStateChange: handleCameraStateChange,
-      }),
+      createElement(
+        ErrorBoundary,
+        { context: "widget" },
+        createElement(WidgetViewer, {
+          snapshot: currentSnapshot,
+          frame: currentFrame,
+          currentFrame: frameIndex,
+          totalFrames: totalFrames,
+          onSeek: handleSeek,
+          selectedAtoms: selectedAtoms,
+          onMeasurementChange: handleMeasurementChange,
+          pipelineJson: pipelineJson,
+          nodeSnapshotsData: nodeSnapshotsData,
+          onPipelineChange: handlePipelineChange,
+          initialCameraState: getInitialCameraState(),
+          onCameraStateChange: handleCameraStateChange,
+        }),
+      ),
     );
   }
 

@@ -23,6 +23,7 @@ import type { MeganeCameraState } from "../../src/renderer/MoleculeRenderer";
 import type { SelectionState, Measurement } from "../../src/types";
 import { useTour } from "../../src/tour/useTour";
 import { useThemeStore } from "../../src/stores/useThemeStore";
+import { ErrorBoundary } from "../../src/components/ErrorBoundary";
 import "../../src/styles/megane.css";
 
 // Acquire VS Code API
@@ -280,6 +281,8 @@ declare function acquireVsCodeApi(): {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary context="vscode">
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );
