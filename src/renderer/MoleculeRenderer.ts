@@ -94,6 +94,35 @@ export interface MeganeCameraState {
   zoom: number;
 }
 
+/** Largest restorable zoom; guards against a poisoned/overflowed persisted value. */
+const MAX_RESTORABLE_ZOOM = 1e5;
+
+/**
+ * Validate a persisted camera state before it is applied to the live camera.
+ *
+ * Persisted camera state lives in host storage (VSCode `webview.setState`, the
+ * browser localStorage `megane-view-state` key) and survives reloads *and*
+ * extension up/downgrades. A degenerate blob — non-finite position/target,
+ * `zoom <= 0`, or an absurdly large zoom — produces a degenerate projection
+ * matrix that clips the whole scene, so the viewer renders only the background
+ * (a "blank white" window) for every file. Worse, the bad blob persists, so
+ * rolling back the code does not recover. Reject such states here so the
+ * freshly fitted camera is kept instead, making restoration self-healing.
+ */
+export function isValidCameraState(state: unknown): state is MeganeCameraState {
+  if (!state || typeof state !== "object") return false;
+  const s = state as Record<string, unknown>;
+  if (s.mode !== "perspective" && s.mode !== "orthographic") return false;
+  const triple = (v: unknown): v is [number, number, number] =>
+    Array.isArray(v) &&
+    v.length === 3 &&
+    v.every((n) => typeof n === "number" && Number.isFinite(n));
+  if (!triple(s.position) || !triple(s.target)) return false;
+  if (typeof s.zoom !== "number" || !Number.isFinite(s.zoom)) return false;
+  if (s.zoom <= 0 || s.zoom > MAX_RESTORABLE_ZOOM) return false;
+  return true;
+}
+
 export interface MeganeSubsystemVisibility {
   atoms: boolean;
   bonds: boolean;
@@ -1753,6 +1782,9 @@ export class MoleculeRenderer {
   /** Restore camera to a previously saved state. */
   applyCameraState(state: MeganeCameraState): void {
     if (!this.camera || !this.controls) return;
+    // Ignore a degenerate/poisoned persisted state and keep the fitted camera,
+    // rather than applying values that clip the whole scene to a blank view.
+    if (!isValidCameraState(state)) return;
     if ((state.mode === "perspective") !== this.perspectiveMode) {
       this.setPerspective(state.mode === "perspective");
     }

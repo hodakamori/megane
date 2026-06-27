@@ -15,6 +15,7 @@
 import { StrictMode, useState, useEffect, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { MeganeViewer } from "../../src/components/MeganeViewer";
+import { isValidCameraState } from "../../src/renderer/MoleculeRenderer";
 import { useMeganeLocal } from "../../src/hooks/useMeganeLocal";
 import { usePipelineStore } from "../../src/pipeline/store";
 import { usePlaybackStore } from "../../src/stores/usePlaybackStore";
@@ -64,6 +65,14 @@ function App() {
   // Per-document camera persistence using VS Code's webview state API.
   const [initialCameraState] = useState<MeganeCameraState | null>(() => {
     const saved = vscode.getState() as VsCodeState | undefined;
+    // A degenerate camera persisted by an earlier build (e.g. an overflowed
+    // zoom) would clip the whole scene to a blank window for this document and
+    // survive reloads/downgrades. Drop it from webview state so the view
+    // re-fits instead of restoring the poisoned camera.
+    if (saved?.camera && !isValidCameraState(saved.camera)) {
+      vscode.setState({ ...saved, camera: undefined });
+      return null;
+    }
     return saved?.camera ?? null;
   });
 

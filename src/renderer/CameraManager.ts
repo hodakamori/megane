@@ -7,6 +7,9 @@ import * as THREE from "three";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { Snapshot } from "../types";
 
+/** Upper bound for orthographic zoom; keeps a persisted zoom restorable. */
+const MAX_ZOOM = 1e5;
+
 export interface ViewExtent {
   maxExtent: number;
   extentX: number;
@@ -179,7 +182,10 @@ export function zoomOrthographicAroundTarget(
 ): { shiftX: number; shiftY: number } {
   const ndcBefore = target.clone().project(camera);
 
-  camera.zoom = Math.max(0.01, camera.zoom * zoomFactor);
+  // Clamp both ends: the floor keeps the model on screen when zooming out; the
+  // ceiling stops repeated zoom-in from overflowing `zoom` into a value that
+  // (once persisted and restored) would clip the whole scene to a blank view.
+  camera.zoom = Math.min(MAX_ZOOM, Math.max(0.01, camera.zoom * zoomFactor));
   camera.updateProjectionMatrix();
 
   const ndcAfter = target.clone().project(camera);

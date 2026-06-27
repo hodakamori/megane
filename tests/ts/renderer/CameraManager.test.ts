@@ -401,6 +401,16 @@ describe("zoomOrthographicAroundTarget", () => {
     expect(cam.zoom).toBe(0.01);
   });
 
+  it("clamps zoom at the 1e5 maximum so it stays restorable", () => {
+    const target = new THREE.Vector3(0, 0, 0);
+    const cam = makeOrtho(target);
+    // Repeated aggressive zoom-in must not overflow zoom into a value that,
+    // once persisted and restored, would clip the whole scene to a blank view.
+    for (let i = 0; i < 100; i++) zoomOrthographicAroundTarget(cam, target, 10);
+    expect(cam.zoom).toBe(1e5);
+    expect(Number.isFinite(cam.zoom)).toBe(true);
+  });
+
   it("applies no frustum shift when the target is already screen-centered", () => {
     const target = new THREE.Vector3(0, 0, 0);
     const cam = makeOrtho(target); // cx = cy = 0 → target at NDC origin

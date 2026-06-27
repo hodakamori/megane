@@ -5,7 +5,7 @@
  */
 
 import { create } from "zustand";
-import type { MeganeCameraState } from "../renderer/MoleculeRenderer";
+import { isValidCameraState, type MeganeCameraState } from "../renderer/MoleculeRenderer";
 
 export interface PersistedViewState {
   camera: MeganeCameraState | null;
@@ -18,9 +18,12 @@ function loadViewState(): PersistedViewState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.camera && typeof parsed.camera === "object") {
-        return { camera: parsed.camera as MeganeCameraState };
+      if (isValidCameraState(parsed.camera)) {
+        return { camera: parsed.camera };
       }
+      // A degenerate persisted camera (e.g. an overflowed zoom) would blank the
+      // viewer on every load and survive reloads. Drop it so the view re-fits.
+      localStorage.removeItem(STORAGE_KEY);
     }
   } catch {
     // ignore parse errors
