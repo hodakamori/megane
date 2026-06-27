@@ -336,13 +336,28 @@ export class MoleculeRenderer {
     perfMark("megane:mount:start");
     this.container = container;
 
-    // Renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
-    });
+    // Renderer. WebGL context creation throws ("Error creating WebGL context")
+    // when the host has no usable GL backend — e.g. a VSCode window with
+    // hardware acceleration disabled or a blocklisted GPU. Re-throw a clear,
+    // actionable message so the ErrorBoundary can explain the cause instead of
+    // leaving the whole webview blank.
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: true,
+      });
+    } catch (err) {
+      throw new Error(
+        "WebGL is unavailable in this window, so the 3D viewer could not start. " +
+          "This usually means hardware acceleration is disabled or the GPU is blocklisted. " +
+          "In VSCode, try enabling GPU acceleration (command palette → " +
+          '"Preferences: Configure Runtime Arguments" → remove "disable-hardware-acceleration", ' +
+          "or launch with --enable-unsafe-swiftshader for a software fallback), then reopen. " +
+          `(${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight, false);
     this.renderer.setClearColor(0xffffff, 1);

@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Viewport } from "./Viewport";
 import { PipelineEditor } from "./PipelineEditor";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
@@ -400,16 +401,18 @@ export function MeganeViewer({
       data-current-frame={currentFrame}
       style={{ width, height, position: "relative", overflow: "hidden" }}
     >
-      <Viewport
-        snapshot={snapshot}
-        frame={frame}
-        atomLabels={null}
-        atomVectors={null}
-        onRendererReady={handleRendererReady}
-        onHover={setHoverInfo}
-        onAtomRightClick={handleAtomRightClick}
-        onFrameUpdated={handleFrameUpdated}
-      />
+      <ErrorBoundary label="3D viewer">
+        <Viewport
+          snapshot={snapshot}
+          frame={frame}
+          atomLabels={null}
+          atomVectors={null}
+          onRendererReady={handleRendererReady}
+          onHover={setHoverInfo}
+          onAtomRightClick={handleAtomRightClick}
+          onFrameUpdated={handleFrameUpdated}
+        />
+      </ErrorBoundary>
       <div
         ref={tourAnchorRef}
         data-tour-anchor="viewport"
