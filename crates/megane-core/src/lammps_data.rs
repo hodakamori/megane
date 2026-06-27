@@ -448,8 +448,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         .unwrap_or_default();
 
     let n_file_bonds = file_bonds.len();
-    let inferred = bonds::infer_bonds(&atoms.positions, &atoms.elements, atoms.count, &bond_set);
-    file_bonds.extend(inferred);
+
+    // Only infer bonds by distance when the file carries no explicit Bonds
+    // section. LAMMPS `full`-style data files already provide the complete bond
+    // topology, so running the cell-list scan over every atom would be both
+    // wasted work — the slow path on large solvated systems — and incorrect: it
+    // would invent spurious bonds between close non-bonded atoms (e.g.
+    // intermolecular contacts). This mirrors the PSF/AMBER/MOL2 topology
+    // parsers, which trust the file's bonds verbatim. `atomic`/`charge` styles
+    // have no Bonds section and still get distance-based inference.
+    if hd.bonds_start.is_none() {
+        let inferred =
+            bonds::infer_bonds(&atoms.positions, &atoms.elements, atoms.count, &bond_set);
+        file_bonds.extend(inferred);
+    }
 
     let box_matrix = if hd.has_box {
         let lx = hd.xhi - hd.xlo;
@@ -702,6 +714,81 @@ LAMMPS data file
         }
         let result = parse(&text.unwrap()).expect("parse failed");
         assert!(result.n_atoms > 0);
+    }
+
+    #[test]
+    fn test_explicit_bonds_skip_inference() {
+        // A `full`-style file with an explicit Bonds section must trust the
+        // file's topology verbatim: the bonded O-H pair is recorded, but the
+        // third atom sitting at covalent-bond distance (1.0 Å) from O must NOT
+        // gain a distance-inferred bond. This is both the perf fix (no
+        // cell-list scan on topology-bearing files) and a correctness fix
+        // (no spurious intermolecular contacts).
+        let data = "\
+LAMMPS data file
+
+3 atoms
+2 atom types
+1 bonds
+1 bond types
+
+0.0 20.0 xlo xhi
+0.0 20.0 ylo yhi
+0.0 20.0 zlo zhi
+
+Masses
+
+1 15.999
+2 1.008
+
+Atoms # full
+
+1 1 1 -0.8476 10.0 10.0 10.0
+2 1 2 0.4238 10.757 10.587 10.0
+3 2 2 0.4238 9.0 10.0 10.0
+
+Bonds
+
+1 1 1 2
+";
+        let result = parse(data).expect("parse failed");
+        assert_eq!(result.n_atoms, 3);
+        // Only the single file bond survives; no inference adds the close 1-3 pair.
+        assert_eq!(result.n_file_bonds, 1);
+        assert_eq!(result.bonds.len(), 1);
+        assert!(result.bonds.contains(&(0, 1)));
+        assert!(!result.bonds.contains(&(0, 2)));
+    }
+
+    #[test]
+    fn test_no_bonds_section_infers_bonds() {
+        // A `charge`-style file with no Bonds section still gets distance-based
+        // bond inference: the two atoms 1.0 Å apart must be bonded.
+        let data = "\
+LAMMPS data file
+
+2 atoms
+2 atom types
+
+0.0 20.0 xlo xhi
+0.0 20.0 ylo yhi
+0.0 20.0 zlo zhi
+
+Masses
+
+1 15.999
+2 1.008
+
+Atoms # charge
+
+1 1 -0.8476 10.0 10.0 10.0
+2 2 0.4238 10.96 10.0 10.0
+";
+        let result = parse(data).expect("parse failed");
+        assert_eq!(result.n_atoms, 2);
+        assert_eq!(result.n_file_bonds, 0);
+        assert_eq!(result.bonds.len(), 1);
+        assert!(result.bonds.contains(&(0, 1)));
     }
 
     #[test]
