@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-06-28
+
+### Fixed
+
+- **Blank VSCode webview (and other Vite-built hosts).** v0.9.0 bumped Vite to 8 (rolldown), whose CI-built bundle crashed at runtime, leaving a blank panel. Reverted to the known-good Vite 6 / `@vitejs/plugin-react` 4 toolchain in both the root project and `vscode-megane`.
+- Hardened WebGL2 context creation with a clear, actionable error message.
+
+### Added
+
+- **Top-level React error boundary** on every host (VSCode webview, webapp, anywidget widget, JupyterLab structure + pipeline doc widgets) so a render/effect failure shows an actionable message instead of a blank screen.
+- **`render-smoke` CI job** (`npm run smoke:render`) that builds each Vite bundle with the locked toolchain and asserts the viewer mounts and the WebGL canvas draws — closing the gap that let the v0.9.0 blank bundle ship.
+
+### Changed
+
+- `vsce package`/`publish` now always rebuild via a `vscode:prepublish` script, so the extension can never ship stale `out/` + `media/` artifacts.
+
 ## [0.9.0] - 2026-06-18
 
 ### Added
