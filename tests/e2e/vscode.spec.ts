@@ -121,6 +121,15 @@ test("render export is saved through the extension-host saveFile bridge", async 
     ...defaultViewerContract({ expectedAtoms: 327, context: "vscode" }),
   ]);
 
+  // The pipeline panel (which hosts the Render button) starts collapsed when
+  // the webview iframe is narrow (< 768px), which it is under code-server.
+  // Expand it first so the Render button is visible.
+  const panel = wv.locator('[data-testid="panel-pipeline"]');
+  if ((await panel.getAttribute("data-collapsed")) === "true") {
+    await wv.locator('[data-testid="panel-pipeline-toggle"]').click();
+    await expect(panel).toHaveAttribute("data-collapsed", "false");
+  }
+
   await wv.locator('[data-testid="pipeline-editor-render"]').click();
   await expect(wv.locator('[data-testid="render-modal"]')).toBeVisible();
   await wv.locator('[data-testid="render-modal-export"]').click();

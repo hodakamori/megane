@@ -58,6 +58,10 @@ coverage.xml
 # megane LLM benchmark generated results
 bench/llm/results/
 
+# code-server built from npm by scripts/install-code-server.sh (E2E host,
+# used when the prebuilt binary from code-server.dev is unavailable)
+.code-server/
+
 # Generated anywidget bundle (built by `npm run build:widget`, shipped in the
 # wheel via the maturin [tool.maturin] include of python/megane/static/**)
 python/megane/static/widget.js

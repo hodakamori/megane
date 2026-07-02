@@ -74,13 +74,15 @@ E2E is **local-only by policy** — CI does not run any E2E project (port-bind r
 | Category | Scripts | Notes |
 |---|---|---|
 | Full sweep | `npm run test:e2e` | All Playwright projects |
-| Host projects | `:webapp`, `:contract`, `:widget-jupyterlab`, `:widget-vscode`, `:jupyterlab-doc`, `:vscode` | `:webapp` / `:contract` run a Vite static server on port 15173; `:widget-vscode` / `:vscode` need `MEGANE_E2E_MODE=1` |
+| Host projects | `:webapp`, `:contract`, `:widget-jupyterlab`, `:widget-vscode`, `:jupyterlab-doc`, `:vscode` | `:webapp` / `:contract` run a Vite static server on port 15173; `:widget-vscode` / `:vscode` need `MEGANE_E2E_MODE=1` + code-server (see below) |
 | Feature × 5-host matrices | `:modify-node`, `:camera`, `:measurement`, `:subsystems`, `:trajectory-bonds` | Each runs the feature on `webapp`, `jupyterlab-doc`, `vscode`, `widget-jupyterlab`, `widget-vscode`. Per-host variants exist (e.g. `:trajectory-bonds:webapp`, `:camera:webapp`) |
 | Single-feature projects | `:format-loading`, `:playback`, `:sidebar`, `:widget-api`, `:widget-examples`, `:pipeline-editor`, `:pipeline-file`, `:render-modal`, `:phase2` | Webapp host unless the project name encodes another |
 | Legacy mjs runner | `:vscode:legacy`, `:vscode:legacy:update` | `tests/e2e/vscode_full_screen.test.mjs` |
 | Re-baseline flag | `MEGANE_E2E_UPDATE=1 npm run test:e2e:<project>` | Unlinks the existing baseline before capture |
 
 When invoking Playwright directly (`npx playwright test ...`), prefix with `PATH="$(pwd)/.venv/bin:$PATH"` so the `jupyterlab-doc` / `widget-jupyterlab` projects can spawn the venv `jupyter`. `uv run make test-all` already does this implicitly. Re-baseline only when the failure is a pixel diff; treat timeouts and runtime errors as real regressions and fix the root cause instead.
+
+The `:vscode` / `:widget-vscode` projects need code-server. In a sandboxed/proxied env the default `code-server.dev` binary download is blocked (HTTP 403); build from npm instead with `sudo apt-get install -y libkrb5-dev && MEGANE_CODE_SERVER_USE_NPM=1 bash scripts/install-code-server.sh`, then point the run at `MEGANE_CODE_SERVER_BIN="$(pwd)/.code-server/node_modules/.bin/code-server"`. The `e2e-coverage` skill has the full runbook.
 
 ### Lint / Format / Preview
 
