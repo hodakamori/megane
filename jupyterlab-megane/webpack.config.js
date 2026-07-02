@@ -23,6 +23,13 @@ module.exports = {
     new webpack.NormalModuleReplacementPlugin(
       /[\\/]src[\\/]ai[\\/]skillLoader\.ts$/,
       path.resolve(__dirname, "src/skillLoaderStub.ts")
+    ),
+    // parseClient.ts imports a Vite `?worker&inline` module that webpack cannot
+    // parse. Swap it for the synchronous main-thread parse client so the
+    // labextension bundles cleanly (same pattern as skillLoaderStub above).
+    new webpack.NormalModuleReplacementPlugin(
+      /[\\/]src[\\/]parsers[\\/]parseClient\.ts$/,
+      path.resolve(__dirname, "../src/parsers/parseClientSync.ts")
     )
   ],
   module: {

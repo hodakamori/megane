@@ -5,6 +5,12 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react(), wasm()],
+  // The parse worker (src/parsers/parse.worker.ts) imports the WASM module, so
+  // its sub-build needs vite-plugin-wasm too.
+  worker: {
+    format: "es",
+    plugins: () => [wasm()],
+  },
   assetsInclude: ["**/*.xtc"],
   resolve: {
     alias: {

@@ -9,6 +9,11 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react(), wasm()],
+  // The parse worker imports the WASM module; its sub-build needs the wasm plugin.
+  worker: {
+    format: "es",
+    plugins: () => [wasm()],
+  },
   assetsInclude: ["**/*.xtc"],
   resolve: {
     alias: {

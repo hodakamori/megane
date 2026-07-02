@@ -286,7 +286,7 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
     // read per-frame coordinates
     let n_coords = n_atoms * 3;
     let coord_begin = coord_var.begin as usize;
-    let mut frame_positions: Vec<Vec<f32>> = Vec::with_capacity(n_frames);
+    let mut frame_positions_flat: Vec<f32> = Vec::with_capacity(n_frames * n_coords);
 
     for i in 0..n_frames {
         let base = coord_begin
@@ -297,11 +297,9 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
                 "frame {i} coordinates out of bounds (offset {base})"
             ));
         }
-        let mut positions = Vec::with_capacity(n_coords);
         for j in 0..n_coords {
-            positions.push(r.read_f32_at(base + j * 4)?);
+            frame_positions_flat.push(r.read_f32_at(base + j * 4)?);
         }
-        frame_positions.push(positions);
     }
 
     // derive timestep from time variable (frames 0 and 1 difference)
@@ -345,7 +343,7 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
         n_frames,
         timestep_ps,
         box_matrix,
-        frame_positions,
+        frame_positions_flat,
         vector_channels: vec![],
     })
 }
@@ -617,7 +615,8 @@ mod tests {
         assert!((result.timestep_ps - 1.0).abs() < 1e-5, "timestep_ps");
         assert!(result.box_matrix.is_none());
 
-        for (i, frame) in result.frame_positions.iter().enumerate() {
+        for i in 0..result.n_frames {
+            let frame = result.frame(i);
             let fi = i as f32;
             for j in 0..n_atoms {
                 let x = frame[j * 3];
@@ -652,7 +651,7 @@ mod tests {
         assert!((bm[4] - 10.0).abs() < 1e-3, "b");
         assert!((bm[8] - 10.0).abs() < 1e-3, "c");
 
-        let f1 = &result.frame_positions[1];
+        let f1 = result.frame(1);
         assert!((f1[0] - 0.1).abs() < 1e-5);
     }
 

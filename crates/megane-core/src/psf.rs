@@ -196,7 +196,7 @@ pub fn parse_psf(text: &str) -> Result<ParsedStructure, String> {
         n_file_bonds,
         bond_orders: None,
         box_matrix: None,
-        frame_positions: Vec::new(),
+        frame_positions_flat: Vec::new(),
         atom_labels: Some(atom_labels),
         chain_ids: if has_chain { Some(chain_ids) } else { None },
         bfactors: None,

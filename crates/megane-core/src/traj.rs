@@ -368,8 +368,10 @@ pub fn parse_traj(data: &[u8]) -> Result<ParsedStructure, String> {
 
     let box_matrix = extract_cell(data, &first_json, array_le);
 
-    // Collect positions from all frames
-    let mut all_positions: Vec<Vec<f32>> = Vec::with_capacity(nitems);
+    // Collect positions: frame 0 into `positions`, the rest flat into `frame_positions_flat`.
+    let mut positions: Vec<f32> = Vec::new();
+    let mut frame_positions_flat: Vec<f32> =
+        Vec::with_capacity(nitems.saturating_sub(1) * n_atoms * 3);
     for (i, &off) in offsets.iter().enumerate() {
         let json = if i == 0 {
             first_json.clone()
@@ -389,12 +391,12 @@ pub fn parse_traj(data: &[u8]) -> Result<ParsedStructure, String> {
                 n_atoms * 3
             ));
         }
-        all_positions.push(pos);
+        if i == 0 {
+            positions = pos;
+        } else {
+            frame_positions_flat.extend_from_slice(&pos);
+        }
     }
-
-    // First frame positions go into `positions`, rest into `frame_positions`
-    let positions = all_positions.remove(0);
-    let frame_positions = all_positions;
 
     // Infer bonds from first frame
     let empty_bonds: HashSet<(u32, u32)> = HashSet::new();
@@ -408,7 +410,7 @@ pub fn parse_traj(data: &[u8]) -> Result<ParsedStructure, String> {
         n_file_bonds: 0,
         bond_orders: None,
         box_matrix,
-        frame_positions,
+        frame_positions_flat,
         atom_labels: None,
         chain_ids: None,
         bfactors: None,
@@ -440,7 +442,7 @@ mod tests {
         };
         let result = parse_traj(&data).expect("parse traj");
         assert_eq!(result.n_atoms, 3); // water: O + 2H
-        assert!(!result.frame_positions.is_empty()); // at least 1 frame
+        assert!(result.extra_frame_count() >= 1); // at least 1 extra frame beyond frame 0
         assert_eq!(result.positions.len(), 9); // 3 atoms * 3 coords
         assert!(result.elements.contains(&8)); // oxygen
         assert!(result.elements.contains(&1)); // hydrogen

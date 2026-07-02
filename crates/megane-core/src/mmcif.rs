@@ -424,7 +424,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         n_file_bonds: 0,
         bond_orders: None,
         box_matrix,
-        frame_positions: Vec::new(),
+        frame_positions_flat: Vec::new(),
         atom_labels: if has_labels { Some(atom_labels) } else { None },
         chain_ids: if has_chain_ids { Some(chain_ids) } else { None },
         bfactors: if has_bfactors { Some(bfactors) } else { None },
