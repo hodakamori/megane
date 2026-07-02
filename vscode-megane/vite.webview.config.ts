@@ -6,9 +6,16 @@ import path from "path";
 export default defineConfig({
   plugins: [react(), wasm()],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "../src"),
-    },
+    alias: [
+      // Single-file webview bundle: use the synchronous main-thread parse path
+      // rather than embedding a Web Worker (the webview already loads WASM via a
+      // blob URL). Keeps the bundle self-contained under the strict CSP.
+      {
+        find: /\.\/parseClient$/,
+        replacement: path.resolve(__dirname, "../src/parsers/parseClientSync.ts"),
+      },
+      { find: "@", replacement: path.resolve(__dirname, "../src") },
+    ],
     // Resolve dependencies from both vscode-megane/node_modules and parent node_modules
     modules: [
       path.resolve(__dirname, "node_modules"),
