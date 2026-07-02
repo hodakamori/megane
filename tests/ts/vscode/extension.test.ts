@@ -65,6 +65,10 @@ const { mockState } = vi.hoisted(() => ({
     registered: [] as RegisteredProvider[],
     registeredCommands: [] as RegisteredCommand[],
     readFile: vi.fn<(uri: FakeUri) => Promise<Uint8Array>>(),
+    writeFile: vi.fn<(uri: FakeUri, content: Uint8Array) => Promise<void>>(),
+    showSaveDialog: vi.fn<(options?: unknown) => Promise<FakeUri | undefined>>(),
+    showInformationMessage: vi.fn<(message: string) => Promise<undefined>>(),
+    showErrorMessage: vi.fn<(message: string) => Promise<undefined>>(),
     statusBarItems: [] as FakeStatusBarItem[],
   },
 }));
@@ -96,8 +100,11 @@ vi.mock("vscode", () => {
   }
   return {
     Uri,
-    workspace: { fs: { readFile: mockState.readFile } },
+    workspace: { fs: { readFile: mockState.readFile, writeFile: mockState.writeFile } },
     window: {
+      showSaveDialog: mockState.showSaveDialog,
+      showInformationMessage: mockState.showInformationMessage,
+      showErrorMessage: mockState.showErrorMessage,
       registerCustomEditorProvider: vi.fn(
         (viewType: string, provider: FakeProvider, options: RegisteredProvider["options"]) => {
           mockState.registered.push({ viewType, provider, options });
@@ -132,6 +139,7 @@ import {
   deactivate,
   createFrameStatusBarItem,
   createSelectionStatusBarItem,
+  handleSaveFileMessage,
   MeganeEditorProvider,
 } from "../../../vscode-megane/src/extension";
 
@@ -210,6 +218,10 @@ beforeEach(() => {
   mockState.registeredCommands.length = 0;
   mockState.statusBarItems.length = 0;
   mockState.readFile.mockReset();
+  mockState.writeFile.mockReset();
+  mockState.showSaveDialog.mockReset();
+  mockState.showInformationMessage.mockReset();
+  mockState.showErrorMessage.mockReset();
   vi.mocked(vscode.window.registerCustomEditorProvider).mockClear();
   delete process.env.MEGANE_E2E_MODE;
 });
@@ -883,6 +895,155 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     };
     expect(payload.structureFiles).toEqual([]);
     expect(payload.trajectoryFiles).toEqual([]);
+  });
+});
+
+describe("handleSaveFileMessage", () => {
+  const docUri = () => VscodeUri.file("/work/sample.pdb") as unknown as Parameters<
+    typeof handleSaveFileMessage
+  >[1];
+
+  it("writes the chosen file and shows an info message on success", async () => {
+    const target = VscodeUri.file("/elsewhere/out.png");
+    mockState.showSaveDialog.mockResolvedValueOnce(target);
+
+    await handleSaveFileMessage({ filename: "megane-render.png", bytes: [1, 2, 3] }, docUri());
+
+    expect(mockState.writeFile).toHaveBeenCalledTimes(1);
+    const [uri, content] = mockState.writeFile.mock.calls[0];
+    expect(uri).toBe(target);
+    expect(content).toEqual(new Uint8Array([1, 2, 3]));
+    expect(mockState.showInformationMessage).toHaveBeenCalledWith("Saved out.png");
+    expect(mockState.showErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the user cancels the save dialog", async () => {
+    mockState.showSaveDialog.mockResolvedValueOnce(undefined);
+
+    await handleSaveFileMessage({ filename: "megane-render.png", bytes: [1] }, docUri());
+
+    expect(mockState.writeFile).not.toHaveBeenCalled();
+    expect(mockState.showInformationMessage).not.toHaveBeenCalled();
+    expect(mockState.showErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("shows an error message when the write fails", async () => {
+    mockState.showSaveDialog.mockResolvedValueOnce(VscodeUri.file("/work/out.gif"));
+    mockState.writeFile.mockRejectedValueOnce(new Error("disk full"));
+
+    await handleSaveFileMessage({ filename: "megane-render.gif", bytes: [1] }, docUri());
+
+    expect(mockState.showErrorMessage).toHaveBeenCalledTimes(1);
+    expect(mockState.showErrorMessage.mock.calls[0][0]).toContain("disk full");
+    expect(mockState.showInformationMessage).not.toHaveBeenCalled();
+  });
+
+  it("coerces non-Error write failures into a string message", async () => {
+    mockState.showSaveDialog.mockResolvedValueOnce(VscodeUri.file("/work/out.png"));
+    mockState.writeFile.mockRejectedValueOnce("permission denied");
+
+    await handleSaveFileMessage({ filename: "megane-render.png", bytes: [1] }, docUri());
+
+    expect(mockState.showErrorMessage.mock.calls[0][0]).toContain("permission denied");
+  });
+
+  it("suggests the document directory + filename and an extension-derived filter", async () => {
+    mockState.showSaveDialog.mockResolvedValueOnce(undefined);
+
+    await handleSaveFileMessage({ filename: "megane-render.glb", bytes: [1] }, docUri());
+
+    const options = mockState.showSaveDialog.mock.calls[0][0] as {
+      defaultUri: FakeUri;
+      filters: Record<string, string[]>;
+    };
+    expect(options.defaultUri.fsPath).toBe("/work/megane-render.glb");
+    expect(options.filters).toEqual({ "3D Model": ["glb"] });
+  });
+
+  it("falls back to an All Files filter for unknown extensions", async () => {
+    mockState.showSaveDialog.mockResolvedValueOnce(undefined);
+
+    await handleSaveFileMessage({ filename: "output.xyz123", bytes: [1] }, docUri());
+
+    const options = mockState.showSaveDialog.mock.calls[0][0] as {
+      filters: Record<string, string[]>;
+    };
+    expect(options.filters).toEqual({ "All Files": ["*"] });
+  });
+
+  it("skips the dialog and writes to the default path in E2E mode", async () => {
+    process.env.MEGANE_E2E_MODE = "1";
+
+    await handleSaveFileMessage({ filename: "megane-render.png", bytes: [9, 8] }, docUri());
+
+    expect(mockState.showSaveDialog).not.toHaveBeenCalled();
+    expect(mockState.writeFile).toHaveBeenCalledTimes(1);
+    const [uri, content] = mockState.writeFile.mock.calls[0];
+    expect((uri as FakeUri).fsPath).toBe("/work/megane-render.png");
+    expect(content).toEqual(new Uint8Array([9, 8]));
+    expect(mockState.showInformationMessage).toHaveBeenCalledWith("Saved megane-render.png");
+  });
+});
+
+describe("saveFile message routing", () => {
+  beforeEach(() => {
+    activate(makeContext("/ext") as unknown as Parameters<typeof activate>[0]);
+  });
+
+  it("structureViewer routes saveFile messages to the save handler", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+    mockState.showSaveDialog.mockResolvedValueOnce(VscodeUri.file("/work/out.png"));
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireMessage({ type: "saveFile", filename: "megane-render.png", bytes: [1, 2, 3] });
+    await vi.waitFor(() => expect(mockState.writeFile).toHaveBeenCalledTimes(1));
+
+    const options = mockState.showSaveDialog.mock.calls[0][0] as { defaultUri: FakeUri };
+    expect(options.defaultUri.fsPath).toBe("/work/megane-render.png");
+    expect(mockState.writeFile.mock.calls[0][1]).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("pipelineViewer routes saveFile messages to the save handler", async () => {
+    const provider = getProvider("megane.pipelineViewer");
+    mockState.readFile
+      .mockResolvedValueOnce(
+        new TextEncoder().encode(JSON.stringify({ version: 3, nodes: [], edges: [] })),
+      )
+      .mockResolvedValueOnce(new Uint8Array());
+    mockState.showSaveDialog.mockResolvedValueOnce(VscodeUri.file("/work/pipeline.megane.json"));
+
+    const doc = { uri: VscodeUri.file("/work/pipe.megane.json"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireMessage({ type: "saveFile", filename: "pipeline.megane.json", bytes: [7] });
+    await vi.waitFor(() => expect(mockState.writeFile).toHaveBeenCalledTimes(1));
+
+    const options = mockState.showSaveDialog.mock.calls[0][0] as {
+      defaultUri: FakeUri;
+      filters: Record<string, string[]>;
+    };
+    expect(options.defaultUri.fsPath).toBe("/work/pipeline.megane.json");
+    expect(options.filters).toEqual({ JSON: ["json"] });
+    expect(mockState.writeFile.mock.calls[0][1]).toEqual(new Uint8Array([7]));
+  });
+
+  it("saveFile does not trigger the loadFile payload post", async () => {
+    const provider = getProvider("megane.structureViewer");
+    mockState.readFile.mockResolvedValue(new Uint8Array([1]));
+    mockState.showSaveDialog.mockResolvedValueOnce(undefined);
+
+    const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
+    const { panel, fireMessage } = makeWebviewPanel();
+    await provider.resolveCustomEditor(doc, panel, {});
+
+    fireMessage({ type: "saveFile", filename: "a.png", bytes: [] });
+    await vi.waitFor(() => expect(mockState.showSaveDialog).toHaveBeenCalledTimes(1));
+    expect(panel.webview.postMessage).not.toHaveBeenCalled();
   });
 });
 

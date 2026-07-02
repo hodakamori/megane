@@ -39,3 +39,21 @@ This step is REQUIRED before `npm run dev` or `npm run build` will work.
 - Vite dev server fails with missing WASM → run `npm run build:wasm` first
 - Python import errors → run `maturin develop --release`
 - Node module not found → run `npm install`
+
+## VSCode E2E hosts (code-server)
+
+Only needed to run the `vscode` / `widget-vscode` Playwright projects.
+`scripts/install-code-server.sh` installs code-server + the Jupyter extensions +
+the megane VSIX. In a **sandboxed / proxied** environment the default installer
+downloads a binary from GitHub and gets **HTTP 403**; force the npm build path
+instead:
+
+```
+sudo apt-get install -y libkrb5-dev      # kerberos native build needs GSSAPI headers
+MEGANE_CODE_SERVER_USE_NPM=1 bash scripts/install-code-server.sh
+```
+
+The npm route builds code-server into `<repo>/.code-server` (gitignored) and
+needs `libkrb5-dev` (else node-gyp fails on `gssapi/gssapi.h`) and `rg` on PATH
+(else `@vscode/ripgrep`'s GitHub download fails). See the `e2e-coverage` skill
+for the full runbook and the `MEGANE_CODE_SERVER_BIN` invocation.

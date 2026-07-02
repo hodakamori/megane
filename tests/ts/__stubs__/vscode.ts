@@ -41,6 +41,7 @@ export class Uri {
 export const workspace = {
   fs: {
     readFile: (_uri: Uri): Promise<Uint8Array> => Promise.resolve(new Uint8Array()),
+    writeFile: (_uri: Uri, _content: Uint8Array): Promise<void> => Promise.resolve(),
   },
 };
 
@@ -56,6 +57,9 @@ export const window = {
     show: () => {},
     dispose: () => {},
   }),
+  showSaveDialog: (_options?: unknown): Promise<Uri | undefined> => Promise.resolve(undefined),
+  showInformationMessage: (_message: string): Promise<undefined> => Promise.resolve(undefined),
+  showErrorMessage: (_message: string): Promise<undefined> => Promise.resolve(undefined),
 };
 
 export const commands = {

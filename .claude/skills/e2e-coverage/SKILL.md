@@ -60,8 +60,39 @@ cp -r wheel-share/data/share/jupyter/labextensions/megane-jupyterlab \
       "$(jupyter --data-dir)/labextensions/"
 
 # VSCode hosts (only if running widget-vscode / vscode)
-bash scripts/install-code-server.sh    # code-server + ms-toolsai.jupyter + local VSIX
 npm --prefix vscode-megane run build   # ensures media/webview.js is fresh
+npm --prefix vscode-megane run package # produces the VSIX install-code-server.sh installs
+bash scripts/install-code-server.sh    # code-server + ms-toolsai.jupyter + local VSIX
+```
+
+### Sandboxed / proxied environments (code-server.dev blocked)
+
+`scripts/install-code-server.sh` first tries the official installer
+(`https://code-server.dev/install.sh`), which downloads a prebuilt binary from
+GitHub Releases. Behind an egress proxy that GitHub fetch returns **HTTP 403**.
+The script then falls back to building code-server from the **npm** package into
+`<repo>/.code-server` (gitignored). You can force this path with
+`MEGANE_CODE_SERVER_USE_NPM=1 bash scripts/install-code-server.sh`.
+
+The npm build compiles native modules, so two host prerequisites matter:
+
+- **`libkrb5-dev`** (Debian/Ubuntu; `krb5-devel` on Fedora) must be installed,
+  or `kerberos`'s node-gyp build dies with
+  `fatal error: gssapi/gssapi.h: No such file or directory`.
+- **`rg` (ripgrep) on PATH** — `@vscode/ripgrep`'s postinstall otherwise tries
+  to download a prebuilt `rg` from GitHub (also 403). The script seeds the
+  system `rg` into the package's `bin/` so that download is skipped.
+
+Point the spec at the npm-built binary via
+`MEGANE_CODE_SERVER_BIN="$(pwd)/.code-server/node_modules/.bin/code-server"`.
+Full working invocation for the VSCode custom-editor project:
+
+```sh
+sudo apt-get install -y libkrb5-dev
+MEGANE_CODE_SERVER_USE_NPM=1 bash scripts/install-code-server.sh
+MEGANE_E2E_MODE=1 \
+  MEGANE_CODE_SERVER_BIN="$(pwd)/.code-server/node_modules/.bin/code-server" \
+  npx playwright test --project=vscode
 ```
 
 ## 5-Platform Runbook
@@ -211,6 +242,10 @@ When a comparison fails, `<name>.diff.png` and `<name>.new.png` land next to the
 | webServer exits in 5s | port 15173 in use | `pkill -f serve-static.mjs; pkill -f vite` |
 | `jupyter lab` fails to boot | port 18888/18889 in use | `pkill -f "jupyter-lab"` |
 | code-server install missing | first M3 run | `bash scripts/install-code-server.sh` |
+| code-server install → HTTP 403 | proxy blocks the code-server.dev / GitHub binary | `MEGANE_CODE_SERVER_USE_NPM=1 bash scripts/install-code-server.sh` (builds from npm into `.code-server/`) |
+| npm build fails on `gssapi/gssapi.h` | kerberos native build, headers missing | install `libkrb5-dev` (Debian) / `krb5-devel` (Fedora), then re-run |
+| npm build fails downloading ripgrep | `@vscode/ripgrep` postinstall hits GitHub (403) | ensure system `rg` is on PATH; the script seeds it so the download is skipped |
+| `vscode` project: 9 format tests fail with large full-page/viewer diffs (>30%) | GPU/software-render differs from the committed baselines' machine | expected off the baseline host — do NOT re-baseline; the DOM-contract portion still validates the fix |
 | Webview frame not found | code-server version drift | `getWebviewFrame()` falls back to `iframe[src*="vscode-webview"]`; check selector |
 | Pixel diff > 2 % unexpectedly | font/cursor/clock drift | add `mask` region in `stabilizeUi()`, do NOT raise threshold |
 | widget-jupyterlab `widget.js missing` | `npm run build:widget` not run | run it before the project |

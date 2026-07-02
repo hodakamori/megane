@@ -1,4 +1,5 @@
 import type { StoredMeasurement } from "../types";
+import { downloadBlob } from "../renderer/RenderCapture";
 
 /** Serialize measurements to a CSV string. */
 export function exportToCSV(measurements: StoredMeasurement[]): string {
@@ -24,13 +25,7 @@ export function exportToJSON(measurements: StoredMeasurement[]): string {
   return JSON.stringify(data, null, 2);
 }
 
-/** Trigger a browser file download with the given content. */
+/** Trigger a file download with the given content via the shared save path. */
 export function downloadFile(content: string, filename: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([content], { type: mimeType }), filename);
 }

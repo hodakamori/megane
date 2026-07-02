@@ -15,7 +15,7 @@
  * `window.__MEGANE_TEST__ = true` before the bundle loads.
  */
 
-import { copyFileSync, mkdirSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { test, expect } from "playwright/test";
@@ -109,3 +109,35 @@ for (const f of FORMATS) {
     }
   });
 }
+
+test("render export is saved through the extension-host saveFile bridge", async ({ page }) => {
+  // In MEGANE_E2E_MODE the extension host skips the native save dialog and
+  // writes next to the open document, so the export lands in the workspace.
+  const exported = join(WORKSPACE, "megane-render.png");
+  rmSync(exported, { force: true });
+
+  const wv = await openVscodeFile(page, { port: PORT, file: "1crn.pdb" });
+  await assertDomContract(wv, [
+    ...defaultViewerContract({ expectedAtoms: 327, context: "vscode" }),
+  ]);
+
+  // The pipeline panel (which hosts the Render button) starts collapsed when
+  // the webview iframe is narrow (< 768px), which it is under code-server.
+  // Expand it first so the Render button is visible.
+  const panel = wv.locator('[data-testid="panel-pipeline"]');
+  if ((await panel.getAttribute("data-collapsed")) === "true") {
+    await wv.locator('[data-testid="panel-pipeline-toggle"]').click();
+    await expect(panel).toHaveAttribute("data-collapsed", "false");
+  }
+
+  await wv.locator('[data-testid="pipeline-editor-render"]').click();
+  await expect(wv.locator('[data-testid="render-modal"]')).toBeVisible();
+  await wv.locator('[data-testid="render-modal-export"]').click();
+
+  await expect
+    .poll(() => existsSync(exported), {
+      message: "expected the extension host to write megane-render.png into the workspace",
+      timeout: 60_000,
+    })
+    .toBe(true);
+});

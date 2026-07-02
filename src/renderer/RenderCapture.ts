@@ -42,8 +42,20 @@ export function canvasToBlob(
   });
 }
 
+/**
+ * Optional host override for saving blobs. Hosts where a synthetic
+ * `<a download>` click is a silent no-op (the VSCode webview) install this
+ * hook to route the bytes to the host instead (see vscode-megane/webview).
+ */
+type SaveBlobHook = (blob: Blob, filename: string) => void;
+
 /** Trigger a file download from a Blob. */
 export function downloadBlob(blob: Blob, filename: string): void {
+  const hook = (globalThis as { __MEGANE_SAVE_BLOB__?: SaveBlobHook }).__MEGANE_SAVE_BLOB__;
+  if (typeof hook === "function") {
+    hook(blob, filename);
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
