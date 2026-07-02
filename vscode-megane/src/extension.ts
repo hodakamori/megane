@@ -15,6 +15,57 @@ interface SerializedPipeline {
   edges: unknown[];
 }
 
+interface SaveFileMessage {
+  filename: string;
+  bytes: number[];
+}
+
+const SAVE_FILTERS: Record<string, [string, string[]]> = {
+  glb: ["3D Model", ["glb"]],
+  gltf: ["3D Model", ["gltf"]],
+  obj: ["Wavefront OBJ", ["obj"]],
+  png: ["PNG Image", ["png"]],
+  svg: ["SVG Image", ["svg"]],
+  eps: ["EPS Image", ["eps"]],
+  gif: ["GIF Animation", ["gif"]],
+  webm: ["WebM Video", ["webm"]],
+  json: ["JSON", ["json"]],
+  csv: ["CSV", ["csv"]],
+};
+
+/**
+ * Save bytes posted from the webview (`{ type: "saveFile", filename, bytes }`).
+ * Webviews cannot trigger `<a download>` saves, so exports (render output,
+ * pipeline JSON, measurement CSV/JSON) are relayed here and written via the
+ * workspace filesystem API. In E2E mode the native save dialog is skipped —
+ * Playwright cannot drive it — and the file lands next to the open document.
+ */
+export async function handleSaveFileMessage(
+  message: SaveFileMessage,
+  documentUri: vscode.Uri,
+): Promise<void> {
+  const { filename, bytes } = message;
+  const defaultUri = vscode.Uri.file(path.join(path.dirname(documentUri.fsPath), filename));
+  const ext = path.extname(filename).slice(1).toLowerCase();
+  const entry = SAVE_FILTERS[ext];
+  const filters = entry ? { [entry[0]]: entry[1] } : { "All Files": ["*"] };
+
+  const target =
+    process.env.MEGANE_E2E_MODE === "1"
+      ? defaultUri
+      : await vscode.window.showSaveDialog({ defaultUri, filters });
+
+  if (!target) return; // user cancelled the dialog
+  try {
+    await vscode.workspace.fs.writeFile(target, new Uint8Array(bytes));
+    void vscode.window.showInformationMessage(`Saved ${path.basename(target.fsPath)}`);
+  } catch (err) {
+    void vscode.window.showErrorMessage(
+      `Failed to save file: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvider {
   private static readonly viewType = "megane.pipelineViewer";
 
@@ -122,6 +173,10 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
         webview.postMessage(payload);
+        return;
+      }
+      if (message.type === "saveFile") {
+        void handleSaveFileMessage(message as SaveFileMessage, document.uri);
       }
     });
 
@@ -231,6 +286,10 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
     webview.onDidReceiveMessage((message) => {
       if (message.type === "ready") {
         webview.postMessage(payload);
+        return;
+      }
+      if (message.type === "saveFile") {
+        void handleSaveFileMessage(message as SaveFileMessage, document.uri);
         return;
       }
       if (message.type === "frameChange") {
