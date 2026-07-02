@@ -212,13 +212,16 @@ function parseWithFn(parseFn: ParseFn, text: string): StructureParseResult {
 
   const frames: Frame[] = [];
   if (result.n_frames > 0) {
+    // One wasm→JS copy for all extra frames; each frame is a zero-copy view
+    // (subarray) into that single backing buffer, kept alive by the views.
+    // Frames are read-only downstream, so sharing one buffer is safe.
     const allData = result.frame_data();
     const stride = result.n_atoms * 3;
     for (let i = 0; i < result.n_frames; i++) {
       frames.push({
         frameId: i + 1,
         nAtoms: result.n_atoms,
-        positions: allData.slice(i * stride, (i + 1) * stride),
+        positions: allData.subarray(i * stride, (i + 1) * stride),
       });
     }
   }

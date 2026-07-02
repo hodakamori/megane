@@ -392,7 +392,9 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
 /// Parse an XTC binary trajectory and return all frames.
 pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
     let mut xdr = XdrReader::new(data);
-    let mut frame_positions: Vec<Vec<f32>> = Vec::new();
+    // Frame-major flat coordinates (frame count unknown up front → amortized growth).
+    let mut frame_positions_flat: Vec<f32> = Vec::new();
+    let mut n_frames: usize = 0;
     let mut n_atoms: usize = 0;
     let mut first_time: f32 = 0.0;
     let mut second_time: f32 = 0.0;
@@ -424,9 +426,9 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
         let _step = xdr.read_i32()?;
         let time = xdr.read_f32()?;
 
-        if frame_positions.is_empty() {
+        if n_frames == 0 {
             first_time = time;
-        } else if frame_positions.len() == 1 {
+        } else if n_frames == 1 {
             second_time = time;
         }
 
@@ -437,16 +439,17 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
         }
         last_box = Some(box_mat);
 
-        // Decompress coordinate data
+        // Decompress coordinate data straight into the flat buffer.
         let positions = decompress_coords(&mut xdr, n_atoms)?;
-        frame_positions.push(positions);
+        frame_positions_flat.extend_from_slice(&positions);
+        n_frames += 1;
     }
 
-    if frame_positions.is_empty() {
+    if n_frames == 0 {
         return Err("no frames found in XTC file".into());
     }
 
-    let timestep_ps = if frame_positions.len() > 1 {
+    let timestep_ps = if n_frames > 1 {
         second_time - first_time
     } else {
         1.0
@@ -454,10 +457,10 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
 
     Ok(XtcData {
         n_atoms,
-        n_frames: frame_positions.len(),
+        n_frames,
         timestep_ps,
         box_matrix: last_box,
-        frame_positions,
+        frame_positions_flat,
         vector_channels: vec![],
     })
 }
@@ -478,7 +481,7 @@ mod tests {
         assert_eq!(result.n_frames, 100);
 
         // Reference values from MDAnalysis (Angstroms)
-        let frame0 = &result.frame_positions[0];
+        let frame0 = result.frame(0);
         let check = |idx: usize, ex: f32, ey: f32, ez: f32| {
             let (x, y, z) = (frame0[idx * 3], frame0[idx * 3 + 1], frame0[idx * 3 + 2]);
             assert!(

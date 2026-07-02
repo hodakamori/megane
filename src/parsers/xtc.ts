@@ -63,6 +63,10 @@ function extractFrames(
     throw new Error(msg);
   }
 
+  // One wasm→JS copy for the whole trajectory; each frame is a zero-copy view
+  // (subarray) into that single backing buffer. Frames are read-only downstream
+  // (the renderer memcpies out; replicate/isosurface write into fresh buffers),
+  // so sharing one buffer is safe. Keep `allData` alive via these views.
   const allData = result.frame_data();
   const stride = result.n_atoms * 3;
   const frames: Frame[] = [];
@@ -71,7 +75,7 @@ function extractFrames(
     frames.push({
       frameId: i,
       nAtoms: result.n_atoms,
-      positions: allData.slice(i * stride, (i + 1) * stride),
+      positions: allData.subarray(i * stride, (i + 1) * stride),
     });
   }
 

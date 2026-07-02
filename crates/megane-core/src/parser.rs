@@ -24,7 +24,10 @@ pub struct ParsedStructure {
     pub n_file_bonds: usize,
     pub bond_orders: Option<Vec<u8>>,
     pub box_matrix: Option<[f32; 9]>,
-    pub frame_positions: Vec<Vec<f32>>,
+    /// EXTRA frames only (frame 0 lives in `positions`), frame-major flat:
+    /// `[extra0: x0,y0,z0,…][extra1: …]…`. Length == `extra_frame_count() * n_atoms * 3`.
+    /// A single contiguous allocation so the WASM/PyO3 boundary avoids a flatten copy.
+    pub frame_positions_flat: Vec<f32>,
     pub atom_labels: Option<Vec<String>>,
     /// Per-atom chain IDs encoded as raw ASCII bytes (e.g. b'A'=65, b'B'=66).
     /// None when the format does not carry chain information.
@@ -50,6 +53,24 @@ pub struct ParsedStructure {
     /// no space-group information. The parser does NOT apply these — it always
     /// returns the asymmetric unit; symmetry expansion is a downstream feature.
     pub symmetry_ops: Vec<String>,
+}
+
+impl ParsedStructure {
+    /// Number of EXTRA frames stored in `frame_positions_flat` (frame 0 is in `positions`).
+    pub fn extra_frame_count(&self) -> usize {
+        if self.n_atoms == 0 {
+            0
+        } else {
+            self.frame_positions_flat.len() / (self.n_atoms * 3)
+        }
+    }
+
+    /// Flat `[x0,y0,z0,…]` slice for EXTRA frame `i` (overall frame `i + 1`).
+    /// Panics if `i >= extra_frame_count()`.
+    pub fn frame(&self, i: usize) -> &[f32] {
+        let stride = self.n_atoms * 3;
+        &self.frame_positions_flat[i * stride..(i + 1) * stride]
+    }
 }
 
 /// Secondary-structure range from a PDB HELIX or SHEET record.
@@ -404,19 +425,18 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let inferred = crate::bonds::infer_bonds(&positions, &elements, n_atoms, &bond_set);
     unique_bonds.extend(inferred);
 
-    // Build frame positions from additional models
-    let mut frame_positions: Vec<Vec<f32>> = Vec::new();
+    // Build flat frame positions from additional models (frame 0 is `positions`).
+    let extra_models = all_models.len().saturating_sub(1);
+    let mut frame_positions_flat: Vec<f32> = Vec::with_capacity(extra_models * n_atoms * 3);
     for model in all_models.iter().skip(1) {
         if model.len() != n_atoms {
             continue; // Skip models with different atom counts
         }
-        let mut frame_pos = Vec::with_capacity(n_atoms * 3);
         for atom in model {
-            frame_pos.push(atom.x);
-            frame_pos.push(atom.y);
-            frame_pos.push(atom.z);
+            frame_positions_flat.push(atom.x);
+            frame_positions_flat.push(atom.y);
+            frame_positions_flat.push(atom.z);
         }
-        frame_positions.push(frame_pos);
     }
 
     // Check if any labels are non-empty
@@ -465,7 +485,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         n_file_bonds,
         bond_orders: None,
         box_matrix,
-        frame_positions,
+        frame_positions_flat,
         atom_labels,
         chain_ids,
         bfactors,
@@ -510,8 +530,13 @@ mod tests {
         let pdb = "MODEL        1\nATOM      1  CA  ALA A   1       1.000   2.000   3.000  1.00  0.00           C  \nENDMDL\nMODEL        2\nATOM      1  CA  ALA A   1       4.000   5.000   6.000  1.00  0.00           C  \nENDMDL\n";
         let result = parse(pdb).expect("parse failed");
         assert_eq!(result.n_atoms, 1);
-        assert_eq!(result.frame_positions.len(), 1);
-        assert!((result.frame_positions[0][0] - 4.0).abs() < 0.01);
+        // Frame 0 stays in `positions`; the second MODEL is the one extra frame.
+        assert!((result.positions[0] - 1.0).abs() < 0.01);
+        assert_eq!(result.extra_frame_count(), 1);
+        let extra = result.frame(0);
+        assert!((extra[0] - 4.0).abs() < 0.01);
+        assert!((extra[1] - 5.0).abs() < 0.01);
+        assert!((extra[2] - 6.0).abs() < 0.01);
     }
 
     #[test]
