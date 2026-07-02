@@ -67,11 +67,7 @@ impl PyStructure {
         // partial moves (bond_orders, box_matrix, elements).
         let stride = n * 3;
         let frame_flat = data.frame_positions_flat;
-        let n_frames = if stride == 0 {
-            0
-        } else {
-            frame_flat.len() / stride
-        };
+        let n_frames = frame_flat.len().checked_div(stride).unwrap_or(0);
         let frame_array = Array2::from_shape_vec((n_frames, stride), frame_flat).map_err(|e| {
             PyValueError::new_err(format!(
                 "failed to reshape frame_positions into ({n_frames}, {stride}): {e}"
