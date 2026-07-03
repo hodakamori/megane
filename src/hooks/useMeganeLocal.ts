@@ -36,6 +36,11 @@ export interface MeganeLocalState {
   pdbFileName: string | null;
   xtcFileName: string | null;
   loadFile: (pdb: File, topFile?: File) => Promise<void>;
+  applyStructureResult: (
+    result: StructureParseResult,
+    fileName: string,
+    topFile?: File,
+  ) => Promise<void>;
   loadText: (text: string, fileName?: string) => Promise<StructureParseResult>;
   loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
@@ -253,11 +258,14 @@ export function useMeganeLocal(): MeganeLocalState {
     [resetPlayback, bonds.reset, labels.reset, vectors.reset],
   );
 
-  const loadFile = useCallback(
-    async (pdb: File, topFile?: File) => {
-      const result = await parseStructureFile(pdb);
-      applyResult(result, pdb.name);
-      setPdbFileName(pdb.name);
+  // Apply an ALREADY-parsed structure result without re-reading or re-parsing
+  // the file. This is the shared body of loadFile, exposed so callers that have
+  // already parsed the file (e.g. the pipeline load_structure node handler) can
+  // reuse the result instead of paying a second file read + WASM parse.
+  const applyStructureResult = useCallback(
+    async (result: StructureParseResult, fileName: string, topFile?: File) => {
+      applyResult(result, fileName);
+      setPdbFileName(fileName);
       setXtcFileName(result.meta ? "PDB models" : null);
 
       // applyResult calls syncAddBondSourceForLoader (sets "distance" for GRO).
@@ -271,6 +279,14 @@ export function useMeganeLocal(): MeganeLocalState {
       }
     },
     [applyResult],
+  );
+
+  const loadFile = useCallback(
+    async (pdb: File, topFile?: File) => {
+      const result = await parseStructureFile(pdb);
+      await applyStructureResult(result, pdb.name, topFile);
+    },
+    [applyStructureResult],
   );
 
   const loadText = useCallback(
@@ -397,6 +413,7 @@ export function useMeganeLocal(): MeganeLocalState {
     pdbFileName,
     xtcFileName,
     loadFile,
+    applyStructureResult,
     loadText,
     loadXtc,
     seekFrame,

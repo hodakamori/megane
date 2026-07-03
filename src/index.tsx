@@ -29,6 +29,7 @@ import { useThemeStore } from "./stores/useThemeStore";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import type { DataMode } from "./types";
+import type { StructureParseResult } from "./parsers/structure";
 export type { DataMode };
 
 /** Applies data-theme attribute to <html> and listens for OS preference changes. */
@@ -141,9 +142,9 @@ function App() {
   );
 
   const handleUploadStructure = useCallback(
-    (file: File) => {
+    (file: File, preParsed?: StructureParseResult) => {
       usePlaybackStore.getState().pause();
-      ds.uploadStructure(file);
+      ds.uploadStructure(file, preParsed);
     },
     [ds.uploadStructure],
   );

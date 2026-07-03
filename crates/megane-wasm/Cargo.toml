@@ -7,8 +7,11 @@ authors = ["hodakamori"]
 license = "MIT"
 repository = "https://github.com/hodakamori/megane"
 
+# Run wasm-opt (binaryen) on the release build. -O3 optimizes the parser/decoder
+# hot loops (e.g. XTC bit decompression) and also shrinks the shipped .wasm, so
+# the module fetches + compiles faster on first load.
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = false
+wasm-opt = ['-O3']
 
 [lib]
 crate-type = ["cdylib", "rlib"]

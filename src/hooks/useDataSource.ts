@@ -16,6 +16,7 @@ import type {
   LabelSource,
   VectorSource,
 } from "../types";
+import type { StructureParseResult } from "../parsers/structure";
 
 export interface DataSource {
   snapshot: Snapshot | null;
@@ -25,7 +26,7 @@ export interface DataSource {
   currentFrameRef: React.MutableRefObject<number>;
 
   seekFrame: (frameIdx: number) => void;
-  uploadStructure: (file: File) => void;
+  uploadStructure: (file: File, preParsed?: StructureParseResult) => void;
   uploadTrajectory: (file: File) => void;
 
   setBondSource: (source: BondSource) => void;
@@ -72,14 +73,19 @@ export function useDataSource(mode: DataMode): DataSource {
   );
 
   const uploadStructure = useCallback(
-    (file: File) => {
+    (file: File, preParsed?: StructureParseResult) => {
       if (mode === "streaming") {
         uploadFiles(file);
+      } else if (preParsed) {
+        // The pipeline load_structure node already parsed this file; reuse its
+        // result so we don't read + WASM-parse the same file a second time
+        // (previously this doubled the wall-clock parse time on every open).
+        void local.applyStructureResult(preParsed, file.name);
       } else {
         local.loadFile(file);
       }
     },
-    [mode, local.loadFile],
+    [mode, local.loadFile, local.applyStructureResult],
   );
 
   const uploadTrajectory = useCallback(

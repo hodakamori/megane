@@ -106,10 +106,10 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
 
     let payload: object;
     try {
-      const [pipelineData, wasmData] = await Promise.all([
-        vscode.workspace.fs.readFile(document.uri),
-        vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
-      ]);
+      // The WASM module is fetched by the webview directly via the
+      // asWebviewUri set in getHtmlForWebview (window.__MEGANE_WASM_URL__), so
+      // we no longer read + serialize the whole .wasm into the message payload.
+      const pipelineData = await vscode.workspace.fs.readFile(document.uri);
       const pipeline = JSON.parse(
         new TextDecoder("utf-8").decode(pipelineData),
       ) as SerializedPipeline;
@@ -164,7 +164,6 @@ class MeganePipelineEditorProvider implements vscode.CustomReadonlyEditorProvide
         pipeline,
         structureFiles,
         trajectoryFiles,
-        wasmBytes: Array.from(wasmData),
       };
     } catch (err) {
       payload = { type: "error", message: err instanceof Error ? err.message : String(err) };
@@ -238,15 +237,19 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
     // (b) blank screen if file reading fails before HTML is set.
     let payload: object;
     try {
-      const [fileData, wasmData] = await Promise.all([
-        vscode.workspace.fs.readFile(document.uri),
-        vscode.workspace.fs.readFile(vscode.Uri.joinPath(mediaDir, "megane_wasm_bg.wasm")),
-      ]);
+      // Read only the document file. The WASM module is fetched by the webview
+      // directly via the asWebviewUri set in getHtmlForWebview
+      // (window.__MEGANE_WASM_URL__), so we no longer read + serialize the whole
+      // .wasm into the message payload.
+      const fileData = await vscode.workspace.fs.readFile(document.uri);
       // Send raw bytes (not decoded text) so binary formats like .traj survive
       // the trip into the webview. The webview builds a File and the shared
       // parser dispatches by extension to either text() or arrayBuffer().
+      // Transfer the bytes as an ArrayBuffer (structured clone) rather than a
+      // plain number[]; a number[] is JSON-serialized by postMessage and
+      // inflates ~4-6x, which dominated the open latency for large files.
       const filename = path.basename(document.uri.fsPath);
-      let topBytes: number[] | null = null;
+      let topBytes: ArrayBuffer | null = null;
       let topFilename: string | null = null;
       if (filename.toLowerCase().endsWith(".gro")) {
         const stem = filename.slice(0, filename.lastIndexOf("."));
@@ -256,7 +259,7 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
         );
         try {
           const topData = await vscode.workspace.fs.readFile(topUri);
-          topBytes = Array.from(topData);
+          topBytes = topData.buffer as ArrayBuffer;
           topFilename = topName;
         } catch {
           // .top file not found — proceed without topology bonds
@@ -264,9 +267,8 @@ export class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider
       }
       payload = {
         type: "loadFile",
-        contentBytes: Array.from(fileData),
+        contentBytes: fileData.buffer as ArrayBuffer,
         filename,
-        wasmBytes: Array.from(wasmData),
         topBytes,
         topFilename,
       };

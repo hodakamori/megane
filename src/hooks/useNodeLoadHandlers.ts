@@ -11,12 +11,13 @@ import { setTrajectoryLoadHandler } from "../components/nodes/LoadTrajectoryNode
 import { setVectorLoadHandler } from "../components/nodes/LoadVectorNode";
 import { loadVectorFileData } from "../logic/vectorSourceLogic";
 import { parseStructureFile } from "../parsers/structure";
+import type { StructureParseResult } from "../parsers/structure";
 import type { NodeSnapshotData } from "../pipeline/execute";
 import type { Snapshot } from "../types";
 
 interface UseNodeLoadHandlersOptions {
   snapshot: Snapshot | null;
-  onUploadStructure: (file: File) => void;
+  onUploadStructure: (file: File, preParsed?: StructureParseResult) => void;
   onUploadTrajectory?: (file: File) => void;
 }
 
@@ -47,6 +48,7 @@ export function useNodeLoadHandlers({
   // Wire up structure load handler
   useEffect(() => {
     setStructureLoadHandler((nodeId, file) => {
+      const isPrimary = nodeId === primaryNodeIdRef.current;
       parseStructureFile(file)
         .then((result) => {
           clearNodeParseError(nodeId);
@@ -73,15 +75,20 @@ export function useNodeLoadHandlers({
               }
             }
           }
+          // For the primary node, also drive the legacy load path for
+          // trajectory/label/bond source management. Pass the ALREADY-parsed
+          // result so it reuses this parse instead of reading + WASM-parsing the
+          // same file a second time (previously ~2x wall-clock per open). Doing
+          // it inside .then also removes the prior race between this parse and
+          // the legacy path's concurrent parse.
+          if (isPrimary) {
+            onUploadStructure(file, result);
+          }
         })
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
           setNodeParseError(nodeId, `Failed to parse file: ${message}`);
         });
-      // For the primary node, also trigger legacy load path for trajectory/label compat
-      if (nodeId === primaryNodeIdRef.current) {
-        onUploadStructure(file);
-      }
     });
     return () => {
       setStructureLoadHandler(null);

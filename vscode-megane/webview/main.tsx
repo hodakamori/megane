@@ -44,12 +44,6 @@ const vscode = acquireVsCodeApi();
     });
   };
 
-function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
-  if (!wasmBytes) return;
-  const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });
-  (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ = URL.createObjectURL(wasmBlob);
-}
-
 function ThemeSync() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const syncSystem = useThemeStore((s) => s._syncSystemTheme);
@@ -93,13 +87,14 @@ function App() {
       const message = event.data;
 
       if (message.type === "loadFile") {
-        const { contentBytes, filename, wasmBytes, topBytes, topFilename } = message;
-        setWasmUrlFromBytes(wasmBytes);
-        const bytes = new Uint8Array(contentBytes);
+        const { contentBytes, filename, topBytes, topFilename } = message;
+        // contentBytes / topBytes arrive as ArrayBuffers (structured clone).
+        // The WASM URL is provided by the HTML (window.__MEGANE_WASM_URL__).
+        const bytes = new Uint8Array(contentBytes as ArrayBuffer);
         const file = new File([bytes], filename);
         const topFile: File | undefined =
           topBytes && topFilename
-            ? new File([new Uint8Array(topBytes as number[])], topFilename as string)
+            ? new File([new Uint8Array(topBytes as ArrayBuffer)], topFilename as string)
             : undefined;
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
@@ -137,13 +132,12 @@ function App() {
       }
 
       if (message.type === "loadPipeline") {
-        const { pipeline, structureFiles, trajectoryFiles, wasmBytes } = message as {
+        const { pipeline, structureFiles, trajectoryFiles } = message as {
           pipeline: SerializedPipeline;
           structureFiles: Array<{ nodeId: string; content: string; filename: string }>;
           trajectoryFiles: Array<{ nodeId: string; content: ArrayBuffer; filename: string }>;
-          wasmBytes?: number[];
         };
-        setWasmUrlFromBytes(wasmBytes);
+        // The WASM URL is provided by the HTML (window.__MEGANE_WASM_URL__).
 
         (async () => {
           const companions: File[] = [
