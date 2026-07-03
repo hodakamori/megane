@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { exportToCSV, exportToJSON, downloadFile } from "@/utils/measurementExport";
+import { downloadBlob } from "@/renderer/RenderCapture";
 import type { StoredMeasurement } from "@/types";
+
+vi.mock("@/renderer/RenderCapture", () => ({
+  downloadBlob: vi.fn(),
+}));
 
 function makeStored(overrides: Partial<StoredMeasurement> = {}): StoredMeasurement {
   return {
@@ -90,25 +95,17 @@ describe("exportToJSON", () => {
 
 describe("downloadFile", () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
-  it("creates an anchor, clicks it, and revokes the object URL", () => {
-    const mockClick = vi.fn();
-    const mockRevoke = vi.fn();
-    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:test");
-    const mockCreateElement = vi.spyOn(document, "createElement").mockReturnValue({
-      href: "",
-      download: "",
-      click: mockClick,
-    } as unknown as HTMLAnchorElement);
-
-    vi.stubGlobal("URL", { createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevoke });
-
+  it("delegates to the shared downloadBlob helper with a typed Blob", () => {
     downloadFile("hello", "test.csv", "text/csv");
 
-    expect(mockCreateElement).toHaveBeenCalledWith("a");
-    expect(mockClick).toHaveBeenCalledTimes(1);
-    expect(mockRevoke).toHaveBeenCalledWith("blob:test");
+    expect(downloadBlob).toHaveBeenCalledTimes(1);
+    const [blob, filename] = vi.mocked(downloadBlob).mock.calls[0];
+    expect(filename).toBe("test.csv");
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe("text/csv");
+    expect(blob.size).toBe("hello".length);
   });
 });

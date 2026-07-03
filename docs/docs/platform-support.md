@@ -89,10 +89,13 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | `frame_change` callback | ✓ (React prop) | ✓ (Python event) | ✓ (status bar) | ✓ (status bar) | n/a |
 | `selection_change` / `measurement` events | ✓ (React props) | ✓ | ✓² | ✓² | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | ✓³ | ✓⁴ | n/a |
+| Export downloads (render output, pipeline JSON, measurement CSV/JSON) | ✓ | ✓⁵ | ✓ | ✓ (save dialog) | n/a |
 
 ³ JupyterLab: call `meganeReactView.seekFrame(N)` on a `MeganeReactView` instance obtained from the widget tracker. This delegates to `usePlaybackStore.seekFrame(N)` in the viewer.
 
 ⁴ VSCode: call `vscode.commands.executeCommand('megane.seekFrame', N)` from another extension, or call `meganeEditorProvider.seekFrame(N)` on an `MeganeEditorProvider` reference. The command posts a `seekFrame` message to the most recently active megane webview panel.
+
+⁵ Jupyter widget: export downloads work when the notebook runs in a browser (JupyterLab, Jupyter Notebook). Inside a VSCode notebook the widget renders in a sandboxed webview with no path to the extension host, so downloads are unavailable — see Known gaps.
 
 Notes:
 
@@ -120,6 +123,7 @@ How data gets into the viewer on each platform:
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
 - **Trajectory-only opens require a topology first.** On VSCode and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` / `.nc` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
+- **Export downloads do not work for the Jupyter widget inside a VSCode notebook.** Browsers download exports via a synthetic `<a download>` click, and the VSCode custom editor relays them to the extension host (`saveFile` webview message → native save dialog). The anywidget running inside VSCode's notebook renderer webview can do neither — the sandbox ignores anchor downloads and provides no bridge to the extension host. Use JupyterLab (or the VSCode custom editor on a structure file) to export.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
 - **The Replicate node does not replicate trajectory frames.** The `replicate` pipeline node builds a static supercell from the structure's particles, bonds, and cell, but trajectory frames keep the original atom count. With a trajectory connected and any replication count > 1, the static structure and playback frames differ in atom count. The default pipelines wire Replicate with `nx = ny = nz = 1` (identity), so this only surfaces once a user increases the counts on a structure that also has a trajectory. Replicate also requires a unit cell on the input — structures without a cell pass through unchanged.
 - **Jupyter widget has no visual pipeline editor.** The editor's React surface relies on host chrome (drag handles, side panel layout) that the anywidget cell cannot reliably render, so it is only shipped on the standalone app, JupyterLab labextension, and VSCode extension. Build pipelines in Python with `megane.Pipeline` and push them via `MolecularViewer.set_pipeline()`.

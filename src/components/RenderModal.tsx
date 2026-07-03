@@ -551,6 +551,7 @@ export function RenderModal({
         <button
           onClick={handleExport}
           disabled={exporting}
+          data-testid="render-modal-export"
           style={{
             width: "100%",
             marginTop: 20,

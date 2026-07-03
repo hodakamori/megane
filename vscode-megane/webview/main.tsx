@@ -29,6 +29,21 @@ import "../../src/styles/megane.css";
 // Acquire VS Code API
 const vscode = acquireVsCodeApi();
 
+// Route blob downloads through the extension host. A synthetic `<a download>`
+// click is silently ignored inside the webview sandbox, so downloadBlob
+// (src/renderer/RenderCapture.ts) defers to this hook when it is installed.
+// Registered at module scope so it exists before any export can fire.
+(globalThis as { __MEGANE_SAVE_BLOB__?: (blob: Blob, filename: string) => void }).__MEGANE_SAVE_BLOB__ =
+  (blob, filename) => {
+    void blob.arrayBuffer().then((buf) => {
+      vscode.postMessage({
+        type: "saveFile",
+        filename,
+        bytes: Array.from(new Uint8Array(buf)),
+      });
+    });
+  };
+
 function setWasmUrlFromBytes(wasmBytes: number[] | undefined): void {
   if (!wasmBytes) return;
   const wasmBlob = new Blob([new Uint8Array(wasmBytes)], { type: "application/wasm" });

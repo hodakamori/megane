@@ -1,4 +1,16 @@
 import * as vscode from "vscode";
+interface SaveFileMessage {
+    filename: string;
+    bytes: number[];
+}
+/**
+ * Save bytes posted from the webview (`{ type: "saveFile", filename, bytes }`).
+ * Webviews cannot trigger `<a download>` saves, so exports (render output,
+ * pipeline JSON, measurement CSV/JSON) are relayed here and written via the
+ * workspace filesystem API. In E2E mode the native save dialog is skipped —
+ * Playwright cannot drive it — and the file lands next to the open document.
+ */
+export declare function handleSaveFileMessage(message: SaveFileMessage, documentUri: vscode.Uri): Promise<void>;
 export declare function createFrameStatusBarItem(): vscode.StatusBarItem;
 export declare function createSelectionStatusBarItem(): vscode.StatusBarItem;
 export declare class MeganeEditorProvider implements vscode.CustomReadonlyEditorProvider {
@@ -16,3 +28,4 @@ export declare class MeganeEditorProvider implements vscode.CustomReadonlyEditor
 }
 export declare function activate(context: vscode.ExtensionContext): void;
 export declare function deactivate(): void;
+export {};

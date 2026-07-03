@@ -169,6 +169,34 @@ describe("downloadBlob", () => {
     downloadBlob(blob, "megane-render.glb");
     expect(capturedNodes[0].download).toBe("megane-render.glb");
   });
+
+  describe("__MEGANE_SAVE_BLOB__ host hook", () => {
+    afterEach(() => {
+      delete (globalThis as { __MEGANE_SAVE_BLOB__?: unknown }).__MEGANE_SAVE_BLOB__;
+    });
+
+    it("routes the blob to the hook instead of the anchor path", () => {
+      const hook = vi.fn();
+      (globalThis as { __MEGANE_SAVE_BLOB__?: unknown }).__MEGANE_SAVE_BLOB__ = hook;
+
+      const blob = new Blob(["test"], { type: "image/png" });
+      downloadBlob(blob, "megane-render.png");
+
+      expect(hook).toHaveBeenCalledExactlyOnceWith(blob, "megane-render.png");
+      expect(createObjectURL).not.toHaveBeenCalled();
+      expect(clickSpy).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the anchor path when the hook is not a function", () => {
+      (globalThis as { __MEGANE_SAVE_BLOB__?: unknown }).__MEGANE_SAVE_BLOB__ = "not a function";
+
+      const blob = new Blob(["test"], { type: "text/plain" });
+      downloadBlob(blob, "test.txt");
+
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("captureGltf", () => {
