@@ -229,7 +229,13 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
     let expected_coord_bytes = n_atoms * 4;
 
     // ── Frames ───────────────────────────────────────────────────────────────
-    let mut frame_positions: Vec<Vec<f32>> = Vec::new();
+    // Frame-major flat coordinates; reserve up front when the frame count is known.
+    let mut frame_positions_flat: Vec<f32> = if nset > 0 {
+        Vec::with_capacity(nset * n_atoms * 3)
+    } else {
+        Vec::new()
+    };
+    let mut n_frames: usize = 0;
     let mut last_box: Option<[f32; 9]> = None;
 
     loop {
@@ -275,7 +281,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
             Err(_) => break,
         };
         if x_rec.len() != expected_coord_bytes {
-            if frame_positions.is_empty() {
+            if n_frames == 0 {
                 return Err(format!(
                     "DCD X-coord record size {} != expected {}",
                     x_rec.len(),
@@ -305,31 +311,30 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
             ));
         }
 
-        // Build interleaved [x0,y0,z0, x1,y1,z1, …].
-        let mut positions = Vec::with_capacity(n_atoms * 3);
+        // Build interleaved [x0,y0,z0, x1,y1,z1, …] straight into the flat buffer.
         if le {
             for i in 0..n_atoms {
                 let off = i * 4;
-                positions.push(read_f32_le(x_rec, off));
-                positions.push(read_f32_le(y_rec, off));
-                positions.push(read_f32_le(z_rec, off));
+                frame_positions_flat.push(read_f32_le(x_rec, off));
+                frame_positions_flat.push(read_f32_le(y_rec, off));
+                frame_positions_flat.push(read_f32_le(z_rec, off));
             }
         } else {
             for i in 0..n_atoms {
                 let off = i * 4;
-                positions.push(read_f32_be(x_rec, off));
-                positions.push(read_f32_be(y_rec, off));
-                positions.push(read_f32_be(z_rec, off));
+                frame_positions_flat.push(read_f32_be(x_rec, off));
+                frame_positions_flat.push(read_f32_be(y_rec, off));
+                frame_positions_flat.push(read_f32_be(z_rec, off));
             }
         }
-        frame_positions.push(positions);
+        n_frames += 1;
 
-        if nset > 0 && frame_positions.len() >= nset {
+        if nset > 0 && n_frames >= nset {
             break;
         }
     }
 
-    if frame_positions.is_empty() {
+    if n_frames == 0 {
         return Err("no frames found in DCD file".into());
     }
 
@@ -341,10 +346,10 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
 
     Ok(DcdData {
         n_atoms,
-        n_frames: frame_positions.len(),
+        n_frames,
         timestep_ps,
         box_matrix: last_box,
-        frame_positions,
+        frame_positions_flat,
         vector_channels: vec![],
     })
 }
@@ -375,7 +380,7 @@ mod tests {
         assert!((bx[8] - 10.0).abs() < 0.01, "box c = {}", bx[8]);
 
         // Frame 0: atom 0 at (0,0,0), atom 1 at (0.96,0,0), atom 2 at (0,0.96,0)
-        let f0 = &result.frame_positions[0];
+        let f0 = result.frame(0);
         let check = |ai: usize, ex: f32, ey: f32, ez: f32| {
             let (x, y, z) = (f0[ai * 3], f0[ai * 3 + 1], f0[ai * 3 + 2]);
             assert!(
@@ -388,7 +393,7 @@ mod tests {
         check(2, 0.00, 0.96, 0.00);
 
         // Frame 4 (last) should match frame 0 (oscillation returns to origin)
-        let f4 = &result.frame_positions[4];
+        let f4 = result.frame(4);
         assert!((f4[0] - 0.00f32).abs() < 1e-4, "frame4 atom0 x");
         assert!((f4[1] - 0.00f32).abs() < 1e-4, "frame4 atom0 y");
     }
@@ -519,7 +524,7 @@ mod tests {
         assert!((bx[4] - 13.0).abs() < 1e-3);
         assert!((bx[8] - 14.0).abs() < 1e-3);
         // First atom should be (0, 2, 4) — interleaved [x0, y0, z0]
-        let f0 = &r.frame_positions[0];
+        let f0 = r.frame(0);
         assert!((f0[0] - 0.0).abs() < 1e-5);
         assert!((f0[1] - 2.0).abs() < 1e-5);
         assert!((f0[2] - 4.0).abs() < 1e-5);

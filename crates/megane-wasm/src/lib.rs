@@ -236,12 +236,16 @@ impl ParseResult {
             .unwrap_or_else(|| vec![1u8; data.bonds.len()]);
         let has_box = data.box_matrix.is_some();
         let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
-        let n_frames = data.frame_positions.len() as u32;
-        let frame_data: Vec<f32> = data
-            .frame_positions
-            .into_iter()
-            .flat_map(|f| f.into_iter())
-            .collect();
+        // Core already stores extra frames as one contiguous buffer — move it out,
+        // no flatten copy and no 2× peak. Derive the frame count from the moved
+        // buffer to avoid borrowing `data` after earlier partial moves.
+        let n_atoms_usize = data.n_atoms;
+        let frame_data: Vec<f32> = data.frame_positions_flat;
+        let n_frames = if n_atoms_usize == 0 {
+            0
+        } else {
+            (frame_data.len() / (n_atoms_usize * 3)) as u32
+        };
         let has_atom_labels = data.atom_labels.is_some();
         let atom_labels = data.atom_labels.map(|l| l.join("\n")).unwrap_or_default();
         let has_chain_ids = data.chain_ids.is_some();
@@ -357,10 +361,8 @@ pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
         None => Vec::new(),
     };
 
-    let mut frame_data: Vec<f32> = Vec::new();
-    for frame in &xtc_data.frame_positions {
-        frame_data.extend_from_slice(frame);
-    }
+    // Contiguous already — move it out, no flatten copy.
+    let frame_data: Vec<f32> = xtc_data.frame_positions_flat;
 
     let vector_channel_count = xtc_data.vector_channels.len() as u32;
     let (vector_channel_meta, vector_channel_data) =
@@ -543,10 +545,8 @@ pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
         None => Vec::new(),
     };
 
-    let mut frame_data: Vec<f32> = Vec::new();
-    for frame in &data.frame_positions {
-        frame_data.extend_from_slice(frame);
-    }
+    // Contiguous already — move it out, no flatten copy.
+    let frame_data: Vec<f32> = data.frame_positions_flat;
 
     let vector_channel_count = data.vector_channels.len() as u32;
     let (vector_channel_meta, vector_channel_data) =
@@ -576,10 +576,8 @@ pub fn parse_dcd_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
         None => Vec::new(),
     };
 
-    let mut frame_data: Vec<f32> = Vec::new();
-    for frame in &dcd_data.frame_positions {
-        frame_data.extend_from_slice(frame);
-    }
+    // Contiguous already — move it out, no flatten copy.
+    let frame_data: Vec<f32> = dcd_data.frame_positions_flat;
 
     let vector_channel_count = dcd_data.vector_channels.len() as u32;
     let (vector_channel_meta, vector_channel_data) =
@@ -616,10 +614,8 @@ pub fn parse_netcdf_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
         None => Vec::new(),
     };
 
-    let mut frame_data: Vec<f32> = Vec::new();
-    for frame in &traj_data.frame_positions {
-        frame_data.extend_from_slice(frame);
-    }
+    // Contiguous already — move it out, no flatten copy.
+    let frame_data: Vec<f32> = traj_data.frame_positions_flat;
 
     let vector_channel_count = traj_data.vector_channels.len() as u32;
     let (vector_channel_meta, vector_channel_data) =

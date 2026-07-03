@@ -73,7 +73,7 @@ pub fn parse_prmtop(text: &str) -> Result<ParsedStructure, String> {
         n_file_bonds,
         bond_orders: None,
         box_matrix: None,
-        frame_positions: Vec::new(),
+        frame_positions_flat: Vec::new(),
         atom_labels: Some(atom_labels),
         chain_ids: None,
         bfactors: None,

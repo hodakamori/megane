@@ -143,7 +143,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         n_file_bonds: 0,
         bond_orders: None,
         box_matrix,
-        frame_positions: Vec::new(),
+        frame_positions_flat: Vec::new(),
         atom_labels,
         chain_ids: None,
         bfactors: None,

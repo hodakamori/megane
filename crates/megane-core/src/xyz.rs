@@ -43,8 +43,11 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let mut first_elements: Option<Vec<u8>> = None;
     let mut first_labels: Option<Vec<String>> = None;
     let mut first_n_atoms = 0usize;
-    let mut frame_positions: Vec<Vec<f32>> = Vec::new();
+    // Extra frames only (frame 0 lives in `first_positions`), frame-major flat.
+    let mut frame_positions_flat: Vec<f32> = Vec::new();
     let mut box_matrix: Option<[f32; 9]> = None;
+    // Reused across every atom line so each line's split does not allocate a Vec.
+    let mut parts: Vec<&str> = Vec::new();
 
     while offset < lines.len() {
         // Line 1: atom count
@@ -74,7 +77,8 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
 
         for i in 0..n_atoms {
             let line = lines[offset + i];
-            let parts: Vec<&str> = line.split_whitespace().collect();
+            parts.clear();
+            parts.extend(line.split_whitespace());
             if parts.len() < 4 {
                 return Err(format!("XYZ atom line {} too short", offset + i + 1));
             }
@@ -115,7 +119,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
             first_elements = Some(elements);
             first_labels = Some(labels);
         } else if n_atoms == first_n_atoms {
-            frame_positions.push(positions);
+            frame_positions_flat.extend_from_slice(&positions);
         }
     }
 
@@ -143,7 +147,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         n_file_bonds: 0,
         bond_orders: None,
         box_matrix,
-        frame_positions,
+        frame_positions_flat,
         atom_labels,
         chain_ids: None,
         bfactors: None,
@@ -159,6 +163,32 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_multiframe_flat() {
+        // Two frames of 2 atoms each; frame 0 lives in `positions`, frame 1 flat.
+        let text = "2\nframe 0\nH 0.0 0.0 0.0\nH 1.0 0.0 0.0\n\
+                    2\nframe 1\nH 0.0 0.0 0.0\nH 2.0 0.0 0.0\n";
+        let result = parse(text).expect("parse multi-frame XYZ");
+        assert_eq!(result.n_atoms, 2);
+        // Frame 0 coordinates in `positions`.
+        assert!((result.positions[3] - 1.0).abs() < 1e-5);
+        // One extra frame stored flat.
+        assert_eq!(result.extra_frame_count(), 1);
+        let f1 = result.frame(0);
+        assert_eq!(f1.len(), 6);
+        assert!((f1[3] - 2.0).abs() < 1e-5); // second atom x moved to 2.0
+    }
+
+    #[test]
+    fn test_multiframe_skips_mismatched_atom_count() {
+        // Second frame has a different atom count and must be dropped.
+        let text = "2\nframe 0\nH 0.0 0.0 0.0\nH 1.0 0.0 0.0\n\
+                    1\nframe 1\nH 5.0 0.0 0.0\n";
+        let result = parse(text).expect("parse XYZ");
+        assert_eq!(result.n_atoms, 2);
+        assert_eq!(result.extra_frame_count(), 0);
+    }
 
     #[test]
     fn test_parse_lattice_double_quotes() {

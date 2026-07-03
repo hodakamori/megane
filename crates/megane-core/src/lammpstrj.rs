@@ -106,11 +106,15 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         return Err("Empty file".to_string());
     }
 
-    let mut frame_positions: Vec<Vec<f32>> = Vec::new();
+    // Frame-major flat coordinates (frame count unknown up front → amortized growth).
+    let mut frame_positions_flat: Vec<f32> = Vec::new();
+    let mut n_frames: usize = 0;
     let mut timesteps: Vec<f64> = Vec::new();
     let mut n_atoms: usize = 0;
     let mut box_matrix: Option<[f32; 9]> = None;
     let mut i = 0;
+    // Reused across every atom line so each line's split does not allocate a Vec.
+    let mut parts: Vec<&str> = Vec::new();
     // Accumulated vector frames keyed by channel name from the first frame's layout.
     // Outer Vec = one entry per named group; inner Vec<VectorFrame> = one entry per frame.
     let mut vec_group_names: Vec<&'static str> = Vec::new();
@@ -149,14 +153,14 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             .parse()
             .map_err(|_| format!("Cannot parse number of atoms at line {}", i + 1))?;
 
-        if frame_positions.is_empty() {
+        if n_frames == 0 {
             n_atoms = frame_n_atoms;
         } else if frame_n_atoms != n_atoms {
             return Err(format!(
                 "Inconsistent atom count: expected {}, got {} at frame {}",
                 n_atoms,
                 frame_n_atoms,
-                frame_positions.len() + 1
+                n_frames + 1
             ));
         }
 
@@ -251,13 +255,32 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         let layout = parse_column_layout(lines[i])?;
 
         // On the first frame, initialise vector group tracking from the layout.
-        if frame_positions.is_empty() {
+        if n_frames == 0 {
             vec_group_names = layout.vector_groups.iter().map(|g| g.name).collect();
             vec_group_frames = layout.vector_groups.iter().map(|_| Vec::new()).collect();
         }
 
+        // Minimum column count for the mandatory id/x/y/z fields — constant for the
+        // whole frame, so compute it once instead of per atom line.
+        let max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
+            .iter()
+            .copied()
+            .max()
+            .unwrap();
+
+        // Resolve each layout vector group to its accumulation slot once per frame
+        // (was a linear name scan per atom per group).
+        let group_slots: Vec<Option<usize>> = layout
+            .vector_groups
+            .iter()
+            .map(|g| vec_group_names.iter().position(|&n| n == g.name))
+            .collect();
+
         // Read atom lines — accumulate both positions and per-group vector data.
         let mut atoms: Vec<(usize, f32, f32, f32)> = Vec::with_capacity(n_atoms);
+        // Track whether atom ids arrive already ascending so we can skip the sort.
+        let mut atoms_sorted = true;
+        let mut prev_id: usize = 0;
         // Per-group unsorted vector buffer for this frame.
         let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> = layout
             .vector_groups
@@ -270,12 +293,8 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             if i >= n_lines {
                 return Err("Unexpected end of file in atom data".to_string());
             }
-            let parts: Vec<&str> = lines[i].split_whitespace().collect();
-            let max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
-                .iter()
-                .copied()
-                .max()
-                .unwrap();
+            parts.clear();
+            parts.extend(lines[i].split_whitespace());
             if parts.len() <= max_col {
                 return Err(format!(
                     "Not enough columns at line {} (expected at least {}, got {})",
@@ -305,15 +324,19 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
                 z = z * lz + zlo_f;
             }
 
+            if id < prev_id {
+                atoms_sorted = false;
+            }
+            prev_id = id;
             atoms.push((id, x, y, z));
 
             // Collect per-group vector values for this atom.
             // Groups are indexed by their slot in frame_vec_atoms, which mirrors
-            // vec_group_names (initialised from the first frame). Lookup by name
-            // guards against column reordering in later frames.
-            for group in layout.vector_groups.iter() {
-                let slot = vec_group_names.iter().position(|&n| n == group.name);
-                if let Some(slot) = slot {
+            // vec_group_names (initialised from the first frame). The slot was
+            // resolved once per frame (group_slots) to guard against column
+            // reordering in later frames without a per-atom name scan.
+            for (gi, group) in layout.vector_groups.iter().enumerate() {
+                if let Some(slot) = group_slots[gi] {
                     let max_vcol = group.x_col.max(group.y_col).max(group.z_col);
                     if parts.len() > max_vcol {
                         let vx: f32 = match parts[group.x_col].parse() {
@@ -334,24 +357,29 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             }
         }
 
-        // Sort by atom id for consistent ordering
-        atoms.sort_by_key(|a| a.0);
-
-        // Flatten to [x0, y0, z0, x1, y1, z1, ...]
-        let mut positions = Vec::with_capacity(n_atoms * 3);
-        for (_, x, y, z) in &atoms {
-            positions.push(*x);
-            positions.push(*y);
-            positions.push(*z);
+        // Sort by atom id for consistent ordering (skip when already ascending).
+        // Stable-sort over unique ids, so skipping when sorted is behavior-identical.
+        if !atoms_sorted {
+            atoms.sort_by_key(|a| a.0);
         }
-        frame_positions.push(positions);
+
+        // Flatten to [x0, y0, z0, x1, y1, z1, ...] straight into the flat buffer.
+        for (_, x, y, z) in &atoms {
+            frame_positions_flat.push(*x);
+            frame_positions_flat.push(*y);
+            frame_positions_flat.push(*z);
+        }
+        let frame_idx = n_frames;
+        n_frames += 1;
 
         // Build a sorted, flat vector array for each group and append as a VectorFrame.
-        // Only emit a frame entry when all n_atoms parsed successfully.
-        let frame_idx = frame_positions.len() - 1;
+        // Only emit a frame entry when all n_atoms parsed successfully. Vector atoms
+        // are collected in the same id order as `atoms`, so they share its sortedness.
         for (slot, mut vatoms) in frame_vec_atoms.into_iter().enumerate() {
             if vatoms.len() == n_atoms {
-                vatoms.sort_by_key(|a| a.0);
+                if !atoms_sorted {
+                    vatoms.sort_by_key(|a| a.0);
+                }
                 let mut flat = Vec::with_capacity(n_atoms * 3);
                 for (_, vx, vy, vz) in &vatoms {
                     flat.push(*vx);
@@ -368,7 +396,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         i += 1;
     }
 
-    if frame_positions.is_empty() {
+    if n_frames == 0 {
         return Err("No frames found in file".to_string());
     }
 
@@ -381,8 +409,6 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     } else {
         0.0
     };
-
-    let n_frames = frame_positions.len();
 
     // Assemble VectorChannel entries for groups that have data in every frame.
     let vector_channels: Vec<VectorChannel> = vec_group_names
@@ -400,7 +426,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         n_frames,
         timestep_ps,
         box_matrix,
-        frame_positions,
+        frame_positions_flat,
         vector_channels,
     })
 }
@@ -448,7 +474,7 @@ mod tests {
     fn test_atom_sorting() {
         let data = parse_lammpstrj(sample_dump()).unwrap();
         // Frame 0: atoms sorted by id (1, 2, 3)
-        let f0 = &data.frame_positions[0];
+        let f0 = data.frame(0);
         assert_eq!(f0[0], 1.0); // atom 1 x
         assert_eq!(f0[1], 2.0); // atom 1 y
         assert_eq!(f0[2], 3.0); // atom 1 z
@@ -456,10 +482,29 @@ mod tests {
         assert_eq!(f0[6], 7.0); // atom 3 x
 
         // Frame 1: also sorted by id
-        let f1 = &data.frame_positions[1];
+        let f1 = data.frame(1);
         assert_eq!(f1[0], 1.1); // atom 1 x
         assert_eq!(f1[3], 4.1); // atom 2 x
         assert_eq!(f1[6], 7.1); // atom 3 x
+    }
+
+    #[test]
+    fn test_ascending_ids_skip_sort() {
+        // Atom ids already ascending (1, 2, 3) — exercises the skip-sort branch.
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n3\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.0 2.0 3.0\n\
+                    2 2 4.0 5.0 6.0\n\
+                    3 2 7.0 8.0 9.0\n";
+        let data = parse_lammpstrj(text).unwrap();
+        assert_eq!(data.n_atoms, 3);
+        assert_eq!(data.n_frames, 1);
+        let f0 = data.frame(0);
+        assert_eq!(f0[0], 1.0); // atom 1 x stays first
+        assert_eq!(f0[3], 4.0); // atom 2 x
+        assert_eq!(f0[6], 7.0); // atom 3 x
     }
 
     #[test]
@@ -485,7 +530,7 @@ mod tests {
                     1 1 0.5 0.5 0.5\n\
                     2 1 0.0 0.0 0.0\n";
         let data = parse_lammpstrj(text).unwrap();
-        let f0 = &data.frame_positions[0];
+        let f0 = data.frame(0);
         // atom 1: 0.5*10+0 = 5.0, 0.5*20+0 = 10.0, 0.5*30+0 = 15.0
         assert!((f0[0] - 5.0).abs() < 1e-5);
         assert!((f0[1] - 10.0).abs() < 1e-5);

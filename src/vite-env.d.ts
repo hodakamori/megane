@@ -14,3 +14,10 @@ declare module "*?worker" {
   const WorkerFactory: new () => Worker;
   export default WorkerFactory;
 }
+
+// Vite inlined worker imports (base64 blob worker; required for single-file
+// bundles and the VSCode webview CSP which only allows `worker-src blob:`).
+declare module "*?worker&inline" {
+  const WorkerFactory: new () => Worker;
+  export default WorkerFactory;
+}

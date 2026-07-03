@@ -61,31 +61,18 @@ impl PyStructure {
             PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
         })?;
 
-        // Frame positions for multi-frame formats (e.g. .traj)
-        let n_frames = data.frame_positions.len();
+        // Frame positions for multi-frame formats (e.g. .traj). Core already stores
+        // the extra frames as one contiguous buffer — reshape it directly. Derive the
+        // frame count from the moved buffer to avoid borrowing `data` after the earlier
+        // partial moves (bond_orders, box_matrix, elements).
         let stride = n * 3;
-        let frame_array = if n_frames > 0 {
-            let mut flat: Vec<f32> = Vec::with_capacity(n_frames * stride);
-            for frame in &data.frame_positions {
-                if frame.len() != stride {
-                    return Err(PyValueError::new_err(format!(
-                        "frame has {} elements, expected {} (n_atoms * 3)",
-                        frame.len(),
-                        stride
-                    )));
-                }
-                flat.extend_from_slice(frame);
-            }
-            Array2::from_shape_vec((n_frames, stride), flat).map_err(|e| {
-                PyValueError::new_err(format!(
-                    "failed to reshape frame_positions into ({n_frames}, {stride}): {e}"
-                ))
-            })?
-        } else {
-            Array2::from_shape_vec((0, stride), vec![]).map_err(|e| {
-                PyValueError::new_err(format!("failed to create empty frame_positions array: {e}"))
-            })?
-        };
+        let frame_flat = data.frame_positions_flat;
+        let n_frames = frame_flat.len().checked_div(stride).unwrap_or(0);
+        let frame_array = Array2::from_shape_vec((n_frames, stride), frame_flat).map_err(|e| {
+            PyValueError::new_err(format!(
+                "failed to reshape frame_positions into ({n_frames}, {stride}): {e}"
+            ))
+        })?;
 
         Ok(Self {
             n_atoms: n,
@@ -198,24 +185,22 @@ fn parse_xtc(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     })?;
 
     let stride = traj.n_atoms * 3;
-    let mut flat: Vec<f32> = Vec::with_capacity(traj.n_frames * stride);
-    for frame in &traj.frame_positions {
-        flat.extend_from_slice(frame);
-    }
     let expected_len = traj.n_frames * stride;
-    if flat.len() != expected_len {
+    if traj.frame_positions_flat.len() != expected_len {
         return Err(PyValueError::new_err(format!(
             "frame_positions has length {}, but expected {} (n_frames * n_atoms * 3)",
-            flat.len(),
+            traj.frame_positions_flat.len(),
             expected_len
         )));
     }
-    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), flat).map_err(|e| {
-        PyValueError::new_err(format!(
-            "failed to reshape frame_positions into ({}, {}): {e}",
-            traj.n_frames, stride
-        ))
-    })?;
+    // Core already stores frames contiguously — reshape without a flatten copy.
+    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
+        .map_err(|e| {
+            PyValueError::new_err(format!(
+                "failed to reshape frame_positions into ({}, {}): {e}",
+                traj.n_frames, stride
+            ))
+        })?;
 
     Ok(PyTrajectoryData {
         n_atoms: traj.n_atoms,
@@ -262,16 +247,14 @@ fn parse_dcd(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     })?;
 
     let stride = traj.n_atoms * 3;
-    let mut flat: Vec<f32> = Vec::with_capacity(traj.n_frames * stride);
-    for frame in &traj.frame_positions {
-        flat.extend_from_slice(frame);
-    }
-    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), flat).map_err(|e| {
-        PyValueError::new_err(format!(
-            "failed to reshape frame_positions into ({}, {}): {e}",
-            traj.n_frames, stride
-        ))
-    })?;
+    // Core already stores frames contiguously — reshape without a flatten copy.
+    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
+        .map_err(|e| {
+            PyValueError::new_err(format!(
+                "failed to reshape frame_positions into ({}, {}): {e}",
+                traj.n_frames, stride
+            ))
+        })?;
 
     Ok(PyTrajectoryData {
         n_atoms: traj.n_atoms,
@@ -295,18 +278,15 @@ fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
         PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
     })?;
 
-    // Flatten all frames into (n_frames, n_atoms * 3)
+    // Core already stores frames contiguously as (n_frames, n_atoms * 3) — reshape directly.
     let stride = data.n_atoms * 3;
-    let mut flat: Vec<f32> = Vec::with_capacity(data.n_frames * stride);
-    for frame in &data.frame_positions {
-        flat.extend_from_slice(frame);
-    }
-    let frame_array = Array2::from_shape_vec((data.n_frames, stride), flat).map_err(|e| {
-        PyValueError::new_err(format!(
-            "failed to reshape frame_positions into ({}, {}): {e}",
-            data.n_frames, stride
-        ))
-    })?;
+    let frame_array = Array2::from_shape_vec((data.n_frames, stride), data.frame_positions_flat)
+        .map_err(|e| {
+            PyValueError::new_err(format!(
+                "failed to reshape frame_positions into ({}, {}): {e}",
+                data.n_frames, stride
+            ))
+        })?;
 
     Ok(PyTrajectoryData {
         n_atoms: data.n_atoms,
@@ -331,16 +311,14 @@ fn parse_netcdf(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     })?;
 
     let stride = traj.n_atoms * 3;
-    let mut flat: Vec<f32> = Vec::with_capacity(traj.n_frames * stride);
-    for frame in &traj.frame_positions {
-        flat.extend_from_slice(frame);
-    }
-    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), flat).map_err(|e| {
-        PyValueError::new_err(format!(
-            "failed to reshape frame_positions into ({}, {}): {e}",
-            traj.n_frames, stride
-        ))
-    })?;
+    // Core already stores frames contiguously — reshape without a flatten copy.
+    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
+        .map_err(|e| {
+            PyValueError::new_err(format!(
+                "failed to reshape frame_positions into ({}, {}): {e}",
+                traj.n_frames, stride
+            ))
+        })?;
 
     Ok(PyTrajectoryData {
         n_atoms: traj.n_atoms,
