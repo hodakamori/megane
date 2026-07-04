@@ -561,11 +561,7 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
     let mut second_time: f32 = 0.0;
     let mut last_box: Option<[f32; 9]> = None;
 
-    loop {
-        let header = match read_frame_header(&mut xdr)? {
-            Some(h) => h,
-            None => break,
-        };
+    while let Some(header) = read_frame_header(&mut xdr)? {
         if n_atoms == 0 {
             n_atoms = header.natoms;
         } else if header.natoms != n_atoms {

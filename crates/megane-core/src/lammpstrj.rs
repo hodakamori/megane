@@ -168,14 +168,20 @@ fn read_frame_header(lines: &[&str], i: usize) -> Result<FrameHeader, String> {
             .collect();
         if is_triclinic {
             if parts.len() < 3 {
-                return Err(format!("Expected 3 values for triclinic box at line {}", i + 1));
+                return Err(format!(
+                    "Expected 3 values for triclinic box at line {}",
+                    i + 1
+                ));
             }
             lo[dim] = parts[0];
             hi[dim] = parts[1];
             tilt[dim] = parts[2];
         } else {
             if parts.len() < 2 {
-                return Err(format!("Expected 2 values for box bounds at line {}", i + 1));
+                return Err(format!(
+                    "Expected 2 values for box bounds at line {}",
+                    i + 1
+                ));
             }
             lo[dim] = parts[0];
             hi[dim] = parts[1];
@@ -235,6 +241,10 @@ fn read_frame_header(lines: &[&str], i: usize) -> Result<FrameHeader, String> {
     })
 }
 
+/// One decoded atom block: flat positions, per-group vectors (in
+/// `header.layout.vector_groups` order), and the index of the line after it.
+type AtomBlock = (Vec<f32>, Vec<Vec<f32>>, usize);
+
 /// Read one frame's atom block into flat positions and per-group vectors (in
 /// `header.layout.vector_groups` order). Returns `(positions, group_vectors,
 /// next_line_index)`. Shared by the eager parser and the single-frame decoder.
@@ -242,7 +252,7 @@ fn read_atom_block(
     lines: &[&str],
     header: &FrameHeader,
     expected_n_atoms: usize,
-) -> Result<(Vec<f32>, Vec<Vec<f32>>, usize), String> {
+) -> Result<AtomBlock, String> {
     let layout = &header.layout;
     let n_atoms = header.n_atoms;
     if n_atoms != expected_n_atoms {
@@ -449,7 +459,7 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
     };
 
     Ok(LammpstrjIndex {
-        n_atoms: n_atoms,
+        n_atoms,
         n_frames: offsets.len(),
         timestep_ps,
         box_matrix,
@@ -1056,7 +1066,10 @@ mod tests {
                         .iter()
                         .find(|c| &c.name == name)
                         .expect("channel present in eager result");
-                    assert_eq!(f.vectors[ci], ch.frames[i].vectors, "frame {i} channel {name}");
+                    assert_eq!(
+                        f.vectors[ci], ch.frames[i].vectors,
+                        "frame {i} channel {name}"
+                    );
                 }
             }
         }

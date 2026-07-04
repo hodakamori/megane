@@ -81,7 +81,12 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
         req.expectedNAtoms,
       );
       ctx.postMessage(
-        { id: req.id, ok: true, op: "trajectoryFrame0", result: { positions } } satisfies ParseResponse,
+        {
+          id: req.id,
+          ok: true,
+          op: "trajectoryFrame0",
+          result: { positions },
+        } satisfies ParseResponse,
         [positions.buffer],
       );
     } else if (req.op === "indexStructure") {
