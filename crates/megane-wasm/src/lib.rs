@@ -381,6 +381,306 @@ pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
     })
 }
 
+/// Persistent XTC decoder for lazy/streaming playback.
+///
+/// Owns the whole XTC file in wasm memory and holds a lightweight frame index
+/// (built once in the constructor without decompressing coordinates). The JS
+/// side keeps one of these alive per open trajectory and calls `decode_frame`
+/// on demand, so frame 0 can render immediately while later frames stream in.
+#[wasm_bindgen]
+pub struct XtcDecoder {
+    bytes: Vec<u8>,
+    offsets: Vec<usize>,
+    n_atoms: usize,
+    n_frames: u32,
+    timestep_ps: f32,
+    has_box: bool,
+    box_matrix: Vec<f32>,
+    times: Vec<f32>,
+}
+
+#[wasm_bindgen]
+impl XtcDecoder {
+    /// Build the frame index from the file bytes. The bytes are moved into wasm
+    /// memory and retained for the decoder's lifetime.
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: Vec<u8>) -> Result<XtcDecoder, JsError> {
+        let idx = xtc::build_index(&data).map_err(|e| JsError::new(&e))?;
+        let has_box = idx.box_matrix.is_some();
+        let box_matrix = idx.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        Ok(XtcDecoder {
+            bytes: data,
+            offsets: idx.offsets,
+            n_atoms: idx.n_atoms,
+            n_frames: idx.n_frames as u32,
+            timestep_ps: idx.timestep_ps,
+            has_box,
+            box_matrix,
+            times: idx.times,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms as u32
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn timestep_ps(&self) -> f32 {
+        self.timestep_ps
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn has_box(&self) -> bool {
+        self.has_box
+    }
+
+    pub fn box_matrix(&self) -> Float32Array {
+        Float32Array::from(&self.box_matrix[..])
+    }
+
+    /// Per-frame time stamps (ps).
+    pub fn times(&self) -> Float32Array {
+        Float32Array::from(&self.times[..])
+    }
+
+    /// Decode a single frame's positions (Å), `n_atoms * 3` floats.
+    pub fn decode_frame(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let coords = xtc::decode_frame_at(&self.bytes, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(Float32Array::from(&coords[..]))
+    }
+}
+
+/// Persistent LAMMPS-dump decoder for lazy/streaming playback (text format).
+///
+/// Owns the dump text and a frame byte-offset index; decodes one frame's
+/// positions (and any velocity/force vector channels) on demand.
+#[wasm_bindgen]
+pub struct LammpstrjDecoder {
+    text: String,
+    offsets: Vec<usize>,
+    n_atoms: usize,
+    n_frames: u32,
+    timestep_ps: f32,
+    has_box: bool,
+    box_matrix: Vec<f32>,
+    /// Newline-joined vector channel names (velocity/force), in decode order.
+    vector_channel_names: Vec<String>,
+}
+
+#[wasm_bindgen]
+impl LammpstrjDecoder {
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: Vec<u8>) -> Result<LammpstrjDecoder, JsError> {
+        let text = String::from_utf8(data).map_err(|_| JsError::new("dump is not valid UTF-8"))?;
+        let idx = lammpstrj::build_index(&text).map_err(|e| JsError::new(&e))?;
+        let has_box = idx.box_matrix.is_some();
+        let box_matrix = idx.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        Ok(LammpstrjDecoder {
+            text,
+            offsets: idx.offsets,
+            n_atoms: idx.n_atoms,
+            n_frames: idx.n_frames as u32,
+            timestep_ps: idx.timestep_ps,
+            has_box,
+            box_matrix,
+            vector_channel_names: idx.vector_channel_names,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms as u32
+    }
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+    #[wasm_bindgen(getter)]
+    pub fn timestep_ps(&self) -> f32 {
+        self.timestep_ps
+    }
+    #[wasm_bindgen(getter)]
+    pub fn has_box(&self) -> bool {
+        self.has_box
+    }
+    pub fn box_matrix(&self) -> Float32Array {
+        Float32Array::from(&self.box_matrix[..])
+    }
+    /// Number of per-atom vector channels (velocity/force).
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_count(&self) -> u32 {
+        self.vector_channel_names.len() as u32
+    }
+    /// Newline-joined vector channel names, in decode order.
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_names(&self) -> String {
+        self.vector_channel_names.join("\n")
+    }
+
+    /// Decode a single frame's positions (Å), `n_atoms * 3` floats.
+    pub fn decode_frame(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let decoded = lammpstrj::decode_frame_at(&self.text, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(Float32Array::from(&decoded.positions[..]))
+    }
+
+    /// Decode a single frame's vector channels, concatenated in channel order:
+    /// `[channel0 (n_atoms*3), channel1 (n_atoms*3), ...]`. Empty if none.
+    pub fn decode_frame_vectors(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let decoded = lammpstrj::decode_frame_at(&self.text, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        let mut flat: Vec<f32> = Vec::new();
+        for v in &decoded.vectors {
+            flat.extend_from_slice(v);
+        }
+        Ok(Float32Array::from(&flat[..]))
+    }
+}
+
+/// Persistent decoder for the extra frames of a multi-frame structure file
+/// (XYZ frames or PDB models). Owns the text and a per-frame byte-offset index,
+/// and parses frame 0 (via `frame0()`) from the SAME held copy — so one worker
+/// round-trip (one file read) yields both the index and the eager snapshot.
+#[wasm_bindgen]
+pub struct StructureFrameDecoder {
+    text: String,
+    kind: String,
+    offsets: Vec<usize>,
+    n_atoms: usize,
+    n_frames: u32,
+}
+
+#[wasm_bindgen]
+impl StructureFrameDecoder {
+    /// `kind` selects the format ("xyz" or "pdb"). The bytes move into wasm memory.
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: Vec<u8>, kind: &str) -> Result<StructureFrameDecoder, JsError> {
+        let text = String::from_utf8(data).map_err(|_| JsError::new("file is not valid UTF-8"))?;
+        let (offsets, n_atoms) = match kind {
+            "xyz" => {
+                let idx = xyz::build_index(&text).map_err(|e| JsError::new(&e))?;
+                (idx.offsets, idx.n_atoms)
+            }
+            "pdb" => {
+                let idx = parser::build_index(&text).map_err(|e| JsError::new(&e))?;
+                (idx.offsets, idx.n_atoms)
+            }
+            _ => return Err(JsError::new("unsupported structure decoder kind")),
+        };
+        let n_frames = offsets.len() as u32;
+        Ok(StructureFrameDecoder {
+            text,
+            kind: kind.to_string(),
+            offsets,
+            n_atoms,
+            n_frames,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms as u32
+    }
+    /// Number of EXTRA frames (excludes the eager snapshot frame 0).
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+
+    /// Parse frame 0 (the eager snapshot: topology + frame-0 coordinates) from
+    /// the held text, WITHOUT re-reading the file. Lets one worker round-trip
+    /// return both the index and frame 0 for instant first paint.
+    pub fn frame0(&self) -> Result<ParseResult, JsError> {
+        let data = match self.kind.as_str() {
+            "pdb" => parser::parse_frame0(&self.text),
+            _ => xyz::parse_frame0(&self.text),
+        }
+        .map_err(|e| JsError::new(&e))?;
+        Ok(ParseResult::from_parsed(data))
+    }
+
+    /// Decode extra frame `i` (0-indexed into the extra frames) → positions (Å).
+    pub fn decode_frame(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let coords = match self.kind.as_str() {
+            "pdb" => parser::decode_model_at(&self.text, offset, self.n_atoms),
+            _ => xyz::decode_frame_at(&self.text, offset, self.n_atoms),
+        }
+        .map_err(|e| JsError::new(&e))?;
+        Ok(Float32Array::from(&coords[..]))
+    }
+}
+
+/// Parse ONLY frame 0 from a bounded PREFIX of a large multi-frame structure
+/// file (XYZ / PDB), for size-independent first paint. Errors if frame 0 is not
+/// fully contained in the prefix (the JS side then grows the prefix or falls back
+/// to a full read). `is_whole_file` is true when the prefix already covers the
+/// entire file.
+#[wasm_bindgen]
+pub fn parse_structure_prefix(
+    text: &str,
+    kind: &str,
+    is_whole_file: bool,
+) -> Result<ParseResult, JsError> {
+    let data = match kind {
+        "pdb" => parser::parse_frame0_prefix(text, is_whole_file),
+        "xyz" => xyz::parse_frame0(text), // errors if frame 0's atom lines are truncated
+        _ => return Err(JsError::new("unsupported structure prefix kind")),
+    }
+    .map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Decode ONLY frame 0 (positions, Å) from a bounded PREFIX of a large
+/// trajectory (XTC / LAMMPS dump), for size-independent first paint. Frame 0 is
+/// at the start of the file, so a bounded prefix contains it. Errors if the
+/// prefix is too small to hold frame 0 (the JS side then grows it or falls back
+/// to a full read). `data` is the raw prefix bytes (UTF-8 text for LAMMPS dump).
+#[wasm_bindgen]
+pub fn decode_trajectory_frame0(
+    data: Vec<u8>,
+    kind: &str,
+    n_atoms: u32,
+) -> Result<Float32Array, JsError> {
+    let n = n_atoms as usize;
+    let coords: Vec<f32> = match kind {
+        "lammpstrj" => {
+            let text = String::from_utf8_lossy(&data);
+            let off = text
+                .find("ITEM: TIMESTEP")
+                .ok_or_else(|| JsError::new("no frame in prefix"))?;
+            lammpstrj::decode_frame_at(&text, off, n)
+                .map(|f| f.positions)
+                .map_err(|e| JsError::new(&e))?
+        }
+        "xtc" => xtc::decode_frame_at(&data, 0, n).map_err(|e| JsError::new(&e))?,
+        _ => return Err(JsError::new("unsupported trajectory frame0 kind")),
+    };
+    Ok(Float32Array::from(&coords[..]))
+}
+
 /// Parse a PDB file text and return structured data for the molecular viewer.
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {

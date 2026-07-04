@@ -19,17 +19,32 @@ import ParseWorker from "./parse.worker?worker&inline";
 import wasmAssetUrl from "../../crates/megane-wasm/pkg/megane_wasm_bg.wasm?url";
 import { perfMark, perfMeasure } from "../perf";
 import * as sync from "./parseClientSync";
-import type { StructureParseResult, XTCParseResult, TrajectoryKind } from "./parseCore";
-import type { ParseRequest, ParseResponse } from "./parseMessages";
+import type {
+  StructureParseResult,
+  XTCParseResult,
+  TrajectoryKind,
+  TrajectoryIndexResult,
+  LazyTrajectoryKind,
+  LazyStructureKind,
+  StructureIndexResult,
+} from "./parseCore";
+import type {
+  ParseRequest,
+  ParseResponse,
+  DecodeFrameResult,
+  IndexStructureResult,
+  TrajectoryFrame0Result,
+} from "./parseMessages";
 
 const TIMEOUT_MS = 120_000;
 
 let worker: Worker | null = null;
 let workerBroken = false;
 let nextId = 0;
+let nextTrajId = 0;
 
 interface Pending {
-  resolve: (r: StructureParseResult | XTCParseResult) => void;
+  resolve: (r: unknown) => void;
   reject: (e: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
@@ -37,6 +52,35 @@ const pending = new Map<number, Pending>();
 
 function workerUnavailable(): boolean {
   return workerBroken || typeof Worker === "undefined";
+}
+
+// Below this file size, eager decode is fast enough that streaming would only
+// add per-frame worker overhead (and slightly slower playback) for no benefit —
+// so lazy decode only kicks in for genuinely large trajectories, where decoding
+// every frame up-front is the actual bottleneck.
+const LAZY_XTC_MIN_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Shared gate for lazy/streaming decode. Requires a worker. A
+ * `globalThis.__MEGANE_LAZY_XTC__` boolean override forces lazy on/off
+ * (bypassing the size gate — used by tests and as a kill switch); otherwise
+ * lazy is used only for files at or above {@link LAZY_XTC_MIN_BYTES}.
+ */
+function shouldUseLazy(fileSize: number): boolean {
+  if (workerUnavailable()) return false;
+  const override = (globalThis as Record<string, unknown>).__MEGANE_LAZY_XTC__;
+  if (typeof override === "boolean") return override;
+  return fileSize >= LAZY_XTC_MIN_BYTES;
+}
+
+/** Whether to stream a given trajectory file lazily (XTC / LAMMPS dump). */
+export function shouldUseLazyTrajectory(_kind: LazyTrajectoryKind, fileSize: number): boolean {
+  return shouldUseLazy(fileSize);
+}
+
+/** Whether to lazily decode a multi-frame structure file's extra frames (XYZ). */
+export function shouldUseLazyStructure(_kind: LazyStructureKind, fileSize: number): boolean {
+  return shouldUseLazy(fileSize);
 }
 
 /** Reject every in-flight request and drop the worker (used on a fatal error). */
@@ -61,7 +105,7 @@ function getWorker(): Worker {
     if (!entry) return;
     clearTimeout(entry.timer);
     pending.delete(e.data.id);
-    if (e.data.ok && e.data.result) {
+    if (e.data.ok) {
       entry.resolve(e.data.result);
     } else {
       entry.reject(new Error(e.data.error ?? "worker parse failed"));
@@ -79,10 +123,7 @@ function resolveWasmUrl(): string | undefined {
   return wasmAssetUrl as unknown as string;
 }
 
-function send<T extends StructureParseResult | XTCParseResult>(
-  req: ParseRequest,
-  transfer: Transferable[],
-): Promise<T> {
+function send<T>(req: ParseRequest, transfer: Transferable[]): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const w = getWorker();
     const timer = setTimeout(() => {
@@ -189,4 +230,223 @@ export function parseLammpstrjFile(file: File, expectedNAtoms: number): Promise<
 
 export function parseNetCDFFile(file: File, expectedNAtoms: number): Promise<XTCParseResult> {
   return parseTrajectoryFile("netcdf", file, expectedNAtoms, sync.parseNetCDFFile);
+}
+
+/** Handle returned by `indexTrajectoryLazy`, consumed by `LazyFrameProvider`. */
+export interface TrajectoryLazyHandle {
+  trajectoryId: number;
+  kind: LazyTrajectoryKind;
+  index: TrajectoryIndexResult;
+}
+
+/** One lazily-decoded frame: positions plus any embedded vector channels. */
+export interface DecodedLazyFrame {
+  positions: Float32Array;
+  /** Concatenated per-atom vector channels for this frame (empty if none). */
+  vectors: Float32Array;
+  vectorChannelCount: number;
+}
+
+/**
+ * Build a lazy trajectory decoder in the worker: reads the file, scans its
+ * frame index (no coordinate decode), and keeps the bytes resident in the
+ * worker so frames can be decoded on demand via {@link decodeTrajectoryFrame}.
+ * Returns `null` — the single uniform "fall back to eager parse" signal — when
+ * the worker is unavailable (incl. the `parseClientSync` build) or indexing fails.
+ */
+export async function indexTrajectoryLazy(
+  file: File,
+  kind: LazyTrajectoryKind,
+  expectedNAtoms: number,
+): Promise<TrajectoryLazyHandle | null> {
+  if (workerUnavailable()) return null;
+  try {
+    const id = nextId++;
+    const trajectoryId = nextTrajId++;
+    const buffer = await file.arrayBuffer();
+    const index = await send<TrajectoryIndexResult>(
+      {
+        id,
+        op: "indexTrajectory",
+        wasmUrl: resolveWasmUrl(),
+        kind,
+        trajectoryId,
+        bytes: buffer,
+        expectedNAtoms,
+      },
+      [buffer],
+    );
+    return { trajectoryId, kind, index };
+  } catch {
+    // Any failure ⇒ let the caller fall back to eager parsing.
+    return null;
+  }
+}
+
+/**
+ * Decode ONLY frame 0 of a large trajectory (XTC / LAMMPS dump) from a bounded
+ * prefix — for size-independent first paint (read one frame, not the whole
+ * file). Grows the prefix if frame 0 doesn't fit; returns `null` (caller falls
+ * back to the full index read) when the worker is unavailable or frame 0 exceeds
+ * the max prefix.
+ */
+export async function decodeTrajectoryFrame0(
+  file: File,
+  kind: LazyTrajectoryKind,
+  expectedNAtoms: number,
+): Promise<Float32Array | null> {
+  if (workerUnavailable()) return null;
+  // Kill switch / A-B knob: `globalThis.__MEGANE_TRAJ_FRAME0__ === false` disables
+  // the phase-1 partial read so loadXtc falls back to the single full-read index
+  // (the pre-two-phase behaviour). Used by the perf profiler to measure the win.
+  if ((globalThis as Record<string, unknown>).__MEGANE_TRAJ_FRAME0__ === false) return null;
+  let size = Math.min(file.size, LAZY_XTC_MIN_BYTES);
+  for (;;) {
+    try {
+      const id = nextId++;
+      const buffer = await file.slice(0, size).arrayBuffer();
+      const { positions } = await send<TrajectoryFrame0Result>(
+        {
+          id,
+          op: "trajectoryFrame0",
+          wasmUrl: resolveWasmUrl(),
+          kind,
+          bytes: buffer,
+          expectedNAtoms,
+        },
+        [buffer],
+      );
+      return positions;
+    } catch {
+      if (size >= file.size || size >= PREFIX_MAX_BYTES) return null;
+      size = Math.min(file.size, size * 2);
+    }
+  }
+}
+
+/** Decode one frame (positions + any vectors) of a previously-indexed trajectory. */
+export async function decodeTrajectoryFrame(
+  trajectoryId: number,
+  frame: number,
+): Promise<DecodedLazyFrame> {
+  const id = nextId++;
+  const result = await send<DecodeFrameResult>({ id, op: "decodeFrame", trajectoryId, frame }, []);
+  return {
+    positions: result.positions,
+    vectors: result.vectors,
+    vectorChannelCount: result.vectorChannelCount,
+  };
+}
+
+/** Free a lazy trajectory decoder in the worker (fire-and-forget). */
+export function disposeTrajectoryLazy(trajectoryId: number): void {
+  if (workerUnavailable()) return;
+  const id = nextId++;
+  void send<undefined>({ id, op: "disposeTrajectory", trajectoryId }, []).catch(() => {
+    // best-effort cleanup; worker teardown already frees everything
+  });
+}
+
+// ── Lazy multi-frame structure files (XYZ / PDB) ────────────────────────
+//
+// Structure files carry frame 0 as the eager snapshot and frames 1..N as
+// "extra" frames. `indexStructureLazy` reads the file ONCE: the worker builds a
+// persistent decoder (the extra-frame index) AND parses frame 0 from the same
+// bytes, so frame 0 can render immediately while the rest stream in on demand
+// via {@link decodeTrajectoryFrame}. The decoder shares the trajectory decoder
+// map, so `decodeTrajectoryFrame` / `disposeTrajectoryLazy` service it too.
+
+/** Handle returned by `indexStructureLazy`, consumed by `LazyFrameProvider`. */
+export interface StructureLazyHandle {
+  trajectoryId: number;
+  kind: LazyStructureKind;
+  index: StructureIndexResult;
+}
+
+/** `indexStructureLazy` result: the streaming handle plus frame 0's snapshot. */
+export interface StructureLazyResult {
+  handle: StructureLazyHandle;
+  frame0: StructureParseResult;
+}
+
+// Initial / max prefix read for `parseStructurePrefix`. One large frame of a
+// big multi-frame file (e.g. 100k atoms ≈ a few MB) must fit; grow-and-retry
+// handles bigger frames, capping the critical-path read regardless of total size.
+const PREFIX_INITIAL_BYTES = 8 * 1024 * 1024;
+const PREFIX_MAX_BYTES = 256 * 1024 * 1024;
+// Bounded tail read that captures a multi-MODEL PDB's trailing CONECT section
+// (written once after the last ENDMDL) so frame 0 gets explicit bonds.
+const PDB_TAIL_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Parse ONLY frame 0 from the FIRST chunk of a large multi-frame structure file,
+ * for size-independent first paint: the read + parse cost is one frame, not the
+ * whole file. Reads a bounded prefix (trimmed to the last newline so no atom line
+ * is cut), growing if frame 0 doesn't fit. Returns `null` (caller falls back to a
+ * full read) when the worker is unavailable, frame 0 exceeds the max prefix, or
+ * the parse fails.
+ *
+ * For PDB it ALSO reads a bounded TAIL in parallel: multi-MODEL PDB writes its
+ * `CONECT` records once, after the last `ENDMDL`, and they apply to every model.
+ * Concatenating `head(model 0) + tail(CONECT)` gives frame 0 its explicit bonds
+ * instead of distance-inferred ones — without reading the whole file.
+ */
+export async function parseStructurePrefix(
+  file: File,
+  kind: LazyStructureKind,
+): Promise<StructureParseResult | null> {
+  if (workerUnavailable()) return null;
+  let size = Math.min(file.size, PREFIX_INITIAL_BYTES);
+  for (;;) {
+    const isWholeFile = size >= file.size;
+    // Read the head (frame 0) and — for PDB — the trailing CONECT section in
+    // parallel. The tail starts at/after the head so the two never overlap.
+    const wantTail = kind === "pdb" && !isWholeFile && file.size - size > 0;
+    const tailStart = Math.max(size, file.size - PDB_TAIL_BYTES);
+    const [rawHead, rawTail] = await Promise.all([
+      file.slice(0, size).text(),
+      wantTail ? file.slice(tailStart).text() : Promise.resolve(""),
+    ]);
+    // Trim a partial trailing head line, and the partial leading tail line, so no
+    // record is cut mid-way where the two chunks are stitched together.
+    const head = isWholeFile ? rawHead : rawHead.slice(0, rawHead.lastIndexOf("\n") + 1);
+    const tail = rawTail ? rawTail.slice(rawTail.indexOf("\n") + 1) : "";
+    const text = tail ? head + tail : head;
+    try {
+      const id = nextId++;
+      return await send<StructureParseResult>(
+        { id, op: "structurePrefix", wasmUrl: resolveWasmUrl(), kind, text, isWholeFile },
+        [],
+      );
+    } catch {
+      // Frame 0 didn't fit: grow and retry, or give up (→ full-read fallback).
+      if (isWholeFile || size >= PREFIX_MAX_BYTES) return null;
+      size = Math.min(file.size, size * 2);
+    }
+  }
+}
+
+/**
+ * Build a lazy structure-frame decoder in the worker AND get frame 0 in one file
+ * read: the worker scans the extra-frame index (no bulk coordinate decode),
+ * keeps the bytes resident, and parses frame 0 from the same copy. Returns `null`
+ * (fall back to eager parse) when the worker is unavailable or indexing fails.
+ */
+export async function indexStructureLazy(
+  file: File,
+  kind: LazyStructureKind,
+): Promise<StructureLazyResult | null> {
+  if (workerUnavailable()) return null;
+  try {
+    const id = nextId++;
+    const trajectoryId = nextTrajId++;
+    const buffer = await file.arrayBuffer();
+    const { index, frame0 } = await send<IndexStructureResult>(
+      { id, op: "indexStructure", wasmUrl: resolveWasmUrl(), kind, trajectoryId, bytes: buffer },
+      [buffer],
+    );
+    return { handle: { trajectoryId, kind, index }, frame0 };
+  } catch {
+    return null;
+  }
 }

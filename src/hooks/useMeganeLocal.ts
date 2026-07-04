@@ -6,9 +6,32 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-import { parseStructureFile, parseStructureText } from "../parsers/structure";
-import type { StructureParseResult } from "../parsers/structure";
-import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "../parsers/xtc";
+import {
+  parseStructureFile,
+  parseStructureText,
+  indexStructureLazy,
+  parseStructurePrefix,
+  shouldUseLazyStructure,
+} from "../parsers/structure";
+import type {
+  StructureParseResult,
+  LazyStructureKind,
+  StructureLazyHandle,
+} from "../parsers/structure";
+import {
+  parseXTCFile,
+  parseLammpstrjFile,
+  parseDCDFile,
+  parseNetCDFFile,
+  indexTrajectoryLazy,
+  decodeTrajectoryFrame0,
+  decodeTrajectoryFrame,
+  disposeTrajectoryLazy,
+  shouldUseLazyTrajectory,
+} from "../parsers/xtc";
+import type { TrajectoryLazyHandle, LazyTrajectoryKind } from "../parsers/xtc";
+import { LazyFrameProvider } from "../stream/LazyFrameProvider";
+import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
@@ -26,6 +49,12 @@ import type {
   VectorSource,
 } from "../types";
 
+/** File extensions eligible for lazy multi-frame structure streaming → decoder kind. */
+const LAZY_STRUCTURE_KIND: Record<string, LazyStructureKind> = {
+  ".xyz": "xyz",
+  ".pdb": "pdb",
+};
+
 export interface MeganeLocalState {
   snapshot: Snapshot | null;
   frame: Frame | null;
@@ -36,6 +65,11 @@ export interface MeganeLocalState {
   pdbFileName: string | null;
   xtcFileName: string | null;
   loadFile: (pdb: File, topFile?: File) => Promise<void>;
+  applyStructureResult: (
+    result: StructureParseResult,
+    fileName: string,
+    topFile?: File,
+  ) => Promise<void>;
   loadText: (text: string, fileName?: string) => Promise<StructureParseResult>;
   loadXtc: (xtc: File) => Promise<void>;
   seekFrame: (frameIdx: number) => void;
@@ -78,6 +112,12 @@ export function useMeganeLocal(): MeganeLocalState {
   const fileFramesRef = useRef<Frame[]>([]);
   const baseSnapshotRef = useRef<Snapshot | null>(null);
   const xtcFileNameRef = useRef<string | null>(null);
+  // Bumped on every load so a slow background index (Phase-2 streaming attach)
+  // can detect it's stale and not clobber a newer file.
+  const loadTokenRef = useRef(0);
+  // Same idea for the trajectory path, kept separate so a trajectory load never
+  // invalidates an in-flight structure phase-2 attach (or vice versa).
+  const xtcLoadTokenRef = useRef(0);
   const fileTrajMetaRef = useRef<TrajectoryMeta | null>(null);
   const currentTrajSourceRef = useRef<TrajectorySource>("structure");
 
@@ -130,6 +170,11 @@ export function useMeganeLocal(): MeganeLocalState {
         labels: string[] | null;
       },
       filename?: string,
+      // Lazy multi-frame structure (large XYZ/PDB): frame 0 is the eager
+      // snapshot, extra frames stream from this provider via the pipeline's
+      // structure-trajectory channel. When set, the eager frame arrays stay
+      // empty and `result.frames` is empty.
+      lazy?: { provider: LazyFrameProvider },
     ) => {
       const prevSnapshot = baseSnapshotRef.current;
       baseSnapshotRef.current = result.snapshot;
@@ -137,6 +182,8 @@ export function useMeganeLocal(): MeganeLocalState {
       fileFramesRef.current = [];
       fileTrajMetaRef.current = null;
       xtcFileNameRef.current = null;
+      // Multi-frame when the file carries eager extra frames OR a lazy provider.
+      const hasFrames = result.frames.length > 0 || !!lazy;
 
       // If the new structure itself carries multiple frames (multi-frame
       // XYZ, multi-MODEL PDB, etc.), feed them through the pipeline's
@@ -155,7 +202,13 @@ export function useMeganeLocal(): MeganeLocalState {
       // load (no prior structure) to avoid racing against a follow-up
       // loadXtc() in the auto-load.
       const pipeStore = usePipelineStore.getState();
-      if (result.frames.length > 0) {
+      if (lazy) {
+        // Extra frames stream through the structure-trajectory channel. Clear
+        // (and dispose) any prior file trajectory so only this provider is live;
+        // removeLoadTrajectoryAndRewire below makes LoadStructure the live source.
+        pipeStore.setFileFrames(null, null);
+        pipeStore.setStructureProvider(lazy.provider);
+      } else if (result.frames.length > 0) {
         const allFrames: Frame[] = [
           {
             frameId: 0,
@@ -209,7 +262,7 @@ export function useMeganeLocal(): MeganeLocalState {
           });
           pipeStore.updateNodeParams(loaderNode.id, {
             fileName: filename,
-            hasTrajectory: result.frames.length > 0,
+            hasTrajectory: hasFrames,
             hasCell: !!result.snapshot.box,
           });
           // Mirror the openFile path: pick AddBond's Source by file format
@@ -219,7 +272,7 @@ export function useMeganeLocal(): MeganeLocalState {
           // start with a sensible default for formats that lack bond info.
           syncAddBondSourceForLoader(usePipelineStore.getState(), loaderNode.id, filename);
         }
-        if (result.frames.length > 0) {
+        if (hasFrames) {
           // Multi-frame structure files (.traj, multi-MODEL PDB,
           // multi-frame XYZ) carry their trajectory in the structure file
           // itself, so a separate LoadTrajectory node is redundant.
@@ -239,25 +292,30 @@ export function useMeganeLocal(): MeganeLocalState {
       labels.reset(result.labels);
       vectors.reset();
 
-      setHasStructureFrames(result.frames.length > 0);
+      setHasStructureFrames(hasFrames);
       setHasFileFrames(false);
 
-      const initialTrajSource = result.frames.length > 0 ? "structure" : "file";
+      const initialTrajSource = hasFrames ? "structure" : "file";
       currentTrajSourceRef.current = initialTrajSource;
       setTrajectorySourceState(initialTrajSource);
 
       setSnapshot(result.snapshot);
-      setMeta(result.meta);
+      // Lazy provider knows the true frame count (extra + 1); the eager frame-0
+      // result has no meta of its own.
+      setMeta(lazy ? lazy.provider.meta : result.meta);
       resetPlayback();
     },
     [resetPlayback, bonds.reset, labels.reset, vectors.reset],
   );
 
-  const loadFile = useCallback(
-    async (pdb: File, topFile?: File) => {
-      const result = await parseStructureFile(pdb);
-      applyResult(result, pdb.name);
-      setPdbFileName(pdb.name);
+  // Apply an ALREADY-parsed structure result without re-reading or re-parsing
+  // the file. This is the shared body of loadFile, exposed so callers that have
+  // already parsed the file (e.g. the pipeline load_structure node handler) can
+  // reuse the result instead of paying a second file read + WASM parse.
+  const applyStructureResult = useCallback(
+    async (result: StructureParseResult, fileName: string, topFile?: File) => {
+      applyResult(result, fileName);
+      setPdbFileName(fileName);
       setXtcFileName(result.meta ? "PDB models" : null);
 
       // applyResult calls syncAddBondSourceForLoader (sets "distance" for GRO).
@@ -273,6 +331,132 @@ export function useMeganeLocal(): MeganeLocalState {
     [applyResult],
   );
 
+  // Build the streaming provider from frame 0 and attach it to the pipeline,
+  // upgrading a statically-rendered frame 0 into a scrubbable trajectory. Called
+  // in the background (Phase 2) so it never blocks first paint. Guarded by a load
+  // token so a slow index for an old file cannot clobber a newer load.
+  const attachStreamingProvider = useCallback(
+    (handle: StructureLazyHandle, frame0: StructureParseResult, token: number) => {
+      const meta: TrajectoryMeta = {
+        nFrames: handle.index.nFrames + 1, // + synthetic frame 0 (the eager snapshot)
+        timestepPs: 1.0,
+        nAtoms: frame0.snapshot.nAtoms,
+      };
+      const provider = new LazyFrameProvider(handle, meta, {
+        decode: decodeTrajectoryFrame,
+        dispose: disposeTrajectoryLazy,
+        basePositions: frame0.snapshot.positions,
+      });
+      if (loadTokenRef.current !== token) {
+        provider.dispose(); // a newer file superseded this load
+        return;
+      }
+      provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
+      const store = usePipelineStore.getState();
+      store.setStructureProvider(provider);
+      const loaderNode = store.nodes.find((n) => n.type === "load_structure");
+      if (loaderNode) store.updateNodeParams(loaderNode.id, { hasTrajectory: true });
+      store.removeLoadTrajectoryAndRewire();
+      setHasStructureFrames(true);
+      setMeta(meta);
+      currentTrajSourceRef.current = "structure";
+      setTrajectorySourceState("structure");
+      setXtcFileName("PDB models");
+    },
+    [],
+  );
+
+  // Lazy path for large multi-frame structure files (XYZ / PDB) — the target is
+  // big-atom-count, many-frame files (multi-MODEL PDB / multi-frame XYZ) whose
+  // eager whole-file decode dominates the wait.
+  //
+  // Phase 1 (critical): parse ONLY frame 0 from a bounded PREFIX of the file and
+  //   render it — first paint is O(one frame), independent of total file size.
+  // Phase 2 (background): read the full file, build the extra-frame index, and
+  //   attach the streaming provider so the rest becomes scrubbable shortly after.
+  //
+  // Falls back to a single full read (which also renders frame 0 before decoding
+  // the rest) when the prefix can't hold frame 0; returns false only when even
+  // that is unavailable (→ caller's eager parse).
+  const loadStructureLazy = useCallback(
+    async (file: File, kind: LazyStructureKind, topFile?: File): Promise<boolean> => {
+      const myToken = ++loadTokenRef.current;
+
+      const applyTop = async () => {
+        if (!topFile) return;
+        const store = usePipelineStore.getState();
+        const loaderNode = store.nodes.find((n) => n.type === "load_structure");
+        if (loaderNode) await applyTopologyFile(store, loaderNode.id, topFile);
+      };
+
+      // ── Phase 1: instant frame 0 from a bounded prefix ──
+      const prefixFrame0 = await parseStructurePrefix(file, kind);
+      if (prefixFrame0) {
+        applyResult(
+          {
+            snapshot: prefixFrame0.snapshot,
+            frames: [],
+            meta: null,
+            labels: prefixFrame0.labels,
+          },
+          file.name,
+        );
+        setPdbFileName(file.name);
+        setXtcFileName(null);
+        await applyTop();
+        // ── Phase 2 (background): full index → upgrade to streaming ──
+        void indexStructureLazy(file, kind)
+          .then((indexed) => {
+            if (!indexed) return; // frame 0 already shown; no streaming available
+            if (indexed.handle.index.nFrames <= 0) {
+              disposeTrajectoryLazy(indexed.handle.trajectoryId); // single frame — nothing to stream
+              return;
+            }
+            attachStreamingProvider(indexed.handle, prefixFrame0, myToken);
+          })
+          .catch(() => {});
+        return true;
+      }
+
+      // ── Fallback: single full read (frame 0 still renders before full decode) ──
+      const indexed = await indexStructureLazy(file, kind);
+      if (!indexed) return false;
+      const { handle, frame0 } = indexed;
+      if (handle.index.nFrames <= 0) {
+        disposeTrajectoryLazy(handle.trajectoryId);
+        applyResult(
+          { snapshot: frame0.snapshot, frames: [], meta: null, labels: frame0.labels },
+          file.name,
+        );
+        setPdbFileName(file.name);
+        setXtcFileName(null);
+      } else {
+        applyResult(
+          { snapshot: frame0.snapshot, frames: [], meta: null, labels: frame0.labels },
+          file.name,
+        );
+        setPdbFileName(file.name);
+        attachStreamingProvider(handle, frame0, myToken);
+      }
+      await applyTop();
+      return true;
+    },
+    [applyResult, attachStreamingProvider],
+  );
+
+  const loadFile = useCallback(
+    async (pdb: File, topFile?: File) => {
+      const ext = pdb.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
+      const lazyKind = LAZY_STRUCTURE_KIND[ext];
+      if (lazyKind && shouldUseLazyStructure(lazyKind, pdb.size)) {
+        if (await loadStructureLazy(pdb, lazyKind, topFile)) return;
+      }
+      const result = await parseStructureFile(pdb);
+      await applyStructureResult(result, pdb.name, topFile);
+    },
+    [applyStructureResult, loadStructureLazy],
+  );
+
   const loadText = useCallback(
     async (text: string, fileName?: string) => {
       const result = await parseStructureText(text, fileName);
@@ -285,6 +469,80 @@ export function useMeganeLocal(): MeganeLocalState {
     [applyResult],
   );
 
+  // Build the streaming provider from a fully-scanned trajectory index and swap
+  // it into the pipeline's file-trajectory channel, promoting a statically-shown
+  // frame 0 into a scrubbable trajectory. `seedFrame0` (the phase-1 partial-read
+  // positions) primes the provider's frame-0 cache so the swap doesn't flicker.
+  const attachFileProvider = useCallback(
+    (handle: TrajectoryLazyHandle, fileName: string, nAtoms: number, seedFrame0?: Float32Array) => {
+      const meta: TrajectoryMeta = {
+        nFrames: handle.index.nFrames,
+        timestepPs: handle.index.timestepPs,
+        nAtoms: handle.index.nAtoms,
+      };
+      const provider = new LazyFrameProvider(handle, meta, {
+        decode: decodeTrajectoryFrame,
+        dispose: disposeTrajectoryLazy,
+        seedFrame0,
+      });
+      provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
+
+      // Stream embedded vector channels (LAMMPS velocity/force) as frames
+      // decode. The overlay uses the first channel (matching the eager path);
+      // updates are batched so we don't re-run the pipeline per frame.
+      const channelNames = handle.index.vectorChannelNames;
+      if (channelNames.length > 0) {
+        const stride = nAtoms * 3;
+        const accumulated = new Map<number, Float32Array>();
+        let flushScheduled = false;
+        const flush = () => {
+          flushScheduled = false;
+          // Only apply while this provider is still the active trajectory.
+          if (usePipelineStore.getState().fileProvider !== provider) return;
+          const frames = [...accumulated.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([frame, vectors]) => ({ frame, vectors }));
+          usePipelineStore.getState().setFileVectors(frames);
+        };
+        provider.setOnVectors((frameId, vectors) => {
+          accumulated.set(frameId, vectors.slice(0, stride));
+          if (!flushScheduled) {
+            flushScheduled = true;
+            setTimeout(flush, 200);
+          }
+        });
+      }
+
+      // useMeganeLocal's own frame array stays empty — positions render
+      // through the pipeline provider + playback store, not fileFramesRef.
+      fileFramesRef.current = [];
+      fileTrajMetaRef.current = meta;
+      xtcFileNameRef.current = fileName;
+      setHasFileFrames(true);
+      currentTrajSourceRef.current = "file";
+      setTrajectorySourceState("file");
+      setMeta(meta);
+      resetPlayback();
+      setXtcFileName(fileName);
+
+      const store = usePipelineStore.getState();
+      store.setFileProvider(provider);
+      const trajNode = store.nodes.find((n) => n.type === "load_trajectory");
+      if (trajNode) {
+        store.updateNodeParams(trajNode.id, { fileName });
+      }
+      // Surface the embedded vector channel name on load_vector nodes.
+      if (channelNames.length > 0) {
+        for (const n of store.nodes) {
+          if (n.type === "load_vector") {
+            store.updateNodeParams(n.id, { fileName: `[embedded] ${channelNames[0]}` });
+          }
+        }
+      }
+    },
+    [resetPlayback],
+  );
+
   const loadXtc = useCallback(
     async (xtc: File) => {
       if (!baseSnapshotRef.current) {
@@ -294,6 +552,63 @@ export function useMeganeLocal(): MeganeLocalState {
       const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
       const isDcd = ext.endsWith(".dcd");
       const isNetcdf = ext.endsWith(".nc");
+      const isXtc = !isLammpstrj && !isDcd && !isNetcdf;
+      const nAtoms = baseSnapshotRef.current.nAtoms;
+      const store = usePipelineStore.getState();
+
+      // Lazy/streaming path (large XTC or LAMMPS dump, worker-gated). Two phases,
+      // like the structure path, so first paint is O(one frame) not O(file size):
+      //   Phase 1 (critical): decode ONLY frame 0 from a bounded prefix and show
+      //     it — time-to-interactive is independent of total file size.
+      //   Phase 2 (background): scan the full frame index and swap in the
+      //     streaming provider (scrubbable, embedded vectors), seeding frame 0.
+      // Small files stay eager (smoother playback, no per-frame worker cost); a
+      // null result also falls back to a full read.
+      const lazyKind: LazyTrajectoryKind | null = isLammpstrj ? "lammpstrj" : isXtc ? "xtc" : null;
+      if (lazyKind && shouldUseLazyTrajectory(lazyKind, xtc.size)) {
+        const myToken = ++xtcLoadTokenRef.current;
+
+        // ── Phase 1: instant frame 0 from a bounded prefix ──
+        const frame0Positions = await decodeTrajectoryFrame0(xtc, lazyKind, nAtoms);
+        if (frame0Positions) {
+          const frame0: Frame = { frameId: 0, nAtoms, positions: frame0Positions };
+          const provisionalMeta: TrajectoryMeta = { nFrames: 1, timestepPs: 1.0, nAtoms };
+          fileFramesRef.current = [];
+          fileTrajMetaRef.current = provisionalMeta;
+          xtcFileNameRef.current = xtc.name;
+          setHasFileFrames(true);
+          currentTrajSourceRef.current = "file";
+          setTrajectorySourceState("file");
+          setMeta(provisionalMeta);
+          resetPlayback();
+          setXtcFileName(xtc.name);
+          // A single-frame MemoryFrameProvider shows frame 0 while the index scans.
+          store.setFileFrames([frame0], provisionalMeta);
+          const trajNode = store.nodes.find((n) => n.type === "load_trajectory");
+          if (trajNode) store.updateNodeParams(trajNode.id, { fileName: xtc.name });
+
+          // ── Phase 2 (background): full index → swap to streaming provider ──
+          void indexTrajectoryLazy(xtc, lazyKind, nAtoms)
+            .then((handle) => {
+              if (!handle) return; // frame 0 already shown; no streaming available
+              if (xtcLoadTokenRef.current !== myToken) {
+                disposeTrajectoryLazy(handle.trajectoryId); // a newer load superseded this
+                return;
+              }
+              attachFileProvider(handle, xtc.name, nAtoms, frame0Positions);
+            })
+            .catch(() => {});
+          return;
+        }
+
+        // ── Fallback: single full read (frame 0 still renders via the provider) ──
+        const handle = await indexTrajectoryLazy(xtc, lazyKind, nAtoms);
+        if (handle) {
+          attachFileProvider(handle, xtc.name, nAtoms);
+          return;
+        }
+      }
+
       const parseFn = isLammpstrj
         ? parseLammpstrjFile
         : isDcd
@@ -301,11 +616,7 @@ export function useMeganeLocal(): MeganeLocalState {
           : isNetcdf
             ? parseNetCDFFile
             : parseXTCFile;
-      const {
-        frames,
-        meta: xtcMeta,
-        vectorChannels,
-      } = await parseFn(xtc, baseSnapshotRef.current.nAtoms);
+      const { frames, meta: xtcMeta, vectorChannels } = await parseFn(xtc, nAtoms);
       fileFramesRef.current = frames;
       fileTrajMetaRef.current = xtcMeta;
       xtcFileNameRef.current = xtc.name;
@@ -318,7 +629,6 @@ export function useMeganeLocal(): MeganeLocalState {
       setXtcFileName(xtc.name);
 
       // Feed parsed frames into the pipeline store so executeLoadTrajectory produces output.
-      const store = usePipelineStore.getState();
       store.setFileFrames(frames, xtcMeta ?? null);
 
       // Sync the load_trajectory node's displayed fileName so the pipeline
@@ -340,7 +650,7 @@ export function useMeganeLocal(): MeganeLocalState {
         }
       }
     },
-    [resetPlayback],
+    [resetPlayback, attachFileProvider],
   );
 
   const seekFrame = useCallback(
@@ -397,6 +707,7 @@ export function useMeganeLocal(): MeganeLocalState {
     pdbFileName,
     xtcFileName,
     loadFile,
+    applyStructureResult,
     loadText,
     loadXtc,
     seekFrame,

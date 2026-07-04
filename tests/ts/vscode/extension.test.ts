@@ -303,11 +303,11 @@ describe("MeganeEditorProvider — structureViewer", () => {
     expect(options.localResourceRoots[0].path).toBe("/ext/media");
   });
 
-  it("posts loadFile payload (file bytes + wasm bytes + filename) when the webview signals ready", async () => {
+  it("posts loadFile payload (file bytes as ArrayBuffer + filename, no wasm bytes) when the webview signals ready", async () => {
     const provider = getProvider("megane.structureViewer");
-    mockState.readFile
-      .mockResolvedValueOnce(new Uint8Array([72, 73, 74])) // doc bytes
-      .mockResolvedValueOnce(new Uint8Array([1, 2, 3])); // wasm bytes
+    // Only the document file is read now — the WASM module is fetched by the
+    // webview directly via asWebviewUri, not shipped in the message payload.
+    mockState.readFile.mockResolvedValueOnce(new Uint8Array([72, 73, 74])); // doc bytes
 
     const doc = { uri: VscodeUri.file("/work/sample.pdb"), dispose: vi.fn() };
     const { panel, fireMessage } = makeWebviewPanel();
@@ -316,21 +316,28 @@ describe("MeganeEditorProvider — structureViewer", () => {
     expect(panel.webview.postMessage).not.toHaveBeenCalled();
     fireMessage({ type: "ready" });
 
-    expect(panel.webview.postMessage).toHaveBeenCalledWith({
-      type: "loadFile",
-      contentBytes: [72, 73, 74],
-      filename: "sample.pdb",
-      wasmBytes: [1, 2, 3],
-      topBytes: null,
-      topFilename: null,
-    });
+    expect(mockState.readFile).toHaveBeenCalledTimes(1);
+    const payload = panel.webview.postMessage.mock.calls[0][0] as {
+      type: string;
+      contentBytes: ArrayBuffer;
+      filename: string;
+      topBytes: ArrayBuffer | null;
+      topFilename: string | null;
+      wasmBytes?: unknown;
+    };
+    expect(payload.type).toBe("loadFile");
+    expect(payload.filename).toBe("sample.pdb");
+    expect(payload).not.toHaveProperty("wasmBytes");
+    expect(payload.contentBytes).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(payload.contentBytes)).toEqual(new Uint8Array([72, 73, 74]));
+    expect(payload.topBytes).toBeNull();
+    expect(payload.topFilename).toBeNull();
   });
 
   it("includes topBytes and topFilename when a sibling .top file exists alongside a .gro", async () => {
     const provider = getProvider("megane.structureViewer");
     mockState.readFile
       .mockResolvedValueOnce(new Uint8Array([10, 20, 30])) // .gro doc bytes
-      .mockResolvedValueOnce(new Uint8Array([1, 2, 3]))    // wasm bytes
       .mockResolvedValueOnce(new Uint8Array([40, 50, 60])); // .top bytes
 
     const doc = { uri: VscodeUri.file("/work/water.gro"), dispose: vi.fn() };
@@ -338,21 +345,25 @@ describe("MeganeEditorProvider — structureViewer", () => {
     await provider.resolveCustomEditor(doc, panel, {});
     fireMessage({ type: "ready" });
 
-    expect(panel.webview.postMessage).toHaveBeenCalledWith({
-      type: "loadFile",
-      contentBytes: [10, 20, 30],
-      filename: "water.gro",
-      wasmBytes: [1, 2, 3],
-      topBytes: [40, 50, 60],
-      topFilename: "water.top",
-    });
+    const payload = panel.webview.postMessage.mock.calls[0][0] as {
+      type: string;
+      contentBytes: ArrayBuffer;
+      filename: string;
+      topBytes: ArrayBuffer | null;
+      topFilename: string | null;
+    };
+    expect(payload.type).toBe("loadFile");
+    expect(payload.filename).toBe("water.gro");
+    expect(new Uint8Array(payload.contentBytes)).toEqual(new Uint8Array([10, 20, 30]));
+    expect(payload.topBytes).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(payload.topBytes as ArrayBuffer)).toEqual(new Uint8Array([40, 50, 60]));
+    expect(payload.topFilename).toBe("water.top");
   });
 
   it("sets topBytes/topFilename to null when no sibling .top exists for a .gro", async () => {
     const provider = getProvider("megane.structureViewer");
     mockState.readFile
       .mockResolvedValueOnce(new Uint8Array([10, 20, 30])) // .gro doc bytes
-      .mockResolvedValueOnce(new Uint8Array([1, 2, 3]))    // wasm bytes
       .mockRejectedValueOnce(new Error("FileNotFound"));    // .top not present
 
     const doc = { uri: VscodeUri.file("/work/water.gro"), dispose: vi.fn() };
@@ -360,14 +371,18 @@ describe("MeganeEditorProvider — structureViewer", () => {
     await provider.resolveCustomEditor(doc, panel, {});
     fireMessage({ type: "ready" });
 
-    expect(panel.webview.postMessage).toHaveBeenCalledWith({
-      type: "loadFile",
-      contentBytes: [10, 20, 30],
-      filename: "water.gro",
-      wasmBytes: [1, 2, 3],
-      topBytes: null,
-      topFilename: null,
-    });
+    const payload = panel.webview.postMessage.mock.calls[0][0] as {
+      type: string;
+      contentBytes: ArrayBuffer;
+      filename: string;
+      topBytes: ArrayBuffer | null;
+      topFilename: string | null;
+    };
+    expect(payload.type).toBe("loadFile");
+    expect(payload.filename).toBe("water.gro");
+    expect(new Uint8Array(payload.contentBytes)).toEqual(new Uint8Array([10, 20, 30]));
+    expect(payload.topBytes).toBeNull();
+    expect(payload.topFilename).toBeNull();
   });
 
   it("ignores webview messages whose type is not 'ready'", async () => {
@@ -692,9 +707,9 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
       ],
       edges: [],
     };
+    // No wasm read now: pipeline, then structure companion, then trajectory.
     mockState.readFile
       .mockResolvedValueOnce(pipelineBytes(pipeline))
-      .mockResolvedValueOnce(new Uint8Array([1, 2, 3]))
       .mockResolvedValueOnce(new TextEncoder().encode("ATOM 1"))
       .mockResolvedValueOnce(new Uint8Array([9, 8, 7]));
 
@@ -709,11 +724,12 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
       pipeline: unknown;
       structureFiles: Array<{ nodeId: string; content: string; filename: string }>;
       trajectoryFiles: Array<{ nodeId: string; content: ArrayBuffer; filename: string }>;
-      wasmBytes: number[];
+      wasmBytes?: unknown;
     };
 
     expect(payload.type).toBe("loadPipeline");
     expect(payload.pipeline).toEqual(pipeline);
+    expect(payload).not.toHaveProperty("wasmBytes");
     expect(payload.structureFiles).toEqual([
       { nodeId: "n1", content: "ATOM 1", filename: "struct.pdb" },
     ]);
@@ -723,7 +739,6 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     expect(new Uint8Array(payload.trajectoryFiles[0].content as ArrayBuffer)).toEqual(
       new Uint8Array([9, 8, 7]),
     );
-    expect(payload.wasmBytes).toEqual([1, 2, 3]);
   });
 
   it("rejects pipelines whose version is not 3", async () => {
@@ -787,8 +802,8 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     };
     expect(payload.structureFiles).toEqual([]);
     expect(payload.trajectoryFiles).toEqual([]);
-    // Only pipeline + wasm read; no companion read attempted.
-    expect(mockState.readFile).toHaveBeenCalledTimes(2);
+    // Only the pipeline file is read; no companion read attempted.
+    expect(mockState.readFile).toHaveBeenCalledTimes(1);
   });
 
   it("skips nodes whose fileName escapes the pipeline directory", async () => {
@@ -811,7 +826,7 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
       structureFiles: unknown[];
     };
     expect(payload.structureFiles).toEqual([]);
-    expect(mockState.readFile).toHaveBeenCalledTimes(2);
+    expect(mockState.readFile).toHaveBeenCalledTimes(1);
   });
 
   it("silently skips nodes whose companion file cannot be read", async () => {
@@ -826,7 +841,6 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     };
     mockState.readFile
       .mockResolvedValueOnce(pipelineBytes(pipeline))
-      .mockResolvedValueOnce(new Uint8Array([1]))
       .mockRejectedValueOnce(new Error("ENOENT")) // missing.pdb
       .mockResolvedValueOnce(new Uint8Array([4, 5])); // ok.xtc
 
@@ -865,7 +879,7 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     await provider.resolveCustomEditor(doc, panel, {});
 
     fireMessage({ type: "ready" });
-    expect(mockState.readFile).toHaveBeenCalledTimes(2);
+    expect(mockState.readFile).toHaveBeenCalledTimes(1);
     const payload = panel.webview.postMessage.mock.calls[0][0] as {
       structureFiles: unknown[];
     };
@@ -888,7 +902,7 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
     await provider.resolveCustomEditor(doc, panel, {});
 
     fireMessage({ type: "ready" });
-    expect(mockState.readFile).toHaveBeenCalledTimes(2);
+    expect(mockState.readFile).toHaveBeenCalledTimes(1);
     const payload = panel.webview.postMessage.mock.calls[0][0] as {
       structureFiles: unknown[];
       trajectoryFiles: unknown[];

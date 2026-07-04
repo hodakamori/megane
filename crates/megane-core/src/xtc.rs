@@ -73,21 +73,43 @@ impl<'a> XdrReader<'a> {
         self.pos += padded;
         Ok(slice)
     }
+
+    fn pos(&self) -> usize {
+        self.pos
+    }
+
+    /// Jump to an absolute byte position (used to decode a single frame lazily).
+    fn seek(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
+    /// Advance `n` bytes without reading (used by the index scan to skip past a
+    /// compressed coordinate block).
+    fn skip(&mut self, n: usize) -> Result<(), String> {
+        if self.pos + n > self.data.len() {
+            return Err("unexpected end of data while skipping".into());
+        }
+        self.pos += n;
+        Ok(())
+    }
 }
 
 // ---------- Bitstream reader for compressed coords ----------
 
-struct BitReader {
-    buf: Vec<u8>,
+struct BitReader<'a> {
+    buf: &'a [u8],
     cnt: usize,
     lastbits: u32,
     lastbyte: u32,
 }
 
-impl BitReader {
-    fn new(data: &[u8]) -> Self {
+impl<'a> BitReader<'a> {
+    /// Borrow the compressed bitstream directly — no per-frame copy. The caller
+    /// (`decompress_coords`) hands us a slice that already lives in the file
+    /// buffer, so this avoids a full `to_vec()` of every frame's bitstream.
+    fn new(data: &'a [u8]) -> Self {
         Self {
-            buf: data.to_vec(),
+            buf: data,
             cnt: 0,
             lastbits: 0,
             lastbyte: 0,
@@ -387,6 +409,145 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
     Ok(output)
 }
 
+// ---------- Frame header + index scan (shared by eager and lazy paths) ----------
+
+/// The fixed 52-byte XTC frame header: magic + natoms + step + time + 3x3 box.
+struct FrameHeader {
+    natoms: usize,
+    time: f32,
+    box_matrix: [f32; 9],
+}
+
+/// Read one frame header from the current cursor. Returns `Ok(None)` on a clean
+/// end-of-stream (fewer than a header's worth of bytes remain), `Err` on a
+/// corrupt header. Shared by `parse_xtc` (eager) and `build_index`/`decode_frame_at`
+/// (lazy) so the header layout lives in exactly one place.
+fn read_frame_header(xdr: &mut XdrReader) -> Result<Option<FrameHeader>, String> {
+    // A frame needs at least magic+natoms+step+time (16 bytes) to begin.
+    if xdr.remaining() < 16 {
+        return Ok(None);
+    }
+    let magic = xdr.read_i32()?;
+    if magic != XTC_MAGIC {
+        return Err(format!("bad XTC magic: {} (expected {})", magic, XTC_MAGIC));
+    }
+    let natoms = xdr.read_i32()? as usize;
+    if natoms == 0 {
+        return Err("zero atoms in XTC frame".into());
+    }
+    let _step = xdr.read_i32()?;
+    let time = xdr.read_f32()?;
+    let mut box_matrix = [0f32; 9];
+    for v in &mut box_matrix {
+        *v = xdr.read_f32()? * 10.0; // nm -> Angstrom
+    }
+    Ok(Some(FrameHeader {
+        natoms,
+        time,
+        box_matrix,
+    }))
+}
+
+/// Skip a compressed coordinate block without decoding it. The block's byte
+/// length is derivable from the fixed-size sub-header (`nbytes` at a fixed
+/// offset), so an index scan is O(1) per frame regardless of atom count.
+fn skip_coord_block(xdr: &mut XdrReader, natoms: usize) -> Result<(), String> {
+    let lsize = xdr.read_i32()? as usize;
+    if lsize != natoms {
+        return Err(format!("coord block size {} != natoms {}", lsize, natoms));
+    }
+    if natoms <= 9 {
+        // Plain XDR floats: natoms*3 four-byte values (already 4-byte aligned).
+        xdr.skip(natoms * 3 * 4)?;
+        return Ok(());
+    }
+    // precision(4) + minint[3](12) + maxint[3](12) + smallidx(4) = 32 bytes.
+    xdr.skip(32)?;
+    let nbytes = xdr.read_u32()? as usize;
+    // XDR opaque data is padded to a 4-byte boundary.
+    xdr.skip((nbytes + 3) & !3)?;
+    Ok(())
+}
+
+/// Lightweight index over an XTC file: per-frame byte offsets + times + the box,
+/// built without decompressing any coordinates. Backs lazy/streaming decode.
+pub struct XtcIndex {
+    pub n_atoms: usize,
+    pub n_frames: usize,
+    pub timestep_ps: f32,
+    /// Box of the last frame (parity with `parse_xtc`'s single-box output).
+    pub box_matrix: Option<[f32; 9]>,
+    /// Byte offset of each frame's magic header.
+    pub offsets: Vec<usize>,
+    /// Per-frame time (ps).
+    pub times: Vec<f32>,
+}
+
+/// Scan an XTC file and build its frame index without decoding coordinates.
+pub fn build_index(data: &[u8]) -> Result<XtcIndex, String> {
+    let mut xdr = XdrReader::new(data);
+    let mut offsets: Vec<usize> = Vec::new();
+    let mut times: Vec<f32> = Vec::new();
+    let mut n_atoms: usize = 0;
+    let mut last_box: Option<[f32; 9]> = None;
+
+    loop {
+        let start = xdr.pos();
+        let header = match read_frame_header(&mut xdr)? {
+            Some(h) => h,
+            None => break,
+        };
+        if n_atoms == 0 {
+            n_atoms = header.natoms;
+        } else if header.natoms != n_atoms {
+            return Err(format!(
+                "inconsistent atom count: {} vs {}",
+                header.natoms, n_atoms
+            ));
+        }
+        offsets.push(start);
+        times.push(header.time);
+        last_box = Some(header.box_matrix);
+        skip_coord_block(&mut xdr, n_atoms)?;
+    }
+
+    if offsets.is_empty() {
+        return Err("no frames found in XTC file".into());
+    }
+
+    let n_frames = offsets.len();
+    let timestep_ps = if n_frames > 1 {
+        times[1] - times[0]
+    } else {
+        1.0
+    };
+
+    Ok(XtcIndex {
+        n_atoms,
+        n_frames,
+        timestep_ps,
+        box_matrix: last_box,
+        offsets,
+        times,
+    })
+}
+
+/// Decode a single frame's coordinates (Å) given its byte offset (from
+/// `build_index`). Reuses the exact `decompress_coords` path, so the output is
+/// bit-identical to the corresponding `parse_xtc` frame.
+pub fn decode_frame_at(data: &[u8], offset: usize, natoms: usize) -> Result<Vec<f32>, String> {
+    let mut xdr = XdrReader::new(data);
+    xdr.seek(offset);
+    let header = read_frame_header(&mut xdr)?.ok_or("frame offset past end of data")?;
+    if header.natoms != natoms {
+        return Err(format!(
+            "frame atom count {} != expected {}",
+            header.natoms, natoms
+        ));
+    }
+    decompress_coords(&mut xdr, natoms)
+}
+
 // ---------- Public API ----------
 
 /// Parse an XTC binary trajectory and return all frames.
@@ -400,44 +561,22 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
     let mut second_time: f32 = 0.0;
     let mut last_box: Option<[f32; 9]> = None;
 
-    while xdr.remaining() >= 16 {
-        // Frame header
-        let magic = match xdr.read_i32() {
-            Ok(m) => m,
-            Err(_) => break, // EOF
-        };
-        if magic != XTC_MAGIC {
-            return Err(format!("bad XTC magic: {} (expected {})", magic, XTC_MAGIC));
-        }
-
-        let frame_natoms = xdr.read_i32()? as usize;
-        if frame_natoms == 0 {
-            return Err("zero atoms in XTC frame".into());
-        }
+    while let Some(header) = read_frame_header(&mut xdr)? {
         if n_atoms == 0 {
-            n_atoms = frame_natoms;
-        } else if frame_natoms != n_atoms {
+            n_atoms = header.natoms;
+        } else if header.natoms != n_atoms {
             return Err(format!(
                 "inconsistent atom count: {} vs {}",
-                frame_natoms, n_atoms
+                header.natoms, n_atoms
             ));
         }
 
-        let _step = xdr.read_i32()?;
-        let time = xdr.read_f32()?;
-
         if n_frames == 0 {
-            first_time = time;
+            first_time = header.time;
         } else if n_frames == 1 {
-            second_time = time;
+            second_time = header.time;
         }
-
-        // Box vectors (3x3, in nm)
-        let mut box_mat = [0f32; 9];
-        for v in &mut box_mat {
-            *v = xdr.read_f32()? * 10.0; // nm -> Angstrom
-        }
-        last_box = Some(box_mat);
+        last_box = Some(header.box_matrix);
 
         // Decompress coordinate data straight into the flat buffer.
         let positions = decompress_coords(&mut xdr, n_atoms)?;
@@ -500,5 +639,43 @@ mod tests {
         check(169, 7.09, 15.22, 0.81);
         check(200, 1.44, 13.00, 6.36);
         check(326, 12.61, 4.89, 10.66);
+    }
+
+    #[test]
+    fn decode_frame_at_matches_parse_xtc() {
+        let data = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/1crn_vibration.xtc"
+        ))
+        .expect("read XTC");
+
+        let eager = parse_xtc(&data).expect("parse XTC");
+        let idx = build_index(&data).expect("build index");
+
+        // Index parity with the eager parse.
+        assert_eq!(idx.n_frames, eager.n_frames);
+        assert_eq!(idx.n_atoms, eager.n_atoms);
+        assert_eq!(idx.offsets.len(), eager.n_frames);
+        assert_eq!(idx.offsets[0], 0);
+        assert!((idx.timestep_ps - eager.timestep_ps).abs() < 1e-6);
+
+        // Every lazily-decoded frame must be BIT-IDENTICAL to the eager frame:
+        // decode_frame_at reuses the same decompress_coords, so this is exact.
+        for i in 0..idx.n_frames {
+            let lazy = decode_frame_at(&data, idx.offsets[i], idx.n_atoms)
+                .unwrap_or_else(|e| panic!("decode frame {i}: {e}"));
+            assert_eq!(lazy, eager.frame(i), "frame {i} mismatch");
+        }
+    }
+
+    #[test]
+    fn decode_frame_at_rejects_bad_offset() {
+        let data = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/1crn_vibration.xtc"
+        ))
+        .expect("read XTC");
+        // An offset that is not a frame boundary must error (bad magic), not panic.
+        assert!(decode_frame_at(&data, 3, 327).is_err());
     }
 }

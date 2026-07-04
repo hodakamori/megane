@@ -77,6 +77,8 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_structure_prefix: structFn("parse_structure_prefix"),
+    decode_trajectory_frame0: () => new Float32Array(4 * 3),
     parse_mol: structFn("parse_mol"),
     parse_mol2: structFn("parse_mol2"),
     parse_cif: structFn("parse_cif"),
@@ -97,6 +99,51 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_psf_bonds: () => new Uint32Array([0, 1]),
     parse_pdb_bonds: () => new Uint32Array([0, 1]),
     extract_labels: () => "A\nB\nC",
+    XtcDecoder: class {
+      n_atoms = 4;
+      n_frames = 2;
+      timestep_ps = 1;
+      has_box = false;
+      box_matrix() {
+        return new Float32Array(9);
+      }
+      times() {
+        return new Float32Array(2);
+      }
+      decode_frame() {
+        return new Float32Array(4 * 3);
+      }
+      free() {}
+    },
+    LammpstrjDecoder: class {
+      n_atoms = 4;
+      n_frames = 2;
+      timestep_ps = 1;
+      has_box = false;
+      vector_channel_count = 0;
+      vector_channel_names = "";
+      box_matrix() {
+        return new Float32Array(9);
+      }
+      decode_frame() {
+        return new Float32Array(4 * 3);
+      }
+      decode_frame_vectors() {
+        return new Float32Array(0);
+      }
+      free() {}
+    },
+    StructureFrameDecoder: class {
+      n_atoms = 3;
+      n_frames = 2;
+      frame0() {
+        return mockStructResult(3, 0);
+      }
+      decode_frame() {
+        return new Float32Array(3 * 3);
+      }
+      free() {}
+    },
   };
 
   return { calls, wasmMock };
@@ -170,5 +217,26 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     expect(labels).toHaveLength(2); // trimmed to nAtoms
     const txt = await core.extractLabelsFromFile(fakeFile("notes.txt", "a\nb"), 3);
     expect(txt).toEqual(["a", "b", ""]); // padded to nAtoms
+  });
+
+  it("degrades the lazy XTC exports to eager (worker-only feature)", async () => {
+    // On the sync path (JupyterLab/anywidget / worker-unavailable), indexXTCFile
+    // returns null so the caller falls back to eager parseXTCFile; decode is
+    // never reached and dispose is a no-op.
+    expect(await sync.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
+    // frame-0 partial decode also needs a worker → null (caller does a full read).
+    expect(await sync.decodeTrajectoryFrame0(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
+    await expect(sync.decodeTrajectoryFrame(0, 0)).rejects.toThrow(/worker-only/);
+    expect(() => sync.disposeTrajectoryLazy(0)).not.toThrow();
+    // Never streams on the sync path, regardless of file size.
+    expect(sync.shouldUseLazyTrajectory("xtc", 1)).toBe(false);
+    expect(sync.shouldUseLazyTrajectory("lammpstrj", 1024 * 1024 * 1024)).toBe(false);
+  });
+
+  it("degrades the lazy structure exports to eager (worker-only feature)", async () => {
+    // Multi-frame XYZ/PDB streaming needs a worker; the sync path never uses it.
+    expect(await sync.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
+    expect(await sync.parseStructurePrefix(fakeFile("m.xyz"), "xyz")).toBeNull();
+    expect(sync.shouldUseLazyStructure("xyz", 1024 * 1024 * 1024)).toBe(false);
   });
 });

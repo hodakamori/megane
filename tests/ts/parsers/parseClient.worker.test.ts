@@ -19,7 +19,9 @@ const { state, FakeWorker } = vi.hoisted(() => {
       state.lastReq = req;
       queueMicrotask(() => {
         if (state.mode === "ok") {
-          this.onmessage?.({ data: { id: req.id, ok: true, op: req.op, result: { tag: "worker" } } });
+          this.onmessage?.({
+            data: { id: req.id, ok: true, op: req.op, result: { tag: "worker" } },
+          });
         } else {
           this.onmessage?.({ data: { id: req.id, ok: false, op: req.op, error: "boom" } });
         }
@@ -38,13 +40,19 @@ vi.mock("@/parsers/parseClientSync", () => ({
   parseDCDFile: vi.fn(async () => ({ tag: "sync" })),
   parseLammpstrjFile: vi.fn(async () => ({ tag: "sync" })),
   parseNetCDFFile: vi.fn(async () => ({ tag: "sync" })),
+  indexStructureLazy: vi.fn(async () => null),
 }));
 
-function fakeFile(name: string): File {
+function fakeFile(name: string, size = 3): File {
   return {
     name,
-    text: async () => "DATA",
+    size,
+    text: async () => "DATA\n",
     arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    slice: () => ({
+      text: async () => "DATA\n",
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    }),
   } as unknown as File;
 }
 
@@ -104,5 +112,83 @@ describe("parseClient worker path", () => {
     const out = await client.parseXTCFile(fakeFile("t.xtc"), 4);
     expect(out).toEqual({ tag: "sync" });
     expect(sync.parseXTCFile).toHaveBeenCalled();
+  });
+
+  it("builds a lazy trajectory handle via the worker", async () => {
+    const client = await freshClient();
+    const res = await client.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4);
+    expect(state.lastReq?.op).toBe("indexTrajectory");
+    expect(res?.kind).toBe("xtc");
+    expect(typeof res?.trajectoryId).toBe("number");
+  });
+
+  it("returns null (full-read fallback) when trajectory indexing errors", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    expect(await client.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
+  });
+
+  it("decodes frame 0 from a bounded prefix via the worker", async () => {
+    const client = await freshClient();
+    await client.decodeTrajectoryFrame0(fakeFile("t.xtc"), "xtc", 4);
+    expect(state.lastReq?.op).toBe("trajectoryFrame0");
+  });
+
+  it("returns null when the frame-0 prefix decode errors and can't grow", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    // size <= prefix so the read is already whole-file → no retry, straight to null.
+    expect(await client.decodeTrajectoryFrame0(fakeFile("t.xtc", 3), "xtc", 4)).toBeNull();
+  });
+
+  it("builds a lazy structure handle (with frame 0) via the worker in one round-trip", async () => {
+    const client = await freshClient();
+    const res = await client.indexStructureLazy(fakeFile("m.xyz"), "xyz");
+    expect(state.lastReq?.op).toBe("indexStructure");
+    expect(res?.handle.kind).toBe("xyz");
+    expect(typeof res?.handle.trajectoryId).toBe("number");
+  });
+
+  it("returns null (eager fallback) when structure indexing errors", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    expect(await client.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
+  });
+
+  it("parses frame 0 from a prefix via the worker", async () => {
+    const client = await freshClient();
+    const out = await client.parseStructurePrefix(fakeFile("m.xyz", 100), "xyz");
+    expect(out).toEqual({ tag: "worker" });
+    expect(state.lastReq?.op).toBe("structurePrefix");
+  });
+
+  it("returns null when the prefix parse errors and the prefix can't grow", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    // size <= prefix so isWholeFile is true → no retry, straight to null.
+    expect(await client.parseStructurePrefix(fakeFile("m.xyz", 3), "xyz")).toBeNull();
+  });
+
+  it("reads a tail chunk for a large PDB (to capture CONECT) but not for XYZ", async () => {
+    const client = await freshClient();
+    const bigFile = (name: string) => {
+      const slice = vi.fn(() => ({ text: async () => "L1\nL2\n" }));
+      const file = {
+        name,
+        size: 32 * 1024 * 1024, // larger than the 8MB prefix → head + tail
+        text: async () => "L1\nL2\n",
+        arrayBuffer: async () => new ArrayBuffer(0),
+        slice,
+      } as unknown as File;
+      return { file, slice };
+    };
+
+    const pdb = bigFile("big.pdb");
+    await client.parseStructurePrefix(pdb.file, "pdb");
+    expect(pdb.slice).toHaveBeenCalledTimes(2); // head + CONECT tail
+
+    const xyz = bigFile("big.xyz");
+    await client.parseStructurePrefix(xyz.file, "xyz");
+    expect(xyz.slice).toHaveBeenCalledTimes(1); // head only
   });
 });

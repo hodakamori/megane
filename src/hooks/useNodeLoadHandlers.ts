@@ -10,13 +10,14 @@ import { setStructureLoadHandler } from "../components/nodes/LoadStructureNode";
 import { setTrajectoryLoadHandler } from "../components/nodes/LoadTrajectoryNode";
 import { setVectorLoadHandler } from "../components/nodes/LoadVectorNode";
 import { loadVectorFileData } from "../logic/vectorSourceLogic";
-import { parseStructureFile } from "../parsers/structure";
+import { parseStructureFile, shouldUseLazyStructure } from "../parsers/structure";
+import type { StructureParseResult, LazyStructureKind } from "../parsers/structure";
 import type { NodeSnapshotData } from "../pipeline/execute";
 import type { Snapshot } from "../types";
 
 interface UseNodeLoadHandlersOptions {
   snapshot: Snapshot | null;
-  onUploadStructure: (file: File) => void;
+  onUploadStructure: (file: File, preParsed?: StructureParseResult) => void;
   onUploadTrajectory?: (file: File) => void;
 }
 
@@ -47,6 +48,25 @@ export function useNodeLoadHandlers({
   // Wire up structure load handler
   useEffect(() => {
     setStructureLoadHandler((nodeId, file) => {
+      const isPrimary = nodeId === primaryNodeIdRef.current;
+
+      // Large multi-frame structure files (XYZ / multi-MODEL PDB), primary node
+      // only: stream via the lazy path. Delegate to the legacy loader
+      // (loadFile → loadStructureLazy), which indexes the extra frames, parses
+      // frame 0, sets THIS node's snapshot, and installs the structureProvider —
+      // skipping the eager full-file parse here. If lazy is declined (single
+      // frame / no worker) loadFile falls back to an eager parse, which also
+      // populates the node snapshot. Non-primary nodes and other formats keep the
+      // eager path below.
+      const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
+      const lazyKind: LazyStructureKind | null =
+        ext === ".xyz" ? "xyz" : ext === ".pdb" ? "pdb" : null;
+      if (isPrimary && lazyKind && shouldUseLazyStructure(lazyKind, file.size)) {
+        clearNodeParseError(nodeId);
+        onUploadStructure(file);
+        return;
+      }
+
       parseStructureFile(file)
         .then((result) => {
           clearNodeParseError(nodeId);
@@ -73,15 +93,20 @@ export function useNodeLoadHandlers({
               }
             }
           }
+          // For the primary node, also drive the legacy load path for
+          // trajectory/label/bond source management. Pass the ALREADY-parsed
+          // result so it reuses this parse instead of reading + WASM-parsing the
+          // same file a second time (previously ~2x wall-clock per open). Doing
+          // it inside .then also removes the prior race between this parse and
+          // the legacy path's concurrent parse.
+          if (isPrimary) {
+            onUploadStructure(file, result);
+          }
         })
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
           setNodeParseError(nodeId, `Failed to parse file: ${message}`);
         });
-      // For the primary node, also trigger legacy load path for trajectory/label compat
-      if (nodeId === primaryNodeIdRef.current) {
-        onUploadStructure(file);
-      }
     });
     return () => {
       setStructureLoadHandler(null);

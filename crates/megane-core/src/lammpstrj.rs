@@ -98,6 +98,396 @@ fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
     })
 }
 
+/// Parsed header of one LAMMPS dump frame (everything up to the first atom line).
+struct FrameHeader {
+    n_atoms: usize,
+    timestep: f64,
+    box_matrix: [f32; 9],
+    // Box dims for scaled-coordinate conversion.
+    lx: f32,
+    ly: f32,
+    lz: f32,
+    xlo: f32,
+    ylo: f32,
+    zlo: f32,
+    layout: ColumnLayout,
+    /// Line index of the first atom line (line after "ITEM: ATOMS ...").
+    atoms_start: usize,
+}
+
+/// Read one frame's header block starting at `lines[i]` which must be
+/// "ITEM: TIMESTEP". Returns the parsed header and the atom-block start index.
+/// Shared by the eager parser, the index scan, and the single-frame decoder so
+/// their header handling is byte-identical.
+fn read_frame_header(lines: &[&str], i: usize) -> Result<FrameHeader, String> {
+    let n_lines = lines.len();
+    // lines[i] == "ITEM: TIMESTEP"
+    let mut i = i + 1;
+    if i >= n_lines {
+        return Err("Unexpected end of file after TIMESTEP".to_string());
+    }
+    let timestep: f64 = lines[i]
+        .trim()
+        .parse()
+        .map_err(|_| format!("Cannot parse timestep at line {}", i + 1))?;
+
+    i += 1;
+    if i >= n_lines || lines[i].trim() != "ITEM: NUMBER OF ATOMS" {
+        return Err(format!("Expected ITEM: NUMBER OF ATOMS at line {}", i + 1));
+    }
+    i += 1;
+    if i >= n_lines {
+        return Err("Unexpected end of file after NUMBER OF ATOMS".to_string());
+    }
+    let n_atoms: usize = lines[i]
+        .trim()
+        .parse()
+        .map_err(|_| format!("Cannot parse number of atoms at line {}", i + 1))?;
+
+    i += 1;
+    if i >= n_lines {
+        return Err("Unexpected end of file before BOX BOUNDS".to_string());
+    }
+    let box_header = lines[i].trim();
+    if !box_header.starts_with("ITEM: BOX BOUNDS") {
+        return Err(format!("Expected ITEM: BOX BOUNDS at line {}", i + 1));
+    }
+    let is_triclinic = box_header.contains("xy xz yz");
+
+    let mut lo = [0.0f64; 3];
+    let mut hi = [0.0f64; 3];
+    let mut tilt = [0.0f64; 3];
+    for dim in 0..3 {
+        i += 1;
+        if i >= n_lines {
+            return Err("Unexpected end of file in BOX BOUNDS".to_string());
+        }
+        let parts: Vec<f64> = lines[i]
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        if is_triclinic {
+            if parts.len() < 3 {
+                return Err(format!(
+                    "Expected 3 values for triclinic box at line {}",
+                    i + 1
+                ));
+            }
+            lo[dim] = parts[0];
+            hi[dim] = parts[1];
+            tilt[dim] = parts[2];
+        } else {
+            if parts.len() < 2 {
+                return Err(format!(
+                    "Expected 2 values for box bounds at line {}",
+                    i + 1
+                ));
+            }
+            lo[dim] = parts[0];
+            hi[dim] = parts[1];
+        }
+    }
+
+    let box_matrix = if is_triclinic {
+        let xy = tilt[0] as f32;
+        let xz = tilt[1] as f32;
+        let yz = tilt[2] as f32;
+        let xlo_bound = lo[0] as f32;
+        let xhi_bound = hi[0] as f32;
+        let ylo_bound = lo[1] as f32;
+        let yhi_bound = hi[1] as f32;
+        let zlo = lo[2] as f32;
+        let zhi = hi[2] as f32;
+        let xlo = xlo_bound - xy.min(0.0) - xz.min(0.0) - (xy + xz).min(0.0).min(0.0);
+        let xhi = xhi_bound - xy.max(0.0) - xz.max(0.0) - (xy + xz).max(0.0).max(0.0);
+        let ylo = ylo_bound - yz.min(0.0);
+        let yhi = yhi_bound - yz.max(0.0);
+        let lx = xhi - xlo;
+        let ly = yhi - ylo;
+        let lz = zhi - zlo;
+        [lx, 0.0, 0.0, xy, ly, 0.0, xz, yz, lz]
+    } else {
+        let lx = (hi[0] - lo[0]) as f32;
+        let ly = (hi[1] - lo[1]) as f32;
+        let lz = (hi[2] - lo[2]) as f32;
+        [lx, 0.0, 0.0, 0.0, ly, 0.0, 0.0, 0.0, lz]
+    };
+
+    let lx = (hi[0] - lo[0]) as f32;
+    let ly = (hi[1] - lo[1]) as f32;
+    let lz = (hi[2] - lo[2]) as f32;
+    let xlo = lo[0] as f32;
+    let ylo = lo[1] as f32;
+    let zlo = lo[2] as f32;
+
+    i += 1;
+    if i >= n_lines {
+        return Err("Unexpected end of file before ATOMS header".to_string());
+    }
+    let layout = parse_column_layout(lines[i])?;
+
+    Ok(FrameHeader {
+        n_atoms,
+        timestep,
+        box_matrix,
+        lx,
+        ly,
+        lz,
+        xlo,
+        ylo,
+        zlo,
+        layout,
+        atoms_start: i + 1,
+    })
+}
+
+/// One decoded atom block: flat positions, per-group vectors (in
+/// `header.layout.vector_groups` order), and the index of the line after it.
+type AtomBlock = (Vec<f32>, Vec<Vec<f32>>, usize);
+
+/// Read one frame's atom block into flat positions and per-group vectors (in
+/// `header.layout.vector_groups` order). Returns `(positions, group_vectors,
+/// next_line_index)`. Shared by the eager parser and the single-frame decoder.
+fn read_atom_block(
+    lines: &[&str],
+    header: &FrameHeader,
+    expected_n_atoms: usize,
+) -> Result<AtomBlock, String> {
+    let layout = &header.layout;
+    let n_atoms = header.n_atoms;
+    if n_atoms != expected_n_atoms {
+        return Err(format!(
+            "Inconsistent atom count: expected {}, got {}",
+            expected_n_atoms, n_atoms
+        ));
+    }
+    let n_lines = lines.len();
+    let max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
+        .iter()
+        .copied()
+        .max()
+        .unwrap();
+
+    let mut atoms: Vec<(usize, f32, f32, f32)> = Vec::with_capacity(n_atoms);
+    let mut atoms_sorted = true;
+    let mut prev_id: usize = 0;
+    let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> = layout
+        .vector_groups
+        .iter()
+        .map(|_| Vec::with_capacity(n_atoms))
+        .collect();
+
+    let mut parts: Vec<&str> = Vec::new();
+    let mut i = header.atoms_start;
+    for _ in 0..n_atoms {
+        if i >= n_lines {
+            return Err("Unexpected end of file in atom data".to_string());
+        }
+        parts.clear();
+        parts.extend(lines[i].split_whitespace());
+        if parts.len() <= max_col {
+            return Err(format!(
+                "Not enough columns at line {} (expected at least {}, got {})",
+                i + 1,
+                max_col + 1,
+                parts.len()
+            ));
+        }
+
+        let id: usize = parts[layout.id_col]
+            .parse()
+            .map_err(|_| format!("Cannot parse atom id at line {}", i + 1))?;
+        let mut x: f32 = parts[layout.x_col]
+            .parse()
+            .map_err(|_| format!("Cannot parse x at line {}", i + 1))?;
+        let mut y: f32 = parts[layout.y_col]
+            .parse()
+            .map_err(|_| format!("Cannot parse y at line {}", i + 1))?;
+        let mut z: f32 = parts[layout.z_col]
+            .parse()
+            .map_err(|_| format!("Cannot parse z at line {}", i + 1))?;
+
+        if let CoordType::Scaled = layout.coord_type {
+            x = x * header.lx + header.xlo;
+            y = y * header.ly + header.ylo;
+            z = z * header.lz + header.zlo;
+        }
+
+        if id < prev_id {
+            atoms_sorted = false;
+        }
+        prev_id = id;
+        atoms.push((id, x, y, z));
+
+        for (gi, group) in layout.vector_groups.iter().enumerate() {
+            let max_vcol = group.x_col.max(group.y_col).max(group.z_col);
+            if parts.len() > max_vcol {
+                let vx: f32 = match parts[group.x_col].parse() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let vy: f32 = match parts[group.y_col].parse() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let vz: f32 = match parts[group.z_col].parse() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                frame_vec_atoms[gi].push((id, vx, vy, vz));
+            }
+        }
+        i += 1;
+    }
+
+    if !atoms_sorted {
+        atoms.sort_by_key(|a| a.0);
+    }
+
+    let mut positions = Vec::with_capacity(n_atoms * 3);
+    for (_, x, y, z) in &atoms {
+        positions.push(*x);
+        positions.push(*y);
+        positions.push(*z);
+    }
+
+    let mut group_vectors: Vec<Vec<f32>> = Vec::with_capacity(layout.vector_groups.len());
+    for mut vatoms in frame_vec_atoms.into_iter() {
+        if vatoms.len() == n_atoms {
+            if !atoms_sorted {
+                vatoms.sort_by_key(|a| a.0);
+            }
+            let mut flat = Vec::with_capacity(n_atoms * 3);
+            for (_, vx, vy, vz) in &vatoms {
+                flat.push(*vx);
+                flat.push(*vy);
+                flat.push(*vz);
+            }
+            group_vectors.push(flat);
+        } else {
+            group_vectors.push(Vec::new());
+        }
+    }
+
+    Ok((positions, group_vectors, i))
+}
+
+/// Byte offset of each line, so the index scan can record where each frame
+/// begins in the raw text (for lazy per-frame decode from that offset).
+fn line_byte_starts(text: &str) -> Vec<usize> {
+    let mut starts = Vec::new();
+    let mut pos = 0usize;
+    for line in text.split('\n') {
+        starts.push(pos);
+        pos += line.len() + 1; // +1 for the '\n' (last line's phantom \n is harmless)
+    }
+    starts
+}
+
+/// Lightweight index over a LAMMPS dump: per-frame byte offsets + channel names,
+/// built without parsing any coordinates. Backs lazy/streaming decode.
+pub struct LammpstrjIndex {
+    pub n_atoms: usize,
+    pub n_frames: usize,
+    pub timestep_ps: f32,
+    pub box_matrix: Option<[f32; 9]>,
+    /// Byte offset of each frame's "ITEM: TIMESTEP" line.
+    pub offsets: Vec<usize>,
+    /// Vector channel names (velocity/force) from the first frame's layout.
+    pub vector_channel_names: Vec<String>,
+}
+
+/// One decoded LAMMPS frame: positions plus each vector channel's flat data
+/// (parallel to the index's `vector_channel_names`).
+pub struct DecodedLammpstrjFrame {
+    pub positions: Vec<f32>,
+    pub vectors: Vec<Vec<f32>>,
+}
+
+/// Scan a LAMMPS dump and record each frame's byte offset without decoding
+/// coordinates (reads headers, skips atom lines). O(lines) per frame.
+pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let starts = line_byte_starts(text);
+    let n_lines = lines.len();
+
+    let mut offsets: Vec<usize> = Vec::new();
+    let mut timesteps: Vec<f64> = Vec::new();
+    let mut n_atoms = 0usize;
+    let mut box_matrix: Option<[f32; 9]> = None;
+    let mut vector_channel_names: Vec<String> = Vec::new();
+    let mut i = 0usize;
+
+    while i < n_lines {
+        if lines[i].trim() != "ITEM: TIMESTEP" {
+            i += 1;
+            continue;
+        }
+        let frame_start_line = i;
+        let header = read_frame_header(&lines, i)?;
+        if offsets.is_empty() {
+            n_atoms = header.n_atoms;
+            box_matrix = Some(header.box_matrix);
+            vector_channel_names = header
+                .layout
+                .vector_groups
+                .iter()
+                .map(|g| g.name.to_string())
+                .collect();
+        } else if header.n_atoms != n_atoms {
+            return Err(format!(
+                "Inconsistent atom count: expected {}, got {} at frame {}",
+                n_atoms,
+                header.n_atoms,
+                offsets.len() + 1
+            ));
+        }
+        offsets.push(starts[frame_start_line]);
+        timesteps.push(header.timestep);
+        // Skip the atom lines without parsing.
+        i = header.atoms_start + header.n_atoms;
+    }
+
+    if offsets.is_empty() {
+        return Err("No frames found in file".to_string());
+    }
+
+    let timestep_ps = if timesteps.len() >= 2 {
+        (timesteps[1] - timesteps[0]).abs() as f32
+    } else {
+        0.0
+    };
+
+    Ok(LammpstrjIndex {
+        n_atoms,
+        n_frames: offsets.len(),
+        timestep_ps,
+        box_matrix,
+        offsets,
+        vector_channel_names,
+    })
+}
+
+/// Decode a single LAMMPS frame's positions (and vector channels) given the
+/// byte offset of its "ITEM: TIMESTEP" line (from `build_index`).
+pub fn decode_frame_at(
+    text: &str,
+    byte_offset: usize,
+    expected_n_atoms: usize,
+) -> Result<DecodedLammpstrjFrame, String> {
+    if byte_offset > text.len() {
+        return Err("frame offset past end of data".to_string());
+    }
+    let slice = &text[byte_offset..];
+    let lines: Vec<&str> = slice.lines().collect();
+    if lines.is_empty() || lines[0].trim() != "ITEM: TIMESTEP" {
+        return Err("frame offset is not at an ITEM: TIMESTEP boundary".to_string());
+    }
+    let header = read_frame_header(&lines, 0)?;
+    let (positions, vectors, _next) = read_atom_block(&lines, &header, expected_n_atoms)?;
+    Ok(DecodedLammpstrjFrame { positions, vectors })
+}
+
 /// Parse a LAMMPS dump trajectory text.
 pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     let lines: Vec<&str> = text.lines().collect();
@@ -624,5 +1014,71 @@ mod tests {
     fn test_no_vector_columns() {
         let data = parse_lammpstrj(sample_dump()).unwrap();
         assert!(data.vector_channels.is_empty());
+    }
+
+    fn velocity_dump() -> &'static str {
+        "ITEM: TIMESTEP\n\
+         0\n\
+         ITEM: NUMBER OF ATOMS\n\
+         2\n\
+         ITEM: BOX BOUNDS pp pp pp\n\
+         0.0 10.0\n\
+         0.0 10.0\n\
+         0.0 10.0\n\
+         ITEM: ATOMS id type x y z vx vy vz\n\
+         1 1 1.0 2.0 3.0 0.1 0.2 0.3\n\
+         2 2 4.0 5.0 6.0 0.4 0.5 0.6\n\
+         ITEM: TIMESTEP\n\
+         100\n\
+         ITEM: NUMBER OF ATOMS\n\
+         2\n\
+         ITEM: BOX BOUNDS pp pp pp\n\
+         0.0 10.0\n\
+         0.0 10.0\n\
+         0.0 10.0\n\
+         ITEM: ATOMS id type x y z vx vy vz\n\
+         1 1 1.1 2.1 3.1 0.11 0.21 0.31\n\
+         2 2 4.1 5.1 6.1 0.41 0.51 0.61\n"
+    }
+
+    #[test]
+    fn build_index_and_decode_frame_at_match_eager() {
+        // Cover: unsorted-id dump (sample_dump), and a dump with a vector channel.
+        for text in [sample_dump(), velocity_dump()] {
+            let eager = parse_lammpstrj(text).unwrap();
+            let idx = build_index(text).unwrap();
+
+            assert_eq!(idx.n_frames, eager.n_frames);
+            assert_eq!(idx.n_atoms, eager.n_atoms);
+            assert_eq!(idx.offsets.len(), eager.n_frames);
+            assert_eq!(idx.offsets[0], 0);
+            assert!((idx.timestep_ps - eager.timestep_ps).abs() < 1e-6);
+            assert_eq!(idx.vector_channel_names.len(), eager.vector_channels.len());
+
+            for i in 0..idx.n_frames {
+                let f = decode_frame_at(text, idx.offsets[i], idx.n_atoms).unwrap();
+                // Positions must be BYTE-IDENTICAL to the eager parse's frame i.
+                assert_eq!(f.positions, eager.frame(i).to_vec(), "frame {i} positions");
+                // Each vector channel must match the eager channel of the same name.
+                for (ci, name) in idx.vector_channel_names.iter().enumerate() {
+                    let ch = eager
+                        .vector_channels
+                        .iter()
+                        .find(|c| &c.name == name)
+                        .expect("channel present in eager result");
+                    assert_eq!(
+                        f.vectors[ci], ch.frames[i].vectors,
+                        "frame {i} channel {name}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn decode_frame_at_rejects_non_boundary_offset() {
+        let text = sample_dump();
+        // Offset 5 lands mid-header, not on an ITEM: TIMESTEP boundary.
+        assert!(decode_frame_at(text, 5, 3).is_err());
     }
 }

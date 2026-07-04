@@ -81,3 +81,99 @@ export async function parseNetCDFFile(file: File, expectedNAtoms: number): Promi
   const buffer = await file.arrayBuffer();
   return parseTrajectoryCore({ kind: "netcdf", bytes: new Uint8Array(buffer), expectedNAtoms });
 }
+
+/** Handle shape mirrored from `parseClient` (never produced on the sync path). */
+export interface TrajectoryLazyHandle {
+  trajectoryId: number;
+  kind: import("./parseCore").LazyTrajectoryKind;
+  index: import("./parseCore").TrajectoryIndexResult;
+}
+
+/** One lazily-decoded frame (mirrored; never produced on the sync path). */
+export interface DecodedLazyFrame {
+  positions: Float32Array;
+  vectors: Float32Array;
+  vectorChannelCount: number;
+}
+
+/** Lazy decode needs a worker; the sync path never uses it. */
+export function shouldUseLazyTrajectory(
+  _kind: import("./parseCore").LazyTrajectoryKind,
+  _fileSize: number,
+): boolean {
+  return false;
+}
+
+/**
+ * Lazy decode is worker-only. On the synchronous path (JupyterLab/anywidget
+ * bundles, or the runtime worker-unavailable fallback) this returns `null`, the
+ * uniform "fall back to eager parse" signal — the caller then uses the eager parser.
+ */
+export async function indexTrajectoryLazy(
+  _file: File,
+  _kind: import("./parseCore").LazyTrajectoryKind,
+  _expectedNAtoms: number,
+): Promise<TrajectoryLazyHandle | null> {
+  return null;
+}
+
+/** Worker-only; returns `null` so the caller falls back to a full read. */
+export async function decodeTrajectoryFrame0(
+  _file: File,
+  _kind: import("./parseCore").LazyTrajectoryKind,
+  _expectedNAtoms: number,
+): Promise<Float32Array | null> {
+  return null;
+}
+
+/** Never called (indexTrajectoryLazy returns null so no lazy provider is created). */
+export async function decodeTrajectoryFrame(
+  _trajectoryId: number,
+  _frame: number,
+): Promise<DecodedLazyFrame> {
+  throw new Error("decodeTrajectoryFrame is worker-only");
+}
+
+/** No-op: there is no persistent decoder on the synchronous path. */
+export function disposeTrajectoryLazy(_trajectoryId: number): void {
+  /* no-op */
+}
+
+// ── Lazy multi-frame structure files (mirrored; never used on the sync path) ──
+
+/** Handle shape mirrored from `parseClient` (never produced on the sync path). */
+export interface StructureLazyHandle {
+  trajectoryId: number;
+  kind: import("./parseCore").LazyStructureKind;
+  index: import("./parseCore").StructureIndexResult;
+}
+
+/** `indexStructureLazy` result shape (mirrored; never produced on the sync path). */
+export interface StructureLazyResult {
+  handle: StructureLazyHandle;
+  frame0: StructureParseResult;
+}
+
+/** Lazy structure decode needs a worker; the sync path never uses it. */
+export function shouldUseLazyStructure(
+  _kind: import("./parseCore").LazyStructureKind,
+  _fileSize: number,
+): boolean {
+  return false;
+}
+
+/** Worker-only; returns `null` so the caller falls back to eager parsing. */
+export async function parseStructurePrefix(
+  _file: File,
+  _kind: import("./parseCore").LazyStructureKind,
+): Promise<StructureParseResult | null> {
+  return null;
+}
+
+/** Worker-only; returns `null` so the caller falls back to eager parsing. */
+export async function indexStructureLazy(
+  _file: File,
+  _kind: import("./parseCore").LazyStructureKind,
+): Promise<StructureLazyResult | null> {
+  return null;
+}

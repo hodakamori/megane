@@ -159,25 +159,28 @@ async function smokeVscode() {
       () => document.getElementById("root")?.children.length > 0,
       { timeout: 20000 },
     );
-    // Now post a real file like the extension host does on "ready".
+    // Now post a real file like the extension host does on "ready". The WASM
+    // module is loaded from window.__MEGANE_WASM_URL__ (set in the HTML above),
+    // so the message no longer carries wasm bytes. contentBytes is passed as a
+    // plain array here because page.evaluate arguments must be JSON-serializable
+    // (an ArrayBuffer would not survive the transport); the webview's
+    // `new Uint8Array(contentBytes)` accepts either form.
     const pdb = Array.from(fs.readFileSync(path.join(REPO, "tests", "fixtures", "1crn.pdb")));
-    const wasm = Array.from(fs.readFileSync(path.join(media, "megane_wasm_bg.wasm")));
     await page.evaluate(
-      ({ pdb, wasm }) => {
+      ({ pdb }) => {
         window.dispatchEvent(
           new MessageEvent("message", {
             data: {
               type: "loadFile",
               contentBytes: pdb,
               filename: "1crn.pdb",
-              wasmBytes: wasm,
               topBytes: null,
               topFilename: null,
             },
           }),
         );
       },
-      { pdb, wasm },
+      { pdb },
     );
     await assertCanvasDrew(page, "vscode-webview");
     if (errors.length) {

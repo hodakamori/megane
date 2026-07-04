@@ -81,6 +81,71 @@ interface WasmXtcResult {
   free(): void;
 }
 
+/**
+ * Minimal surface of any persistent per-frame decoder (trajectory OR multi-frame
+ * structure). The worker keeps these in one map and only needs `decode_frame`,
+ * `n_atoms`, and `free` to service `decodeFrame` / `disposeTrajectory` requests.
+ */
+export interface WasmFrameDecoder {
+  readonly n_atoms: number;
+  decode_frame(frame: number): Float32Array;
+  free(): void;
+}
+
+/** Common surface of a persistent lazy trajectory decoder (XTC / LAMMPS dump). */
+export interface WasmTrajectoryDecoder extends WasmFrameDecoder {
+  readonly n_frames: number;
+  readonly timestep_ps: number;
+  readonly has_box: boolean;
+  box_matrix(): Float32Array;
+}
+
+/** Persistent XTC decoder (owns the file bytes; decodes one frame on demand). */
+export interface WasmXtcDecoder extends WasmTrajectoryDecoder {
+  times(): Float32Array;
+}
+
+/** Persistent LAMMPS-dump decoder, additionally exposing per-frame vectors. */
+export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
+  readonly vector_channel_count: number;
+  /** Newline-joined channel names (velocity/force), in decode order. */
+  readonly vector_channel_names: string;
+  decode_frame_vectors(frame: number): Float32Array;
+}
+
+/** Persistent decoder for the extra frames of a multi-frame structure file (XYZ / PDB). */
+export interface WasmStructureFrameDecoder extends WasmFrameDecoder {
+  /** Number of EXTRA frames (excludes the eager snapshot frame 0). */
+  readonly n_frames: number;
+  /** Parse frame 0 (the eager snapshot) from the held bytes — no re-read. */
+  frame0(): WasmParseResult;
+}
+
+/** Lazy trajectory formats with a persistent per-frame decoder. */
+export type LazyTrajectoryKind = "xtc" | "lammpstrj";
+
+/** Multi-frame structure formats with lazy extra-frame decode (frame 0 is eager). */
+export type LazyStructureKind = "xyz" | "pdb";
+
+/** Lightweight structure-frame index (from `indexStructureCore`) — no bulk coordinates. */
+export interface StructureIndexResult {
+  nAtoms: number;
+  /** Number of decodable EXTRA frames (excludes the eager snapshot frame 0). */
+  nFrames: number;
+}
+
+/** Lightweight trajectory index (from `indexTrajectoryCore`) — no bulk coordinates. */
+export interface TrajectoryIndexResult {
+  nAtoms: number;
+  nFrames: number;
+  timestepPs: number;
+  hasBox: boolean;
+  box: Float32Array | null;
+  times: Float32Array;
+  /** Embedded per-atom vector channel names (LAMMPS velocity/force); empty otherwise. */
+  vectorChannelNames: string[];
+}
+
 type ParseFn = (text: string) => WasmParseResult;
 type BinaryParseFn = (data: Uint8Array) => WasmParseResult;
 type TrajTextParseFn = (text: string) => WasmXtcResult;
@@ -101,6 +166,11 @@ interface WasmModule {
   parse_dcd_file: TrajBinaryParseFn;
   parse_netcdf_file: TrajBinaryParseFn;
   parse_lammpstrj_file: TrajTextParseFn;
+  parse_structure_prefix: (text: string, kind: string, isWholeFile: boolean) => WasmParseResult;
+  decode_trajectory_frame0: (data: Uint8Array, kind: string, nAtoms: number) => Float32Array;
+  XtcDecoder: new (data: Uint8Array) => WasmXtcDecoder;
+  LammpstrjDecoder: new (data: Uint8Array) => WasmLammpstrjDecoder;
+  StructureFrameDecoder: new (data: Uint8Array, kind: string) => WasmStructureFrameDecoder;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_top_bonds_with_includes: (
@@ -146,6 +216,11 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_dcd_file: wasm.parse_dcd_file,
         parse_netcdf_file: wasm.parse_netcdf_file,
         parse_lammpstrj_file: wasm.parse_lammpstrj_file,
+        parse_structure_prefix: wasm.parse_structure_prefix,
+        decode_trajectory_frame0: wasm.decode_trajectory_frame0,
+        XtcDecoder: wasm.XtcDecoder,
+        LammpstrjDecoder: wasm.LammpstrjDecoder,
+        StructureFrameDecoder: wasm.StructureFrameDecoder,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_top_bonds_with_includes: wasm.parse_top_bonds_with_includes,
@@ -340,6 +415,114 @@ export function parseTrajectoryCore(input: TrajectoryParseInput): XTCParseResult
       break;
   }
   return extractFrames(result, input.expectedNAtoms, TRAJ_LABELS[input.kind]);
+}
+
+/**
+ * Build a lazy trajectory decoder + its frame index without decoding any
+ * coordinates. The returned `decoder` OWNS the file bytes in WASM memory and
+ * must be kept alive (and eventually `free()`d) by the caller — unlike the eager
+ * parse path which frees its result immediately. Requires `ensureInit` first.
+ */
+export function indexTrajectoryCore(
+  bytes: Uint8Array,
+  kind: LazyTrajectoryKind,
+  expectedNAtoms: number,
+): { decoder: WasmTrajectoryDecoder; index: TrajectoryIndexResult } {
+  const decoder: WasmTrajectoryDecoder =
+    kind === "lammpstrj"
+      ? new wasmModule!.LammpstrjDecoder(bytes)
+      : new wasmModule!.XtcDecoder(bytes);
+  if (decoder.n_atoms !== expectedNAtoms) {
+    const label = kind === "lammpstrj" ? "LAMMPS dump" : "XTC";
+    const msg = `${label} atom count (${decoder.n_atoms}) does not match structure (${expectedNAtoms})`;
+    decoder.free();
+    throw new Error(msg);
+  }
+  const vectorChannelNames =
+    kind === "lammpstrj"
+      ? (decoder as WasmLammpstrjDecoder).vector_channel_names
+          .split("\n")
+          .filter((s) => s.length > 0)
+      : [];
+  const index: TrajectoryIndexResult = {
+    nAtoms: decoder.n_atoms,
+    nFrames: decoder.n_frames,
+    timestepPs: decoder.timestep_ps,
+    hasBox: decoder.has_box,
+    box: decoder.has_box ? decoder.box_matrix() : null,
+    times: kind === "xtc" ? (decoder as WasmXtcDecoder).times() : new Float32Array(0),
+    vectorChannelNames,
+  };
+  return { decoder, index };
+}
+
+/**
+ * Build a persistent structure-frame decoder for a multi-frame structure file
+ * (XYZ / PDB) AND parse frame 0 (the eager snapshot) from the SAME held bytes —
+ * one file read yields both the index and frame 0, so frame 0 can render before
+ * the rest is decoded. The `decoder` OWNS the file bytes in WASM memory and must
+ * be kept alive (and eventually `free()`d) by the caller (unlike `frame0`, which
+ * is a normal result whose buffers are freed here). Requires `ensureInit` first.
+ */
+export function indexStructureCore(
+  bytes: Uint8Array,
+  kind: LazyStructureKind,
+): {
+  decoder: WasmStructureFrameDecoder;
+  index: StructureIndexResult;
+  frame0: StructureParseResult;
+} {
+  const decoder = new wasmModule!.StructureFrameDecoder(bytes, kind);
+  const index: StructureIndexResult = {
+    nAtoms: decoder.n_atoms,
+    nFrames: decoder.n_frames,
+  };
+  const frame0 = parseWithFn(() => decoder.frame0(), "");
+  return { decoder, index, frame0 };
+}
+
+/**
+ * Parse ONLY frame 0 from a bounded PREFIX of a large multi-frame structure file
+ * (XYZ / PDB) — for size-independent first paint. Throws (caught upstream so the
+ * caller grows the prefix or falls back to a full read) if frame 0 is not fully
+ * contained in the prefix. `isWholeFile` is true when the prefix covers the whole
+ * file. Requires `ensureInit` first.
+ */
+export function parseStructurePrefixCore(
+  text: string,
+  kind: LazyStructureKind,
+  isWholeFile: boolean,
+): StructureParseResult {
+  return parseWithFn(() => wasmModule!.parse_structure_prefix(text, kind, isWholeFile), "");
+}
+
+/**
+ * Decode ONLY frame 0 (positions, Å) from a bounded prefix of a large trajectory
+ * (XTC / LAMMPS dump). Throws (caught upstream → grow the prefix / fall back) if
+ * the prefix is too small to hold frame 0. Requires `ensureInit` first.
+ */
+export function decodeTrajectoryFrame0Core(
+  bytes: Uint8Array,
+  kind: LazyTrajectoryKind,
+  nAtoms: number,
+): Float32Array {
+  return wasmModule!.decode_trajectory_frame0(bytes, kind, nAtoms);
+}
+
+/** Decode a single frame's positions (Å) from a persistent decoder. */
+export function decodeFrameCore(decoder: WasmFrameDecoder, frame: number): Float32Array {
+  return decoder.decode_frame(frame);
+}
+
+/**
+ * Decode a single frame's embedded vector channels (LAMMPS velocity/force),
+ * concatenated in channel order. Empty for decoders without vector channels.
+ */
+export function decodeFrameVectorsCore(decoder: WasmFrameDecoder, frame: number): Float32Array {
+  if ("decode_frame_vectors" in decoder) {
+    return (decoder as WasmLammpstrjDecoder).decode_frame_vectors(frame);
+  }
+  return new Float32Array(0);
 }
 
 /**

@@ -11,8 +11,15 @@
 import {
   ensureInit,
   parseStructureCore,
+  parseStructurePrefixCore,
   parseTrajectoryCore,
   collectResultBuffers,
+  indexTrajectoryCore,
+  indexStructureCore,
+  decodeTrajectoryFrame0Core,
+  decodeFrameCore,
+  decodeFrameVectorsCore,
+  type WasmFrameDecoder,
 } from "./parseCore";
 import type { ParseRequest, ParseResponse } from "./parseMessages";
 
@@ -23,12 +30,16 @@ interface WorkerSelf {
 
 const ctx = self as unknown as WorkerSelf;
 
+// Persistent lazy per-frame decoders (trajectory OR multi-frame structure),
+// keyed by a client-allocated id. Each holds the whole file in WASM memory for
+// its lifetime so frames can be decoded on demand; freed on `disposeTrajectory`.
+const decoders = new Map<number, WasmFrameDecoder>();
+
 ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
   const req = e.data;
   try {
-    await ensureInit(req.wasmUrl);
-
     if (req.op === "structure") {
+      await ensureInit(req.wasmUrl);
       const result = parseStructureCore({
         ext: req.ext,
         text: req.text,
@@ -39,7 +50,8 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
         { id: req.id, ok: true, op: "structure", result } satisfies ParseResponse,
         transfer,
       );
-    } else {
+    } else if (req.op === "trajectory") {
+      await ensureInit(req.wasmUrl);
       const result = parseTrajectoryCore({
         kind: req.kind,
         text: req.text,
@@ -51,6 +63,84 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
         { id: req.id, ok: true, op: "trajectory", result } satisfies ParseResponse,
         transfer,
       );
+    } else if (req.op === "structurePrefix") {
+      await ensureInit(req.wasmUrl);
+      // Parse frame 0 from a bounded prefix; throws if frame 0 isn't fully in it.
+      const result = parseStructurePrefixCore(req.text, req.kind, req.isWholeFile);
+      const transfer = collectResultBuffers(result);
+      ctx.postMessage(
+        { id: req.id, ok: true, op: "structurePrefix", result } satisfies ParseResponse,
+        transfer,
+      );
+    } else if (req.op === "trajectoryFrame0") {
+      await ensureInit(req.wasmUrl);
+      // Decode frame 0 from a bounded prefix; throws if the prefix is too small.
+      const positions = decodeTrajectoryFrame0Core(
+        new Uint8Array(req.bytes),
+        req.kind,
+        req.expectedNAtoms,
+      );
+      ctx.postMessage(
+        {
+          id: req.id,
+          ok: true,
+          op: "trajectoryFrame0",
+          result: { positions },
+        } satisfies ParseResponse,
+        [positions.buffer],
+      );
+    } else if (req.op === "indexStructure") {
+      await ensureInit(req.wasmUrl);
+      // One read: build the persistent decoder (index) AND parse frame 0.
+      const { decoder, index, frame0 } = indexStructureCore(new Uint8Array(req.bytes), req.kind);
+      decoders.set(req.trajectoryId, decoder);
+      // Transfer frame 0's backing buffers (positions/elements/bonds/…) zero-copy.
+      const transfer = collectResultBuffers(frame0);
+      ctx.postMessage(
+        {
+          id: req.id,
+          ok: true,
+          op: "indexStructure",
+          result: { index, frame0 },
+        } satisfies ParseResponse,
+        transfer,
+      );
+    } else if (req.op === "indexTrajectory") {
+      await ensureInit(req.wasmUrl);
+      const { decoder, index } = indexTrajectoryCore(
+        new Uint8Array(req.bytes),
+        req.kind,
+        req.expectedNAtoms,
+      );
+      decoders.set(req.trajectoryId, decoder);
+      // Transfer the small index arrays (box, times) zero-copy.
+      const transfer: Transferable[] = [index.times.buffer];
+      if (index.box) transfer.push(index.box.buffer);
+      ctx.postMessage(
+        { id: req.id, ok: true, op: "indexTrajectory", result: index } satisfies ParseResponse,
+        transfer,
+      );
+    } else if (req.op === "decodeFrame") {
+      const decoder = decoders.get(req.trajectoryId);
+      if (!decoder) throw new Error(`unknown trajectoryId ${req.trajectoryId}`);
+      const positions = decodeFrameCore(decoder, req.frame);
+      const vectors = decodeFrameVectorsCore(decoder, req.frame);
+      const vectorChannelCount = vectors.length > 0 ? vectors.length / (decoder.n_atoms * 3) : 0;
+      const transfer: Transferable[] = [positions.buffer];
+      if (vectors.length > 0) transfer.push(vectors.buffer);
+      ctx.postMessage(
+        {
+          id: req.id,
+          ok: true,
+          op: "decodeFrame",
+          result: { frame: req.frame, positions, vectors, vectorChannelCount },
+        } satisfies ParseResponse,
+        transfer,
+      );
+    } else if (req.op === "disposeTrajectory") {
+      decoders.get(req.trajectoryId)?.free();
+      decoders.delete(req.trajectoryId);
+      ctx.postMessage({ id: req.id, ok: true, op: "disposeTrajectory" } satisfies ParseResponse);
     }
   } catch (err) {
     ctx.postMessage({

@@ -17,6 +17,7 @@ import { MeasurementPanel } from "./MeasurementPanel";
 import { MeasurementListPanel } from "./MeasurementListPanel";
 import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
+import type { StructureParseResult } from "../parsers/structure";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
@@ -41,7 +42,7 @@ interface MeganeViewerProps {
   onSeek?: (frame: number) => void;
   onPlayPause?: () => void;
   onFpsChange?: (fps: number) => void;
-  onUploadStructure: (file: File) => void;
+  onUploadStructure: (file: File, preParsed?: StructureParseResult) => void;
   onUploadTrajectory?: (file: File) => void;
   onBondSourceChange?: (source: BondSource) => void;
   onLabelSourceChange?: (source: LabelSource) => void;

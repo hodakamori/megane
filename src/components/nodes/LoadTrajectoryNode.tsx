@@ -82,6 +82,7 @@ export function LoadTrajectoryNode({ id, data }: NodeProps<Node<PipelineNodeData
         </button>
         <input
           ref={inputRef}
+          data-testid="load-trajectory-input"
           type="file"
           accept={TRAJECTORY_ACCEPT}
           onChange={(e) => {

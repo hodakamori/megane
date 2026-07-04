@@ -11,6 +11,14 @@
 export type { StructureParseResult } from "./parseCore";
 export { parseStructureFile, parseStructureText } from "./parseClient";
 export {
+  indexStructureLazy,
+  parseStructurePrefix,
+  shouldUseLazyStructure,
+  type StructureLazyHandle,
+  type StructureLazyResult,
+} from "./parseClient";
+export type { LazyStructureKind } from "./parseCore";
+export {
   inferBondsVdw,
   parseTopBonds,
   parseTopBondsWithIncludes,
