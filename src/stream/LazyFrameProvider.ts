@@ -9,11 +9,18 @@
  * `StreamFrameProvider`, so the existing async-frame render path is reused
  * verbatim). Frame 0 and a sliding window ahead of the playhead are prefetched
  * so playback rarely stalls.
+ *
+ * Two shapes are supported:
+ *  - Trajectory files (XTC / LAMMPS dump): provider frame `i` == decoder frame
+ *    `i`; frame 0 is a real decoded frame.
+ *  - Structure files with extra frames (multi-frame XYZ / multi-MODEL PDB):
+ *    `basePositions` is the eager snapshot (provider frame 0), and provider
+ *    frame `i > 0` decodes the underlying "extra" frame `i - 1`.
  */
 
 import type { Frame, TrajectoryMeta } from "../types";
 import type { FrameProvider } from "../pipeline/types";
-import type { XtcLazyHandle } from "../parsers/parseClient";
+import type { TrajectoryLazyHandle, DecodedLazyFrame } from "../parsers/parseClient";
 
 const DEFAULT_CACHE_SIZE = 256;
 const DEFAULT_PREFETCH_AHEAD = 16;
@@ -21,10 +28,17 @@ const DEFAULT_PREFETCH_AHEAD = 16;
 export interface LazyFrameProviderOptions {
   maxCacheSize?: number;
   prefetchAhead?: number;
-  /** Decode one frame (defaults to the worker `decodeXTCFrame`). Injectable for tests. */
-  decode?: (trajectoryId: number, frame: number) => Promise<Float32Array>;
-  /** Dispose the worker decoder (defaults to `disposeXTCTrajectory`). Injectable for tests. */
+  /** Decode one underlying frame (defaults to the worker `decodeTrajectoryFrame`). */
+  decode?: (trajectoryId: number, frame: number) => Promise<DecodedLazyFrame>;
+  /** Dispose the worker decoder (defaults to `disposeTrajectoryLazy`). */
   dispose?: (trajectoryId: number) => void;
+  /**
+   * Eager frame-0 positions for the structure-file convention. When set,
+   * provider frame 0 returns these synchronously and provider frame `i > 0`
+   * decodes underlying frame `i - 1`. Omit for trajectory files (frame 0 is a
+   * real decoded frame).
+   */
+  basePositions?: Float32Array | null;
 }
 
 export class LazyFrameProvider implements FrameProvider {
@@ -35,27 +49,42 @@ export class LazyFrameProvider implements FrameProvider {
 
   private readonly trajectoryId: number;
   private readonly nAtoms: number;
+  /** Number of decodable underlying frames (excludes the synthetic base frame). */
+  private readonly decodableFrames: number;
+  /** 1 when a synthetic base frame 0 is present (structure files), else 0. */
+  private readonly baseOffset: number;
+  /** Total frames exposed to consumers (decodable + base). */
   private readonly nFrames: number;
+  private readonly basePositions: Float32Array | null;
   private cache: Map<number, Frame> = new Map();
   private cacheOrder: number[] = [];
   private inflight: Set<number> = new Set();
   private readonly maxCacheSize: number;
   private readonly prefetchAhead: number;
-  private readonly decode: (trajectoryId: number, frame: number) => Promise<Float32Array>;
+  private readonly decode: (trajectoryId: number, frame: number) => Promise<DecodedLazyFrame>;
   private readonly disposeFn: (trajectoryId: number) => void;
   private onFrameReady: ((frame: Frame) => void) | null = null;
+  private onVectors:
+    | ((frameId: number, vectors: Float32Array, channelCount: number) => void)
+    | null = null;
   private onProgress: ((decoded: number, total: number) => void) | null = null;
   private decodedCountHW = 0;
   private disposed = false;
 
-  constructor(handle: XtcLazyHandle, meta: TrajectoryMeta, opts: LazyFrameProviderOptions = {}) {
+  constructor(
+    handle: TrajectoryLazyHandle,
+    meta: TrajectoryMeta,
+    opts: LazyFrameProviderOptions = {},
+  ) {
     this.trajectoryId = handle.trajectoryId;
     this.nAtoms = handle.index.nAtoms;
-    this.nFrames = handle.index.nFrames;
+    this.decodableFrames = handle.index.nFrames;
+    this.basePositions = opts.basePositions ?? null;
+    this.baseOffset = this.basePositions ? 1 : 0;
+    this.nFrames = this.decodableFrames + this.baseOffset;
     this.meta = meta;
     this.maxCacheSize = opts.maxCacheSize ?? DEFAULT_CACHE_SIZE;
     this.prefetchAhead = opts.prefetchAhead ?? DEFAULT_PREFETCH_AHEAD;
-    // Injected in tests; the runtime wiring passes the worker client functions.
     this.decode = opts.decode ?? (() => Promise.reject(new Error("no decode fn")));
     this.disposeFn = opts.dispose ?? (() => {});
     // Prime frame 0 (and its window) so first paint is fast.
@@ -65,6 +94,13 @@ export class LazyFrameProvider implements FrameProvider {
   /** Register a callback for when a background-decoded frame becomes available. */
   setOnFrameReady(callback: (frame: Frame) => void): void {
     this.onFrameReady = callback;
+  }
+
+  /** Register a callback for a frame's embedded vector channels (LAMMPS velocity/force). */
+  setOnVectors(
+    callback: (frameId: number, vectors: Float32Array, channelCount: number) => void,
+  ): void {
+    this.onVectors = callback;
   }
 
   /** Register a decode-progress callback: (distinct frames decoded, total). */
@@ -78,11 +114,14 @@ export class LazyFrameProvider implements FrameProvider {
   }
 
   /**
-   * Get a frame by index. Returns the cached frame, or null while it (and a
-   * window ahead) decode in the background — the frame then arrives via
-   * `onFrameReady`.
+   * Get a frame by index. Returns the cached frame (or the synchronous base
+   * frame 0), or null while it (and a window ahead) decode in the background —
+   * the frame then arrives via `onFrameReady`.
    */
   getFrame(index: number): Frame | null {
+    if (index === 0 && this.basePositions) {
+      return { frameId: 0, nAtoms: this.nAtoms, positions: this.basePositions };
+    }
     this.prefetchWindow(index);
     return this.cache.get(index) ?? null;
   }
@@ -107,28 +146,39 @@ export class LazyFrameProvider implements FrameProvider {
     for (let f = center; f <= end; f++) this.request(f);
   }
 
-  private request(index: number): void {
+  private request(providerIndex: number): void {
     if (this.disposed) return;
-    if (index < 0 || index >= this.nFrames) return;
-    if (this.cache.has(index) || this.inflight.has(index)) return;
-    this.inflight.add(index);
-    this.decode(this.trajectoryId, index)
-      .then((positions) => {
-        this.inflight.delete(index);
+    if (providerIndex < 0 || providerIndex >= this.nFrames) return;
+    // The synthetic base frame 0 needs no decode.
+    if (providerIndex === 0 && this.basePositions) return;
+    if (this.cache.has(providerIndex) || this.inflight.has(providerIndex)) return;
+    const fileFrame = providerIndex - this.baseOffset;
+    if (fileFrame < 0 || fileFrame >= this.decodableFrames) return;
+    this.inflight.add(providerIndex);
+    this.decode(this.trajectoryId, fileFrame)
+      .then((decoded) => {
+        this.inflight.delete(providerIndex);
         if (this.disposed) return;
-        const frame: Frame = { frameId: index, nAtoms: this.nAtoms, positions };
-        const isNew = !this.cache.has(index);
+        const frame: Frame = {
+          frameId: providerIndex,
+          nAtoms: this.nAtoms,
+          positions: decoded.positions,
+        };
+        const isNew = !this.cache.has(providerIndex);
         this.cacheFrame(frame);
         if (isNew) {
           this.decodedCountHW += 1;
           this.onProgress?.(this.decodedCountHW, this.nFrames);
         }
         this.onFrameReady?.(frame);
+        if (decoded.vectors && decoded.vectors.length > 0) {
+          this.onVectors?.(providerIndex, decoded.vectors, decoded.vectorChannelCount);
+        }
       })
       .catch(() => {
         // Leave the frame undecoded (getFrame keeps returning null → the viewer
         // holds the last frame). The owner may retry on the next getFrame.
-        this.inflight.delete(index);
+        this.inflight.delete(providerIndex);
       });
   }
 

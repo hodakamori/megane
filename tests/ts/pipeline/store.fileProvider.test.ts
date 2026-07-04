@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { usePipelineStore } from "@/pipeline/store";
 import { LazyFrameProvider } from "@/stream/LazyFrameProvider";
-import type { XtcLazyHandle } from "@/parsers/parseClient";
+import type { TrajectoryLazyHandle } from "@/parsers/parseClient";
 import type { TrajectoryMeta, Frame } from "@/types";
 
 const meta: TrajectoryMeta = { nFrames: 5, timestepPs: 1, nAtoms: 2 };
 const eagerFrames: Frame[] = [{ frameId: 0, nAtoms: 2, positions: new Float32Array(6) }];
 
 function makeProvider(dispose: () => void, trajectoryId = 1): LazyFrameProvider {
-  const handle: XtcLazyHandle = {
+  const handle: TrajectoryLazyHandle = {
     trajectoryId,
+    kind: "xtc",
     index: {
       nAtoms: 2,
       nFrames: 5,
@@ -17,10 +18,12 @@ function makeProvider(dispose: () => void, trajectoryId = 1): LazyFrameProvider 
       hasBox: false,
       box: null,
       times: new Float32Array(5),
+      vectorChannelNames: [],
     },
   };
   return new LazyFrameProvider(handle, meta, {
-    decode: () => Promise.resolve(new Float32Array(6)),
+    decode: () =>
+      Promise.resolve({ positions: new Float32Array(6), vectors: new Float32Array(0), vectorChannelCount: 0 }),
     dispose,
     prefetchAhead: 0,
   });

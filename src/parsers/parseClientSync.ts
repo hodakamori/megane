@@ -83,34 +83,49 @@ export async function parseNetCDFFile(file: File, expectedNAtoms: number): Promi
 }
 
 /** Handle shape mirrored from `parseClient` (never produced on the sync path). */
-export interface XtcLazyHandle {
+export interface TrajectoryLazyHandle {
   trajectoryId: number;
-  index: import("./parseCore").XtcIndexResult;
+  kind: import("./parseCore").LazyTrajectoryKind;
+  index: import("./parseCore").TrajectoryIndexResult;
+}
+
+/** One lazily-decoded frame (mirrored; never produced on the sync path). */
+export interface DecodedLazyFrame {
+  positions: Float32Array;
+  vectors: Float32Array;
+  vectorChannelCount: number;
 }
 
 /** Lazy decode needs a worker; the sync path never uses it. */
-export function shouldUseLazyXtc(_fileSize: number): boolean {
+export function shouldUseLazyTrajectory(
+  _kind: import("./parseCore").LazyTrajectoryKind,
+  _fileSize: number,
+): boolean {
   return false;
 }
 
 /**
- * Lazy XTC decode is worker-only. On the synchronous path (JupyterLab/anywidget
+ * Lazy decode is worker-only. On the synchronous path (JupyterLab/anywidget
  * bundles, or the runtime worker-unavailable fallback) this returns `null`, the
- * uniform "fall back to eager parse" signal — the caller then uses `parseXTCFile`.
+ * uniform "fall back to eager parse" signal — the caller then uses the eager parser.
  */
-export async function indexXTCFile(
+export async function indexTrajectoryLazy(
   _file: File,
+  _kind: import("./parseCore").LazyTrajectoryKind,
   _expectedNAtoms: number,
-): Promise<XtcLazyHandle | null> {
+): Promise<TrajectoryLazyHandle | null> {
   return null;
 }
 
-/** Never called (indexXTCFile returns null so no lazy provider is created). */
-export async function decodeXTCFrame(_trajectoryId: number, _frame: number): Promise<Float32Array> {
-  throw new Error("decodeXTCFrame is worker-only");
+/** Never called (indexTrajectoryLazy returns null so no lazy provider is created). */
+export async function decodeTrajectoryFrame(
+  _trajectoryId: number,
+  _frame: number,
+): Promise<DecodedLazyFrame> {
+  throw new Error("decodeTrajectoryFrame is worker-only");
 }
 
 /** No-op: there is no persistent decoder on the synchronous path. */
-export function disposeXTCTrajectory(_trajectoryId: number): void {
+export function disposeTrajectoryLazy(_trajectoryId: number): void {
   /* no-op */
 }

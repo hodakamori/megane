@@ -9,9 +9,10 @@
 export type { XTCParseResult } from "./parseCore";
 export { parseXTCFile, parseDCDFile, parseLammpstrjFile, parseNetCDFFile } from "./parseClient";
 export {
-  indexXTCFile,
-  decodeXTCFrame,
-  disposeXTCTrajectory,
-  shouldUseLazyXtc,
-  type XtcLazyHandle,
+  indexTrajectoryLazy,
+  decodeTrajectoryFrame,
+  disposeTrajectoryLazy,
+  shouldUseLazyTrajectory,
+  type TrajectoryLazyHandle,
+  type DecodedLazyFrame,
 } from "./parseClient";

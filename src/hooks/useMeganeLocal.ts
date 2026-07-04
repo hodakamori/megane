@@ -13,10 +13,10 @@ import {
   parseLammpstrjFile,
   parseDCDFile,
   parseNetCDFFile,
-  indexXTCFile,
-  decodeXTCFrame,
-  disposeXTCTrajectory,
-  shouldUseLazyXtc,
+  indexTrajectoryLazy,
+  decodeTrajectoryFrame,
+  disposeTrajectoryLazy,
+  shouldUseLazyTrajectory,
 } from "../parsers/xtc";
 import { LazyFrameProvider } from "../stream/LazyFrameProvider";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
@@ -325,13 +325,15 @@ export function useMeganeLocal(): MeganeLocalState {
       const nAtoms = baseSnapshotRef.current.nAtoms;
       const store = usePipelineStore.getState();
 
-      // Lazy/streaming path (large XTC only, worker-gated). indexXTCFile scans
-      // the frame index without decoding coordinates and keeps the file resident
-      // in the worker; frame 0 renders immediately and the rest stream in via the
-      // playback store's async-frame path. Small files stay eager (smoother
-      // playback, no per-frame worker cost); a null handle also falls back.
-      if (isXtc && shouldUseLazyXtc(xtc.size)) {
-        const handle = await indexXTCFile(xtc, nAtoms);
+      // Lazy/streaming path (large XTC or LAMMPS dump, worker-gated).
+      // indexTrajectoryLazy scans the frame index without decoding coordinates
+      // and keeps the file resident in the worker; frame 0 renders immediately
+      // and the rest stream in via the playback store's async-frame path. Small
+      // files stay eager (smoother playback, no per-frame worker cost); a null
+      // handle also falls back.
+      const lazyKind = isLammpstrj ? "lammpstrj" : isXtc ? "xtc" : null;
+      if (lazyKind && shouldUseLazyTrajectory(lazyKind, xtc.size)) {
+        const handle = await indexTrajectoryLazy(xtc, lazyKind, nAtoms);
         if (handle) {
           const meta: TrajectoryMeta = {
             nFrames: handle.index.nFrames,
@@ -339,10 +341,36 @@ export function useMeganeLocal(): MeganeLocalState {
             nAtoms: handle.index.nAtoms,
           };
           const provider = new LazyFrameProvider(handle, meta, {
-            decode: decodeXTCFrame,
-            dispose: disposeXTCTrajectory,
+            decode: decodeTrajectoryFrame,
+            dispose: disposeTrajectoryLazy,
           });
           provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
+
+          // Stream embedded vector channels (LAMMPS velocity/force) as frames
+          // decode. The overlay uses the first channel (matching the eager path);
+          // updates are batched so we don't re-run the pipeline per frame.
+          const channelNames = handle.index.vectorChannelNames;
+          if (channelNames.length > 0) {
+            const stride = nAtoms * 3;
+            const accumulated = new Map<number, Float32Array>();
+            let flushScheduled = false;
+            const flush = () => {
+              flushScheduled = false;
+              // Only apply while this provider is still the active trajectory.
+              if (usePipelineStore.getState().fileProvider !== provider) return;
+              const frames = [...accumulated.entries()]
+                .sort((a, b) => a[0] - b[0])
+                .map(([frame, vectors]) => ({ frame, vectors }));
+              usePipelineStore.getState().setFileVectors(frames);
+            };
+            provider.setOnVectors((frameId, vectors) => {
+              accumulated.set(frameId, vectors.slice(0, stride));
+              if (!flushScheduled) {
+                flushScheduled = true;
+                setTimeout(flush, 200);
+              }
+            });
+          }
 
           // useMeganeLocal's own frame array stays empty — positions render
           // through the pipeline provider + playback store, not fileFramesRef.
@@ -361,6 +389,14 @@ export function useMeganeLocal(): MeganeLocalState {
           if (trajNode) {
             store.updateNodeParams(trajNode.id, { fileName: xtc.name });
           }
+          // Surface the embedded vector channel name on load_vector nodes.
+          if (channelNames.length > 0) {
+            for (const n of store.nodes) {
+              if (n.type === "load_vector") {
+                store.updateNodeParams(n.id, { fileName: `[embedded] ${channelNames[0]}` });
+              }
+            }
+          }
           return;
         }
       }
@@ -372,11 +408,7 @@ export function useMeganeLocal(): MeganeLocalState {
           : isNetcdf
             ? parseNetCDFFile
             : parseXTCFile;
-      const {
-        frames,
-        meta: xtcMeta,
-        vectorChannels,
-      } = await parseFn(xtc, nAtoms);
+      const { frames, meta: xtcMeta, vectorChannels } = await parseFn(xtc, nAtoms);
       fileFramesRef.current = frames;
       fileTrajMetaRef.current = xtcMeta;
       xtcFileNameRef.current = xtc.name;

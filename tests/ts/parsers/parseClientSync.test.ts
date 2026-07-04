@@ -113,6 +113,24 @@ const { calls, wasmMock } = vi.hoisted(() => {
       }
       free() {}
     },
+    LammpstrjDecoder: class {
+      n_atoms = 4;
+      n_frames = 2;
+      timestep_ps = 1;
+      has_box = false;
+      vector_channel_count = 0;
+      vector_channel_names = "";
+      box_matrix() {
+        return new Float32Array(9);
+      }
+      decode_frame() {
+        return new Float32Array(4 * 3);
+      }
+      decode_frame_vectors() {
+        return new Float32Array(0);
+      }
+      free() {}
+    },
   };
 
   return { calls, wasmMock };
@@ -192,11 +210,11 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     // On the sync path (JupyterLab/anywidget / worker-unavailable), indexXTCFile
     // returns null so the caller falls back to eager parseXTCFile; decode is
     // never reached and dispose is a no-op.
-    expect(await sync.indexXTCFile(fakeFile("t.xtc"), 4)).toBeNull();
-    await expect(sync.decodeXTCFrame(0, 0)).rejects.toThrow(/worker-only/);
-    expect(() => sync.disposeXTCTrajectory(0)).not.toThrow();
+    expect(await sync.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
+    await expect(sync.decodeTrajectoryFrame(0, 0)).rejects.toThrow(/worker-only/);
+    expect(() => sync.disposeTrajectoryLazy(0)).not.toThrow();
     // Never streams on the sync path, regardless of file size.
-    expect(sync.shouldUseLazyXtc(1)).toBe(false);
-    expect(sync.shouldUseLazyXtc(1024 * 1024 * 1024)).toBe(false);
+    expect(sync.shouldUseLazyTrajectory("xtc", 1)).toBe(false);
+    expect(sync.shouldUseLazyTrajectory("lammpstrj", 1024 * 1024 * 1024)).toBe(false);
   });
 });

@@ -15,7 +15,8 @@ import {
   collectResultBuffers,
   indexTrajectoryCore,
   decodeFrameCore,
-  type WasmXtcDecoder,
+  decodeFrameVectorsCore,
+  type WasmTrajectoryDecoder,
 } from "./parseCore";
 import type { ParseRequest, ParseResponse } from "./parseMessages";
 
@@ -29,7 +30,7 @@ const ctx = self as unknown as WorkerSelf;
 // Persistent lazy XTC decoders, keyed by a client-allocated trajectoryId. Each
 // holds the whole file in WASM memory for the trajectory's lifetime so frames
 // can be decoded on demand; freed on `disposeTrajectory`.
-const decoders = new Map<number, WasmXtcDecoder>();
+const decoders = new Map<number, WasmTrajectoryDecoder>();
 
 ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
   const req = e.data;
@@ -63,6 +64,7 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
       await ensureInit(req.wasmUrl);
       const { decoder, index } = indexTrajectoryCore(
         new Uint8Array(req.bytes),
+        req.kind,
         req.expectedNAtoms,
       );
       decoders.set(req.trajectoryId, decoder);
@@ -77,14 +79,18 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
       const decoder = decoders.get(req.trajectoryId);
       if (!decoder) throw new Error(`unknown trajectoryId ${req.trajectoryId}`);
       const positions = decodeFrameCore(decoder, req.frame);
+      const vectors = decodeFrameVectorsCore(decoder, req.frame);
+      const vectorChannelCount = vectors.length > 0 ? vectors.length / (decoder.n_atoms * 3) : 0;
+      const transfer: Transferable[] = [positions.buffer];
+      if (vectors.length > 0) transfer.push(vectors.buffer);
       ctx.postMessage(
         {
           id: req.id,
           ok: true,
           op: "decodeFrame",
-          result: { frame: req.frame, positions },
+          result: { frame: req.frame, positions, vectors, vectorChannelCount },
         } satisfies ParseResponse,
-        [positions.buffer],
+        transfer,
       );
     } else if (req.op === "disposeTrajectory") {
       decoders.get(req.trajectoryId)?.free();

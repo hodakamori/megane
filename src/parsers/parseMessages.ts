@@ -7,7 +7,8 @@ import type {
   StructureParseResult,
   XTCParseResult,
   TrajectoryKind,
-  XtcIndexResult,
+  TrajectoryIndexResult,
+  LazyTrajectoryKind,
 } from "./parseCore";
 
 /** Request: parse a structure file's already-read contents. */
@@ -31,11 +32,12 @@ export interface TrajectoryParseRequest {
   expectedNAtoms: number;
 }
 
-/** Request: build a lazy XTC decoder (scans the index, holds bytes in the worker). */
+/** Request: build a lazy trajectory decoder (scans the index, holds bytes in the worker). */
 export interface IndexTrajectoryRequest {
   id: number;
   op: "indexTrajectory";
   wasmUrl: string | undefined;
+  kind: LazyTrajectoryKind;
   trajectoryId: number;
   bytes: ArrayBuffer;
   expectedNAtoms: number;
@@ -63,16 +65,20 @@ export type ParseRequest =
   | DecodeFrameRequest
   | DisposeTrajectoryRequest;
 
-/** Response payload for a `decodeFrame` request: one frame's positions. */
+/** Response payload for a `decodeFrame` request: one frame's positions (+ vectors). */
 export interface DecodeFrameResult {
   frame: number;
   positions: Float32Array;
+  /** Embedded vector channels for this frame, concatenated (empty if none). */
+  vectors: Float32Array;
+  /** Number of vector channels packed into `vectors`. */
+  vectorChannelCount: number;
 }
 
 export interface ParseResponse {
   id: number;
   ok: boolean;
   op: "structure" | "trajectory" | "indexTrajectory" | "decodeFrame" | "disposeTrajectory";
-  result?: StructureParseResult | XTCParseResult | XtcIndexResult | DecodeFrameResult;
+  result?: StructureParseResult | XTCParseResult | TrajectoryIndexResult | DecodeFrameResult;
   error?: string;
 }

@@ -461,6 +461,101 @@ impl XtcDecoder {
     }
 }
 
+/// Persistent LAMMPS-dump decoder for lazy/streaming playback (text format).
+///
+/// Owns the dump text and a frame byte-offset index; decodes one frame's
+/// positions (and any velocity/force vector channels) on demand.
+#[wasm_bindgen]
+pub struct LammpstrjDecoder {
+    text: String,
+    offsets: Vec<usize>,
+    n_atoms: usize,
+    n_frames: u32,
+    timestep_ps: f32,
+    has_box: bool,
+    box_matrix: Vec<f32>,
+    /// Newline-joined vector channel names (velocity/force), in decode order.
+    vector_channel_names: Vec<String>,
+}
+
+#[wasm_bindgen]
+impl LammpstrjDecoder {
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: Vec<u8>) -> Result<LammpstrjDecoder, JsError> {
+        let text = String::from_utf8(data).map_err(|_| JsError::new("dump is not valid UTF-8"))?;
+        let idx = lammpstrj::build_index(&text).map_err(|e| JsError::new(&e))?;
+        let has_box = idx.box_matrix.is_some();
+        let box_matrix = idx.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        Ok(LammpstrjDecoder {
+            text,
+            offsets: idx.offsets,
+            n_atoms: idx.n_atoms,
+            n_frames: idx.n_frames as u32,
+            timestep_ps: idx.timestep_ps,
+            has_box,
+            box_matrix,
+            vector_channel_names: idx.vector_channel_names,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms as u32
+    }
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+    #[wasm_bindgen(getter)]
+    pub fn timestep_ps(&self) -> f32 {
+        self.timestep_ps
+    }
+    #[wasm_bindgen(getter)]
+    pub fn has_box(&self) -> bool {
+        self.has_box
+    }
+    pub fn box_matrix(&self) -> Float32Array {
+        Float32Array::from(&self.box_matrix[..])
+    }
+    /// Number of per-atom vector channels (velocity/force).
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_count(&self) -> u32 {
+        self.vector_channel_names.len() as u32
+    }
+    /// Newline-joined vector channel names, in decode order.
+    #[wasm_bindgen(getter)]
+    pub fn vector_channel_names(&self) -> String {
+        self.vector_channel_names.join("\n")
+    }
+
+    /// Decode a single frame's positions (Å), `n_atoms * 3` floats.
+    pub fn decode_frame(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let decoded = lammpstrj::decode_frame_at(&self.text, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(Float32Array::from(&decoded.positions[..]))
+    }
+
+    /// Decode a single frame's vector channels, concatenated in channel order:
+    /// `[channel0 (n_atoms*3), channel1 (n_atoms*3), ...]`. Empty if none.
+    pub fn decode_frame_vectors(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let decoded = lammpstrj::decode_frame_at(&self.text, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        let mut flat: Vec<f32> = Vec::new();
+        for v in &decoded.vectors {
+            flat.extend_from_slice(v);
+        }
+        Ok(Float32Array::from(&flat[..]))
+    }
+}
+
 /// Parse a PDB file text and return structured data for the molecular viewer.
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {

@@ -93,6 +93,24 @@ const { wasmMock } = vi.hoisted(() => {
       }
       free() {}
     },
+    LammpstrjDecoder: class {
+      n_atoms = 4;
+      n_frames = 2;
+      timestep_ps = 1;
+      has_box = false;
+      vector_channel_count = 1;
+      vector_channel_names = "velocity";
+      box_matrix() {
+        return new Float32Array(9);
+      }
+      decode_frame() {
+        return new Float32Array(4 * 3);
+      }
+      decode_frame_vectors() {
+        return new Float32Array(4 * 3);
+      }
+      free() {}
+    },
   };
   return { wasmMock };
 });
@@ -177,6 +195,7 @@ describe("parse.worker onmessage", () => {
         id: 10,
         op: "indexTrajectory",
         wasmUrl: undefined,
+        kind: "xtc",
         trajectoryId: 100,
         bytes: new Uint8Array([1, 2, 3, 4]).buffer,
         expectedNAtoms: 4,
@@ -206,6 +225,36 @@ describe("parse.worker onmessage", () => {
     expect(posts[3].error).toMatch(/unknown trajectoryId/);
   });
 
+  it("indexes a LAMMPS dump (kind=lammpstrj) and decodes a frame with vectors", async () => {
+    const { handler, posts } = await loadWorker();
+    await handler({
+      data: {
+        id: 30,
+        op: "indexTrajectory",
+        wasmUrl: undefined,
+        kind: "lammpstrj",
+        trajectoryId: 300,
+        bytes: new Uint8Array([1, 2, 3, 4]).buffer,
+        expectedNAtoms: 4,
+      },
+    });
+    expect(posts[0].ok).toBe(true);
+    const index = posts[0].result as { vectorChannelNames: string[] };
+    expect(index.vectorChannelNames).toEqual(["velocity"]);
+
+    await handler({ data: { id: 31, op: "decodeFrame", trajectoryId: 300, frame: 0 } });
+    expect(posts[1].ok).toBe(true);
+    const decoded = posts[1].result as {
+      positions: Float32Array;
+      vectors: Float32Array;
+      vectorChannelCount: number;
+    };
+    expect(decoded.positions).toHaveLength(4 * 3);
+    // LammpstrjDecoder mock returns one channel of 4*3 floats.
+    expect(decoded.vectors).toHaveLength(4 * 3);
+    expect(decoded.vectorChannelCount).toBe(1);
+  });
+
   it("errors when the index atom count does not match the structure", async () => {
     const { handler, posts } = await loadWorker();
     await handler({
@@ -213,6 +262,7 @@ describe("parse.worker onmessage", () => {
         id: 20,
         op: "indexTrajectory",
         wasmUrl: undefined,
+        kind: "xtc",
         trajectoryId: 200,
         bytes: new Uint8Array([1]).buffer,
         expectedNAtoms: 999,

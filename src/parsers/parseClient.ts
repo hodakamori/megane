@@ -23,7 +23,8 @@ import type {
   StructureParseResult,
   XTCParseResult,
   TrajectoryKind,
-  XtcIndexResult,
+  TrajectoryIndexResult,
+  LazyTrajectoryKind,
 } from "./parseCore";
 import type { ParseRequest, ParseResponse, DecodeFrameResult } from "./parseMessages";
 
@@ -52,12 +53,12 @@ function workerUnavailable(): boolean {
 const LAZY_XTC_MIN_BYTES = 8 * 1024 * 1024;
 
 /**
- * Whether to stream a given XTC file lazily. Requires a worker. A
+ * Whether to stream a given trajectory file lazily. Requires a worker. A
  * `globalThis.__MEGANE_LAZY_XTC__` boolean override forces lazy on/off
  * (bypassing the size gate — used by tests and as a kill switch); otherwise
  * lazy is used only for files at or above {@link LAZY_XTC_MIN_BYTES}.
  */
-export function shouldUseLazyXtc(fileSize: number): boolean {
+export function shouldUseLazyTrajectory(_kind: LazyTrajectoryKind, fileSize: number): boolean {
   if (workerUnavailable()) return false;
   const override = (globalThis as Record<string, unknown>).__MEGANE_LAZY_XTC__;
   if (typeof override === "boolean") return override;
@@ -213,54 +214,73 @@ export function parseNetCDFFile(file: File, expectedNAtoms: number): Promise<XTC
   return parseTrajectoryFile("netcdf", file, expectedNAtoms, sync.parseNetCDFFile);
 }
 
-/** Handle returned by `indexXTCFile`, consumed by `LazyFrameProvider`. */
-export interface XtcLazyHandle {
+/** Handle returned by `indexTrajectoryLazy`, consumed by `LazyFrameProvider`. */
+export interface TrajectoryLazyHandle {
   trajectoryId: number;
-  index: XtcIndexResult;
+  kind: LazyTrajectoryKind;
+  index: TrajectoryIndexResult;
+}
+
+/** One lazily-decoded frame: positions plus any embedded vector channels. */
+export interface DecodedLazyFrame {
+  positions: Float32Array;
+  /** Concatenated per-atom vector channels for this frame (empty if none). */
+  vectors: Float32Array;
+  vectorChannelCount: number;
 }
 
 /**
- * Build a lazy XTC decoder in the worker: reads the file, scans its frame index
- * (no coordinate decode), and keeps the bytes resident in the worker so frames
- * can be decoded on demand via {@link decodeXTCFrame}. Returns `null` — the
- * single uniform "fall back to eager parse" signal — when lazy is disabled, the
- * worker is unavailable (incl. the `parseClientSync` build), or indexing fails.
+ * Build a lazy trajectory decoder in the worker: reads the file, scans its
+ * frame index (no coordinate decode), and keeps the bytes resident in the
+ * worker so frames can be decoded on demand via {@link decodeTrajectoryFrame}.
+ * Returns `null` — the single uniform "fall back to eager parse" signal — when
+ * the worker is unavailable (incl. the `parseClientSync` build) or indexing fails.
  */
-export async function indexXTCFile(
+export async function indexTrajectoryLazy(
   file: File,
+  kind: LazyTrajectoryKind,
   expectedNAtoms: number,
-): Promise<XtcLazyHandle | null> {
+): Promise<TrajectoryLazyHandle | null> {
   if (workerUnavailable()) return null;
   try {
     const id = nextId++;
     const trajectoryId = nextTrajId++;
     const buffer = await file.arrayBuffer();
-    const index = await send<XtcIndexResult>(
-      { id, op: "indexTrajectory", wasmUrl: resolveWasmUrl(), trajectoryId, bytes: buffer, expectedNAtoms },
+    const index = await send<TrajectoryIndexResult>(
+      {
+        id,
+        op: "indexTrajectory",
+        wasmUrl: resolveWasmUrl(),
+        kind,
+        trajectoryId,
+        bytes: buffer,
+        expectedNAtoms,
+      },
       [buffer],
     );
-    return { trajectoryId, index };
+    return { trajectoryId, kind, index };
   } catch {
     // Any failure ⇒ let the caller fall back to eager parsing.
     return null;
   }
 }
 
-/** Decode one frame of a previously-indexed trajectory (worker round-trip). */
-export async function decodeXTCFrame(
+/** Decode one frame (positions + any vectors) of a previously-indexed trajectory. */
+export async function decodeTrajectoryFrame(
   trajectoryId: number,
   frame: number,
-): Promise<Float32Array> {
+): Promise<DecodedLazyFrame> {
   const id = nextId++;
-  const result = await send<DecodeFrameResult>(
-    { id, op: "decodeFrame", trajectoryId, frame },
-    [],
-  );
-  return result.positions;
+  const result = await send<DecodeFrameResult>({ id, op: "decodeFrame", trajectoryId, frame }, []);
+  return {
+    positions: result.positions,
+    vectors: result.vectors,
+    vectorChannelCount: result.vectorChannelCount,
+  };
 }
 
-/** Free a lazy XTC decoder in the worker (fire-and-forget). */
-export function disposeXTCTrajectory(trajectoryId: number): void {
+/** Free a lazy trajectory decoder in the worker (fire-and-forget). */
+export function disposeTrajectoryLazy(trajectoryId: number): void {
   if (workerUnavailable()) return;
   const id = nextId++;
   void send<undefined>({ id, op: "disposeTrajectory", trajectoryId }, []).catch(() => {

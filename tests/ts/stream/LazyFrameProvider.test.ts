@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LazyFrameProvider } from "@/stream/LazyFrameProvider";
-import type { XtcLazyHandle } from "@/parsers/parseClient";
+import type { TrajectoryLazyHandle, DecodedLazyFrame } from "@/parsers/parseClient";
 import type { TrajectoryMeta } from "@/types";
 
 const N_ATOMS = 4;
 const N_FRAMES = 50;
 
-function makeHandle(nFrames = N_FRAMES): XtcLazyHandle {
+function makeHandle(nFrames = N_FRAMES): TrajectoryLazyHandle {
   return {
     trajectoryId: 7,
+    kind: "xtc",
     index: {
       nAtoms: N_ATOMS,
       nFrames,
@@ -16,6 +17,7 @@ function makeHandle(nFrames = N_FRAMES): XtcLazyHandle {
       hasBox: false,
       box: null,
       times: new Float32Array(nFrames),
+      vectorChannelNames: [],
     },
   };
 }
@@ -24,15 +26,20 @@ function makeMeta(nFrames = N_FRAMES): TrajectoryMeta {
   return { nFrames, timestepPs: 2, nAtoms: N_ATOMS };
 }
 
+function decoded(frame: number): DecodedLazyFrame {
+  return {
+    positions: new Float32Array(N_ATOMS * 3).fill(frame),
+    vectors: new Float32Array(0),
+    vectorChannelCount: 0,
+  };
+}
+
 /** A decode stub whose promises resolve only when we call `flush()`. */
 function deferredDecode() {
   const resolvers: Array<() => void> = [];
   const fn = vi.fn((_tid: number, frame: number) => {
-    return new Promise<Float32Array>((resolve) => {
-      resolvers.push(() => {
-        const positions = new Float32Array(N_ATOMS * 3).fill(frame);
-        resolve(positions);
-      });
+    return new Promise<DecodedLazyFrame>((resolve) => {
+      resolvers.push(() => resolve(decoded(frame)));
     });
   });
   return {
@@ -162,7 +169,7 @@ describe("LazyFrameProvider", () => {
     let sixCalls = 0;
     const failing = vi.fn((_tid: number, frame: number) => {
       if (frame === 6 && ++sixCalls === 1) return Promise.reject(new Error("boom"));
-      return Promise.resolve(new Float32Array(N_ATOMS * 3).fill(1));
+      return Promise.resolve(decoded(1));
     });
     const p = new LazyFrameProvider(makeHandle(), makeMeta(), {
       decode: failing,
@@ -195,5 +202,63 @@ describe("LazyFrameProvider", () => {
     decode.fn.mockClear();
     expect(p.getFrame(5)).toBeNull();
     expect(decode.fn).not.toHaveBeenCalled();
+  });
+
+  it("emits embedded vectors via onVectors when a decoded frame carries them", async () => {
+    const withVectors = vi.fn((_tid: number, frame: number) =>
+      Promise.resolve({
+        positions: new Float32Array(N_ATOMS * 3).fill(frame),
+        vectors: new Float32Array(N_ATOMS * 3).fill(frame + 100),
+        vectorChannelCount: 1,
+      }),
+    );
+    const p = new LazyFrameProvider(makeHandle(), makeMeta(), {
+      decode: withVectors,
+      dispose,
+      prefetchAhead: 0,
+    });
+    const onVectors = vi.fn();
+    p.setOnVectors(onVectors);
+    p.getFrame(4);
+    await Promise.resolve();
+    await Promise.resolve();
+    const call = onVectors.mock.calls.find((c) => c[0] === 4);
+    expect(call).toBeDefined();
+    expect(call![1]).toBeInstanceOf(Float32Array);
+    expect(call![1][0]).toBe(104);
+    expect(call![2]).toBe(1);
+  });
+
+  it("does not emit onVectors for a frame with no vectors", async () => {
+    const p = make({ prefetchAhead: 0 });
+    const onVectors = vi.fn();
+    p.setOnVectors(onVectors);
+    p.getFrame(2);
+    await decode.flush();
+    expect(onVectors).not.toHaveBeenCalled();
+  });
+
+  it("applies the structure-file base-frame convention (frame 0 = basePositions, decode i-1)", () => {
+    const basePositions = new Float32Array(N_ATOMS * 3).fill(42);
+    // index.nFrames = decodable extra frames; provider exposes nFrames + 1.
+    const handle = makeHandle(3);
+    const p = new LazyFrameProvider(
+      handle,
+      { nFrames: 4, timestepPs: 2, nAtoms: N_ATOMS },
+      {
+        decode: decode.fn,
+        dispose,
+        prefetchAhead: 0,
+        basePositions,
+      },
+    );
+    // Frame 0 is synchronous (the eager snapshot), no decode.
+    decode.fn.mockClear();
+    const f0 = p.getFrame(0);
+    expect(f0!.positions).toBe(basePositions);
+    expect(decode.fn).not.toHaveBeenCalled();
+    // Provider frame 2 decodes underlying extra frame 1.
+    p.getFrame(2);
+    expect(decode.fn).toHaveBeenCalledExactlyOnceWith(7, 1);
   });
 });
