@@ -22,7 +22,7 @@ sidebar_position: 1
 | **Jupyter / Python** | `pip install megane` | [Jupyter Guide](./guide/jupyter) |
 | **Web / React** | `npm install megane-viewer` | [Web Guide](./guide/web) |
 | **CLI (Docker)** | `docker build -t megane .` | [CLI Guide](./guide/cli) |
-| **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline/index) |
+| **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline) |
 
 For a side-by-side comparison of which formats and UI features each environment supports — including known gaps — see [Platform Support](./platform-support).
 

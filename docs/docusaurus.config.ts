@@ -14,7 +14,8 @@ const config: Config = {
   baseUrl: "/megane/",
   organizationName: "hodakamori",
   projectName: "megane",
-  onBrokenLinks: "warn",
+  onBrokenLinks: "throw",
+  onBrokenAnchors: "throw",
   staticDirectories: ["public"],
 
   i18n: {
