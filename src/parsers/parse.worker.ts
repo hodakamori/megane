@@ -11,12 +11,14 @@
 import {
   ensureInit,
   parseStructureCore,
+  parseStructureFrame0Core,
   parseTrajectoryCore,
   collectResultBuffers,
   indexTrajectoryCore,
+  indexStructureCore,
   decodeFrameCore,
   decodeFrameVectorsCore,
-  type WasmTrajectoryDecoder,
+  type WasmFrameDecoder,
 } from "./parseCore";
 import type { ParseRequest, ParseResponse } from "./parseMessages";
 
@@ -27,10 +29,10 @@ interface WorkerSelf {
 
 const ctx = self as unknown as WorkerSelf;
 
-// Persistent lazy XTC decoders, keyed by a client-allocated trajectoryId. Each
-// holds the whole file in WASM memory for the trajectory's lifetime so frames
-// can be decoded on demand; freed on `disposeTrajectory`.
-const decoders = new Map<number, WasmTrajectoryDecoder>();
+// Persistent lazy per-frame decoders (trajectory OR multi-frame structure),
+// keyed by a client-allocated id. Each holds the whole file in WASM memory for
+// its lifetime so frames can be decoded on demand; freed on `disposeTrajectory`.
+const decoders = new Map<number, WasmFrameDecoder>();
 
 ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
   const req = e.data;
@@ -60,6 +62,28 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
         { id: req.id, ok: true, op: "trajectory", result } satisfies ParseResponse,
         transfer,
       );
+    } else if (req.op === "structureFrame0") {
+      await ensureInit(req.wasmUrl);
+      const result = parseStructureFrame0Core({
+        ext: req.ext,
+        text: req.text,
+        bytes: req.bytes ? new Uint8Array(req.bytes) : undefined,
+      });
+      const transfer = collectResultBuffers(result);
+      ctx.postMessage(
+        { id: req.id, ok: true, op: "structureFrame0", result } satisfies ParseResponse,
+        transfer,
+      );
+    } else if (req.op === "indexStructure") {
+      await ensureInit(req.wasmUrl);
+      const { decoder, index } = indexStructureCore(new Uint8Array(req.bytes), req.kind);
+      decoders.set(req.trajectoryId, decoder);
+      ctx.postMessage({
+        id: req.id,
+        ok: true,
+        op: "indexStructure",
+        result: index,
+      } satisfies ParseResponse);
     } else if (req.op === "indexTrajectory") {
       await ensureInit(req.wasmUrl);
       const { decoder, index } = indexTrajectoryCore(

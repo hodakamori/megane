@@ -20,8 +20,10 @@ vi.mock("@/components/nodes/LoadTrajectoryNode", () => ({
 vi.mock("@/components/nodes/LoadVectorNode", () => ({
   setVectorLoadHandler: vi.fn(),
 }));
+const shouldLazyMock = vi.hoisted(() => vi.fn(() => false));
 vi.mock("@/parsers/structure", () => ({
   parseStructureFile: parseMock,
+  shouldUseLazyStructure: shouldLazyMock,
 }));
 
 import { useNodeLoadHandlers } from "@/hooks/useNodeLoadHandlers";
@@ -66,6 +68,8 @@ describe("useNodeLoadHandlers — double-parse fix", () => {
   beforeEach(() => {
     captured.structure = null;
     parseMock.mockReset();
+    shouldLazyMock.mockReset();
+    shouldLazyMock.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -110,6 +114,43 @@ describe("useNodeLoadHandlers — double-parse fix", () => {
 
     expect(parseMock).toHaveBeenCalledTimes(1);
     expect(onUploadStructure).not.toHaveBeenCalled();
+  });
+
+  it("routes a large multi-frame XYZ to the lazy loader without an eager parse", async () => {
+    seedStore("n1");
+    shouldLazyMock.mockReturnValue(true);
+    const onUploadStructure = vi.fn();
+
+    renderHook(() => useNodeLoadHandlers({ snapshot: null, onUploadStructure }));
+
+    const file = new File(["dummy"], "big.xyz");
+    await act(async () => {
+      captured.structure?.("n1", file);
+      await Promise.resolve();
+    });
+
+    // No eager full-file parse; the file is handed to the lazy loader (no preParsed).
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(onUploadStructure).toHaveBeenCalledExactlyOnceWith(file);
+    expect(shouldLazyMock).toHaveBeenCalledWith("xyz", file.size);
+  });
+
+  it("keeps the eager path for a small XYZ (lazy declined)", async () => {
+    seedStore("n1");
+    shouldLazyMock.mockReturnValue(false);
+    parseMock.mockResolvedValue(makeResult());
+    const onUploadStructure = vi.fn();
+
+    renderHook(() => useNodeLoadHandlers({ snapshot: null, onUploadStructure }));
+
+    const file = new File(["dummy"], "small.xyz");
+    await act(async () => {
+      captured.structure?.("n1", file);
+      await Promise.resolve();
+    });
+
+    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(onUploadStructure).toHaveBeenCalledWith(file, expect.anything());
   });
 
   it("does not call onUploadStructure when parsing fails", async () => {

@@ -556,6 +556,70 @@ impl LammpstrjDecoder {
     }
 }
 
+/// Parse ONLY the first frame of a multi-frame XYZ into a structure snapshot
+/// (topology + frame-0 coordinates, no extra frames). Backs lazy XYZ decode.
+#[wasm_bindgen]
+pub fn parse_xyz_frame0(text: &str) -> Result<ParseResult, JsError> {
+    let data = xyz::parse_frame0(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Persistent decoder for the extra frames of a multi-frame structure file
+/// (currently XYZ). Owns the text and a per-frame byte-offset index; decodes one
+/// extra frame's positions on demand. Frame 0 is the eager snapshot from
+/// `parse_xyz_frame0` and is NOT part of this decoder's frame set.
+#[wasm_bindgen]
+pub struct StructureFrameDecoder {
+    text: String,
+    offsets: Vec<usize>,
+    n_atoms: usize,
+    n_frames: u32,
+}
+
+#[wasm_bindgen]
+impl StructureFrameDecoder {
+    /// `kind` selects the format ("xyz"). The bytes are moved into wasm memory.
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: Vec<u8>, kind: &str) -> Result<StructureFrameDecoder, JsError> {
+        let text = String::from_utf8(data).map_err(|_| JsError::new("file is not valid UTF-8"))?;
+        let (offsets, n_atoms) = match kind {
+            "xyz" => {
+                let idx = xyz::build_index(&text).map_err(|e| JsError::new(&e))?;
+                (idx.offsets, idx.n_atoms)
+            }
+            _ => return Err(JsError::new("unsupported structure decoder kind")),
+        };
+        let n_frames = offsets.len() as u32;
+        Ok(StructureFrameDecoder {
+            text,
+            offsets,
+            n_atoms,
+            n_frames,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms as u32
+    }
+    /// Number of EXTRA frames (excludes the eager snapshot frame 0).
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+
+    /// Decode extra frame `i` (0-indexed into the extra frames) → positions (Å).
+    pub fn decode_frame(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let coords = xyz::decode_frame_at(&self.text, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(Float32Array::from(&coords[..]))
+    }
+}
+
 /// Parse a PDB file text and return structured data for the molecular viewer.
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {

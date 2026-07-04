@@ -20,7 +20,19 @@
 
 import type { Frame, TrajectoryMeta } from "../types";
 import type { FrameProvider } from "../pipeline/types";
-import type { TrajectoryLazyHandle, DecodedLazyFrame } from "../parsers/parseClient";
+import type { DecodedLazyFrame } from "../parsers/parseClient";
+
+/**
+ * Minimal handle shape this provider needs — satisfied by both
+ * `TrajectoryLazyHandle` (XTC / LAMMPS dump) and `StructureLazyHandle`
+ * (multi-frame XYZ / PDB). Only the decoder id and its atom/frame counts matter
+ * here; format-specific index fields (times, box, vector names) are consumed
+ * upstream when the provider's `meta` is built.
+ */
+export interface LazyFrameHandle {
+  trajectoryId: number;
+  index: { nAtoms: number; nFrames: number };
+}
 
 const DEFAULT_CACHE_SIZE = 256;
 const DEFAULT_PREFETCH_AHEAD = 16;
@@ -71,11 +83,7 @@ export class LazyFrameProvider implements FrameProvider {
   private decodedCountHW = 0;
   private disposed = false;
 
-  constructor(
-    handle: TrajectoryLazyHandle,
-    meta: TrajectoryMeta,
-    opts: LazyFrameProviderOptions = {},
-  ) {
+  constructor(handle: LazyFrameHandle, meta: TrajectoryMeta, opts: LazyFrameProviderOptions = {}) {
     this.trajectoryId = handle.trajectoryId;
     this.nAtoms = handle.index.nAtoms;
     this.decodableFrames = handle.index.nFrames;

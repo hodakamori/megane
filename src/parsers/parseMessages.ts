@@ -9,6 +9,8 @@ import type {
   TrajectoryKind,
   TrajectoryIndexResult,
   LazyTrajectoryKind,
+  LazyStructureKind,
+  StructureIndexResult,
 } from "./parseCore";
 
 /** Request: parse a structure file's already-read contents. */
@@ -43,6 +45,27 @@ export interface IndexTrajectoryRequest {
   expectedNAtoms: number;
 }
 
+/** Request: parse only frame 0 of a multi-frame structure file (XYZ) into a snapshot. */
+export interface StructureFrame0Request {
+  id: number;
+  op: "structureFrame0";
+  wasmUrl: string | undefined;
+  ext: string;
+  text?: string;
+  bytes?: ArrayBuffer;
+}
+
+/** Request: build a lazy structure-frame decoder (scans extra frames, holds bytes in the worker). */
+export interface IndexStructureRequest {
+  id: number;
+  op: "indexStructure";
+  wasmUrl: string | undefined;
+  kind: LazyStructureKind;
+  /** Reuses the trajectory decoder map, so `decodeFrame` / `disposeTrajectory` apply. */
+  trajectoryId: number;
+  bytes: ArrayBuffer;
+}
+
 /** Request: decode a single frame from a previously-indexed trajectory. */
 export interface DecodeFrameRequest {
   id: number;
@@ -61,6 +84,8 @@ export interface DisposeTrajectoryRequest {
 export type ParseRequest =
   | StructureParseRequest
   | TrajectoryParseRequest
+  | StructureFrame0Request
+  | IndexStructureRequest
   | IndexTrajectoryRequest
   | DecodeFrameRequest
   | DisposeTrajectoryRequest;
@@ -78,7 +103,19 @@ export interface DecodeFrameResult {
 export interface ParseResponse {
   id: number;
   ok: boolean;
-  op: "structure" | "trajectory" | "indexTrajectory" | "decodeFrame" | "disposeTrajectory";
-  result?: StructureParseResult | XTCParseResult | TrajectoryIndexResult | DecodeFrameResult;
+  op:
+    | "structure"
+    | "trajectory"
+    | "structureFrame0"
+    | "indexStructure"
+    | "indexTrajectory"
+    | "decodeFrame"
+    | "disposeTrajectory";
+  result?:
+    | StructureParseResult
+    | XTCParseResult
+    | TrajectoryIndexResult
+    | StructureIndexResult
+    | DecodeFrameResult;
   error?: string;
 }

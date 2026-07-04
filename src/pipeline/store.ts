@@ -45,6 +45,8 @@ export interface PipelineStore {
   atomLabels: string[] | null;
   structureFrames: Frame[] | null;
   structureMeta: TrajectoryMeta | null;
+  /** Pre-built lazy/streaming provider for a multi-frame structure file (mutually exclusive with structureFrames). */
+  structureProvider: FrameProvider | null;
   fileFrames: Frame[] | null;
   fileMeta: TrajectoryMeta | null;
   /** Pre-built lazy/streaming provider for the file trajectory (mutually exclusive with fileFrames). */
@@ -61,6 +63,7 @@ export interface PipelineStore {
   setSnapshot: (s: Snapshot | null) => void;
   setAtomLabels: (labels: string[] | null) => void;
   setStructureFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
+  setStructureProvider: (provider: FrameProvider | null) => void;
   setFileFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileProvider: (provider: FrameProvider | null) => void;
   setFileVectors: (vectors: VectorFrame[] | null) => void;
@@ -137,6 +140,7 @@ const CLEARED_EXECUTION_CONTEXT = {
   atomLabels: null,
   structureFrames: null,
   structureMeta: null,
+  structureProvider: null,
   fileFrames: null,
   fileMeta: null,
   fileProvider: null,
@@ -160,6 +164,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
   atomLabels: null,
   structureFrames: null,
   structureMeta: null,
+  structureProvider: null,
   fileFrames: null,
   fileMeta: null,
   fileProvider: null,
@@ -177,7 +182,17 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     get().execute();
   },
   setStructureFrames: (frames, meta) => {
-    set({ structureFrames: frames, structureMeta: meta });
+    // Eager frames and a lazy provider are mutually exclusive; installing frames
+    // releases any active lazy structure decoder.
+    disposeIfLazy(get().structureProvider);
+    set({ structureFrames: frames, structureMeta: meta, structureProvider: null });
+    get().execute();
+  },
+  setStructureProvider: (provider) => {
+    const prev = get().structureProvider;
+    if (prev !== provider) disposeIfLazy(prev);
+    // Clear the eager structure-frame channel so executeLoadStructure sees only the provider.
+    set({ structureProvider: provider, structureFrames: null, structureMeta: null });
     get().execute();
   },
   setFileFrames: (frames, meta) => {
@@ -441,6 +456,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
       atomLabels,
       structureFrames,
       structureMeta,
+      structureProvider,
       fileFrames,
       fileMeta,
       fileProvider,
@@ -454,6 +470,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
       atomLabels,
       structureFrames,
       structureMeta,
+      structureProvider,
       fileFrames,
       fileMeta,
       fileProvider,
@@ -501,6 +518,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     // VSCode) reuse this singleton store across documents, so every
     // .megane.json open must start from a clean slate.
     disposeIfLazy(get().fileProvider);
+    disposeIfLazy(get().structureProvider);
     set({
       nodes,
       edges,
@@ -518,6 +536,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     const sortedIds = Object.keys(nodeSnapshots).sort();
     const primarySnapshot = sortedIds.length > 0 ? nodeSnapshots[sortedIds[0]].snapshot : null;
     disposeIfLazy(get().fileProvider);
+    disposeIfLazy(get().structureProvider);
     set({
       nodes,
       edges,
@@ -537,6 +556,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     const raw = template.create();
     const { nodes, edges } = getLayoutedElements(raw.nodes, raw.edges);
     disposeIfLazy(get().fileProvider);
+    disposeIfLazy(get().structureProvider);
     set({
       nodes,
       edges,
@@ -560,6 +580,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
   reset: () => {
     const def = getInitialPipeline();
     disposeIfLazy(get().fileProvider);
+    disposeIfLazy(get().structureProvider);
     set({
       nodes: def.nodes,
       edges: def.edges,

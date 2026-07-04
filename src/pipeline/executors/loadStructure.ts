@@ -5,6 +5,7 @@ import type {
   CellData,
   TrajectoryData,
   LoadStructureParams,
+  FrameProvider,
 } from "../types";
 import { MemoryFrameProvider } from "../types";
 
@@ -14,6 +15,7 @@ export function executeLoadStructure(
   structureFrames: Frame[] | null,
   structureMeta: TrajectoryMeta | null,
   sourceNodeId: string,
+  structureProvider: FrameProvider | null = null,
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
   if (!snapshot) return outputs;
@@ -30,7 +32,18 @@ export function executeLoadStructure(
   };
   outputs.set("particle", particle);
 
-  if (structureFrames && structureFrames.length > 0 && structureMeta) {
+  // A pre-built provider (lazy/streaming multi-frame XYZ/PDB) takes precedence
+  // over eager frames. Its frame 0 is the eager snapshot (basePositions baked
+  // into the provider), matching the MemoryFrameProvider convention below.
+  if (structureProvider) {
+    const trajectory: TrajectoryData = {
+      type: "trajectory",
+      provider: structureProvider,
+      meta: structureProvider.meta,
+      source: "structure",
+    };
+    outputs.set("trajectory", trajectory);
+  } else if (structureFrames && structureFrames.length > 0 && structureMeta) {
     const provider = new MemoryFrameProvider(structureFrames, structureMeta, snapshot.positions);
     const trajectory: TrajectoryData = {
       type: "trajectory",

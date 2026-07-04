@@ -6,7 +6,13 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-import { parseStructureFile, parseStructureText } from "../parsers/structure";
+import {
+  parseStructureFile,
+  parseStructureText,
+  parseStructureFrame0,
+  indexStructureLazy,
+  shouldUseLazyStructure,
+} from "../parsers/structure";
 import type { StructureParseResult } from "../parsers/structure";
 import {
   parseXTCFile,
@@ -146,6 +152,11 @@ export function useMeganeLocal(): MeganeLocalState {
         labels: string[] | null;
       },
       filename?: string,
+      // Lazy multi-frame structure (large XYZ/PDB): frame 0 is the eager
+      // snapshot, extra frames stream from this provider via the pipeline's
+      // structure-trajectory channel. When set, the eager frame arrays stay
+      // empty and `result.frames` is empty.
+      lazy?: { provider: LazyFrameProvider },
     ) => {
       const prevSnapshot = baseSnapshotRef.current;
       baseSnapshotRef.current = result.snapshot;
@@ -153,6 +164,8 @@ export function useMeganeLocal(): MeganeLocalState {
       fileFramesRef.current = [];
       fileTrajMetaRef.current = null;
       xtcFileNameRef.current = null;
+      // Multi-frame when the file carries eager extra frames OR a lazy provider.
+      const hasFrames = result.frames.length > 0 || !!lazy;
 
       // If the new structure itself carries multiple frames (multi-frame
       // XYZ, multi-MODEL PDB, etc.), feed them through the pipeline's
@@ -171,7 +184,13 @@ export function useMeganeLocal(): MeganeLocalState {
       // load (no prior structure) to avoid racing against a follow-up
       // loadXtc() in the auto-load.
       const pipeStore = usePipelineStore.getState();
-      if (result.frames.length > 0) {
+      if (lazy) {
+        // Extra frames stream through the structure-trajectory channel. Clear
+        // (and dispose) any prior file trajectory so only this provider is live;
+        // removeLoadTrajectoryAndRewire below makes LoadStructure the live source.
+        pipeStore.setFileFrames(null, null);
+        pipeStore.setStructureProvider(lazy.provider);
+      } else if (result.frames.length > 0) {
         const allFrames: Frame[] = [
           {
             frameId: 0,
@@ -225,7 +244,7 @@ export function useMeganeLocal(): MeganeLocalState {
           });
           pipeStore.updateNodeParams(loaderNode.id, {
             fileName: filename,
-            hasTrajectory: result.frames.length > 0,
+            hasTrajectory: hasFrames,
             hasCell: !!result.snapshot.box,
           });
           // Mirror the openFile path: pick AddBond's Source by file format
@@ -235,7 +254,7 @@ export function useMeganeLocal(): MeganeLocalState {
           // start with a sensible default for formats that lack bond info.
           syncAddBondSourceForLoader(usePipelineStore.getState(), loaderNode.id, filename);
         }
-        if (result.frames.length > 0) {
+        if (hasFrames) {
           // Multi-frame structure files (.traj, multi-MODEL PDB,
           // multi-frame XYZ) carry their trajectory in the structure file
           // itself, so a separate LoadTrajectory node is redundant.
@@ -255,15 +274,17 @@ export function useMeganeLocal(): MeganeLocalState {
       labels.reset(result.labels);
       vectors.reset();
 
-      setHasStructureFrames(result.frames.length > 0);
+      setHasStructureFrames(hasFrames);
       setHasFileFrames(false);
 
-      const initialTrajSource = result.frames.length > 0 ? "structure" : "file";
+      const initialTrajSource = hasFrames ? "structure" : "file";
       currentTrajSourceRef.current = initialTrajSource;
       setTrajectorySourceState(initialTrajSource);
 
       setSnapshot(result.snapshot);
-      setMeta(result.meta);
+      // Lazy provider knows the true frame count (extra + 1); the eager frame-0
+      // result has no meta of its own.
+      setMeta(lazy ? lazy.provider.meta : result.meta);
       resetPlayback();
     },
     [resetPlayback, bonds.reset, labels.reset, vectors.reset],
@@ -292,12 +313,64 @@ export function useMeganeLocal(): MeganeLocalState {
     [applyResult],
   );
 
+  // Lazy path for large multi-frame structure files (currently XYZ): parse
+  // frame 0 eagerly for instant first paint, then stream the extra frames from
+  // a persistent worker decoder through the pipeline's structure-trajectory
+  // channel. Returns false (→ eager fallback) when the worker is unavailable,
+  // the file has no extra frames, or indexing fails.
+  const loadStructureLazy = useCallback(
+    async (file: File, kind: "xyz", topFile?: File): Promise<boolean> => {
+      const ext = `.${kind}`;
+      const frame0 = await parseStructureFrame0(file, ext);
+      if (!frame0) return false;
+      const handle = await indexStructureLazy(file, kind);
+      if (!handle || handle.index.nFrames <= 0) {
+        // Single-frame file or indexing failed → free any decoder and fall back.
+        if (handle) disposeTrajectoryLazy(handle.trajectoryId);
+        return false;
+      }
+
+      const meta: TrajectoryMeta = {
+        nFrames: handle.index.nFrames + 1, // + synthetic frame 0 (the eager snapshot)
+        timestepPs: 1.0,
+        nAtoms: frame0.snapshot.nAtoms,
+      };
+      const provider = new LazyFrameProvider(handle, meta, {
+        decode: decodeTrajectoryFrame,
+        dispose: disposeTrajectoryLazy,
+        basePositions: frame0.snapshot.positions,
+      });
+      provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
+
+      applyResult(
+        { snapshot: frame0.snapshot, frames: [], meta: null, labels: frame0.labels },
+        file.name,
+        { provider },
+      );
+      setPdbFileName(file.name);
+      setXtcFileName("PDB models");
+
+      // Mirror applyStructureResult: overwrite bonds with a sibling .top if present.
+      if (topFile) {
+        const store = usePipelineStore.getState();
+        const loaderNode = store.nodes.find((n) => n.type === "load_structure");
+        if (loaderNode) await applyTopologyFile(store, loaderNode.id, topFile);
+      }
+      return true;
+    },
+    [applyResult],
+  );
+
   const loadFile = useCallback(
     async (pdb: File, topFile?: File) => {
+      const ext = pdb.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
+      if (ext === ".xyz" && shouldUseLazyStructure("xyz", pdb.size)) {
+        if (await loadStructureLazy(pdb, "xyz", topFile)) return;
+      }
       const result = await parseStructureFile(pdb);
       await applyStructureResult(result, pdb.name, topFile);
     },
-    [applyStructureResult],
+    [applyStructureResult, loadStructureLazy],
   );
 
   const loadText = useCallback(

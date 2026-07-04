@@ -129,3 +129,36 @@ export async function decodeTrajectoryFrame(
 export function disposeTrajectoryLazy(_trajectoryId: number): void {
   /* no-op */
 }
+
+// ── Lazy multi-frame structure files (mirrored; never used on the sync path) ──
+
+/** Handle shape mirrored from `parseClient` (never produced on the sync path). */
+export interface StructureLazyHandle {
+  trajectoryId: number;
+  kind: import("./parseCore").LazyStructureKind;
+  index: import("./parseCore").StructureIndexResult;
+}
+
+/** Lazy structure decode needs a worker; the sync path never uses it. */
+export function shouldUseLazyStructure(
+  _kind: import("./parseCore").LazyStructureKind,
+  _fileSize: number,
+): boolean {
+  return false;
+}
+
+/** Worker-only; returns `null` so the caller falls back to eager parsing. */
+export async function parseStructureFrame0(
+  _file: File,
+  _ext: string,
+): Promise<StructureParseResult | null> {
+  return null;
+}
+
+/** Worker-only; returns `null` so the caller falls back to eager parsing. */
+export async function indexStructureLazy(
+  _file: File,
+  _kind: import("./parseCore").LazyStructureKind,
+): Promise<StructureLazyHandle | null> {
+  return null;
+}

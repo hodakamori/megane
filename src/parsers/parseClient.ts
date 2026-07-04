@@ -25,6 +25,8 @@ import type {
   TrajectoryKind,
   TrajectoryIndexResult,
   LazyTrajectoryKind,
+  LazyStructureKind,
+  StructureIndexResult,
 } from "./parseCore";
 import type { ParseRequest, ParseResponse, DecodeFrameResult } from "./parseMessages";
 
@@ -53,16 +55,26 @@ function workerUnavailable(): boolean {
 const LAZY_XTC_MIN_BYTES = 8 * 1024 * 1024;
 
 /**
- * Whether to stream a given trajectory file lazily. Requires a worker. A
+ * Shared gate for lazy/streaming decode. Requires a worker. A
  * `globalThis.__MEGANE_LAZY_XTC__` boolean override forces lazy on/off
  * (bypassing the size gate — used by tests and as a kill switch); otherwise
  * lazy is used only for files at or above {@link LAZY_XTC_MIN_BYTES}.
  */
-export function shouldUseLazyTrajectory(_kind: LazyTrajectoryKind, fileSize: number): boolean {
+function shouldUseLazy(fileSize: number): boolean {
   if (workerUnavailable()) return false;
   const override = (globalThis as Record<string, unknown>).__MEGANE_LAZY_XTC__;
   if (typeof override === "boolean") return override;
   return fileSize >= LAZY_XTC_MIN_BYTES;
+}
+
+/** Whether to stream a given trajectory file lazily (XTC / LAMMPS dump). */
+export function shouldUseLazyTrajectory(_kind: LazyTrajectoryKind, fileSize: number): boolean {
+  return shouldUseLazy(fileSize);
+}
+
+/** Whether to lazily decode a multi-frame structure file's extra frames (XYZ). */
+export function shouldUseLazyStructure(_kind: LazyStructureKind, fileSize: number): boolean {
+  return shouldUseLazy(fileSize);
 }
 
 /** Reject every in-flight request and drop the worker (used on a fatal error). */
@@ -286,4 +298,65 @@ export function disposeTrajectoryLazy(trajectoryId: number): void {
   void send<undefined>({ id, op: "disposeTrajectory", trajectoryId }, []).catch(() => {
     // best-effort cleanup; worker teardown already frees everything
   });
+}
+
+// ── Lazy multi-frame structure files (XYZ) ──────────────────────────────
+//
+// Structure files carry frame 0 as the eager snapshot and frames 1..N as
+// "extra" frames. Frame 0 is parsed eagerly (topology + coordinates) via
+// `parseStructureFrame0`; the extra frames are decoded on demand from a
+// persistent worker decoder built by `indexStructureLazy`. The decoder shares
+// the trajectory decoder map, so `decodeTrajectoryFrame` / `disposeTrajectoryLazy`
+// service structure frames too.
+
+/** Handle returned by `indexStructureLazy`, consumed by `LazyFrameProvider`. */
+export interface StructureLazyHandle {
+  trajectoryId: number;
+  kind: LazyStructureKind;
+  index: StructureIndexResult;
+}
+
+/**
+ * Parse only frame 0 of a multi-frame structure file into a snapshot (topology +
+ * frame-0 coordinates, no extra frames). Returns `null` when the worker is
+ * unavailable or the parse fails — the caller then falls back to eager parsing.
+ */
+export async function parseStructureFrame0(
+  file: File,
+  ext: string,
+): Promise<StructureParseResult | null> {
+  if (workerUnavailable()) return null;
+  try {
+    const id = nextId++;
+    const text = await file.text();
+    const req: ParseRequest = { id, op: "structureFrame0", wasmUrl: resolveWasmUrl(), ext, text };
+    return await send<StructureParseResult>(req, []);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a lazy structure-frame decoder in the worker: scans the extra-frame
+ * index (no coordinate decode) and keeps the bytes resident so frames stream in
+ * on demand via {@link decodeTrajectoryFrame}. Returns `null` (fall back to
+ * eager parse) when the worker is unavailable or indexing fails.
+ */
+export async function indexStructureLazy(
+  file: File,
+  kind: LazyStructureKind,
+): Promise<StructureLazyHandle | null> {
+  if (workerUnavailable()) return null;
+  try {
+    const id = nextId++;
+    const trajectoryId = nextTrajId++;
+    const buffer = await file.arrayBuffer();
+    const index = await send<StructureIndexResult>(
+      { id, op: "indexStructure", wasmUrl: resolveWasmUrl(), kind, trajectoryId, bytes: buffer },
+      [buffer],
+    );
+    return { trajectoryId, kind, index };
+  } catch {
+    return null;
+  }
 }

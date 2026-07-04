@@ -160,6 +160,208 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     })
 }
 
+// ---------- Lazy / streaming support ----------
+
+/// Byte offset of each line, so the index scan can record where each frame
+/// begins in the raw text (for lazy per-frame decode from that offset).
+fn line_byte_starts(text: &str) -> Vec<usize> {
+    let mut starts = Vec::new();
+    let mut pos = 0usize;
+    for line in text.split('\n') {
+        starts.push(pos);
+        pos += line.len() + 1;
+    }
+    starts
+}
+
+/// Lightweight index over a multi-frame XYZ: byte offset of each EXTRA frame
+/// (frames 1..N; frame 0 is the eager snapshot), built without parsing
+/// coordinates. Frames whose atom count differs from frame 0 are skipped, exactly
+/// as the eager parser drops them.
+pub struct XyzIndex {
+    pub n_atoms: usize,
+    /// Number of extra frames (excludes frame 0).
+    pub n_extra_frames: usize,
+    /// Byte offset of each extra frame's count line.
+    pub offsets: Vec<usize>,
+}
+
+/// Parse only the first frame of an XYZ file into a `ParsedStructure` (topology,
+/// elements, bonds, box, frame-0 coordinates), leaving `frame_positions_flat`
+/// empty. Used to build the lazy snapshot without decoding every frame.
+pub fn parse_frame0(text: &str) -> Result<crate::parser::ParsedStructure, String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() < 3 {
+        return Err("XYZ file too short".into());
+    }
+
+    let mut offset = 0;
+    // Skip leading blank count lines (matches the eager parser).
+    while offset < lines.len() && lines[offset].trim().is_empty() {
+        offset += 1;
+    }
+    if offset + 2 > lines.len() {
+        return Err("XYZ file contains no atoms".into());
+    }
+    let n_atoms: usize = lines[offset]
+        .trim()
+        .parse()
+        .map_err(|_| format!("cannot parse atom count at line {}", offset + 1))?;
+    if offset + 2 + n_atoms > lines.len() {
+        return Err("XYZ first frame incomplete".into());
+    }
+
+    let box_matrix = parse_lattice(lines[offset + 1]);
+    offset += 2;
+
+    let mut positions = Vec::with_capacity(n_atoms * 3);
+    let mut elements = Vec::with_capacity(n_atoms);
+    let mut labels = Vec::with_capacity(n_atoms);
+    let mut parts: Vec<&str> = Vec::new();
+    for i in 0..n_atoms {
+        let line = lines[offset + i];
+        parts.clear();
+        parts.extend(line.split_whitespace());
+        if parts.len() < 4 {
+            return Err(format!("XYZ atom line {} too short", offset + i + 1));
+        }
+        let sym = crate::parser::capitalize(parts[0]);
+        elements.push(symbol_to_atomic_num(&sym));
+        let label = if parts.len() > 4 {
+            parts[4..].join(" ")
+        } else {
+            String::new()
+        };
+        labels.push(label);
+        let x: f32 = parts[1]
+            .parse()
+            .map_err(|_| format!("bad x coord at line {}", offset + i + 1))?;
+        let y: f32 = parts[2]
+            .parse()
+            .map_err(|_| format!("bad y coord at line {}", offset + i + 1))?;
+        let z: f32 = parts[3]
+            .parse()
+            .map_err(|_| format!("bad z coord at line {}", offset + i + 1))?;
+        positions.push(x);
+        positions.push(y);
+        positions.push(z);
+    }
+
+    let empty_bonds = HashSet::new();
+    let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
+    let atom_labels = if labels.iter().any(|l| !l.is_empty()) {
+        Some(labels)
+    } else {
+        None
+    };
+
+    Ok(crate::parser::ParsedStructure {
+        n_atoms,
+        positions,
+        elements,
+        bonds,
+        n_file_bonds: 0,
+        bond_orders: None,
+        box_matrix,
+        frame_positions_flat: Vec::new(),
+        atom_labels,
+        chain_ids: None,
+        bfactors: None,
+        vector_channels: vec![],
+        ca_indices: vec![],
+        ca_chain_ids: vec![],
+        ca_res_nums: vec![],
+        ca_ss_type: vec![],
+        symmetry_ops: Vec::new(),
+    })
+}
+
+/// Scan a multi-frame XYZ and record each EXTRA frame's byte offset without
+/// decoding coordinates.
+pub fn build_index(text: &str) -> Result<XyzIndex, String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let starts = line_byte_starts(text);
+    let mut offset = 0usize;
+    let mut first_n_atoms: Option<usize> = None;
+    let mut offsets: Vec<usize> = Vec::new();
+
+    while offset < lines.len() {
+        let count_line = lines[offset].trim();
+        if count_line.is_empty() {
+            offset += 1;
+            continue;
+        }
+        let n_atoms: usize = match count_line.parse() {
+            Ok(n) => n,
+            Err(_) => return Err(format!("cannot parse atom count at line {}", offset + 1)),
+        };
+        if offset + 2 + n_atoms > lines.len() {
+            break; // incomplete frame, matches eager
+        }
+        match first_n_atoms {
+            None => {
+                first_n_atoms = Some(n_atoms);
+                // frame 0 is the eager snapshot — not an extra frame
+            }
+            Some(fn0) => {
+                if n_atoms == fn0 {
+                    offsets.push(starts[offset]);
+                }
+                // else: mismatched frame is dropped (matches eager)
+            }
+        }
+        offset += 2 + n_atoms;
+    }
+
+    let n_atoms = first_n_atoms.ok_or("XYZ file contains no atoms")?;
+    Ok(XyzIndex {
+        n_atoms,
+        n_extra_frames: offsets.len(),
+        offsets,
+    })
+}
+
+/// Decode a single XYZ frame's positions (Å) given its count-line byte offset.
+pub fn decode_frame_at(
+    text: &str,
+    byte_offset: usize,
+    expected_n_atoms: usize,
+) -> Result<Vec<f32>, String> {
+    if byte_offset > text.len() {
+        return Err("frame offset past end of data".into());
+    }
+    let slice = &text[byte_offset..];
+    let mut it = slice.lines();
+    let count_line = it.next().ok_or("empty frame")?.trim();
+    let n_atoms: usize = count_line
+        .parse()
+        .map_err(|_| "frame offset is not at a count-line boundary".to_string())?;
+    if n_atoms != expected_n_atoms {
+        return Err(format!(
+            "frame atom count {} != expected {}",
+            n_atoms, expected_n_atoms
+        ));
+    }
+    let _comment = it.next().ok_or("missing comment line")?;
+    let mut positions = Vec::with_capacity(n_atoms * 3);
+    let mut parts: Vec<&str> = Vec::new();
+    for _ in 0..n_atoms {
+        let line = it.next().ok_or("truncated frame")?;
+        parts.clear();
+        parts.extend(line.split_whitespace());
+        if parts.len() < 4 {
+            return Err("XYZ atom line too short".into());
+        }
+        let x: f32 = parts[1].parse().map_err(|_| "bad x coord".to_string())?;
+        let y: f32 = parts[2].parse().map_err(|_| "bad y coord".to_string())?;
+        let z: f32 = parts[3].parse().map_err(|_| "bad z coord".to_string())?;
+        positions.push(x);
+        positions.push(y);
+        positions.push(z);
+    }
+    Ok(positions)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,5 +465,33 @@ O 1.0 0.0 0.0
         assert!((bm[0] - 5.44).abs() < 1e-5);
         assert!((bm[4] - 5.44).abs() < 1e-5);
         assert!((bm[8] - 5.44).abs() < 1e-5);
+    }
+
+    #[test]
+    fn lazy_frame0_and_decode_match_eager() {
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/water_multiframe.xyz"
+        ))
+        .expect("read fixture");
+
+        let eager = parse(&text).unwrap();
+        let f0 = parse_frame0(&text).unwrap();
+        let idx = build_index(&text).unwrap();
+
+        // Frame-0 snapshot is byte-identical to the eager frame 0.
+        assert_eq!(f0.positions, eager.positions);
+        assert_eq!(f0.elements, eager.elements);
+        assert_eq!(f0.n_atoms, eager.n_atoms);
+        assert!(f0.frame_positions_flat.is_empty());
+
+        assert_eq!(idx.n_atoms, eager.n_atoms);
+        assert_eq!(idx.n_extra_frames, eager.extra_frame_count());
+
+        // Every extra frame decoded lazily is byte-identical to the eager frame.
+        for k in 0..idx.n_extra_frames {
+            let p = decode_frame_at(&text, idx.offsets[k], idx.n_atoms).unwrap();
+            assert_eq!(p, eager.frame(k).to_vec(), "extra frame {k}");
+        }
     }
 }

@@ -77,6 +77,8 @@ export interface PipelineExecutionContext {
   atomLabels?: string[] | null;
   structureFrames?: Frame[] | null;
   structureMeta?: TrajectoryMeta | null;
+  /** Pre-built lazy/streaming provider for a multi-frame structure file (takes precedence over structureFrames). */
+  structureProvider?: FrameProvider | null;
   fileFrames?: Frame[] | null;
   fileMeta?: TrajectoryMeta | null;
   /** Pre-built lazy/streaming provider for the file trajectory (takes precedence over fileFrames). */
@@ -174,12 +176,16 @@ export function executePipeline(
         const snapshot = nodeData?.snapshot ?? ctx.snapshot ?? null;
         const frames = nodeData?.frames ?? ctx.structureFrames ?? null;
         const meta = nodeData?.meta ?? ctx.structureMeta ?? null;
+        // A lazy structure provider applies only when this node has no eager
+        // frames of its own (mirrors executeLoadTrajectory's provider precedence).
+        const provider = nodeData?.frames ? null : (ctx.structureProvider ?? null);
         const outputs = executeLoadStructure(
           data.params as LoadStructureParams,
           snapshot,
           frames,
           meta,
           id,
+          provider,
         );
         edgeOutputs.set(id, outputs);
         if (!snapshot) {

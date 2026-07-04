@@ -77,6 +77,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_xyz_frame0: structFn("parse_xyz_frame0"),
     parse_mol: structFn("parse_mol"),
     parse_mol2: structFn("parse_mol2"),
     parse_cif: structFn("parse_cif"),
@@ -128,6 +129,14 @@ const { calls, wasmMock } = vi.hoisted(() => {
       }
       decode_frame_vectors() {
         return new Float32Array(0);
+      }
+      free() {}
+    },
+    StructureFrameDecoder: class {
+      n_atoms = 3;
+      n_frames = 2;
+      decode_frame() {
+        return new Float32Array(3 * 3);
       }
       free() {}
     },
@@ -216,5 +225,12 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     // Never streams on the sync path, regardless of file size.
     expect(sync.shouldUseLazyTrajectory("xtc", 1)).toBe(false);
     expect(sync.shouldUseLazyTrajectory("lammpstrj", 1024 * 1024 * 1024)).toBe(false);
+  });
+
+  it("degrades the lazy structure exports to eager (worker-only feature)", async () => {
+    // Multi-frame XYZ streaming needs a worker; the sync path never uses it.
+    expect(await sync.parseStructureFrame0(fakeFile("m.xyz"), ".xyz")).toBeNull();
+    expect(await sync.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
+    expect(sync.shouldUseLazyStructure("xyz", 1024 * 1024 * 1024)).toBe(false);
   });
 });

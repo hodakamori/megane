@@ -81,15 +81,23 @@ interface WasmXtcResult {
   free(): void;
 }
 
-/** Common surface of a persistent lazy trajectory decoder (XTC / LAMMPS dump). */
-export interface WasmTrajectoryDecoder {
+/**
+ * Minimal surface of any persistent per-frame decoder (trajectory OR multi-frame
+ * structure). The worker keeps these in one map and only needs `decode_frame`,
+ * `n_atoms`, and `free` to service `decodeFrame` / `disposeTrajectory` requests.
+ */
+export interface WasmFrameDecoder {
   readonly n_atoms: number;
+  decode_frame(frame: number): Float32Array;
+  free(): void;
+}
+
+/** Common surface of a persistent lazy trajectory decoder (XTC / LAMMPS dump). */
+export interface WasmTrajectoryDecoder extends WasmFrameDecoder {
   readonly n_frames: number;
   readonly timestep_ps: number;
   readonly has_box: boolean;
   box_matrix(): Float32Array;
-  decode_frame(frame: number): Float32Array;
-  free(): void;
 }
 
 /** Persistent XTC decoder (owns the file bytes; decodes one frame on demand). */
@@ -105,8 +113,24 @@ export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
   decode_frame_vectors(frame: number): Float32Array;
 }
 
+/** Persistent decoder for the extra frames of a multi-frame structure file (XYZ). */
+export interface WasmStructureFrameDecoder extends WasmFrameDecoder {
+  /** Number of EXTRA frames (excludes the eager snapshot frame 0). */
+  readonly n_frames: number;
+}
+
 /** Lazy trajectory formats with a persistent per-frame decoder. */
 export type LazyTrajectoryKind = "xtc" | "lammpstrj";
+
+/** Multi-frame structure formats with lazy extra-frame decode (frame 0 is eager). */
+export type LazyStructureKind = "xyz";
+
+/** Lightweight structure-frame index (from `indexStructureCore`) — no bulk coordinates. */
+export interface StructureIndexResult {
+  nAtoms: number;
+  /** Number of decodable EXTRA frames (excludes the eager snapshot frame 0). */
+  nFrames: number;
+}
 
 /** Lightweight trajectory index (from `indexTrajectoryCore`) — no bulk coordinates. */
 export interface TrajectoryIndexResult {
@@ -129,6 +153,7 @@ interface WasmModule {
   parse_pdb: ParseFn;
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
+  parse_xyz_frame0: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
@@ -142,6 +167,7 @@ interface WasmModule {
   parse_lammpstrj_file: TrajTextParseFn;
   XtcDecoder: new (data: Uint8Array) => WasmXtcDecoder;
   LammpstrjDecoder: new (data: Uint8Array) => WasmLammpstrjDecoder;
+  StructureFrameDecoder: new (data: Uint8Array, kind: string) => WasmStructureFrameDecoder;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_top_bonds_with_includes: (
@@ -176,6 +202,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
+        parse_xyz_frame0: wasm.parse_xyz_frame0,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
@@ -189,6 +216,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_lammpstrj_file: wasm.parse_lammpstrj_file,
         XtcDecoder: wasm.XtcDecoder,
         LammpstrjDecoder: wasm.LammpstrjDecoder,
+        StructureFrameDecoder: wasm.StructureFrameDecoder,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_top_bonds_with_includes: wasm.parse_top_bonds_with_includes,
@@ -224,6 +252,19 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_prmtop;
     default:
       return wasmModule!.parse_pdb;
+  }
+}
+
+/**
+ * Choose the frame-0-only parser for a multi-frame structure format, or null
+ * when the format has no lazy variant (caller falls back to eager parsing).
+ */
+function getFrame0ParserForExtension(ext: string): ParseFn | null {
+  switch (ext) {
+    case ".xyz":
+      return wasmModule!.parse_xyz_frame0;
+    default:
+      return null;
   }
 }
 
@@ -350,6 +391,18 @@ export function parseStructureCore(input: StructureParseInput): StructureParseRe
   return parseWithFn(parseFn, input.text ?? "");
 }
 
+/**
+ * Parse ONLY frame 0 of a multi-frame structure file into a snapshot (topology +
+ * frame-0 coordinates, `frames` empty, `meta` null). Requires `ensureInit`
+ * first. Throws if the format has no frame-0 parser (callers gate on the file
+ * extension — currently only `.xyz`).
+ */
+export function parseStructureFrame0Core(input: StructureParseInput): StructureParseResult {
+  const parseFn = getFrame0ParserForExtension(input.ext);
+  if (!parseFn) throw new Error(`no frame-0 parser for ${input.ext}`);
+  return parseWithFn(parseFn, input.text ?? "");
+}
+
 /** Input for the trajectory parse core (already read from the File). */
 export interface TrajectoryParseInput {
   kind: TrajectoryKind;
@@ -408,7 +461,9 @@ export function indexTrajectoryCore(
   }
   const vectorChannelNames =
     kind === "lammpstrj"
-      ? (decoder as WasmLammpstrjDecoder).vector_channel_names.split("\n").filter((s) => s.length > 0)
+      ? (decoder as WasmLammpstrjDecoder).vector_channel_names
+          .split("\n")
+          .filter((s) => s.length > 0)
       : [];
   const index: TrajectoryIndexResult = {
     nAtoms: decoder.n_atoms,
@@ -422,8 +477,28 @@ export function indexTrajectoryCore(
   return { decoder, index };
 }
 
+/**
+ * Build a persistent structure-frame decoder for a multi-frame structure file
+ * (currently XYZ) plus its extra-frame index, without decoding coordinates. The
+ * `decoder` OWNS the file bytes in WASM memory and must be kept alive (and
+ * eventually `free()`d) by the caller. Frame 0 is the eager snapshot (from
+ * `parseStructureFrame0Core`) and is NOT part of this decoder's frame set.
+ * Requires `ensureInit` first.
+ */
+export function indexStructureCore(
+  bytes: Uint8Array,
+  kind: LazyStructureKind,
+): { decoder: WasmStructureFrameDecoder; index: StructureIndexResult } {
+  const decoder = new wasmModule!.StructureFrameDecoder(bytes, kind);
+  const index: StructureIndexResult = {
+    nAtoms: decoder.n_atoms,
+    nFrames: decoder.n_frames,
+  };
+  return { decoder, index };
+}
+
 /** Decode a single frame's positions (Å) from a persistent decoder. */
-export function decodeFrameCore(decoder: WasmTrajectoryDecoder, frame: number): Float32Array {
+export function decodeFrameCore(decoder: WasmFrameDecoder, frame: number): Float32Array {
   return decoder.decode_frame(frame);
 }
 
@@ -431,10 +506,7 @@ export function decodeFrameCore(decoder: WasmTrajectoryDecoder, frame: number): 
  * Decode a single frame's embedded vector channels (LAMMPS velocity/force),
  * concatenated in channel order. Empty for decoders without vector channels.
  */
-export function decodeFrameVectorsCore(
-  decoder: WasmTrajectoryDecoder,
-  frame: number,
-): Float32Array {
+export function decodeFrameVectorsCore(decoder: WasmFrameDecoder, frame: number): Float32Array {
   if ("decode_frame_vectors" in decoder) {
     return (decoder as WasmLammpstrjDecoder).decode_frame_vectors(frame);
   }
