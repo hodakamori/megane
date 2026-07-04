@@ -332,6 +332,9 @@ export interface StructureLazyResult {
 // handles bigger frames, capping the critical-path read regardless of total size.
 const PREFIX_INITIAL_BYTES = 8 * 1024 * 1024;
 const PREFIX_MAX_BYTES = 256 * 1024 * 1024;
+// Bounded tail read that captures a multi-MODEL PDB's trailing CONECT section
+// (written once after the last ENDMDL) so frame 0 gets explicit bonds.
+const PDB_TAIL_BYTES = 4 * 1024 * 1024;
 
 /**
  * Parse ONLY frame 0 from the FIRST chunk of a large multi-frame structure file,
@@ -340,6 +343,11 @@ const PREFIX_MAX_BYTES = 256 * 1024 * 1024;
  * is cut), growing if frame 0 doesn't fit. Returns `null` (caller falls back to a
  * full read) when the worker is unavailable, frame 0 exceeds the max prefix, or
  * the parse fails.
+ *
+ * For PDB it ALSO reads a bounded TAIL in parallel: multi-MODEL PDB writes its
+ * `CONECT` records once, after the last `ENDMDL`, and they apply to every model.
+ * Concatenating `head(model 0) + tail(CONECT)` gives frame 0 its explicit bonds
+ * instead of distance-inferred ones — without reading the whole file.
  */
 export async function parseStructurePrefix(
   file: File,
@@ -349,9 +357,19 @@ export async function parseStructurePrefix(
   let size = Math.min(file.size, PREFIX_INITIAL_BYTES);
   for (;;) {
     const isWholeFile = size >= file.size;
-    const raw = await file.slice(0, size).text();
-    // Trim a partial trailing line so frame 0's atom lines are never truncated.
-    const text = isWholeFile ? raw : raw.slice(0, raw.lastIndexOf("\n") + 1);
+    // Read the head (frame 0) and — for PDB — the trailing CONECT section in
+    // parallel. The tail starts at/after the head so the two never overlap.
+    const wantTail = kind === "pdb" && !isWholeFile && file.size - size > 0;
+    const tailStart = Math.max(size, file.size - PDB_TAIL_BYTES);
+    const [rawHead, rawTail] = await Promise.all([
+      file.slice(0, size).text(),
+      wantTail ? file.slice(tailStart).text() : Promise.resolve(""),
+    ]);
+    // Trim a partial trailing head line, and the partial leading tail line, so no
+    // record is cut mid-way where the two chunks are stitched together.
+    const head = isWholeFile ? rawHead : rawHead.slice(0, rawHead.lastIndexOf("\n") + 1);
+    const tail = rawTail ? rawTail.slice(rawTail.indexOf("\n") + 1) : "";
+    const text = tail ? head + tail : head;
     try {
       const id = nextId++;
       return await send<StructureParseResult>(

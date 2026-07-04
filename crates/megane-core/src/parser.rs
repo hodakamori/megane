@@ -806,6 +806,27 @@ END
     }
 
     #[test]
+    fn parse_frame0_prefix_picks_up_trailing_conect() {
+        // The JS prefix reader concatenates head(model 0) + tail(CONECT section);
+        // CONECT is written once after the last model and applies to model 0's
+        // serials, so frame 0 must gain those explicit bonds.
+        let text = "\
+CRYST1   10.000   10.000   10.000  90.00  90.00  90.00 P 1           1
+MODEL        1
+ATOM      1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       3.500   0.000   0.000  1.00  0.00           H
+ENDMDL
+CONECT    1    2
+END
+";
+        let got = parse_frame0_prefix(text, false).unwrap();
+        assert_eq!(got.n_atoms, 2);
+        // The two atoms are 3.5 Å apart (beyond the inferred-bond cutoff), so the
+        // only bond present is the explicit CONECT one.
+        assert_eq!(got.n_file_bonds, 1);
+    }
+
+    #[test]
     fn build_index_single_model_has_no_extra_frames() {
         let single = "\
 ATOM      1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O

@@ -138,4 +138,27 @@ describe("parseClient worker path", () => {
     // size <= prefix so isWholeFile is true → no retry, straight to null.
     expect(await client.parseStructurePrefix(fakeFile("m.xyz", 3), "xyz")).toBeNull();
   });
+
+  it("reads a tail chunk for a large PDB (to capture CONECT) but not for XYZ", async () => {
+    const client = await freshClient();
+    const bigFile = (name: string) => {
+      const slice = vi.fn(() => ({ text: async () => "L1\nL2\n" }));
+      const file = {
+        name,
+        size: 32 * 1024 * 1024, // larger than the 8MB prefix → head + tail
+        text: async () => "L1\nL2\n",
+        arrayBuffer: async () => new ArrayBuffer(0),
+        slice,
+      } as unknown as File;
+      return { file, slice };
+    };
+
+    const pdb = bigFile("big.pdb");
+    await client.parseStructurePrefix(pdb.file, "pdb");
+    expect(pdb.slice).toHaveBeenCalledTimes(2); // head + CONECT tail
+
+    const xyz = bigFile("big.xyz");
+    await client.parseStructurePrefix(xyz.file, "xyz");
+    expect(xyz.slice).toHaveBeenCalledTimes(1); // head only
+  });
 });
