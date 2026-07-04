@@ -9,7 +9,6 @@ vi.mock("@/parsers/structure", () => ({
   parseStructureText: vi.fn(),
   // Lazy structure streaming is disabled here so loadFile takes the eager path.
   shouldUseLazyStructure: () => false,
-  parseStructureFrame0: vi.fn(async () => null),
   indexStructureLazy: vi.fn(async () => null),
 }));
 

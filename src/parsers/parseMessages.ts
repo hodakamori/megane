@@ -45,17 +45,11 @@ export interface IndexTrajectoryRequest {
   expectedNAtoms: number;
 }
 
-/** Request: parse only frame 0 of a multi-frame structure file (XYZ) into a snapshot. */
-export interface StructureFrame0Request {
-  id: number;
-  op: "structureFrame0";
-  wasmUrl: string | undefined;
-  ext: string;
-  text?: string;
-  bytes?: ArrayBuffer;
-}
-
-/** Request: build a lazy structure-frame decoder (scans extra frames, holds bytes in the worker). */
+/**
+ * Request: build a lazy structure-frame decoder (scans extra frames, holds bytes
+ * in the worker) AND parse frame 0 in the same round-trip — one file read yields
+ * both the index and the eager snapshot.
+ */
 export interface IndexStructureRequest {
   id: number;
   op: "indexStructure";
@@ -64,6 +58,12 @@ export interface IndexStructureRequest {
   /** Reuses the trajectory decoder map, so `decodeFrame` / `disposeTrajectory` apply. */
   trajectoryId: number;
   bytes: ArrayBuffer;
+}
+
+/** Response for `indexStructure`: the extra-frame index plus frame 0's snapshot. */
+export interface IndexStructureResult {
+  index: StructureIndexResult;
+  frame0: StructureParseResult;
 }
 
 /** Request: decode a single frame from a previously-indexed trajectory. */
@@ -84,7 +84,6 @@ export interface DisposeTrajectoryRequest {
 export type ParseRequest =
   | StructureParseRequest
   | TrajectoryParseRequest
-  | StructureFrame0Request
   | IndexStructureRequest
   | IndexTrajectoryRequest
   | DecodeFrameRequest
@@ -106,7 +105,6 @@ export interface ParseResponse {
   op:
     | "structure"
     | "trajectory"
-    | "structureFrame0"
     | "indexStructure"
     | "indexTrajectory"
     | "decodeFrame"
@@ -115,7 +113,7 @@ export interface ParseResponse {
     | StructureParseResult
     | XTCParseResult
     | TrajectoryIndexResult
-    | StructureIndexResult
+    | IndexStructureResult
     | DecodeFrameResult;
   error?: string;
 }

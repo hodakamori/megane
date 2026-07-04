@@ -556,26 +556,10 @@ impl LammpstrjDecoder {
     }
 }
 
-/// Parse ONLY the first frame of a multi-frame XYZ into a structure snapshot
-/// (topology + frame-0 coordinates, no extra frames). Backs lazy XYZ decode.
-#[wasm_bindgen]
-pub fn parse_xyz_frame0(text: &str) -> Result<ParseResult, JsError> {
-    let data = xyz::parse_frame0(text).map_err(|e| JsError::new(&e))?;
-    Ok(ParseResult::from_parsed(data))
-}
-
-/// Parse ONLY the first model of a multi-MODEL PDB into a structure snapshot
-/// (topology + model-0 coordinates, no extra frames). Backs lazy PDB decode.
-#[wasm_bindgen]
-pub fn parse_pdb_frame0(text: &str) -> Result<ParseResult, JsError> {
-    let data = parser::parse_frame0(text).map_err(|e| JsError::new(&e))?;
-    Ok(ParseResult::from_parsed(data))
-}
-
 /// Persistent decoder for the extra frames of a multi-frame structure file
-/// (XYZ frames or PDB models). Owns the text and a per-frame byte-offset index;
-/// decodes one extra frame's positions on demand. Frame 0 is the eager snapshot
-/// (`parse_xyz_frame0` / `parse_pdb_frame0`) and is NOT part of this frame set.
+/// (XYZ frames or PDB models). Owns the text and a per-frame byte-offset index,
+/// and parses frame 0 (via `frame0()`) from the SAME held copy — so one worker
+/// round-trip (one file read) yields both the index and the eager snapshot.
 #[wasm_bindgen]
 pub struct StructureFrameDecoder {
     text: String,
@@ -620,6 +604,18 @@ impl StructureFrameDecoder {
     #[wasm_bindgen(getter)]
     pub fn n_frames(&self) -> u32 {
         self.n_frames
+    }
+
+    /// Parse frame 0 (the eager snapshot: topology + frame-0 coordinates) from
+    /// the held text, WITHOUT re-reading the file. Lets one worker round-trip
+    /// return both the index and frame 0 for instant first paint.
+    pub fn frame0(&self) -> Result<ParseResult, JsError> {
+        let data = match self.kind.as_str() {
+            "pdb" => parser::parse_frame0(&self.text),
+            _ => xyz::parse_frame0(&self.text),
+        }
+        .map_err(|e| JsError::new(&e))?;
+        Ok(ParseResult::from_parsed(data))
     }
 
     /// Decode extra frame `i` (0-indexed into the extra frames) → positions (Å).

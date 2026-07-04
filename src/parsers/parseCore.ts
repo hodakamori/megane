@@ -113,10 +113,12 @@ export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
   decode_frame_vectors(frame: number): Float32Array;
 }
 
-/** Persistent decoder for the extra frames of a multi-frame structure file (XYZ). */
+/** Persistent decoder for the extra frames of a multi-frame structure file (XYZ / PDB). */
 export interface WasmStructureFrameDecoder extends WasmFrameDecoder {
   /** Number of EXTRA frames (excludes the eager snapshot frame 0). */
   readonly n_frames: number;
+  /** Parse frame 0 (the eager snapshot) from the held bytes — no re-read. */
+  frame0(): WasmParseResult;
 }
 
 /** Lazy trajectory formats with a persistent per-frame decoder. */
@@ -153,8 +155,6 @@ interface WasmModule {
   parse_pdb: ParseFn;
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
-  parse_xyz_frame0: ParseFn;
-  parse_pdb_frame0: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
@@ -203,8 +203,6 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
-        parse_xyz_frame0: wasm.parse_xyz_frame0,
-        parse_pdb_frame0: wasm.parse_pdb_frame0,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
@@ -254,21 +252,6 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_prmtop;
     default:
       return wasmModule!.parse_pdb;
-  }
-}
-
-/**
- * Choose the frame-0-only parser for a multi-frame structure format, or null
- * when the format has no lazy variant (caller falls back to eager parsing).
- */
-function getFrame0ParserForExtension(ext: string): ParseFn | null {
-  switch (ext) {
-    case ".xyz":
-      return wasmModule!.parse_xyz_frame0;
-    case ".pdb":
-      return wasmModule!.parse_pdb_frame0;
-    default:
-      return null;
   }
 }
 
@@ -395,18 +378,6 @@ export function parseStructureCore(input: StructureParseInput): StructureParseRe
   return parseWithFn(parseFn, input.text ?? "");
 }
 
-/**
- * Parse ONLY frame 0 of a multi-frame structure file into a snapshot (topology +
- * frame-0 coordinates, `frames` empty, `meta` null). Requires `ensureInit`
- * first. Throws if the format has no frame-0 parser (callers gate on the file
- * extension — currently only `.xyz`).
- */
-export function parseStructureFrame0Core(input: StructureParseInput): StructureParseResult {
-  const parseFn = getFrame0ParserForExtension(input.ext);
-  if (!parseFn) throw new Error(`no frame-0 parser for ${input.ext}`);
-  return parseWithFn(parseFn, input.text ?? "");
-}
-
 /** Input for the trajectory parse core (already read from the File). */
 export interface TrajectoryParseInput {
   kind: TrajectoryKind;
@@ -483,22 +454,27 @@ export function indexTrajectoryCore(
 
 /**
  * Build a persistent structure-frame decoder for a multi-frame structure file
- * (currently XYZ) plus its extra-frame index, without decoding coordinates. The
- * `decoder` OWNS the file bytes in WASM memory and must be kept alive (and
- * eventually `free()`d) by the caller. Frame 0 is the eager snapshot (from
- * `parseStructureFrame0Core`) and is NOT part of this decoder's frame set.
- * Requires `ensureInit` first.
+ * (XYZ / PDB) AND parse frame 0 (the eager snapshot) from the SAME held bytes —
+ * one file read yields both the index and frame 0, so frame 0 can render before
+ * the rest is decoded. The `decoder` OWNS the file bytes in WASM memory and must
+ * be kept alive (and eventually `free()`d) by the caller (unlike `frame0`, which
+ * is a normal result whose buffers are freed here). Requires `ensureInit` first.
  */
 export function indexStructureCore(
   bytes: Uint8Array,
   kind: LazyStructureKind,
-): { decoder: WasmStructureFrameDecoder; index: StructureIndexResult } {
+): {
+  decoder: WasmStructureFrameDecoder;
+  index: StructureIndexResult;
+  frame0: StructureParseResult;
+} {
   const decoder = new wasmModule!.StructureFrameDecoder(bytes, kind);
   const index: StructureIndexResult = {
     nAtoms: decoder.n_atoms,
     nFrames: decoder.n_frames,
   };
-  return { decoder, index };
+  const frame0 = parseWithFn(() => decoder.frame0(), "");
+  return { decoder, index, frame0 };
 }
 
 /** Decode a single frame's positions (Å) from a persistent decoder. */

@@ -28,7 +28,12 @@ import type {
   LazyStructureKind,
   StructureIndexResult,
 } from "./parseCore";
-import type { ParseRequest, ParseResponse, DecodeFrameResult } from "./parseMessages";
+import type {
+  ParseRequest,
+  ParseResponse,
+  DecodeFrameResult,
+  IndexStructureResult,
+} from "./parseMessages";
 
 const TIMEOUT_MS = 120_000;
 
@@ -300,14 +305,14 @@ export function disposeTrajectoryLazy(trajectoryId: number): void {
   });
 }
 
-// ── Lazy multi-frame structure files (XYZ) ──────────────────────────────
+// ── Lazy multi-frame structure files (XYZ / PDB) ────────────────────────
 //
 // Structure files carry frame 0 as the eager snapshot and frames 1..N as
-// "extra" frames. Frame 0 is parsed eagerly (topology + coordinates) via
-// `parseStructureFrame0`; the extra frames are decoded on demand from a
-// persistent worker decoder built by `indexStructureLazy`. The decoder shares
-// the trajectory decoder map, so `decodeTrajectoryFrame` / `disposeTrajectoryLazy`
-// service structure frames too.
+// "extra" frames. `indexStructureLazy` reads the file ONCE: the worker builds a
+// persistent decoder (the extra-frame index) AND parses frame 0 from the same
+// bytes, so frame 0 can render immediately while the rest stream in on demand
+// via {@link decodeTrajectoryFrame}. The decoder shares the trajectory decoder
+// map, so `decodeTrajectoryFrame` / `disposeTrajectoryLazy` service it too.
 
 /** Handle returned by `indexStructureLazy`, consumed by `LazyFrameProvider`. */
 export interface StructureLazyHandle {
@@ -316,46 +321,32 @@ export interface StructureLazyHandle {
   index: StructureIndexResult;
 }
 
-/**
- * Parse only frame 0 of a multi-frame structure file into a snapshot (topology +
- * frame-0 coordinates, no extra frames). Returns `null` when the worker is
- * unavailable or the parse fails — the caller then falls back to eager parsing.
- */
-export async function parseStructureFrame0(
-  file: File,
-  ext: string,
-): Promise<StructureParseResult | null> {
-  if (workerUnavailable()) return null;
-  try {
-    const id = nextId++;
-    const text = await file.text();
-    const req: ParseRequest = { id, op: "structureFrame0", wasmUrl: resolveWasmUrl(), ext, text };
-    return await send<StructureParseResult>(req, []);
-  } catch {
-    return null;
-  }
+/** `indexStructureLazy` result: the streaming handle plus frame 0's snapshot. */
+export interface StructureLazyResult {
+  handle: StructureLazyHandle;
+  frame0: StructureParseResult;
 }
 
 /**
- * Build a lazy structure-frame decoder in the worker: scans the extra-frame
- * index (no coordinate decode) and keeps the bytes resident so frames stream in
- * on demand via {@link decodeTrajectoryFrame}. Returns `null` (fall back to
- * eager parse) when the worker is unavailable or indexing fails.
+ * Build a lazy structure-frame decoder in the worker AND get frame 0 in one file
+ * read: the worker scans the extra-frame index (no bulk coordinate decode),
+ * keeps the bytes resident, and parses frame 0 from the same copy. Returns `null`
+ * (fall back to eager parse) when the worker is unavailable or indexing fails.
  */
 export async function indexStructureLazy(
   file: File,
   kind: LazyStructureKind,
-): Promise<StructureLazyHandle | null> {
+): Promise<StructureLazyResult | null> {
   if (workerUnavailable()) return null;
   try {
     const id = nextId++;
     const trajectoryId = nextTrajId++;
     const buffer = await file.arrayBuffer();
-    const index = await send<StructureIndexResult>(
+    const { index, frame0 } = await send<IndexStructureResult>(
       { id, op: "indexStructure", wasmUrl: resolveWasmUrl(), kind, trajectoryId, bytes: buffer },
       [buffer],
     );
-    return { trajectoryId, kind, index };
+    return { handle: { trajectoryId, kind, index }, frame0 };
   } catch {
     return null;
   }

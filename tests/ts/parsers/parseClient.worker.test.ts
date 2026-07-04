@@ -38,7 +38,6 @@ vi.mock("@/parsers/parseClientSync", () => ({
   parseDCDFile: vi.fn(async () => ({ tag: "sync" })),
   parseLammpstrjFile: vi.fn(async () => ({ tag: "sync" })),
   parseNetCDFFile: vi.fn(async () => ({ tag: "sync" })),
-  parseStructureFrame0: vi.fn(async () => null),
   indexStructureLazy: vi.fn(async () => null),
 }));
 
@@ -108,25 +107,17 @@ describe("parseClient worker path", () => {
     expect(sync.parseXTCFile).toHaveBeenCalled();
   });
 
-  it("parses structure frame 0 via the worker", async () => {
+  it("builds a lazy structure handle (with frame 0) via the worker in one round-trip", async () => {
     const client = await freshClient();
-    const out = await client.parseStructureFrame0(fakeFile("m.xyz"), ".xyz");
-    expect(out).toEqual({ tag: "worker" });
-    expect(state.lastReq?.op).toBe("structureFrame0");
-  });
-
-  it("builds a lazy structure handle via the worker", async () => {
-    const client = await freshClient();
-    const handle = await client.indexStructureLazy(fakeFile("m.xyz"), "xyz");
+    const res = await client.indexStructureLazy(fakeFile("m.xyz"), "xyz");
     expect(state.lastReq?.op).toBe("indexStructure");
-    expect(handle).toMatchObject({ kind: "xyz", index: { tag: "worker" } });
-    expect(typeof handle?.trajectoryId).toBe("number");
+    expect(res?.handle.kind).toBe("xyz");
+    expect(typeof res?.handle.trajectoryId).toBe("number");
   });
 
   it("returns null (eager fallback) when structure indexing errors", async () => {
     const client = await freshClient();
     state.mode = "err";
-    expect(await client.parseStructureFrame0(fakeFile("m.xyz"), ".xyz")).toBeNull();
     expect(await client.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
   });
 });

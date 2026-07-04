@@ -139,6 +139,12 @@ export interface StructureLazyHandle {
   index: import("./parseCore").StructureIndexResult;
 }
 
+/** `indexStructureLazy` result shape (mirrored; never produced on the sync path). */
+export interface StructureLazyResult {
+  handle: StructureLazyHandle;
+  frame0: StructureParseResult;
+}
+
 /** Lazy structure decode needs a worker; the sync path never uses it. */
 export function shouldUseLazyStructure(
   _kind: import("./parseCore").LazyStructureKind,
@@ -148,17 +154,9 @@ export function shouldUseLazyStructure(
 }
 
 /** Worker-only; returns `null` so the caller falls back to eager parsing. */
-export async function parseStructureFrame0(
-  _file: File,
-  _ext: string,
-): Promise<StructureParseResult | null> {
-  return null;
-}
-
-/** Worker-only; returns `null` so the caller falls back to eager parsing. */
 export async function indexStructureLazy(
   _file: File,
   _kind: import("./parseCore").LazyStructureKind,
-): Promise<StructureLazyHandle | null> {
+): Promise<StructureLazyResult | null> {
   return null;
 }

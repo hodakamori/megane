@@ -11,10 +11,10 @@
 export type { StructureParseResult } from "./parseCore";
 export { parseStructureFile, parseStructureText } from "./parseClient";
 export {
-  parseStructureFrame0,
   indexStructureLazy,
   shouldUseLazyStructure,
   type StructureLazyHandle,
+  type StructureLazyResult,
 } from "./parseClient";
 export type { LazyStructureKind } from "./parseCore";
 export {

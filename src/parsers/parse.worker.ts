@@ -11,7 +11,6 @@
 import {
   ensureInit,
   parseStructureCore,
-  parseStructureFrame0Core,
   parseTrajectoryCore,
   collectResultBuffers,
   indexTrajectoryCore,
@@ -62,28 +61,22 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
         { id: req.id, ok: true, op: "trajectory", result } satisfies ParseResponse,
         transfer,
       );
-    } else if (req.op === "structureFrame0") {
-      await ensureInit(req.wasmUrl);
-      const result = parseStructureFrame0Core({
-        ext: req.ext,
-        text: req.text,
-        bytes: req.bytes ? new Uint8Array(req.bytes) : undefined,
-      });
-      const transfer = collectResultBuffers(result);
-      ctx.postMessage(
-        { id: req.id, ok: true, op: "structureFrame0", result } satisfies ParseResponse,
-        transfer,
-      );
     } else if (req.op === "indexStructure") {
       await ensureInit(req.wasmUrl);
-      const { decoder, index } = indexStructureCore(new Uint8Array(req.bytes), req.kind);
+      // One read: build the persistent decoder (index) AND parse frame 0.
+      const { decoder, index, frame0 } = indexStructureCore(new Uint8Array(req.bytes), req.kind);
       decoders.set(req.trajectoryId, decoder);
-      ctx.postMessage({
-        id: req.id,
-        ok: true,
-        op: "indexStructure",
-        result: index,
-      } satisfies ParseResponse);
+      // Transfer frame 0's backing buffers (positions/elements/bonds/…) zero-copy.
+      const transfer = collectResultBuffers(frame0);
+      ctx.postMessage(
+        {
+          id: req.id,
+          ok: true,
+          op: "indexStructure",
+          result: { index, frame0 },
+        } satisfies ParseResponse,
+        transfer,
+      );
     } else if (req.op === "indexTrajectory") {
       await ensureInit(req.wasmUrl);
       const { decoder, index } = indexTrajectoryCore(

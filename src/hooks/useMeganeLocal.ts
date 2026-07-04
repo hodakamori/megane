@@ -9,7 +9,6 @@ import { useState, useRef, useCallback } from "react";
 import {
   parseStructureFile,
   parseStructureText,
-  parseStructureFrame0,
   indexStructureLazy,
   shouldUseLazyStructure,
 } from "../parsers/structure";
@@ -319,47 +318,49 @@ export function useMeganeLocal(): MeganeLocalState {
     [applyResult],
   );
 
-  // Lazy path for large multi-frame structure files (currently XYZ): parse
-  // frame 0 eagerly for instant first paint, then stream the extra frames from
-  // a persistent worker decoder through the pipeline's structure-trajectory
-  // channel. Returns false (→ eager fallback) when the worker is unavailable,
-  // the file has no extra frames, or indexing fails.
+  // Lazy path for large multi-frame structure files (XYZ / PDB). ONE file read:
+  // the worker builds the extra-frame index AND parses frame 0 from the same
+  // bytes, so frame 0 renders immediately (interactive) while the remaining
+  // frames stream in through the pipeline's structure-trajectory channel. Returns
+  // false (→ eager fallback) only when the worker is unavailable or indexing
+  // fails. A single-frame file needs no eager re-parse — frame 0 IS the whole
+  // structure, so it renders statically.
   const loadStructureLazy = useCallback(
     async (file: File, kind: LazyStructureKind, topFile?: File): Promise<boolean> => {
-      const ext = `.${kind}`;
-      // Index first — it's a cheap scan (no coordinate decode). A single-frame
-      // file (e.g. a large single-MODEL PDB) then bails out here BEFORE any
-      // frame-0 parse, so the eager fallback pays only one full parse, never two.
-      const handle = await indexStructureLazy(file, kind);
-      if (!handle || handle.index.nFrames <= 0) {
-        if (handle) disposeTrajectoryLazy(handle.trajectoryId);
-        return false;
-      }
-      const frame0 = await parseStructureFrame0(file, ext);
-      if (!frame0) {
+      const indexed = await indexStructureLazy(file, kind);
+      if (!indexed) return false; // worker unavailable / index failed → eager fallback
+      const { handle, frame0 } = indexed;
+
+      if (handle.index.nFrames <= 0) {
+        // Single-frame structure: frame 0 already holds the whole structure.
+        // Render it statically and free the decoder — no second full parse.
         disposeTrajectoryLazy(handle.trajectoryId);
-        return false;
+        applyResult(
+          { snapshot: frame0.snapshot, frames: [], meta: null, labels: frame0.labels },
+          file.name,
+        );
+      } else {
+        // Multi-frame: render frame 0 now, stream the rest via the provider.
+        const meta: TrajectoryMeta = {
+          nFrames: handle.index.nFrames + 1, // + synthetic frame 0 (the eager snapshot)
+          timestepPs: 1.0,
+          nAtoms: frame0.snapshot.nAtoms,
+        };
+        const provider = new LazyFrameProvider(handle, meta, {
+          decode: decodeTrajectoryFrame,
+          dispose: disposeTrajectoryLazy,
+          basePositions: frame0.snapshot.positions,
+        });
+        provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
+        applyResult(
+          { snapshot: frame0.snapshot, frames: [], meta: null, labels: frame0.labels },
+          file.name,
+          { provider },
+        );
       }
 
-      const meta: TrajectoryMeta = {
-        nFrames: handle.index.nFrames + 1, // + synthetic frame 0 (the eager snapshot)
-        timestepPs: 1.0,
-        nAtoms: frame0.snapshot.nAtoms,
-      };
-      const provider = new LazyFrameProvider(handle, meta, {
-        decode: decodeTrajectoryFrame,
-        dispose: disposeTrajectoryLazy,
-        basePositions: frame0.snapshot.positions,
-      });
-      provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
-
-      applyResult(
-        { snapshot: frame0.snapshot, frames: [], meta: null, labels: frame0.labels },
-        file.name,
-        { provider },
-      );
       setPdbFileName(file.name);
-      setXtcFileName("PDB models");
+      setXtcFileName(handle.index.nFrames > 0 ? "PDB models" : null);
 
       // Mirror applyStructureResult: overwrite bonds with a sibling .top if present.
       if (topFile) {

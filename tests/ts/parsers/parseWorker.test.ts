@@ -60,8 +60,6 @@ const { wasmMock } = vi.hoisted(() => {
     parse_pdb: () => mockStructResult(3),
     parse_gro: () => mockStructResult(3),
     parse_xyz: () => mockStructResult(3),
-    parse_xyz_frame0: () => mockStructResult(3, 0),
-    parse_pdb_frame0: () => mockStructResult(3, 0),
     parse_mol: () => mockStructResult(3),
     parse_mol2: () => mockStructResult(3),
     parse_cif: () => mockStructResult(3),
@@ -116,6 +114,9 @@ const { wasmMock } = vi.hoisted(() => {
     StructureFrameDecoder: class {
       n_atoms = 3;
       n_frames = 2;
+      frame0() {
+        return mockStructResult(3, 0);
+      }
       decode_frame() {
         return new Float32Array(3 * 3);
       }
@@ -282,22 +283,10 @@ describe("parse.worker onmessage", () => {
     expect(posts[0].error).toMatch(/atom count/);
   });
 
-  it("parses only frame 0 of a multi-frame structure file (structureFrame0)", async () => {
-    const { handler, posts } = await loadWorker();
-    await handler({
-      data: { id: 40, op: "structureFrame0", wasmUrl: undefined, ext: ".xyz", text: "3\n\nO 0 0 0" },
-    });
-    expect(posts[0].ok).toBe(true);
-    expect(posts[0].op).toBe("structureFrame0");
-    // parse_xyz_frame0 mock reports 0 extra frames — the snapshot only.
-    const result = posts[0].result as { frames: unknown[] };
-    expect(result.frames).toHaveLength(0);
-  });
-
-  it("indexes a structure file's extra frames and decodes one on demand", async () => {
+  it("indexes a structure file (returning frame 0 too) and decodes an extra frame on demand", async () => {
     const { handler, posts } = await loadWorker();
 
-    // 1. Build a persistent structure-frame decoder (mock: n_atoms 3, n_frames 2).
+    // 1. One round-trip: build the decoder (index) AND parse frame 0.
     await handler({
       data: {
         id: 50,
@@ -310,9 +299,15 @@ describe("parse.worker onmessage", () => {
     });
     expect(posts[0].ok).toBe(true);
     expect(posts[0].op).toBe("indexStructure");
-    const index = posts[0].result as { nAtoms: number; nFrames: number };
-    expect(index.nAtoms).toBe(3);
-    expect(index.nFrames).toBe(2);
+    const res = posts[0].result as {
+      index: { nAtoms: number; nFrames: number };
+      frame0: { snapshot: { nAtoms: number }; frames: unknown[] };
+    };
+    expect(res.index.nAtoms).toBe(3);
+    expect(res.index.nFrames).toBe(2);
+    // Frame 0 comes back in the same response (no second file read).
+    expect(res.frame0.snapshot.nAtoms).toBe(3);
+    expect(res.frame0.frames).toHaveLength(0);
 
     // 2. Decode a single extra frame from the retained decoder (no vectors).
     await handler({ data: { id: 51, op: "decodeFrame", trajectoryId: 500, frame: 1 } });
