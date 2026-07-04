@@ -79,4 +79,11 @@ describe("parseClient falls back to the synchronous path when no Worker exists",
     expect(await client.parseStructurePrefix(file("m.xyz"), "xyz")).toBeNull();
     expect(client.shouldUseLazyStructure("xyz", 1024 * 1024 * 1024)).toBe(false);
   });
+
+  it("lazy trajectory entry points no-op without a worker", async () => {
+    // No worker ⇒ null so loadXtc falls back to a full read / eager parse.
+    expect(await client.indexTrajectoryLazy(file("t.xtc"), "xtc", 4)).toBeNull();
+    expect(await client.decodeTrajectoryFrame0(file("t.xtc"), "xtc", 4)).toBeNull();
+    expect(client.shouldUseLazyTrajectory("xtc", 1024 * 1024 * 1024)).toBe(false);
+  });
 });

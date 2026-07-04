@@ -80,6 +80,21 @@ export interface StructurePrefixRequest {
   isWholeFile: boolean;
 }
 
+/** Request: decode frame 0 from a bounded prefix of a large trajectory (instant first paint). */
+export interface TrajectoryFrame0Request {
+  id: number;
+  op: "trajectoryFrame0";
+  wasmUrl: string | undefined;
+  kind: LazyTrajectoryKind;
+  bytes: ArrayBuffer;
+  expectedNAtoms: number;
+}
+
+/** Response for `trajectoryFrame0`: frame 0's positions. */
+export interface TrajectoryFrame0Result {
+  positions: Float32Array;
+}
+
 /** Request: decode a single frame from a previously-indexed trajectory. */
 export interface DecodeFrameRequest {
   id: number;
@@ -99,6 +114,7 @@ export type ParseRequest =
   | StructureParseRequest
   | TrajectoryParseRequest
   | StructurePrefixRequest
+  | TrajectoryFrame0Request
   | IndexStructureRequest
   | IndexTrajectoryRequest
   | DecodeFrameRequest
@@ -121,6 +137,7 @@ export interface ParseResponse {
     | "structure"
     | "trajectory"
     | "structurePrefix"
+    | "trajectoryFrame0"
     | "indexStructure"
     | "indexTrajectory"
     | "decodeFrame"
@@ -130,6 +147,7 @@ export interface ParseResponse {
     | XTCParseResult
     | TrajectoryIndexResult
     | IndexStructureResult
+    | TrajectoryFrame0Result
     | DecodeFrameResult;
   error?: string;
 }

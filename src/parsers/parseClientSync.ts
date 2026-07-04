@@ -117,6 +117,15 @@ export async function indexTrajectoryLazy(
   return null;
 }
 
+/** Worker-only; returns `null` so the caller falls back to a full read. */
+export async function decodeTrajectoryFrame0(
+  _file: File,
+  _kind: import("./parseCore").LazyTrajectoryKind,
+  _expectedNAtoms: number,
+): Promise<Float32Array | null> {
+  return null;
+}
+
 /** Never called (indexTrajectoryLazy returns null so no lazy provider is created). */
 export async function decodeTrajectoryFrame(
   _trajectoryId: number,

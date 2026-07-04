@@ -51,6 +51,14 @@ export interface LazyFrameProviderOptions {
    * real decoded frame).
    */
   basePositions?: Float32Array | null;
+  /**
+   * Pre-decoded frame-0 positions for the trajectory-file convention (frame 0 is
+   * a real decodable frame). Seeds the cache so the first paint after a
+   * phase-1→phase-2 provider swap needs no worker round-trip and doesn't flicker.
+   * Ignored when `basePositions` is set (that convention already has a
+   * synchronous frame 0).
+   */
+  seedFrame0?: Float32Array | null;
 }
 
 export class LazyFrameProvider implements FrameProvider {
@@ -95,6 +103,13 @@ export class LazyFrameProvider implements FrameProvider {
     this.prefetchAhead = opts.prefetchAhead ?? DEFAULT_PREFETCH_AHEAD;
     this.decode = opts.decode ?? (() => Promise.reject(new Error("no decode fn")));
     this.disposeFn = opts.dispose ?? (() => {});
+    // Seed a pre-decoded frame 0 (trajectory convention) so the cache serves it
+    // synchronously — the phase-1 partial-read result carries over the swap with
+    // no re-decode and no flicker.
+    if (opts.seedFrame0 && !this.basePositions) {
+      this.cacheFrame({ frameId: 0, nAtoms: this.nAtoms, positions: opts.seedFrame0 });
+      this.decodedCountHW = 1;
+    }
     // Prime frame 0 (and its window) so first paint is fast.
     this.prefetchWindow(0);
   }

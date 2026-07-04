@@ -16,6 +16,7 @@ import {
   collectResultBuffers,
   indexTrajectoryCore,
   indexStructureCore,
+  decodeTrajectoryFrame0Core,
   decodeFrameCore,
   decodeFrameVectorsCore,
   type WasmFrameDecoder,
@@ -70,6 +71,18 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
       ctx.postMessage(
         { id: req.id, ok: true, op: "structurePrefix", result } satisfies ParseResponse,
         transfer,
+      );
+    } else if (req.op === "trajectoryFrame0") {
+      await ensureInit(req.wasmUrl);
+      // Decode frame 0 from a bounded prefix; throws if the prefix is too small.
+      const positions = decodeTrajectoryFrame0Core(
+        new Uint8Array(req.bytes),
+        req.kind,
+        req.expectedNAtoms,
+      );
+      ctx.postMessage(
+        { id: req.id, ok: true, op: "trajectoryFrame0", result: { positions } } satisfies ParseResponse,
+        [positions.buffer],
       );
     } else if (req.op === "indexStructure") {
       await ensureInit(req.wasmUrl);

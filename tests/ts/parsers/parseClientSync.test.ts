@@ -78,6 +78,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
+    decode_trajectory_frame0: () => new Float32Array(4 * 3),
     parse_mol: structFn("parse_mol"),
     parse_mol2: structFn("parse_mol2"),
     parse_cif: structFn("parse_cif"),
@@ -223,6 +224,8 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     // returns null so the caller falls back to eager parseXTCFile; decode is
     // never reached and dispose is a no-op.
     expect(await sync.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
+    // frame-0 partial decode also needs a worker → null (caller does a full read).
+    expect(await sync.decodeTrajectoryFrame0(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
     await expect(sync.decodeTrajectoryFrame(0, 0)).rejects.toThrow(/worker-only/);
     expect(() => sync.disposeTrajectoryLazy(0)).not.toThrow();
     // Never streams on the sync path, regardless of file size.

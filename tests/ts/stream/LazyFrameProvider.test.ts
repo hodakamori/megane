@@ -261,4 +261,41 @@ describe("LazyFrameProvider", () => {
     p.getFrame(2);
     expect(decode.fn).toHaveBeenCalledExactlyOnceWith(7, 1);
   });
+
+  it("seeds frame 0 (trajectory convention) so it serves synchronously with no decode", () => {
+    const seed = new Float32Array(N_ATOMS * 3).fill(77);
+    const p = new LazyFrameProvider(makeHandle(), makeMeta(), {
+      decode: decode.fn,
+      dispose,
+      prefetchAhead: 0,
+      seedFrame0: seed,
+    });
+    // Frame 0 comes straight from the seeded cache — no worker round-trip.
+    expect(decode.fn).not.toHaveBeenCalledWith(7, 0);
+    const f0 = p.getFrame(0);
+    expect(f0).not.toBeNull();
+    expect(f0!.frameId).toBe(0);
+    expect(f0!.positions).toBe(seed);
+    expect(p.decodedCount()).toBe(1);
+    // Other frames still decode on demand.
+    p.getFrame(5);
+    expect(decode.fn).toHaveBeenCalledExactlyOnceWith(7, 5);
+  });
+
+  it("ignores seedFrame0 when basePositions is set (structure convention wins)", () => {
+    const seed = new Float32Array(N_ATOMS * 3).fill(1);
+    const basePositions = new Float32Array(N_ATOMS * 3).fill(2);
+    const p = new LazyFrameProvider(
+      makeHandle(3),
+      { nFrames: 4, timestepPs: 2, nAtoms: N_ATOMS },
+      {
+        decode: decode.fn,
+        dispose,
+        prefetchAhead: 0,
+        seedFrame0: seed,
+        basePositions,
+      },
+    );
+    expect(p.getFrame(0)!.positions).toBe(basePositions);
+  });
 });

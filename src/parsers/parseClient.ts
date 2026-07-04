@@ -33,6 +33,7 @@ import type {
   ParseResponse,
   DecodeFrameResult,
   IndexStructureResult,
+  TrajectoryFrame0Result,
 } from "./parseMessages";
 
 const TIMEOUT_MS = 120_000;
@@ -279,6 +280,47 @@ export async function indexTrajectoryLazy(
   } catch {
     // Any failure ⇒ let the caller fall back to eager parsing.
     return null;
+  }
+}
+
+/**
+ * Decode ONLY frame 0 of a large trajectory (XTC / LAMMPS dump) from a bounded
+ * prefix — for size-independent first paint (read one frame, not the whole
+ * file). Grows the prefix if frame 0 doesn't fit; returns `null` (caller falls
+ * back to the full index read) when the worker is unavailable or frame 0 exceeds
+ * the max prefix.
+ */
+export async function decodeTrajectoryFrame0(
+  file: File,
+  kind: LazyTrajectoryKind,
+  expectedNAtoms: number,
+): Promise<Float32Array | null> {
+  if (workerUnavailable()) return null;
+  // Kill switch / A-B knob: `globalThis.__MEGANE_TRAJ_FRAME0__ === false` disables
+  // the phase-1 partial read so loadXtc falls back to the single full-read index
+  // (the pre-two-phase behaviour). Used by the perf profiler to measure the win.
+  if ((globalThis as Record<string, unknown>).__MEGANE_TRAJ_FRAME0__ === false) return null;
+  let size = Math.min(file.size, LAZY_XTC_MIN_BYTES);
+  for (;;) {
+    try {
+      const id = nextId++;
+      const buffer = await file.slice(0, size).arrayBuffer();
+      const { positions } = await send<TrajectoryFrame0Result>(
+        {
+          id,
+          op: "trajectoryFrame0",
+          wasmUrl: resolveWasmUrl(),
+          kind,
+          bytes: buffer,
+          expectedNAtoms,
+        },
+        [buffer],
+      );
+      return positions;
+    } catch {
+      if (size >= file.size || size >= PREFIX_MAX_BYTES) return null;
+      size = Math.min(file.size, size * 2);
+    }
   }
 }
 

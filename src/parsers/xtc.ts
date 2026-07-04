@@ -6,10 +6,11 @@
  * callers and `openFile.ts` are untouched.
  */
 
-export type { XTCParseResult } from "./parseCore";
+export type { XTCParseResult, LazyTrajectoryKind } from "./parseCore";
 export { parseXTCFile, parseDCDFile, parseLammpstrjFile, parseNetCDFFile } from "./parseClient";
 export {
   indexTrajectoryLazy,
+  decodeTrajectoryFrame0,
   decodeTrajectoryFrame,
   disposeTrajectoryLazy,
   shouldUseLazyTrajectory,

@@ -61,6 +61,7 @@ const { wasmMock } = vi.hoisted(() => {
     parse_gro: () => mockStructResult(3),
     parse_xyz: () => mockStructResult(3),
     parse_structure_prefix: () => mockStructResult(3, 0),
+    decode_trajectory_frame0: () => new Float32Array(4 * 3),
     parse_mol: () => mockStructResult(3),
     parse_mol2: () => mockStructResult(3),
     parse_cif: () => mockStructResult(3),
@@ -300,6 +301,24 @@ describe("parse.worker onmessage", () => {
     expect(posts[0].op).toBe("structurePrefix");
     const result = posts[0].result as { snapshot: { nAtoms: number } };
     expect(result.snapshot.nAtoms).toBe(3);
+  });
+
+  it("decodes only frame 0 of a trajectory from a bounded prefix", async () => {
+    const { handler, posts } = await loadWorker();
+    await handler({
+      data: {
+        id: 46,
+        op: "trajectoryFrame0",
+        wasmUrl: undefined,
+        kind: "xtc",
+        bytes: new Uint8Array([1, 2, 3, 4]).buffer,
+        expectedNAtoms: 4,
+      },
+    });
+    expect(posts[0].ok).toBe(true);
+    expect(posts[0].op).toBe("trajectoryFrame0");
+    const result = posts[0].result as { positions: Float32Array };
+    expect(result.positions).toHaveLength(4 * 3);
   });
 
   it("indexes a structure file (returning frame 0 too) and decodes an extra frame on demand", async () => {

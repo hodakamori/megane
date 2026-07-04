@@ -49,7 +49,10 @@ function fakeFile(name: string, size = 3): File {
     size,
     text: async () => "DATA\n",
     arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-    slice: () => ({ text: async () => "DATA\n" }),
+    slice: () => ({
+      text: async () => "DATA\n",
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    }),
   } as unknown as File;
 }
 
@@ -109,6 +112,33 @@ describe("parseClient worker path", () => {
     const out = await client.parseXTCFile(fakeFile("t.xtc"), 4);
     expect(out).toEqual({ tag: "sync" });
     expect(sync.parseXTCFile).toHaveBeenCalled();
+  });
+
+  it("builds a lazy trajectory handle via the worker", async () => {
+    const client = await freshClient();
+    const res = await client.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4);
+    expect(state.lastReq?.op).toBe("indexTrajectory");
+    expect(res?.kind).toBe("xtc");
+    expect(typeof res?.trajectoryId).toBe("number");
+  });
+
+  it("returns null (full-read fallback) when trajectory indexing errors", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    expect(await client.indexTrajectoryLazy(fakeFile("t.xtc"), "xtc", 4)).toBeNull();
+  });
+
+  it("decodes frame 0 from a bounded prefix via the worker", async () => {
+    const client = await freshClient();
+    await client.decodeTrajectoryFrame0(fakeFile("t.xtc"), "xtc", 4);
+    expect(state.lastReq?.op).toBe("trajectoryFrame0");
+  });
+
+  it("returns null when the frame-0 prefix decode errors and can't grow", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    // size <= prefix so the read is already whole-file → no retry, straight to null.
+    expect(await client.decodeTrajectoryFrame0(fakeFile("t.xtc", 3), "xtc", 4)).toBeNull();
   });
 
   it("builds a lazy structure handle (with frame 0) via the worker in one round-trip", async () => {

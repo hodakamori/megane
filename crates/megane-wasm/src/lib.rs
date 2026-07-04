@@ -653,6 +653,34 @@ pub fn parse_structure_prefix(
     Ok(ParseResult::from_parsed(data))
 }
 
+/// Decode ONLY frame 0 (positions, Å) from a bounded PREFIX of a large
+/// trajectory (XTC / LAMMPS dump), for size-independent first paint. Frame 0 is
+/// at the start of the file, so a bounded prefix contains it. Errors if the
+/// prefix is too small to hold frame 0 (the JS side then grows it or falls back
+/// to a full read). `data` is the raw prefix bytes (UTF-8 text for LAMMPS dump).
+#[wasm_bindgen]
+pub fn decode_trajectory_frame0(
+    data: Vec<u8>,
+    kind: &str,
+    n_atoms: u32,
+) -> Result<Float32Array, JsError> {
+    let n = n_atoms as usize;
+    let coords: Vec<f32> = match kind {
+        "lammpstrj" => {
+            let text = String::from_utf8_lossy(&data);
+            let off = text
+                .find("ITEM: TIMESTEP")
+                .ok_or_else(|| JsError::new("no frame in prefix"))?;
+            lammpstrj::decode_frame_at(&text, off, n)
+                .map(|f| f.positions)
+                .map_err(|e| JsError::new(&e))?
+        }
+        "xtc" => xtc::decode_frame_at(&data, 0, n).map_err(|e| JsError::new(&e))?,
+        _ => return Err(JsError::new("unsupported trajectory frame0 kind")),
+    };
+    Ok(Float32Array::from(&coords[..]))
+}
+
 /// Parse a PDB file text and return structured data for the molecular viewer.
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {

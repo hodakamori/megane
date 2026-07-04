@@ -167,6 +167,7 @@ interface WasmModule {
   parse_netcdf_file: TrajBinaryParseFn;
   parse_lammpstrj_file: TrajTextParseFn;
   parse_structure_prefix: (text: string, kind: string, isWholeFile: boolean) => WasmParseResult;
+  decode_trajectory_frame0: (data: Uint8Array, kind: string, nAtoms: number) => Float32Array;
   XtcDecoder: new (data: Uint8Array) => WasmXtcDecoder;
   LammpstrjDecoder: new (data: Uint8Array) => WasmLammpstrjDecoder;
   StructureFrameDecoder: new (data: Uint8Array, kind: string) => WasmStructureFrameDecoder;
@@ -216,6 +217,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_netcdf_file: wasm.parse_netcdf_file,
         parse_lammpstrj_file: wasm.parse_lammpstrj_file,
         parse_structure_prefix: wasm.parse_structure_prefix,
+        decode_trajectory_frame0: wasm.decode_trajectory_frame0,
         XtcDecoder: wasm.XtcDecoder,
         LammpstrjDecoder: wasm.LammpstrjDecoder,
         StructureFrameDecoder: wasm.StructureFrameDecoder,
@@ -492,6 +494,19 @@ export function parseStructurePrefixCore(
   isWholeFile: boolean,
 ): StructureParseResult {
   return parseWithFn(() => wasmModule!.parse_structure_prefix(text, kind, isWholeFile), "");
+}
+
+/**
+ * Decode ONLY frame 0 (positions, Å) from a bounded prefix of a large trajectory
+ * (XTC / LAMMPS dump). Throws (caught upstream → grow the prefix / fall back) if
+ * the prefix is too small to hold frame 0. Requires `ensureInit` first.
+ */
+export function decodeTrajectoryFrame0Core(
+  bytes: Uint8Array,
+  kind: LazyTrajectoryKind,
+  nAtoms: number,
+): Float32Array {
+  return wasmModule!.decode_trajectory_frame0(bytes, kind, nAtoms);
 }
 
 /** Decode a single frame's positions (Å) from a persistent decoder. */
