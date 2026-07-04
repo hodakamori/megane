@@ -150,7 +150,11 @@ impl<'a> BitReader<'a> {
         num & mask
     }
 
-    fn decode_ints(&mut self, num_of_ints: usize, num_of_bits: u32, sizes: &[u32]) -> Vec<i32> {
+    fn decode_ints(&mut self, num_of_ints: usize, num_of_bits: u32, sizes: &[u32]) -> [i32; 3] {
+        // Coordinates are always 3D, so this hot-loop helper (called once per atom
+        // per frame) returns a fixed-size stack array instead of heap-allocating a
+        // Vec on every call.
+        debug_assert_eq!(num_of_ints, 3, "decode_ints only decodes 3D coordinates");
         let mut bytes = [0u32; 32];
         let mut num_of_bytes: usize = 0;
         let mut remaining_bits = num_of_bits;
@@ -165,7 +169,7 @@ impl<'a> BitReader<'a> {
             num_of_bytes += 1;
         }
 
-        let mut nums = vec![0i32; num_of_ints];
+        let mut nums = [0i32; 3];
         for i in (1..num_of_ints).rev() {
             let mut num: u32 = 0;
             for j in (0..num_of_bytes).rev() {

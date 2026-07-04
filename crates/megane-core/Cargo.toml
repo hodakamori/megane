@@ -12,3 +12,9 @@ serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
+
+# Dependency-free A/B parser benchmark (std timing only, no criterion).
+# Run with: cargo bench -p megane-core
+[[bench]]
+name = "parsers"
+harness = false
