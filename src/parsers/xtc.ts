@@ -8,3 +8,9 @@
 
 export type { XTCParseResult } from "./parseCore";
 export { parseXTCFile, parseDCDFile, parseLammpstrjFile, parseNetCDFFile } from "./parseClient";
+export {
+  indexXTCFile,
+  decodeXTCFrame,
+  disposeXTCTrajectory,
+  type XtcLazyHandle,
+} from "./parseClient";

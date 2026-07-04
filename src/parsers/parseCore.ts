@@ -81,6 +81,28 @@ interface WasmXtcResult {
   free(): void;
 }
 
+/** Persistent XTC decoder (owns the file bytes; decodes one frame on demand). */
+export interface WasmXtcDecoder {
+  readonly n_atoms: number;
+  readonly n_frames: number;
+  readonly timestep_ps: number;
+  readonly has_box: boolean;
+  box_matrix(): Float32Array;
+  times(): Float32Array;
+  decode_frame(frame: number): Float32Array;
+  free(): void;
+}
+
+/** Lightweight XTC index (from `indexTrajectoryCore`) — no bulk coordinates. */
+export interface XtcIndexResult {
+  nAtoms: number;
+  nFrames: number;
+  timestepPs: number;
+  hasBox: boolean;
+  box: Float32Array | null;
+  times: Float32Array;
+}
+
 type ParseFn = (text: string) => WasmParseResult;
 type BinaryParseFn = (data: Uint8Array) => WasmParseResult;
 type TrajTextParseFn = (text: string) => WasmXtcResult;
@@ -101,6 +123,7 @@ interface WasmModule {
   parse_dcd_file: TrajBinaryParseFn;
   parse_netcdf_file: TrajBinaryParseFn;
   parse_lammpstrj_file: TrajTextParseFn;
+  XtcDecoder: new (data: Uint8Array) => WasmXtcDecoder;
   infer_bonds_vdw: (positions: Float32Array, elements: Uint8Array, n_atoms: number) => Uint32Array;
   parse_top_bonds: (text: string, n_atoms: number) => Uint32Array;
   parse_top_bonds_with_includes: (
@@ -146,6 +169,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_dcd_file: wasm.parse_dcd_file,
         parse_netcdf_file: wasm.parse_netcdf_file,
         parse_lammpstrj_file: wasm.parse_lammpstrj_file,
+        XtcDecoder: wasm.XtcDecoder,
         infer_bonds_vdw: wasm.infer_bonds_vdw,
         parse_top_bonds: wasm.parse_top_bonds,
         parse_top_bonds_with_includes: wasm.parse_top_bonds_with_includes,
@@ -340,6 +364,38 @@ export function parseTrajectoryCore(input: TrajectoryParseInput): XTCParseResult
       break;
   }
   return extractFrames(result, input.expectedNAtoms, TRAJ_LABELS[input.kind]);
+}
+
+/**
+ * Build a lazy XTC decoder + its frame index without decompressing coordinates.
+ * The returned `decoder` OWNS the file bytes in WASM memory and must be kept
+ * alive (and eventually `free()`d) by the caller — unlike the eager parse path
+ * which frees its result immediately. Requires `ensureInit` first.
+ */
+export function indexTrajectoryCore(
+  bytes: Uint8Array,
+  expectedNAtoms: number,
+): { decoder: WasmXtcDecoder; index: XtcIndexResult } {
+  const decoder = new wasmModule!.XtcDecoder(bytes);
+  if (decoder.n_atoms !== expectedNAtoms) {
+    const msg = `XTC atom count (${decoder.n_atoms}) does not match structure (${expectedNAtoms})`;
+    decoder.free();
+    throw new Error(msg);
+  }
+  const index: XtcIndexResult = {
+    nAtoms: decoder.n_atoms,
+    nFrames: decoder.n_frames,
+    timestepPs: decoder.timestep_ps,
+    hasBox: decoder.has_box,
+    box: decoder.has_box ? decoder.box_matrix() : null,
+    times: decoder.times(),
+  };
+  return { decoder, index };
+}
+
+/** Decode a single frame's positions (Å) from a persistent decoder. */
+export function decodeFrameCore(decoder: WasmXtcDecoder, frame: number): Float32Array {
+  return decoder.decode_frame(frame);
 }
 
 /**

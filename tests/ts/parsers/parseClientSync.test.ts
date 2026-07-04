@@ -97,6 +97,22 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_psf_bonds: () => new Uint32Array([0, 1]),
     parse_pdb_bonds: () => new Uint32Array([0, 1]),
     extract_labels: () => "A\nB\nC",
+    XtcDecoder: class {
+      n_atoms = 4;
+      n_frames = 2;
+      timestep_ps = 1;
+      has_box = false;
+      box_matrix() {
+        return new Float32Array(9);
+      }
+      times() {
+        return new Float32Array(2);
+      }
+      decode_frame() {
+        return new Float32Array(4 * 3);
+      }
+      free() {}
+    },
   };
 
   return { calls, wasmMock };
@@ -170,5 +186,14 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     expect(labels).toHaveLength(2); // trimmed to nAtoms
     const txt = await core.extractLabelsFromFile(fakeFile("notes.txt", "a\nb"), 3);
     expect(txt).toEqual(["a", "b", ""]); // padded to nAtoms
+  });
+
+  it("degrades the lazy XTC exports to eager (worker-only feature)", async () => {
+    // On the sync path (JupyterLab/anywidget / worker-unavailable), indexXTCFile
+    // returns null so the caller falls back to eager parseXTCFile; decode is
+    // never reached and dispose is a no-op.
+    expect(await sync.indexXTCFile(fakeFile("t.xtc"), 4)).toBeNull();
+    await expect(sync.decodeXTCFrame(0, 0)).rejects.toThrow(/worker-only/);
+    expect(() => sync.disposeXTCTrajectory(0)).not.toThrow();
   });
 });

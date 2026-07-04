@@ -10,8 +10,15 @@ import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
 import type { PipelineNodeData, PipelineExecutionContext, NodeSnapshotData } from "./execute";
 import type { NodeStreamingData } from "./executors/streaming";
 import type { Snapshot, Frame, TrajectoryMeta, VectorFrame } from "../types";
-import type { PipelineNodeType, ViewportState, SerializedPipeline, NodeError } from "./types";
+import type {
+  PipelineNodeType,
+  ViewportState,
+  SerializedPipeline,
+  NodeError,
+  FrameProvider,
+} from "./types";
 import { defaultParams, DEFAULT_VIEWPORT_STATE, canConnect } from "./types";
+import { LazyFrameProvider } from "../stream/LazyFrameProvider";
 import { executePipeline } from "./execute";
 import { validatePipeline } from "./validate";
 import { serializePipeline, deserializePipeline } from "./serialize";
@@ -40,6 +47,8 @@ export interface PipelineStore {
   structureMeta: TrajectoryMeta | null;
   fileFrames: Frame[] | null;
   fileMeta: TrajectoryMeta | null;
+  /** Pre-built lazy/streaming provider for the file trajectory (mutually exclusive with fileFrames). */
+  fileProvider: FrameProvider | null;
   fileVectors: VectorFrame[] | null;
 
   // Per-node snapshot storage (keyed by load_structure node ID)
@@ -53,6 +62,7 @@ export interface PipelineStore {
   setAtomLabels: (labels: string[] | null) => void;
   setStructureFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
   setFileFrames: (frames: Frame[] | null, meta: TrajectoryMeta | null) => void;
+  setFileProvider: (provider: FrameProvider | null) => void;
   setFileVectors: (vectors: VectorFrame[] | null) => void;
   setNodeSnapshot: (nodeId: string, data: NodeSnapshotData) => void;
   removeNodeSnapshot: (nodeId: string) => void;
@@ -129,11 +139,17 @@ const CLEARED_EXECUTION_CONTEXT = {
   structureMeta: null,
   fileFrames: null,
   fileMeta: null,
+  fileProvider: null,
   fileVectors: null,
   nodeSnapshots: {} as Record<string, NodeSnapshotData>,
   nodeParseErrors: {} as Record<string, string>,
   nodeStreamingData: {} as Record<string, NodeStreamingData>,
 } as const;
+
+/** Free a lazy trajectory provider's worker decoder when it is replaced/cleared. */
+function disposeIfLazy(provider: FrameProvider | null | undefined): void {
+  if (provider instanceof LazyFrameProvider) provider.dispose();
+}
 
 const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
   nodes: defaultState.nodes,
@@ -146,6 +162,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
   structureMeta: null,
   fileFrames: null,
   fileMeta: null,
+  fileProvider: null,
   fileVectors: null,
   nodeSnapshots: {},
   nodeParseErrors: {},
@@ -164,7 +181,17 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     get().execute();
   },
   setFileFrames: (frames, meta) => {
-    set({ fileFrames: frames, fileMeta: meta });
+    // Eager frames and a lazy provider are mutually exclusive inputs; installing
+    // frames releases any active lazy decoder.
+    disposeIfLazy(get().fileProvider);
+    set({ fileFrames: frames, fileMeta: meta, fileProvider: null });
+    get().execute();
+  },
+  setFileProvider: (provider) => {
+    const prev = get().fileProvider;
+    if (prev !== provider) disposeIfLazy(prev);
+    // Clear the eager frame channel so executeLoadTrajectory sees only the provider.
+    set({ fileProvider: provider, fileFrames: null, fileMeta: null });
     get().execute();
   },
   setFileVectors: (vectors) => {
@@ -416,6 +443,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
       structureMeta,
       fileFrames,
       fileMeta,
+      fileProvider,
       fileVectors,
       nodeSnapshots,
       nodeParseErrors,
@@ -428,6 +456,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
       structureMeta,
       fileFrames,
       fileMeta,
+      fileProvider,
       fileVectors,
       nodeSnapshots,
       nodeStreamingData,
@@ -471,6 +500,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     // bleed into the new pipeline's execution. Hosts (JupyterLab,
     // VSCode) reuse this singleton store across documents, so every
     // .megane.json open must start from a clean slate.
+    disposeIfLazy(get().fileProvider);
     set({
       nodes,
       edges,
@@ -487,6 +517,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     // node-id order to be deterministic across hosts.
     const sortedIds = Object.keys(nodeSnapshots).sort();
     const primarySnapshot = sortedIds.length > 0 ? nodeSnapshots[sortedIds[0]].snapshot : null;
+    disposeIfLazy(get().fileProvider);
     set({
       nodes,
       edges,
@@ -505,6 +536,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
     if (!template) return;
     const raw = template.create();
     const { nodes, edges } = getLayoutedElements(raw.nodes, raw.edges);
+    disposeIfLazy(get().fileProvider);
     set({
       nodes,
       edges,
@@ -527,6 +559,7 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
 
   reset: () => {
     const def = getInitialPipeline();
+    disposeIfLazy(get().fileProvider);
     set({
       nodes: def.nodes,
       edges: def.edges,

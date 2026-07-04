@@ -81,3 +81,31 @@ export async function parseNetCDFFile(file: File, expectedNAtoms: number): Promi
   const buffer = await file.arrayBuffer();
   return parseTrajectoryCore({ kind: "netcdf", bytes: new Uint8Array(buffer), expectedNAtoms });
 }
+
+/** Handle shape mirrored from `parseClient` (never produced on the sync path). */
+export interface XtcLazyHandle {
+  trajectoryId: number;
+  index: import("./parseCore").XtcIndexResult;
+}
+
+/**
+ * Lazy XTC decode is worker-only. On the synchronous path (JupyterLab/anywidget
+ * bundles, or the runtime worker-unavailable fallback) this returns `null`, the
+ * uniform "fall back to eager parse" signal — the caller then uses `parseXTCFile`.
+ */
+export async function indexXTCFile(
+  _file: File,
+  _expectedNAtoms: number,
+): Promise<XtcLazyHandle | null> {
+  return null;
+}
+
+/** Never called (indexXTCFile returns null so no lazy provider is created). */
+export async function decodeXTCFrame(_trajectoryId: number, _frame: number): Promise<Float32Array> {
+  throw new Error("decodeXTCFrame is worker-only");
+}
+
+/** No-op: there is no persistent decoder on the synchronous path. */
+export function disposeXTCTrajectory(_trajectoryId: number): void {
+  /* no-op */
+}

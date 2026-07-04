@@ -19,17 +19,23 @@ import ParseWorker from "./parse.worker?worker&inline";
 import wasmAssetUrl from "../../crates/megane-wasm/pkg/megane_wasm_bg.wasm?url";
 import { perfMark, perfMeasure } from "../perf";
 import * as sync from "./parseClientSync";
-import type { StructureParseResult, XTCParseResult, TrajectoryKind } from "./parseCore";
-import type { ParseRequest, ParseResponse } from "./parseMessages";
+import type {
+  StructureParseResult,
+  XTCParseResult,
+  TrajectoryKind,
+  XtcIndexResult,
+} from "./parseCore";
+import type { ParseRequest, ParseResponse, DecodeFrameResult } from "./parseMessages";
 
 const TIMEOUT_MS = 120_000;
 
 let worker: Worker | null = null;
 let workerBroken = false;
 let nextId = 0;
+let nextTrajId = 0;
 
 interface Pending {
-  resolve: (r: StructureParseResult | XTCParseResult) => void;
+  resolve: (r: unknown) => void;
   reject: (e: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
@@ -37,6 +43,18 @@ const pending = new Map<number, Pending>();
 
 function workerUnavailable(): boolean {
   return workerBroken || typeof Worker === "undefined";
+}
+
+/**
+ * Whether lazy/streaming XTC decode is enabled. Off ⇒ the client falls back to
+ * eager parsing everywhere (a single, instantly-revertible kill switch). Reads a
+ * `globalThis.__MEGANE_LAZY_XTC__` override (mirrors `__MEGANE_WASM_URL__`),
+ * defaulting to on.
+ */
+function lazyXtcEnabled(): boolean {
+  const override = (globalThis as Record<string, unknown>).__MEGANE_LAZY_XTC__;
+  if (typeof override === "boolean") return override;
+  return true;
 }
 
 /** Reject every in-flight request and drop the worker (used on a fatal error). */
@@ -61,7 +79,7 @@ function getWorker(): Worker {
     if (!entry) return;
     clearTimeout(entry.timer);
     pending.delete(e.data.id);
-    if (e.data.ok && e.data.result) {
+    if (e.data.ok) {
       entry.resolve(e.data.result);
     } else {
       entry.reject(new Error(e.data.error ?? "worker parse failed"));
@@ -79,10 +97,7 @@ function resolveWasmUrl(): string | undefined {
   return wasmAssetUrl as unknown as string;
 }
 
-function send<T extends StructureParseResult | XTCParseResult>(
-  req: ParseRequest,
-  transfer: Transferable[],
-): Promise<T> {
+function send<T>(req: ParseRequest, transfer: Transferable[]): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const w = getWorker();
     const timer = setTimeout(() => {
@@ -189,4 +204,59 @@ export function parseLammpstrjFile(file: File, expectedNAtoms: number): Promise<
 
 export function parseNetCDFFile(file: File, expectedNAtoms: number): Promise<XTCParseResult> {
   return parseTrajectoryFile("netcdf", file, expectedNAtoms, sync.parseNetCDFFile);
+}
+
+/** Handle returned by `indexXTCFile`, consumed by `LazyFrameProvider`. */
+export interface XtcLazyHandle {
+  trajectoryId: number;
+  index: XtcIndexResult;
+}
+
+/**
+ * Build a lazy XTC decoder in the worker: reads the file, scans its frame index
+ * (no coordinate decode), and keeps the bytes resident in the worker so frames
+ * can be decoded on demand via {@link decodeXTCFrame}. Returns `null` — the
+ * single uniform "fall back to eager parse" signal — when lazy is disabled, the
+ * worker is unavailable (incl. the `parseClientSync` build), or indexing fails.
+ */
+export async function indexXTCFile(
+  file: File,
+  expectedNAtoms: number,
+): Promise<XtcLazyHandle | null> {
+  if (!lazyXtcEnabled() || workerUnavailable()) return null;
+  try {
+    const id = nextId++;
+    const trajectoryId = nextTrajId++;
+    const buffer = await file.arrayBuffer();
+    const index = await send<XtcIndexResult>(
+      { id, op: "indexTrajectory", wasmUrl: resolveWasmUrl(), trajectoryId, bytes: buffer, expectedNAtoms },
+      [buffer],
+    );
+    return { trajectoryId, index };
+  } catch {
+    // Any failure ⇒ let the caller fall back to eager parsing.
+    return null;
+  }
+}
+
+/** Decode one frame of a previously-indexed trajectory (worker round-trip). */
+export async function decodeXTCFrame(
+  trajectoryId: number,
+  frame: number,
+): Promise<Float32Array> {
+  const id = nextId++;
+  const result = await send<DecodeFrameResult>(
+    { id, op: "decodeFrame", trajectoryId, frame },
+    [],
+  );
+  return result.positions;
+}
+
+/** Free a lazy XTC decoder in the worker (fire-and-forget). */
+export function disposeXTCTrajectory(trajectoryId: number): void {
+  if (workerUnavailable()) return;
+  const id = nextId++;
+  void send<undefined>({ id, op: "disposeTrajectory", trajectoryId }, []).catch(() => {
+    // best-effort cleanup; worker teardown already frees everything
+  });
 }

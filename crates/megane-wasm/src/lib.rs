@@ -381,6 +381,86 @@ pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
     })
 }
 
+/// Persistent XTC decoder for lazy/streaming playback.
+///
+/// Owns the whole XTC file in wasm memory and holds a lightweight frame index
+/// (built once in the constructor without decompressing coordinates). The JS
+/// side keeps one of these alive per open trajectory and calls `decode_frame`
+/// on demand, so frame 0 can render immediately while later frames stream in.
+#[wasm_bindgen]
+pub struct XtcDecoder {
+    bytes: Vec<u8>,
+    offsets: Vec<usize>,
+    n_atoms: usize,
+    n_frames: u32,
+    timestep_ps: f32,
+    has_box: bool,
+    box_matrix: Vec<f32>,
+    times: Vec<f32>,
+}
+
+#[wasm_bindgen]
+impl XtcDecoder {
+    /// Build the frame index from the file bytes. The bytes are moved into wasm
+    /// memory and retained for the decoder's lifetime.
+    #[wasm_bindgen(constructor)]
+    pub fn new(data: Vec<u8>) -> Result<XtcDecoder, JsError> {
+        let idx = xtc::build_index(&data).map_err(|e| JsError::new(&e))?;
+        let has_box = idx.box_matrix.is_some();
+        let box_matrix = idx.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        Ok(XtcDecoder {
+            bytes: data,
+            offsets: idx.offsets,
+            n_atoms: idx.n_atoms,
+            n_frames: idx.n_frames as u32,
+            timestep_ps: idx.timestep_ps,
+            has_box,
+            box_matrix,
+            times: idx.times,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_atoms(&self) -> u32 {
+        self.n_atoms as u32
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn n_frames(&self) -> u32 {
+        self.n_frames
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn timestep_ps(&self) -> f32 {
+        self.timestep_ps
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn has_box(&self) -> bool {
+        self.has_box
+    }
+
+    pub fn box_matrix(&self) -> Float32Array {
+        Float32Array::from(&self.box_matrix[..])
+    }
+
+    /// Per-frame time stamps (ps).
+    pub fn times(&self) -> Float32Array {
+        Float32Array::from(&self.times[..])
+    }
+
+    /// Decode a single frame's positions (Å), `n_atoms * 3` floats.
+    pub fn decode_frame(&self, frame: u32) -> Result<Float32Array, JsError> {
+        let offset = *self
+            .offsets
+            .get(frame as usize)
+            .ok_or_else(|| JsError::new("frame index out of range"))?;
+        let coords = xtc::decode_frame_at(&self.bytes, offset, self.n_atoms)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(Float32Array::from(&coords[..]))
+    }
+}
+
 /// Parse a PDB file text and return structured data for the molecular viewer.
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {

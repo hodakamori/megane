@@ -29,6 +29,7 @@ import type {
   PipelineNodeType,
   NodeError,
   ParticleData,
+  FrameProvider,
 } from "./types";
 import type { Frame, TrajectoryMeta, VectorFrame } from "../types";
 import { executeStreaming, type NodeStreamingData } from "./executors/streaming";
@@ -78,6 +79,8 @@ export interface PipelineExecutionContext {
   structureMeta?: TrajectoryMeta | null;
   fileFrames?: Frame[] | null;
   fileMeta?: TrajectoryMeta | null;
+  /** Pre-built lazy/streaming provider for the file trajectory (takes precedence over fileFrames). */
+  fileProvider?: FrameProvider | null;
   fileVectors?: VectorFrame[] | null;
   /** Per-node snapshots keyed by load_structure node ID. */
   nodeSnapshots?: Record<string, NodeSnapshotData>;
@@ -195,6 +198,7 @@ export function executePipeline(
           inputs,
           ctx.fileFrames ?? null,
           ctx.fileMeta ?? null,
+          ctx.fileProvider ?? null,
         );
         edgeOutputs.set(id, outputs);
         break;

@@ -8,7 +8,17 @@
 import { useState, useRef, useCallback } from "react";
 import { parseStructureFile, parseStructureText } from "../parsers/structure";
 import type { StructureParseResult } from "../parsers/structure";
-import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "../parsers/xtc";
+import {
+  parseXTCFile,
+  parseLammpstrjFile,
+  parseDCDFile,
+  parseNetCDFFile,
+  indexXTCFile,
+  decodeXTCFrame,
+  disposeXTCTrajectory,
+} from "../parsers/xtc";
+import { LazyFrameProvider } from "../stream/LazyFrameProvider";
+import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { useBondSource } from "./useBondSource";
 import { useLabelSource } from "./useLabelSource";
 import { useVectorSource } from "./useVectorSource";
@@ -310,6 +320,49 @@ export function useMeganeLocal(): MeganeLocalState {
       const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
       const isDcd = ext.endsWith(".dcd");
       const isNetcdf = ext.endsWith(".nc");
+      const isXtc = !isLammpstrj && !isDcd && !isNetcdf;
+      const nAtoms = baseSnapshotRef.current.nAtoms;
+      const store = usePipelineStore.getState();
+
+      // Lazy/streaming path (XTC only, worker + flag gated). indexXTCFile scans
+      // the frame index without decoding coordinates and keeps the file resident
+      // in the worker; frame 0 renders immediately and the rest stream in via the
+      // playback store's async-frame path. Returns null → fall back to eager.
+      if (isXtc) {
+        const handle = await indexXTCFile(xtc, nAtoms);
+        if (handle) {
+          const meta: TrajectoryMeta = {
+            nFrames: handle.index.nFrames,
+            timestepPs: handle.index.timestepPs,
+            nAtoms: handle.index.nAtoms,
+          };
+          const provider = new LazyFrameProvider(handle, meta, {
+            decode: decodeXTCFrame,
+            dispose: disposeXTCTrajectory,
+          });
+          provider.setOnFrameReady((f) => usePlaybackStore.getState()._onAsyncFrame(f));
+
+          // useMeganeLocal's own frame array stays empty — positions render
+          // through the pipeline provider + playback store, not fileFramesRef.
+          fileFramesRef.current = [];
+          fileTrajMetaRef.current = meta;
+          xtcFileNameRef.current = xtc.name;
+          setHasFileFrames(true);
+          currentTrajSourceRef.current = "file";
+          setTrajectorySourceState("file");
+          setMeta(meta);
+          resetPlayback();
+          setXtcFileName(xtc.name);
+
+          store.setFileProvider(provider);
+          const trajNode = store.nodes.find((n) => n.type === "load_trajectory");
+          if (trajNode) {
+            store.updateNodeParams(trajNode.id, { fileName: xtc.name });
+          }
+          return;
+        }
+      }
+
       const parseFn = isLammpstrj
         ? parseLammpstrjFile
         : isDcd
@@ -321,7 +374,7 @@ export function useMeganeLocal(): MeganeLocalState {
         frames,
         meta: xtcMeta,
         vectorChannels,
-      } = await parseFn(xtc, baseSnapshotRef.current.nAtoms);
+      } = await parseFn(xtc, nAtoms);
       fileFramesRef.current = frames;
       fileTrajMetaRef.current = xtcMeta;
       xtcFileNameRef.current = xtc.name;
@@ -334,7 +387,6 @@ export function useMeganeLocal(): MeganeLocalState {
       setXtcFileName(xtc.name);
 
       // Feed parsed frames into the pipeline store so executeLoadTrajectory produces output.
-      const store = usePipelineStore.getState();
       store.setFileFrames(frames, xtcMeta ?? null);
 
       // Sync the load_trajectory node's displayed fileName so the pipeline
