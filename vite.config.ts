@@ -32,5 +32,27 @@ export default defineConfig({
   },
   build: {
     outDir: "python/megane/static/app",
+    rollupOptions: {
+      output: {
+        // Split the large, stable third-party libraries into their own chunks so
+        // the app shell no longer ships as a single ~1.8 MB bundle. These deps
+        // change far less often than app code, so separating them lets the
+        // browser cache them across app releases and parallelize the fetch.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("/node_modules/three/")) return "vendor-three";
+          if (id.includes("/node_modules/@xyflow/")) return "vendor-reactflow";
+          if (id.includes("/node_modules/@dagrejs/")) return "vendor-dagre";
+          if (
+            id.includes("/node_modules/react/") ||
+            id.includes("/node_modules/react-dom/") ||
+            id.includes("/node_modules/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+          return undefined;
+        },
+      },
+    },
   },
 });
