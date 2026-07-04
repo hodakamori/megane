@@ -12,5 +12,6 @@ export {
   indexXTCFile,
   decodeXTCFrame,
   disposeXTCTrajectory,
+  shouldUseLazyXtc,
   type XtcLazyHandle,
 } from "./parseClient";

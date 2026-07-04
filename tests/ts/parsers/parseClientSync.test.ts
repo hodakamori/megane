@@ -195,5 +195,8 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     expect(await sync.indexXTCFile(fakeFile("t.xtc"), 4)).toBeNull();
     await expect(sync.decodeXTCFrame(0, 0)).rejects.toThrow(/worker-only/);
     expect(() => sync.disposeXTCTrajectory(0)).not.toThrow();
+    // Never streams on the sync path, regardless of file size.
+    expect(sync.shouldUseLazyXtc(1)).toBe(false);
+    expect(sync.shouldUseLazyXtc(1024 * 1024 * 1024)).toBe(false);
   });
 });

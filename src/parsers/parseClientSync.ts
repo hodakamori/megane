@@ -88,6 +88,11 @@ export interface XtcLazyHandle {
   index: import("./parseCore").XtcIndexResult;
 }
 
+/** Lazy decode needs a worker; the sync path never uses it. */
+export function shouldUseLazyXtc(_fileSize: number): boolean {
+  return false;
+}
+
 /**
  * Lazy XTC decode is worker-only. On the synchronous path (JupyterLab/anywidget
  * bundles, or the runtime worker-unavailable fallback) this returns `null`, the

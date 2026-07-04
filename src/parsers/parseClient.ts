@@ -45,16 +45,23 @@ function workerUnavailable(): boolean {
   return workerBroken || typeof Worker === "undefined";
 }
 
+// Below this file size, eager decode is fast enough that streaming would only
+// add per-frame worker overhead (and slightly slower playback) for no benefit —
+// so lazy decode only kicks in for genuinely large trajectories, where decoding
+// every frame up-front is the actual bottleneck.
+const LAZY_XTC_MIN_BYTES = 8 * 1024 * 1024;
+
 /**
- * Whether lazy/streaming XTC decode is enabled. Off ⇒ the client falls back to
- * eager parsing everywhere (a single, instantly-revertible kill switch). Reads a
- * `globalThis.__MEGANE_LAZY_XTC__` override (mirrors `__MEGANE_WASM_URL__`),
- * defaulting to on.
+ * Whether to stream a given XTC file lazily. Requires a worker. A
+ * `globalThis.__MEGANE_LAZY_XTC__` boolean override forces lazy on/off
+ * (bypassing the size gate — used by tests and as a kill switch); otherwise
+ * lazy is used only for files at or above {@link LAZY_XTC_MIN_BYTES}.
  */
-function lazyXtcEnabled(): boolean {
+export function shouldUseLazyXtc(fileSize: number): boolean {
+  if (workerUnavailable()) return false;
   const override = (globalThis as Record<string, unknown>).__MEGANE_LAZY_XTC__;
   if (typeof override === "boolean") return override;
-  return true;
+  return fileSize >= LAZY_XTC_MIN_BYTES;
 }
 
 /** Reject every in-flight request and drop the worker (used on a fatal error). */
@@ -223,7 +230,7 @@ export async function indexXTCFile(
   file: File,
   expectedNAtoms: number,
 ): Promise<XtcLazyHandle | null> {
-  if (!lazyXtcEnabled() || workerUnavailable()) return null;
+  if (workerUnavailable()) return null;
   try {
     const id = nextId++;
     const trajectoryId = nextTrajId++;

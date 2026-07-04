@@ -16,6 +16,7 @@ import {
   indexXTCFile,
   decodeXTCFrame,
   disposeXTCTrajectory,
+  shouldUseLazyXtc,
 } from "../parsers/xtc";
 import { LazyFrameProvider } from "../stream/LazyFrameProvider";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
@@ -324,11 +325,12 @@ export function useMeganeLocal(): MeganeLocalState {
       const nAtoms = baseSnapshotRef.current.nAtoms;
       const store = usePipelineStore.getState();
 
-      // Lazy/streaming path (XTC only, worker + flag gated). indexXTCFile scans
+      // Lazy/streaming path (large XTC only, worker-gated). indexXTCFile scans
       // the frame index without decoding coordinates and keeps the file resident
       // in the worker; frame 0 renders immediately and the rest stream in via the
-      // playback store's async-frame path. Returns null → fall back to eager.
-      if (isXtc) {
+      // playback store's async-frame path. Small files stay eager (smoother
+      // playback, no per-frame worker cost); a null handle also falls back.
+      if (isXtc && shouldUseLazyXtc(xtc.size)) {
         const handle = await indexXTCFile(xtc, nAtoms);
         if (handle) {
           const meta: TrajectoryMeta = {
