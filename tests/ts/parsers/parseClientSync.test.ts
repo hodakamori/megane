@@ -77,6 +77,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_structure_prefix: structFn("parse_structure_prefix"),
     parse_mol: structFn("parse_mol"),
     parse_mol2: structFn("parse_mol2"),
     parse_cif: structFn("parse_cif"),
@@ -232,6 +233,7 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
   it("degrades the lazy structure exports to eager (worker-only feature)", async () => {
     // Multi-frame XYZ/PDB streaming needs a worker; the sync path never uses it.
     expect(await sync.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
+    expect(await sync.parseStructurePrefix(fakeFile("m.xyz"), "xyz")).toBeNull();
     expect(sync.shouldUseLazyStructure("xyz", 1024 * 1024 * 1024)).toBe(false);
   });
 });

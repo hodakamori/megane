@@ -11,6 +11,7 @@
 import {
   ensureInit,
   parseStructureCore,
+  parseStructurePrefixCore,
   parseTrajectoryCore,
   collectResultBuffers,
   indexTrajectoryCore,
@@ -59,6 +60,15 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
       const transfer = collectResultBuffers(result);
       ctx.postMessage(
         { id: req.id, ok: true, op: "trajectory", result } satisfies ParseResponse,
+        transfer,
+      );
+    } else if (req.op === "structurePrefix") {
+      await ensureInit(req.wasmUrl);
+      // Parse frame 0 from a bounded prefix; throws if frame 0 isn't fully in it.
+      const result = parseStructurePrefixCore(req.text, req.kind, req.isWholeFile);
+      const transfer = collectResultBuffers(result);
+      ctx.postMessage(
+        { id: req.id, ok: true, op: "structurePrefix", result } satisfies ParseResponse,
         transfer,
       );
     } else if (req.op === "indexStructure") {

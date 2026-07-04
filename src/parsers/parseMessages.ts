@@ -66,6 +66,20 @@ export interface IndexStructureResult {
   frame0: StructureParseResult;
 }
 
+/**
+ * Request: parse ONLY frame 0 from a bounded prefix of a large multi-frame
+ * structure file (for instant first paint). Fails if frame 0 is not fully
+ * contained (the caller grows the prefix / falls back).
+ */
+export interface StructurePrefixRequest {
+  id: number;
+  op: "structurePrefix";
+  wasmUrl: string | undefined;
+  kind: LazyStructureKind;
+  text: string;
+  isWholeFile: boolean;
+}
+
 /** Request: decode a single frame from a previously-indexed trajectory. */
 export interface DecodeFrameRequest {
   id: number;
@@ -84,6 +98,7 @@ export interface DisposeTrajectoryRequest {
 export type ParseRequest =
   | StructureParseRequest
   | TrajectoryParseRequest
+  | StructurePrefixRequest
   | IndexStructureRequest
   | IndexTrajectoryRequest
   | DecodeFrameRequest
@@ -105,6 +120,7 @@ export interface ParseResponse {
   op:
     | "structure"
     | "trajectory"
+    | "structurePrefix"
     | "indexStructure"
     | "indexTrajectory"
     | "decodeFrame"

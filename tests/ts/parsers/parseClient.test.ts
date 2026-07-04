@@ -76,6 +76,7 @@ describe("parseClient falls back to the synchronous path when no Worker exists",
   it("lazy structure entry points no-op without a worker", async () => {
     // No worker ⇒ null (caller falls back to eager parse) and no streaming.
     expect(await client.indexStructureLazy(file("m.xyz"), "xyz")).toBeNull();
+    expect(await client.parseStructurePrefix(file("m.xyz"), "xyz")).toBeNull();
     expect(client.shouldUseLazyStructure("xyz", 1024 * 1024 * 1024)).toBe(false);
   });
 });

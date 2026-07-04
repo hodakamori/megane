@@ -1,14 +1,15 @@
 /**
- * Tests the lazy multi-frame structure path in useMeganeLocal.loadFile. ONE file
- * read: indexStructureLazy returns the streaming handle AND frame 0 together, so
- * frame 0 renders immediately while the rest stream through the structureProvider
- * channel. Single-frame files render statically (no eager re-parse); only a null
- * index (worker unavailable / failure) falls back to the eager parser.
+ * Tests the two-phase lazy structure path in useMeganeLocal.loadFile.
+ * Phase 1: parseStructurePrefix parses frame 0 from a bounded prefix → instant
+ * first paint. Phase 2 (background): indexStructureLazy builds the full index and
+ * attaches the streaming provider. Prefix-miss falls back to a single full read;
+ * only a null index (worker unavailable) falls back to the eager parser.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { StructureParseResult } from "@/parsers/parseCore";
 
+const prefixMock = vi.hoisted(() => vi.fn());
 const indexMock = vi.hoisted(() => vi.fn());
 const parseFileMock = vi.hoisted(() => vi.fn());
 const disposeMock = vi.hoisted(() => vi.fn());
@@ -16,6 +17,7 @@ const disposeMock = vi.hoisted(() => vi.fn());
 vi.mock("@/parsers/structure", () => ({
   parseStructureFile: parseFileMock,
   parseStructureText: vi.fn(),
+  parseStructurePrefix: prefixMock,
   indexStructureLazy: indexMock,
   shouldUseLazyStructure: () => true,
 }));
@@ -61,73 +63,98 @@ function indexed(
   return { handle: { trajectoryId, kind, index: { nAtoms: 3, nFrames } }, frame0 };
 }
 
-describe("useMeganeLocal — lazy multi-frame structure", () => {
+/** Drain the microtasks the fire-and-forget Phase-2 promise chain schedules. */
+async function flushBackground() {
+  await act(async () => {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  });
+}
+
+describe("useMeganeLocal — two-phase lazy structure", () => {
   beforeEach(() => {
+    prefixMock.mockReset();
     indexMock.mockReset();
     parseFileMock.mockReset();
     disposeMock.mockReset();
     usePipelineStore.getState().reset();
   });
 
-  it("streams extra frames through the structureProvider channel (XYZ)", async () => {
+  it("renders frame 0 from the prefix (phase 1), then attaches the stream (phase 2)", async () => {
     const f0 = makeFrame0();
-    indexMock.mockResolvedValue(indexed(1, "xyz", 5, f0));
+    prefixMock.mockResolvedValue(f0); // phase 1: instant frame 0
+    indexMock.mockResolvedValue(indexed(1, "xyz", 5, f0)); // phase 2: index
 
     const { result } = renderHook(() => useMeganeLocal());
     await act(async () => {
       await result.current.loadFile(new File(["dummy"], "big.xyz"));
     });
 
+    // Phase 1: frame 0 is on screen immediately from the prefix — no full read.
+    expect(result.current.snapshot).toBe(f0.snapshot);
+    expect(parseFileMock).not.toHaveBeenCalled();
+    expect(result.current.pdbFileName).toBe("big.xyz");
+
+    // Phase 2 (background): the streaming provider is attached.
+    await flushBackground();
     const store = usePipelineStore.getState();
     expect(store.structureProvider).not.toBeNull();
-    // Provider exposes extra frames + the synthetic frame 0.
-    expect(store.structureProvider!.meta.nFrames).toBe(6);
-    // Eager frame channels stay empty; the provider is the live source.
+    expect(store.structureProvider!.meta.nFrames).toBe(6); // 5 extra + frame 0
     expect(store.structureFrames).toBeNull();
-    expect(store.fileFrames).toBeNull();
-    // Eager full-file parse was never invoked — frame 0 came from the single index read.
-    expect(parseFileMock).not.toHaveBeenCalled();
-    expect(result.current.snapshot).toBe(f0.snapshot);
     expect(result.current.hasStructureFrames).toBe(true);
-    expect(result.current.meta?.nFrames).toBe(6);
-    expect(result.current.pdbFileName).toBe("big.xyz");
   });
 
-  it("streams a large multi-MODEL PDB through the structureProvider channel", async () => {
+  it("attaches a multi-MODEL PDB stream after prefix first paint", async () => {
     const f0 = makeFrame0();
+    prefixMock.mockResolvedValue(f0);
     indexMock.mockResolvedValue(indexed(9, "pdb", 2, f0));
 
     const { result } = renderHook(() => useMeganeLocal());
     await act(async () => {
       await result.current.loadFile(new File(["dummy"], "traj.pdb"));
     });
-
-    const store = usePipelineStore.getState();
-    expect(store.structureProvider).not.toBeNull();
-    expect(store.structureProvider!.meta.nFrames).toBe(3); // 2 models + frame 0
-    expect(parseFileMock).not.toHaveBeenCalled();
     expect(result.current.snapshot).toBe(f0.snapshot);
+    await flushBackground();
+
+    expect(usePipelineStore.getState().structureProvider).not.toBeNull();
+    expect(usePipelineStore.getState().structureProvider!.meta.nFrames).toBe(3);
+    expect(parseFileMock).not.toHaveBeenCalled();
   });
 
-  it("renders a single-frame file statically without an eager re-parse", async () => {
+  it("keeps a single-frame file static (no stream attached)", async () => {
     const f0 = makeFrame0();
-    indexMock.mockResolvedValue(indexed(2, "xyz", 0, f0));
+    prefixMock.mockResolvedValue(f0);
+    indexMock.mockResolvedValue(indexed(2, "xyz", 0, f0)); // no extra frames
 
     const { result } = renderHook(() => useMeganeLocal());
     await act(async () => {
       await result.current.loadFile(new File(["dummy"], "single.xyz"));
     });
+    await flushBackground();
 
-    // Single frame → frame 0 IS the whole structure: render statically, free the
-    // decoder, and DO NOT pay a second full parse.
+    // Frame 0 stays static; the background index decoder is freed, no provider.
     expect(disposeMock).toHaveBeenCalledWith(2);
-    expect(parseFileMock).not.toHaveBeenCalled();
     expect(usePipelineStore.getState().structureProvider).toBeNull();
     expect(result.current.snapshot).toBe(f0.snapshot);
-    expect(result.current.hasStructureFrames).toBe(false);
+    expect(parseFileMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to eager parse when indexing is unavailable (null)", async () => {
+  it("falls back to a single full read when the prefix can't hold frame 0", async () => {
+    const f0 = makeFrame0();
+    prefixMock.mockResolvedValue(null); // frame 0 too big for the prefix
+    indexMock.mockResolvedValue(indexed(3, "xyz", 5, f0)); // full read still streams
+
+    const { result } = renderHook(() => useMeganeLocal());
+    await act(async () => {
+      await result.current.loadFile(new File(["dummy"], "huge.xyz"));
+    });
+
+    expect(result.current.snapshot).toBe(f0.snapshot);
+    expect(usePipelineStore.getState().structureProvider).not.toBeNull();
+    expect(parseFileMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to eager parse when both prefix and index are unavailable", async () => {
+    prefixMock.mockResolvedValue(null);
     indexMock.mockResolvedValue(null);
     const eager = makeFrame0();
     parseFileMock.mockResolvedValue(eager);

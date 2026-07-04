@@ -327,6 +327,45 @@ export interface StructureLazyResult {
   frame0: StructureParseResult;
 }
 
+// Initial / max prefix read for `parseStructurePrefix`. One large frame of a
+// big multi-frame file (e.g. 100k atoms ≈ a few MB) must fit; grow-and-retry
+// handles bigger frames, capping the critical-path read regardless of total size.
+const PREFIX_INITIAL_BYTES = 8 * 1024 * 1024;
+const PREFIX_MAX_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Parse ONLY frame 0 from the FIRST chunk of a large multi-frame structure file,
+ * for size-independent first paint: the read + parse cost is one frame, not the
+ * whole file. Reads a bounded prefix (trimmed to the last newline so no atom line
+ * is cut), growing if frame 0 doesn't fit. Returns `null` (caller falls back to a
+ * full read) when the worker is unavailable, frame 0 exceeds the max prefix, or
+ * the parse fails.
+ */
+export async function parseStructurePrefix(
+  file: File,
+  kind: LazyStructureKind,
+): Promise<StructureParseResult | null> {
+  if (workerUnavailable()) return null;
+  let size = Math.min(file.size, PREFIX_INITIAL_BYTES);
+  for (;;) {
+    const isWholeFile = size >= file.size;
+    const raw = await file.slice(0, size).text();
+    // Trim a partial trailing line so frame 0's atom lines are never truncated.
+    const text = isWholeFile ? raw : raw.slice(0, raw.lastIndexOf("\n") + 1);
+    try {
+      const id = nextId++;
+      return await send<StructureParseResult>(
+        { id, op: "structurePrefix", wasmUrl: resolveWasmUrl(), kind, text, isWholeFile },
+        [],
+      );
+    } catch {
+      // Frame 0 didn't fit: grow and retry, or give up (→ full-read fallback).
+      if (isWholeFile || size >= PREFIX_MAX_BYTES) return null;
+      size = Math.min(file.size, size * 2);
+    }
+  }
+}
+
 /**
  * Build a lazy structure-frame decoder in the worker AND get frame 0 in one file
  * read: the worker scans the extra-frame index (no bulk coordinate decode),

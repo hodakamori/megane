@@ -36,7 +36,7 @@ import {
 } from "../tests/e2e/utils/playwright.mjs";
 
 const RUNS = Number(process.env.RUNS ?? 2);
-const LOAD_TIMEOUT_MS = 180000;
+const LOAD_TIMEOUT_MS = Number(process.env.LOAD_TIMEOUT_MS ?? 180000);
 const N_MOL = Number(process.env.N_MOL ?? 200); // waters; atoms = 3 * N_MOL
 const N_FRAMES = Number(process.env.N_FRAMES ?? 1000);
 
@@ -201,6 +201,11 @@ async function measureOnce(context, server, file, lazy) {
     const parseSumMs = perf.measures
       .filter((m) => m.name.startsWith("megane:parse:"))
       .reduce((s, m) => s + m.duration, 0);
+
+    // Dispose the lazy provider so its background prefetch stops before the next
+    // run — otherwise a big file's in-flight decode can starve the following
+    // page's warm-up (made RUNS>1 flaky).
+    await page.evaluate(() => window.__megane_test_pipeline_store?.getState?.().reset?.());
 
     return { wallMs, parseSumMs, hasProvider: info.hasProvider, nFrames: info.nFrames };
   } finally {

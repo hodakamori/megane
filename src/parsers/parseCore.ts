@@ -166,6 +166,7 @@ interface WasmModule {
   parse_dcd_file: TrajBinaryParseFn;
   parse_netcdf_file: TrajBinaryParseFn;
   parse_lammpstrj_file: TrajTextParseFn;
+  parse_structure_prefix: (text: string, kind: string, isWholeFile: boolean) => WasmParseResult;
   XtcDecoder: new (data: Uint8Array) => WasmXtcDecoder;
   LammpstrjDecoder: new (data: Uint8Array) => WasmLammpstrjDecoder;
   StructureFrameDecoder: new (data: Uint8Array, kind: string) => WasmStructureFrameDecoder;
@@ -214,6 +215,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_dcd_file: wasm.parse_dcd_file,
         parse_netcdf_file: wasm.parse_netcdf_file,
         parse_lammpstrj_file: wasm.parse_lammpstrj_file,
+        parse_structure_prefix: wasm.parse_structure_prefix,
         XtcDecoder: wasm.XtcDecoder,
         LammpstrjDecoder: wasm.LammpstrjDecoder,
         StructureFrameDecoder: wasm.StructureFrameDecoder,
@@ -475,6 +477,21 @@ export function indexStructureCore(
   };
   const frame0 = parseWithFn(() => decoder.frame0(), "");
   return { decoder, index, frame0 };
+}
+
+/**
+ * Parse ONLY frame 0 from a bounded PREFIX of a large multi-frame structure file
+ * (XYZ / PDB) — for size-independent first paint. Throws (caught upstream so the
+ * caller grows the prefix or falls back to a full read) if frame 0 is not fully
+ * contained in the prefix. `isWholeFile` is true when the prefix covers the whole
+ * file. Requires `ensureInit` first.
+ */
+export function parseStructurePrefixCore(
+  text: string,
+  kind: LazyStructureKind,
+  isWholeFile: boolean,
+): StructureParseResult {
+  return parseWithFn(() => wasmModule!.parse_structure_prefix(text, kind, isWholeFile), "");
 }
 
 /** Decode a single frame's positions (Å) from a persistent decoder. */

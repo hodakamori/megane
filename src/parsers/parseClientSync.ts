@@ -154,6 +154,14 @@ export function shouldUseLazyStructure(
 }
 
 /** Worker-only; returns `null` so the caller falls back to eager parsing. */
+export async function parseStructurePrefix(
+  _file: File,
+  _kind: import("./parseCore").LazyStructureKind,
+): Promise<StructureParseResult | null> {
+  return null;
+}
+
+/** Worker-only; returns `null` so the caller falls back to eager parsing. */
 export async function indexStructureLazy(
   _file: File,
   _kind: import("./parseCore").LazyStructureKind,

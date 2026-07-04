@@ -19,7 +19,9 @@ const { state, FakeWorker } = vi.hoisted(() => {
       state.lastReq = req;
       queueMicrotask(() => {
         if (state.mode === "ok") {
-          this.onmessage?.({ data: { id: req.id, ok: true, op: req.op, result: { tag: "worker" } } });
+          this.onmessage?.({
+            data: { id: req.id, ok: true, op: req.op, result: { tag: "worker" } },
+          });
         } else {
           this.onmessage?.({ data: { id: req.id, ok: false, op: req.op, error: "boom" } });
         }
@@ -41,11 +43,13 @@ vi.mock("@/parsers/parseClientSync", () => ({
   indexStructureLazy: vi.fn(async () => null),
 }));
 
-function fakeFile(name: string): File {
+function fakeFile(name: string, size = 3): File {
   return {
     name,
-    text: async () => "DATA",
+    size,
+    text: async () => "DATA\n",
     arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    slice: () => ({ text: async () => "DATA\n" }),
   } as unknown as File;
 }
 
@@ -119,5 +123,19 @@ describe("parseClient worker path", () => {
     const client = await freshClient();
     state.mode = "err";
     expect(await client.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
+  });
+
+  it("parses frame 0 from a prefix via the worker", async () => {
+    const client = await freshClient();
+    const out = await client.parseStructurePrefix(fakeFile("m.xyz", 100), "xyz");
+    expect(out).toEqual({ tag: "worker" });
+    expect(state.lastReq?.op).toBe("structurePrefix");
+  });
+
+  it("returns null when the prefix parse errors and the prefix can't grow", async () => {
+    const client = await freshClient();
+    state.mode = "err";
+    // size <= prefix so isWholeFile is true → no retry, straight to null.
+    expect(await client.parseStructurePrefix(fakeFile("m.xyz", 3), "xyz")).toBeNull();
   });
 });

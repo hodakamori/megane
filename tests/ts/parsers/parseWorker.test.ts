@@ -60,6 +60,7 @@ const { wasmMock } = vi.hoisted(() => {
     parse_pdb: () => mockStructResult(3),
     parse_gro: () => mockStructResult(3),
     parse_xyz: () => mockStructResult(3),
+    parse_structure_prefix: () => mockStructResult(3, 0),
     parse_mol: () => mockStructResult(3),
     parse_mol2: () => mockStructResult(3),
     parse_cif: () => mockStructResult(3),
@@ -281,6 +282,24 @@ describe("parse.worker onmessage", () => {
     });
     expect(posts[0].ok).toBe(false);
     expect(posts[0].error).toMatch(/atom count/);
+  });
+
+  it("parses frame 0 from a structure prefix", async () => {
+    const { handler, posts } = await loadWorker();
+    await handler({
+      data: {
+        id: 45,
+        op: "structurePrefix",
+        wasmUrl: undefined,
+        kind: "xyz",
+        text: "3\n\nO 0 0 0\nH 1 0 0\nH 0 1 0\n",
+        isWholeFile: false,
+      },
+    });
+    expect(posts[0].ok).toBe(true);
+    expect(posts[0].op).toBe("structurePrefix");
+    const result = posts[0].result as { snapshot: { nAtoms: number } };
+    expect(result.snapshot.nAtoms).toBe(3);
   });
 
   it("indexes a structure file (returning frame 0 too) and decodes an extra frame on demand", async () => {

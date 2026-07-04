@@ -633,6 +633,26 @@ impl StructureFrameDecoder {
     }
 }
 
+/// Parse ONLY frame 0 from a bounded PREFIX of a large multi-frame structure
+/// file (XYZ / PDB), for size-independent first paint. Errors if frame 0 is not
+/// fully contained in the prefix (the JS side then grows the prefix or falls back
+/// to a full read). `is_whole_file` is true when the prefix already covers the
+/// entire file.
+#[wasm_bindgen]
+pub fn parse_structure_prefix(
+    text: &str,
+    kind: &str,
+    is_whole_file: bool,
+) -> Result<ParseResult, JsError> {
+    let data = match kind {
+        "pdb" => parser::parse_frame0_prefix(text, is_whole_file),
+        "xyz" => xyz::parse_frame0(text), // errors if frame 0's atom lines are truncated
+        _ => return Err(JsError::new("unsupported structure prefix kind")),
+    }
+    .map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
 /// Parse a PDB file text and return structured data for the molecular viewer.
 #[wasm_bindgen]
 pub fn parse_pdb(text: &str) -> Result<ParseResult, JsError> {

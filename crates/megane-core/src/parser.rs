@@ -297,6 +297,21 @@ pub fn parse_frame0(text: &str) -> Result<ParsedStructure, String> {
     parse_impl(text, true)
 }
 
+/// Parse model 0 from a (possibly truncated) PDB *prefix* — the first chunk of a
+/// large file — for instant first paint. Errors if model 0 is not fully
+/// contained (no `ENDMDL` seen AND the prefix is not the whole file), so the
+/// caller can grow the prefix or fall back to a full read. Trailing `CONECT`
+/// records beyond the prefix are not seen, so bonds are inferred (fine for the
+/// large multi-MODEL ensembles this targets).
+pub fn parse_frame0_prefix(text: &str, is_whole_file: bool) -> Result<ParsedStructure, String> {
+    // A terminated model 0 (first ENDMDL) proves model 0 is fully in the prefix.
+    let model0_terminated = text.contains("ENDMDL");
+    if !model0_terminated && !is_whole_file {
+        return Err("PDB model 0 not fully contained in prefix".into());
+    }
+    parse_frame0(text)
+}
+
 /// Shared body of {@link parse} / {@link parse_frame0}. When `frame0_only`, the
 /// coordinates of models after the first are not retained, so
 /// `frame_positions_flat` comes back empty (topology is still taken from model 0
@@ -763,6 +778,31 @@ ENDMDL
         assert!(decode_model_at(MULTI_MODEL_PDB, idx.offsets[0], idx.n_atoms + 1).is_err());
         // An offset past the end of the data is rejected outright.
         assert!(decode_model_at(MULTI_MODEL_PDB, MULTI_MODEL_PDB.len() + 1, idx.n_atoms).is_err());
+    }
+
+    #[test]
+    fn parse_frame0_prefix_requires_model0_terminated() {
+        // A prefix cut off before model 0's ENDMDL (and not the whole file) is
+        // rejected so the caller grows the prefix / falls back.
+        let cut = MULTI_MODEL_PDB.find("ENDMDL").unwrap();
+        let truncated = &MULTI_MODEL_PDB[..cut];
+        assert!(parse_frame0_prefix(truncated, false).is_err());
+        // A prefix that includes model 0's ENDMDL parses model 0 identically to
+        // the eager frame-0 snapshot.
+        let end = MULTI_MODEL_PDB.find("ENDMDL").unwrap() + "ENDMDL\n".len();
+        let prefix = &MULTI_MODEL_PDB[..end];
+        let got = parse_frame0_prefix(prefix, false).unwrap();
+        let eager = parse(MULTI_MODEL_PDB).unwrap();
+        assert_eq!(got.positions, eager.positions);
+        assert_eq!(got.n_atoms, eager.n_atoms);
+        // A single-model file (no MODEL records) parses as the whole structure
+        // when the prefix is the whole file.
+        let single = "\
+ATOM      1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       1.000   0.000   0.000  1.00  0.00           H
+END
+";
+        assert!(parse_frame0_prefix(single, true).is_ok());
     }
 
     #[test]
