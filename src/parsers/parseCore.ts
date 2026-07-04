@@ -123,7 +123,7 @@ export interface WasmStructureFrameDecoder extends WasmFrameDecoder {
 export type LazyTrajectoryKind = "xtc" | "lammpstrj";
 
 /** Multi-frame structure formats with lazy extra-frame decode (frame 0 is eager). */
-export type LazyStructureKind = "xyz";
+export type LazyStructureKind = "xyz" | "pdb";
 
 /** Lightweight structure-frame index (from `indexStructureCore`) — no bulk coordinates. */
 export interface StructureIndexResult {
@@ -154,6 +154,7 @@ interface WasmModule {
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
   parse_xyz_frame0: ParseFn;
+  parse_pdb_frame0: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
@@ -203,6 +204,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
         parse_xyz_frame0: wasm.parse_xyz_frame0,
+        parse_pdb_frame0: wasm.parse_pdb_frame0,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
@@ -263,6 +265,8 @@ function getFrame0ParserForExtension(ext: string): ParseFn | null {
   switch (ext) {
     case ".xyz":
       return wasmModule!.parse_xyz_frame0;
+    case ".pdb":
+      return wasmModule!.parse_pdb_frame0;
     default:
       return null;
   }

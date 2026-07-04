@@ -61,6 +61,7 @@ const { wasmMock } = vi.hoisted(() => {
     parse_gro: () => mockStructResult(3),
     parse_xyz: () => mockStructResult(3),
     parse_xyz_frame0: () => mockStructResult(3, 0),
+    parse_pdb_frame0: () => mockStructResult(3, 0),
     parse_mol: () => mockStructResult(3),
     parse_mol2: () => mockStructResult(3),
     parse_cif: () => mockStructResult(3),

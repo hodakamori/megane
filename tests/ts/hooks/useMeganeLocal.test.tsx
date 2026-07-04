@@ -7,6 +7,10 @@ const parseMock = vi.hoisted(() => vi.fn());
 vi.mock("@/parsers/structure", () => ({
   parseStructureFile: parseMock,
   parseStructureText: vi.fn(),
+  // Lazy structure streaming is disabled here so loadFile takes the eager path.
+  shouldUseLazyStructure: () => false,
+  parseStructureFrame0: vi.fn(async () => null),
+  indexStructureLazy: vi.fn(async () => null),
 }));
 
 import { useMeganeLocal } from "@/hooks/useMeganeLocal";

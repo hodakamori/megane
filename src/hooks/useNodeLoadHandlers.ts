@@ -11,7 +11,7 @@ import { setTrajectoryLoadHandler } from "../components/nodes/LoadTrajectoryNode
 import { setVectorLoadHandler } from "../components/nodes/LoadVectorNode";
 import { loadVectorFileData } from "../logic/vectorSourceLogic";
 import { parseStructureFile, shouldUseLazyStructure } from "../parsers/structure";
-import type { StructureParseResult } from "../parsers/structure";
+import type { StructureParseResult, LazyStructureKind } from "../parsers/structure";
 import type { NodeSnapshotData } from "../pipeline/execute";
 import type { Snapshot } from "../types";
 
@@ -50,15 +50,18 @@ export function useNodeLoadHandlers({
     setStructureLoadHandler((nodeId, file) => {
       const isPrimary = nodeId === primaryNodeIdRef.current;
 
-      // Large multi-frame XYZ (primary node only): stream via the lazy path.
-      // Delegate to the legacy loader (loadFile → loadStructureLazy), which
-      // parses frame 0 eagerly, indexes the rest, sets THIS node's snapshot, and
-      // installs the structureProvider — skipping the eager full-file parse here.
-      // If lazy is declined (single frame / no worker) loadFile falls back to an
-      // eager parse, which also populates the node snapshot. Non-primary nodes and
-      // other formats keep the eager path below.
+      // Large multi-frame structure files (XYZ / multi-MODEL PDB), primary node
+      // only: stream via the lazy path. Delegate to the legacy loader
+      // (loadFile → loadStructureLazy), which indexes the extra frames, parses
+      // frame 0, sets THIS node's snapshot, and installs the structureProvider —
+      // skipping the eager full-file parse here. If lazy is declined (single
+      // frame / no worker) loadFile falls back to an eager parse, which also
+      // populates the node snapshot. Non-primary nodes and other formats keep the
+      // eager path below.
       const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
-      if (isPrimary && ext === ".xyz" && shouldUseLazyStructure("xyz", file.size)) {
+      const lazyKind: LazyStructureKind | null =
+        ext === ".xyz" ? "xyz" : ext === ".pdb" ? "pdb" : null;
+      if (isPrimary && lazyKind && shouldUseLazyStructure(lazyKind, file.size)) {
         clearNodeParseError(nodeId);
         onUploadStructure(file);
         return;

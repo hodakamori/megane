@@ -564,13 +564,22 @@ pub fn parse_xyz_frame0(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult::from_parsed(data))
 }
 
+/// Parse ONLY the first model of a multi-MODEL PDB into a structure snapshot
+/// (topology + model-0 coordinates, no extra frames). Backs lazy PDB decode.
+#[wasm_bindgen]
+pub fn parse_pdb_frame0(text: &str) -> Result<ParseResult, JsError> {
+    let data = parser::parse_frame0(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
 /// Persistent decoder for the extra frames of a multi-frame structure file
-/// (currently XYZ). Owns the text and a per-frame byte-offset index; decodes one
-/// extra frame's positions on demand. Frame 0 is the eager snapshot from
-/// `parse_xyz_frame0` and is NOT part of this decoder's frame set.
+/// (XYZ frames or PDB models). Owns the text and a per-frame byte-offset index;
+/// decodes one extra frame's positions on demand. Frame 0 is the eager snapshot
+/// (`parse_xyz_frame0` / `parse_pdb_frame0`) and is NOT part of this frame set.
 #[wasm_bindgen]
 pub struct StructureFrameDecoder {
     text: String,
+    kind: String,
     offsets: Vec<usize>,
     n_atoms: usize,
     n_frames: u32,
@@ -578,7 +587,7 @@ pub struct StructureFrameDecoder {
 
 #[wasm_bindgen]
 impl StructureFrameDecoder {
-    /// `kind` selects the format ("xyz"). The bytes are moved into wasm memory.
+    /// `kind` selects the format ("xyz" or "pdb"). The bytes move into wasm memory.
     #[wasm_bindgen(constructor)]
     pub fn new(data: Vec<u8>, kind: &str) -> Result<StructureFrameDecoder, JsError> {
         let text = String::from_utf8(data).map_err(|_| JsError::new("file is not valid UTF-8"))?;
@@ -587,11 +596,16 @@ impl StructureFrameDecoder {
                 let idx = xyz::build_index(&text).map_err(|e| JsError::new(&e))?;
                 (idx.offsets, idx.n_atoms)
             }
+            "pdb" => {
+                let idx = parser::build_index(&text).map_err(|e| JsError::new(&e))?;
+                (idx.offsets, idx.n_atoms)
+            }
             _ => return Err(JsError::new("unsupported structure decoder kind")),
         };
         let n_frames = offsets.len() as u32;
         Ok(StructureFrameDecoder {
             text,
+            kind: kind.to_string(),
             offsets,
             n_atoms,
             n_frames,
@@ -614,8 +628,11 @@ impl StructureFrameDecoder {
             .offsets
             .get(frame as usize)
             .ok_or_else(|| JsError::new("frame index out of range"))?;
-        let coords = xyz::decode_frame_at(&self.text, offset, self.n_atoms)
-            .map_err(|e| JsError::new(&e))?;
+        let coords = match self.kind.as_str() {
+            "pdb" => parser::decode_model_at(&self.text, offset, self.n_atoms),
+            _ => xyz::decode_frame_at(&self.text, offset, self.n_atoms),
+        }
+        .map_err(|e| JsError::new(&e))?;
         Ok(Float32Array::from(&coords[..]))
     }
 }

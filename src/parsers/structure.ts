@@ -16,6 +16,7 @@ export {
   shouldUseLazyStructure,
   type StructureLazyHandle,
 } from "./parseClient";
+export type { LazyStructureKind } from "./parseCore";
 export {
   inferBondsVdw,
   parseTopBonds,

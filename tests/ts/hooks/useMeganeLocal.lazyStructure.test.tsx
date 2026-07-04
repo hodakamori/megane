@@ -86,6 +86,23 @@ describe("useMeganeLocal — lazy multi-frame XYZ", () => {
     expect(result.current.pdbFileName).toBe("big.xyz");
   });
 
+  it("streams a large multi-MODEL PDB through the structureProvider channel", async () => {
+    const f0 = makeFrame0();
+    parseFrame0Mock.mockResolvedValue(f0);
+    indexMock.mockResolvedValue({ trajectoryId: 9, kind: "pdb", index: { nAtoms: 3, nFrames: 2 } });
+
+    const { result } = renderHook(() => useMeganeLocal());
+    await act(async () => {
+      await result.current.loadFile(new File(["dummy"], "traj.pdb"));
+    });
+
+    const store = usePipelineStore.getState();
+    expect(store.structureProvider).not.toBeNull();
+    expect(store.structureProvider!.meta.nFrames).toBe(3); // 2 models + frame 0
+    expect(parseFileMock).not.toHaveBeenCalled();
+    expect(result.current.snapshot).toBe(f0.snapshot);
+  });
+
   it("falls back to eager parse when the file has no extra frames", async () => {
     parseFrame0Mock.mockResolvedValue(makeFrame0());
     indexMock.mockResolvedValue({ trajectoryId: 2, kind: "xyz", index: { nAtoms: 3, nFrames: 0 } });
@@ -99,6 +116,25 @@ describe("useMeganeLocal — lazy multi-frame XYZ", () => {
 
     // The single-frame index decoder is freed and the eager parser runs.
     expect(disposeMock).toHaveBeenCalledWith(2);
+    expect(parseFileMock).toHaveBeenCalledTimes(1);
+    expect(usePipelineStore.getState().structureProvider).toBeNull();
+    expect(result.current.snapshot).toBe(eager.snapshot);
+  });
+
+  it("falls back to eager parse (and frees the decoder) when frame 0 fails", async () => {
+    // Index succeeds with extra frames, but the frame-0 parse fails → the
+    // decoder is disposed and the eager parser takes over.
+    indexMock.mockResolvedValue({ trajectoryId: 7, kind: "xyz", index: { nAtoms: 3, nFrames: 4 } });
+    parseFrame0Mock.mockResolvedValue(null);
+    const eager = makeFrame0();
+    parseFileMock.mockResolvedValue(eager);
+
+    const { result } = renderHook(() => useMeganeLocal());
+    await act(async () => {
+      await result.current.loadFile(new File(["dummy"], "weird.xyz"));
+    });
+
+    expect(disposeMock).toHaveBeenCalledWith(7);
     expect(parseFileMock).toHaveBeenCalledTimes(1);
     expect(usePipelineStore.getState().structureProvider).toBeNull();
     expect(result.current.snapshot).toBe(eager.snapshot);

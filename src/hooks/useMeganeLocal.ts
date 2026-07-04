@@ -13,7 +13,7 @@ import {
   indexStructureLazy,
   shouldUseLazyStructure,
 } from "../parsers/structure";
-import type { StructureParseResult } from "../parsers/structure";
+import type { StructureParseResult, LazyStructureKind } from "../parsers/structure";
 import {
   parseXTCFile,
   parseLammpstrjFile,
@@ -42,6 +42,12 @@ import type {
   LabelSource,
   VectorSource,
 } from "../types";
+
+/** File extensions eligible for lazy multi-frame structure streaming → decoder kind. */
+const LAZY_STRUCTURE_KIND: Record<string, LazyStructureKind> = {
+  ".xyz": "xyz",
+  ".pdb": "pdb",
+};
 
 export interface MeganeLocalState {
   snapshot: Snapshot | null;
@@ -319,14 +325,19 @@ export function useMeganeLocal(): MeganeLocalState {
   // channel. Returns false (→ eager fallback) when the worker is unavailable,
   // the file has no extra frames, or indexing fails.
   const loadStructureLazy = useCallback(
-    async (file: File, kind: "xyz", topFile?: File): Promise<boolean> => {
+    async (file: File, kind: LazyStructureKind, topFile?: File): Promise<boolean> => {
       const ext = `.${kind}`;
-      const frame0 = await parseStructureFrame0(file, ext);
-      if (!frame0) return false;
+      // Index first — it's a cheap scan (no coordinate decode). A single-frame
+      // file (e.g. a large single-MODEL PDB) then bails out here BEFORE any
+      // frame-0 parse, so the eager fallback pays only one full parse, never two.
       const handle = await indexStructureLazy(file, kind);
       if (!handle || handle.index.nFrames <= 0) {
-        // Single-frame file or indexing failed → free any decoder and fall back.
         if (handle) disposeTrajectoryLazy(handle.trajectoryId);
+        return false;
+      }
+      const frame0 = await parseStructureFrame0(file, ext);
+      if (!frame0) {
+        disposeTrajectoryLazy(handle.trajectoryId);
         return false;
       }
 
@@ -364,8 +375,9 @@ export function useMeganeLocal(): MeganeLocalState {
   const loadFile = useCallback(
     async (pdb: File, topFile?: File) => {
       const ext = pdb.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? "";
-      if (ext === ".xyz" && shouldUseLazyStructure("xyz", pdb.size)) {
-        if (await loadStructureLazy(pdb, "xyz", topFile)) return;
+      const lazyKind = LAZY_STRUCTURE_KIND[ext];
+      if (lazyKind && shouldUseLazyStructure(lazyKind, pdb.size)) {
+        if (await loadStructureLazy(pdb, lazyKind, topFile)) return;
       }
       const result = await parseStructureFile(pdb);
       await applyStructureResult(result, pdb.name, topFile);

@@ -78,6 +78,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
     parse_xyz_frame0: structFn("parse_xyz_frame0"),
+    parse_pdb_frame0: structFn("parse_pdb_frame0"),
     parse_mol: structFn("parse_mol"),
     parse_mol2: structFn("parse_mol2"),
     parse_cif: structFn("parse_cif"),

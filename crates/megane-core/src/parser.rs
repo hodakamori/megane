@@ -285,6 +285,23 @@ fn parse_conect_line(line: &str, serial_to_index: &HashMap<i32, usize>) -> Vec<(
 
 /// Parse a PDB file text into structured data.
 pub fn parse(text: &str) -> Result<ParsedStructure, String> {
+    parse_impl(text, false)
+}
+
+/// Parse ONLY the first model of a (possibly multi-MODEL) PDB into a
+/// `ParsedStructure` — topology, elements, bonds, box, Cα/SS, and frame-0
+/// coordinates — leaving `frame_positions_flat` empty. Extra models are scanned
+/// for records (CONECT/CRYST) but their coordinates are not retained. Backs the
+/// lazy PDB decode path (frame 0 renders immediately; extra models stream in).
+pub fn parse_frame0(text: &str) -> Result<ParsedStructure, String> {
+    parse_impl(text, true)
+}
+
+/// Shared body of {@link parse} / {@link parse_frame0}. When `frame0_only`, the
+/// coordinates of models after the first are not retained, so
+/// `frame_positions_flat` comes back empty (topology is still taken from model 0
+/// exactly as the full parse does).
+fn parse_impl(text: &str, frame0_only: bool) -> Result<ParsedStructure, String> {
     let mut box_matrix: Option<[f32; 9]> = None;
     let mut serial_to_index: HashMap<i32, usize> = HashMap::new();
     let mut conect_bonds: Vec<(u32, u32)> = Vec::new();
@@ -353,6 +370,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         if let Some((chain_id, res_num)) = parse_ca_info(line) {
                             raw_ca.push((current_model.len(), chain_id, res_num));
                         }
+                    }
+                    // Frame-0-only parse: don't retain extra models' coordinates
+                    // or per-atom metadata (they are decoded lazily on demand).
+                    if frame0_only && model_count >= 1 {
+                        continue;
                     }
                     // Extract residue label: resName (cols 17-20) + resSeq (cols 22-26)
                     let res_name = if line.len() >= 20 {
@@ -498,6 +520,152 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     })
 }
 
+// ---------- Lazy / streaming support (multi-MODEL PDB) ----------
+
+/// Byte offset of each line, so the index scan can record where each model
+/// begins in the raw text (for lazy per-model decode from that offset).
+fn line_byte_starts(text: &str) -> Vec<usize> {
+    let mut starts = Vec::new();
+    let mut pos = 0usize;
+    for line in text.split('\n') {
+        starts.push(pos);
+        pos += line.len() + 1;
+    }
+    starts
+}
+
+/// Lightweight index over a multi-MODEL PDB: byte offset of each EXTRA model
+/// (models 1..N; model 0 is the eager snapshot), built without retaining
+/// coordinates. Models whose atom count differs from model 0 are skipped,
+/// exactly as the eager parser drops them.
+pub struct PdbIndex {
+    pub n_atoms: usize,
+    /// Number of extra models (excludes model 0).
+    pub n_extra_frames: usize,
+    /// Byte offset of each extra model's `MODEL` record line.
+    pub offsets: Vec<usize>,
+}
+
+/// Cheap per-model atom-count test used only by {@link build_index}: an
+/// ATOM/HETATM line long enough for `parse_atom_line` to accept. This avoids
+/// float-parsing every atom just to count them, so indexing a large
+/// single-model PDB stays O(lines) instead of paying a full extra parse.
+/// Well-formed PDBs (the norm) count identically to the eager parser.
+fn is_countable_atom_line(line: &str) -> bool {
+    line.len() >= 54
+}
+
+/// Scan a multi-MODEL PDB and record each EXTRA model's byte offset without
+/// retaining coordinates. Models whose atom count differs from model 0 are
+/// dropped, matching the eager parser so extra-model indices line up.
+pub fn build_index(text: &str) -> Result<PdbIndex, String> {
+    let starts = line_byte_starts(text);
+    let mut first_n_atoms: Option<usize> = None;
+    let mut offsets: Vec<usize> = Vec::new();
+    let mut has_model_record = false;
+    let mut current_offset = 0usize; // MODEL line offset of the current model
+    let mut current_count = 0usize;
+
+    for (i, line) in text.lines().enumerate() {
+        let record = if line.len() >= 6 {
+            line[..6].trim_end()
+        } else {
+            line.trim_end()
+        };
+        match record {
+            "MODEL" => {
+                has_model_record = true;
+                current_offset = starts[i];
+                current_count = 0;
+            }
+            "ENDMDL" => {
+                match first_n_atoms {
+                    None => first_n_atoms = Some(current_count), // model 0 = eager snapshot
+                    Some(n0) => {
+                        if current_count == n0 {
+                            offsets.push(current_offset);
+                        }
+                        // else: mismatched model is dropped (matches eager)
+                    }
+                }
+                current_count = 0;
+            }
+            "ATOM" | "HETATM" => {
+                if is_countable_atom_line(line) {
+                    current_count += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // No MODEL/ENDMDL: all atoms are a single implicit model, no extra frames.
+    if !has_model_record {
+        if current_count == 0 {
+            return Err("PDB file contains no ATOM or HETATM records".into());
+        }
+        return Ok(PdbIndex {
+            n_atoms: current_count,
+            n_extra_frames: 0,
+            offsets: Vec::new(),
+        });
+    }
+
+    let n_atoms = first_n_atoms.ok_or("PDB file contains no models")?;
+    if n_atoms == 0 {
+        return Err("PDB file contains no ATOM or HETATM records".into());
+    }
+    Ok(PdbIndex {
+        n_atoms,
+        n_extra_frames: offsets.len(),
+        offsets,
+    })
+}
+
+/// Decode a single PDB model's positions (Å) given its `MODEL`-record byte
+/// offset. Reads ATOM/HETATM lines (matching the eager parser's acceptance)
+/// until `ENDMDL` or `expected_n_atoms` atoms have been collected.
+pub fn decode_model_at(
+    text: &str,
+    byte_offset: usize,
+    expected_n_atoms: usize,
+) -> Result<Vec<f32>, String> {
+    if byte_offset > text.len() {
+        return Err("model offset past end of data".into());
+    }
+    let slice = &text[byte_offset..];
+    let mut positions = Vec::with_capacity(expected_n_atoms * 3);
+    for line in slice.lines() {
+        let record = if line.len() >= 6 {
+            line[..6].trim_end()
+        } else {
+            line.trim_end()
+        };
+        match record {
+            "ENDMDL" => break,
+            "ATOM" | "HETATM" => {
+                if let Some((_serial, atom)) = parse_atom_line(line) {
+                    positions.push(atom.x);
+                    positions.push(atom.y);
+                    positions.push(atom.z);
+                    if positions.len() == expected_n_atoms * 3 {
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if positions.len() != expected_n_atoms * 3 {
+        return Err(format!(
+            "decoded {} atoms, expected {}",
+            positions.len() / 3,
+            expected_n_atoms
+        ));
+    }
+    Ok(positions)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543,6 +711,70 @@ mod tests {
     fn test_parse_empty_pdb_errors() {
         let result = parse("REMARK test\nEND\n");
         assert!(result.is_err());
+    }
+
+    // A 3-model, 2-atom PDB for the lazy decode tests. The middle model has a
+    // mismatched atom count so it must be dropped exactly as the eager parser
+    // drops it (keeping extra-frame indices aligned).
+    const MULTI_MODEL_PDB: &str = "\
+CRYST1   10.000   10.000   10.000  90.00  90.00  90.00 P 1           1
+MODEL        1
+ATOM      1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       1.000   0.000   0.000  1.00  0.00           H
+ENDMDL
+MODEL        2
+ATOM      1  O   HOH A   1       2.000   0.000   0.000  1.00  0.00           O
+ENDMDL
+MODEL        3
+ATOM      1  O   HOH A   1       3.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       4.000   0.000   0.000  1.00  0.00           H
+ENDMDL
+";
+
+    #[test]
+    fn lazy_frame0_and_decode_model_match_eager() {
+        let eager = parse(MULTI_MODEL_PDB).unwrap();
+        let f0 = parse_frame0(MULTI_MODEL_PDB).unwrap();
+        let idx = build_index(MULTI_MODEL_PDB).unwrap();
+
+        // Frame-0 snapshot is byte-identical to the eager model 0 (topology + coords).
+        assert_eq!(f0.positions, eager.positions);
+        assert_eq!(f0.elements, eager.elements);
+        assert_eq!(f0.n_atoms, eager.n_atoms);
+        assert_eq!(f0.box_matrix, eager.box_matrix);
+        assert!(f0.frame_positions_flat.is_empty());
+
+        // The mismatched middle model is dropped by BOTH paths, leaving one extra.
+        assert_eq!(idx.n_atoms, eager.n_atoms);
+        assert_eq!(idx.n_extra_frames, eager.extra_frame_count());
+        assert_eq!(idx.n_extra_frames, 1);
+
+        for k in 0..idx.n_extra_frames {
+            let p = decode_model_at(MULTI_MODEL_PDB, idx.offsets[k], idx.n_atoms).unwrap();
+            assert_eq!(p, eager.frame(k).to_vec(), "extra model {k}");
+        }
+    }
+
+    #[test]
+    fn decode_model_at_errors_on_insufficient_atoms() {
+        let idx = build_index(MULTI_MODEL_PDB).unwrap();
+        // A model that stops at ENDMDL before the expected atom count is reached
+        // (here: asking for more atoms than the model holds) is rejected.
+        assert!(decode_model_at(MULTI_MODEL_PDB, idx.offsets[0], idx.n_atoms + 1).is_err());
+        // An offset past the end of the data is rejected outright.
+        assert!(decode_model_at(MULTI_MODEL_PDB, MULTI_MODEL_PDB.len() + 1, idx.n_atoms).is_err());
+    }
+
+    #[test]
+    fn build_index_single_model_has_no_extra_frames() {
+        let single = "\
+ATOM      1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       1.000   0.000   0.000  1.00  0.00           H
+END
+";
+        let idx = build_index(single).unwrap();
+        assert_eq!(idx.n_atoms, 2);
+        assert_eq!(idx.n_extra_frames, 0);
     }
 
     #[test]

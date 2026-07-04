@@ -135,6 +135,24 @@ describe("useNodeLoadHandlers — double-parse fix", () => {
     expect(shouldLazyMock).toHaveBeenCalledWith("xyz", file.size);
   });
 
+  it("routes a large multi-MODEL PDB to the lazy loader", async () => {
+    seedStore("n1");
+    shouldLazyMock.mockReturnValue(true);
+    const onUploadStructure = vi.fn();
+
+    renderHook(() => useNodeLoadHandlers({ snapshot: null, onUploadStructure }));
+
+    const file = new File(["dummy"], "trajectory.pdb");
+    await act(async () => {
+      captured.structure?.("n1", file);
+      await Promise.resolve();
+    });
+
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(onUploadStructure).toHaveBeenCalledExactlyOnceWith(file);
+    expect(shouldLazyMock).toHaveBeenCalledWith("pdb", file.size);
+  });
+
   it("keeps the eager path for a small XYZ (lazy declined)", async () => {
     seedStore("n1");
     shouldLazyMock.mockReturnValue(false);
