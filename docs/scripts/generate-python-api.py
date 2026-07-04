@@ -20,6 +20,9 @@ OUTPUT_DIR = Path(__file__).resolve().parent.parent / "docs" / "api" / "python"
 SOURCES = [
     PYTHON_SRC / "__init__.py",
     PYTHON_SRC / "widget.py",
+    # Pipeline builder + all node classes — the single largest chunk of the
+    # public API and previously documented only by hand in the pipeline guide.
+    PYTHON_SRC / "pipeline.py",
     PYTHON_SRC / "parsers" / "pdb.py",
     PYTHON_SRC / "parsers" / "xtc.py",
 ]

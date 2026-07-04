@@ -1,0 +1,163 @@
+/* ── Brand + design tokens ────────────────────────────────────────────────── */
+
+:root {
+  /* Teal brand scale (light) */
+  --ifm-color-primary: #0d9488;
+  --ifm-color-primary-dark: #0b857a;
+  --ifm-color-primary-darker: #0a7d73;
+  --ifm-color-primary-darkest: #08675f;
+  --ifm-color-primary-light: #0fa396;
+  --ifm-color-primary-lighter: #10aba0;
+  --ifm-color-primary-lightest: #14c2b6;
+
+  /* Typography */
+  --ifm-font-family-base:
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --ifm-font-family-monospace:
+    "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    monospace;
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.7;
+  --ifm-heading-font-weight: 650;
+  --ifm-heading-line-height: 1.25;
+  --ifm-h1-font-size: 2.4rem;
+  --ifm-h2-font-size: 1.65rem;
+  --ifm-h3-font-size: 1.25rem;
+  --ifm-code-font-size: 88%;
+
+  /* Surfaces + radii */
+  --ifm-navbar-shadow: none;
+  --ifm-global-radius: 10px;
+  --ifm-code-border-radius: 6px;
+  --megane-surface-border: var(--ifm-color-emphasis-200);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #2dd4bf;
+  --ifm-color-primary-dark: #1fcfb9;
+  --ifm-color-primary-darker: #16c9b2;
+  --ifm-color-primary-darkest: #0fa391;
+  --ifm-color-primary-light: #3bd9c5;
+  --ifm-color-primary-lighter: #44dbca;
+  --ifm-color-primary-lightest: #62e2d3;
+  --ifm-background-color: #0e1512;
+  --ifm-background-surface-color: #151d1a;
+  --megane-surface-border: var(--ifm-color-emphasis-200);
+}
+
+/* ── Typography refinements ───────────────────────────────────────────────── */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+h1,
+.markdown h1:first-child {
+  letter-spacing: -0.02em;
+}
+
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+.markdown > h2 {
+  margin-top: 2.6rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.markdown > h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+article a {
+  font-weight: 500;
+  text-underline-offset: 2px;
+}
+
+/* ── Navbar ───────────────────────────────────────────────────────────────── */
+
+.navbar {
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  backdrop-filter: saturate(150%) blur(8px);
+  background: color-mix(in srgb, var(--ifm-navbar-background-color) 86%, transparent);
+}
+
+.navbar__title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.navbar__link--active {
+  font-weight: 600;
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
+
+.markdown table {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: var(--ifm-global-radius);
+  overflow: hidden;
+}
+
+.markdown table thead {
+  background: var(--ifm-color-emphasis-100);
+}
+
+.markdown table th,
+.markdown table td {
+  border: none;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.markdown table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Admonitions + cards ──────────────────────────────────────────────────── */
+
+.theme-admonition {
+  border-radius: var(--ifm-global-radius);
+  border-width: 1px;
+  border-left-width: 4px;
+}
+
+.card {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Code blocks ──────────────────────────────────────────────────────────── */
+
+.theme-code-block,
+div[class*="codeBlockContainer"] {
+  border-radius: var(--ifm-global-radius);
+}
+
+/* ── Table of contents ────────────────────────────────────────────────────── */
+
+.table-of-contents__link--active {
+  font-weight: 600;
+}

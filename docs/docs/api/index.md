@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # API Reference
 
 megane provides APIs for both Python and TypeScript/JavaScript.

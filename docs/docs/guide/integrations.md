@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Integrations
 
 megane integrates with your existing tools and workflows. This guide covers Plotly event-driven control, MDX embedding, ipywidgets events, and framework-agnostic rendering.
@@ -88,7 +84,7 @@ See [`examples/external_events.ipynb`](https://github.com/hodakamori/megane/blob
 
 Embed the megane viewer in MDX-based documentation frameworks like Next.js. Drop `<MeganeViewer />` or `<Viewport />` into your `.mdx` files — WASM parsing works out of the box with a one-line webpack config.
 
-For full code examples and Next.js configuration, see the [Web / React Guide — MDX Usage](/guide/web#mdx-usage-next-js).
+For full code examples and Next.js configuration, see the [Web / React Guide — MDX Usage](/guide/web#mdx-usage-nextjs).
 
 ## ipywidgets Events
 

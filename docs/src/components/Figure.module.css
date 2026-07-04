@@ -1,0 +1,28 @@
+.figure {
+  margin: 1.5rem auto;
+}
+
+.frame {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: var(--ifm-background-surface-color);
+}
+
+[data-theme="dark"] .frame {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.caption {
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-600);
+}

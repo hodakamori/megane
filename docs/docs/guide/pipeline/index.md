@@ -1,11 +1,15 @@
 ---
-sidebar_position: 1
 sidebar_label: Visual Pipeline Editor
 ---
+
+import Figure from '@site/src/components/Figure';
+import LiveViewer from '@site/src/components/LiveViewer';
 
 # Visual Pipeline Editor
 
 megane's pipeline editor lets you build visualization workflows by wiring nodes — no code required. Open the pipeline panel from the sidebar to start building.
+
+<Figure src="/screenshots/pipeline-editor.png" alt="megane visual pipeline editor" caption="The visual pipeline editor: nodes on the canvas, live 3D on the right." />
 
 Pipelines can also be built programmatically in [Python](./python.md), [TypeScript](./typescript.md), or written directly as [JSON](./json.md).
 
@@ -51,6 +55,11 @@ Use the **Templates** dropdown to load pre-built pipelines:
 
 - **Molecule** — Caffeine (`caffeine_water.pdb`) with structure-based bonds and a vibration trajectory (`caffeine_water_vibration.xtc`). Nodes: `LoadStructure → AddBond → Viewport`, `LoadTrajectory → Viewport`.
 - **Solid** — Perovskite SrTiO₃ 3×3×3 supercell with distance-based bonds and TiO₆ coordination polyhedra. Nodes: `LoadStructure → AddBond → Viewport`, `PolyhedronGenerator → Viewport`. Auto-detects metal centers and anion-former ligands (VESTA-style); Sr is excluded from centers so only TiO₆ polyhedra are shown.
+
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+  <LiveViewer data="caffeine_water" height="300px" caption="Molecule template — caffeine in water" />
+  <LiveViewer data="perovskite_srtio3" height="300px" caption="Solid template — SrTiO₃ supercell" />
+</div>
 
 ## Node Reference
 
