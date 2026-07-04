@@ -14,15 +14,18 @@
 7. **The Jupyter widget (anywidget `MolecularViewer`) does not mount the visual pipeline editor.** Pipeline data still flows in via `MolecularViewer.set_pipeline()` (`_pipeline_json` + `_node_snapshots_data`), but the in-cell `PipelineEditor` UI is intentionally not rendered — the host cell chrome cannot reliably lay it out. Do not re-introduce a `pipeline=True` opt-in or a `_pipeline_enabled` traitlet. Visual editing lives in the standalone webapp, JupyterLab labextension, and VSCode extension only.
 8. **Codecov is a hard merge gate — write tests for every new line you add.** The `test-rust`, `test-ts`, and `test-python` jobs in `.github/workflows/ci.yml` upload coverage to Codecov with `fail_ci_on_error: true`, and `codecov.yml` requires **patch coverage ≥ 70 %** on every PR (project coverage is off, only the diff is gated). New parsers, pipeline nodes, React components, Python API, and Rust modules MUST ship with unit tests in the same PR — relying on E2E does not count because E2E is local-only and unmeasured. Reproduce the gate locally before pushing: `npm test -- --coverage` (TS → `coverage/ts/lcov.info`), `cargo llvm-cov --package megane-core --lcov --output-path lcov.info` (Rust), `python -m pytest --cov-report=xml:coverage.xml` (Python). The `make coverage-all` target (or `make coverage-ts` / `coverage` / `coverage-rust`) wraps these. If you genuinely cannot cover a line (e.g. unreachable defensive branch) document why in the PR description rather than disabling the check. See the `testing` skill for details.
 9. **UI-affecting changes require E2E verification before PR creation.** Any edit under `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs (`vite.config.ts`, `vite.widget.config.ts`, `vite.lib.config.ts`, `vscode-megane/vite.webview.config.ts`), or `crates/megane-core/src/` paths whose output the renderer consumes counts as UI-affecting. Before opening the PR you MUST: (a) run every Playwright host project that exercises the changed host(s) (`webapp`, `widget-jupyterlab`, `widget-vscode`, `jupyterlab-doc`, `vscode`) plus the per-feature projects in the neighborhood (`format-loading`, `playback`, `sidebar`, `pipeline-editor`, `pipeline-file`, `render-modal`, `widget-api`, `camera`, `measurement`, `subsystems`, `trajectory-bonds`, `modify-node`, `phase2`); the `e2e-coverage` skill has the full table. (b) Confirm the **intended** UI change is reflected — extend specs or re-baseline only when the diff is genuinely intended, and visually inspect any new baseline PNG before committing it. (c) Sweep the rest of the matrix for **side effects** and treat unexpected pixel diffs, timeouts, or runtime errors as regressions to fix at the root, not baselines to update. (d) Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR. (e) Note in the PR description which Playwright projects you ran and which baselines moved. Codecov (rule #8) covers unit coverage; it cannot catch UI regressions because E2E is local-only and unmeasured. See the `e2e-coverage`, `testing`, and `commit` skills.
+10. **Every performance optimization MUST be measured before/after, and kept only if the numbers prove it helps.** A change justified as "faster" is not done until you have run an A/B measurement and shown the win in real numbers — never ship a perf change on reasoning alone. Reuse the perf harness: `scripts/profile-streaming.mjs` (eager-vs-lazy structure loading, flips `window.__MEGANE_LAZY_XTC__`), `scripts/profile-loading.mjs`, `tests/e2e/utils/playwright.mjs` (`setupPerfHooks`/`collectPerf`), and the `megane:*` perf marks under the `window.__MEGANE_PERF__` gate (`src/perf.ts`). If the measurement shows no improvement — or a regression — do NOT merge the change: revert it or redesign until the numbers are favorable, and report the before/after table. (A real example: the first multi-frame XYZ/PDB streaming implementation measured 1.3–1.5× _slower_ than eager because it read the file twice; it had to be reworked before it was worth keeping.) When the local WASM is unoptimized (`wasm-opt = false` in sandboxes), note that absolute numbers are inflated but the relative A/B on the same `.wasm` is still valid. See the `testing` skill.
 
 ## Dev Environment Setup
 
 Required tools (install if missing):
+
 - `wasm-pack`: `cargo install wasm-pack`
 - `maturin`: `pip install maturin` or `uv pip install maturin`
 - Node.js 22+, Rust/Cargo, Python 3.10+, uv
 
 Setup sequence:
+
 ```
 npm install
 cargo install wasm-pack     # if `which wasm-pack` fails
@@ -34,6 +37,7 @@ uv sync --extra dev          # Python dependencies
 
 megane is a molecular viewer: Rust core (parsers) + TypeScript/React frontend (Three.js) + Python backend (FastAPI/anywidget) + VSCode extension.
 Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace with three crates:
+
 - `megane-core` — Core parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, LAMMPS dump, AMBER topology (.prmtop), GROMACS topology (.top), PSF topology (.psf), XTC, DCD, AMBER NetCDF (.nc), ASE `.traj`)
 - `megane-wasm` — WASM bindings (wasm-bindgen)
 - `megane-python` — PyO3 Python extension
@@ -42,43 +46,43 @@ Rust compiles to both PyO3 (Python) and WASM (browser) via a Cargo workspace wit
 
 ### Build
 
-| Command | What it does |
-|---|---|
-| `npm run build:wasm` | Compile Rust to WASM (MUST run first) |
-| `npm run build` | Full build: WASM + tsc + Vite app + Vite widget + Vite lib + JupyterLab labextension |
-| `npm run build:app` | WASM + tsc + Vite app only |
-| `npm run build:widget` | Vite widget bundle only |
-| `npm run build:lib` | WASM + widget bundle + npm library bundle (`vite.lib.config.ts`) |
-| `npm run build:lab` | Build only the JupyterLab labextension (`jupyterlab-megane/`) |
-| `npm run dev` | Vite dev server (requires WASM already built) |
-| `maturin develop --release` | Build+install Python extension (editable) |
+| Command                     | What it does                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| `npm run build:wasm`        | Compile Rust to WASM (MUST run first)                                                |
+| `npm run build`             | Full build: WASM + tsc + Vite app + Vite widget + Vite lib + JupyterLab labextension |
+| `npm run build:app`         | WASM + tsc + Vite app only                                                           |
+| `npm run build:widget`      | Vite widget bundle only                                                              |
+| `npm run build:lib`         | WASM + widget bundle + npm library bundle (`vite.lib.config.ts`)                     |
+| `npm run build:lab`         | Build only the JupyterLab labextension (`jupyterlab-megane/`)                        |
+| `npm run dev`               | Vite dev server (requires WASM already built)                                        |
+| `maturin develop --release` | Build+install Python extension (editable)                                            |
 
 ### Test
 
-| Command | What it does |
-|---|---|
-| `npm test` | TypeScript unit tests (vitest) |
-| `npm test -- --coverage` | vitest with V8 coverage → `coverage/ts/lcov.info` (matches Codecov upload) |
-| `cargo test -p megane-core` | Rust parser tests |
-| `cargo llvm-cov --package megane-core --lcov --output-path lcov.info` | Rust coverage in the exact form CI uploads |
-| `python -m pytest` | Python tests (needs maturin develop first); pytest config already enables `--cov` |
-| `python -m pytest --cov-report=xml:coverage.xml` | Python coverage in the exact form CI uploads |
-| `make coverage-all` | Run all three coverage targets locally before pushing |
-| `npm run test:all` | vitest + full Playwright suite |
-| `make test-all` | Python + TypeScript + Rust + active Playwright projects + notebooks + integration |
+| Command                                                               | What it does                                                                      |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `npm test`                                                            | TypeScript unit tests (vitest)                                                    |
+| `npm test -- --coverage`                                              | vitest with V8 coverage → `coverage/ts/lcov.info` (matches Codecov upload)        |
+| `cargo test -p megane-core`                                           | Rust parser tests                                                                 |
+| `cargo llvm-cov --package megane-core --lcov --output-path lcov.info` | Rust coverage in the exact form CI uploads                                        |
+| `python -m pytest`                                                    | Python tests (needs maturin develop first); pytest config already enables `--cov` |
+| `python -m pytest --cov-report=xml:coverage.xml`                      | Python coverage in the exact form CI uploads                                      |
+| `make coverage-all`                                                   | Run all three coverage targets locally before pushing                             |
+| `npm run test:all`                                                    | vitest + full Playwright suite                                                    |
+| `make test-all`                                                       | Python + TypeScript + Rust + active Playwright projects + notebooks + integration |
 
 #### E2E (Playwright)
 
 E2E is **local-only by policy** — CI does not run any E2E project (port-bind races + font/fontconfig pixel drift on hosted runners). Re-baseline locally and commit PNGs under `tests/e2e/baselines/<project>/`. Full runbook including environment setup, per-host quirks, and matrix expansion lives in `.claude/skills/e2e-coverage/SKILL.md`.
 
-| Category | Scripts | Notes |
-|---|---|---|
-| Full sweep | `npm run test:e2e` | All Playwright projects |
-| Host projects | `:webapp`, `:contract`, `:widget-jupyterlab`, `:widget-vscode`, `:jupyterlab-doc`, `:vscode` | `:webapp` / `:contract` run a Vite static server on port 15173; `:widget-vscode` / `:vscode` need `MEGANE_E2E_MODE=1` + code-server (see below) |
-| Feature × 5-host matrices | `:modify-node`, `:camera`, `:measurement`, `:subsystems`, `:trajectory-bonds` | Each runs the feature on `webapp`, `jupyterlab-doc`, `vscode`, `widget-jupyterlab`, `widget-vscode`. Per-host variants exist (e.g. `:trajectory-bonds:webapp`, `:camera:webapp`) |
-| Single-feature projects | `:format-loading`, `:playback`, `:sidebar`, `:widget-api`, `:widget-examples`, `:pipeline-editor`, `:pipeline-file`, `:render-modal`, `:phase2` | Webapp host unless the project name encodes another |
-| Legacy mjs runner | `:vscode:legacy`, `:vscode:legacy:update` | `tests/e2e/vscode_full_screen.test.mjs` |
-| Re-baseline flag | `MEGANE_E2E_UPDATE=1 npm run test:e2e:<project>` | Unlinks the existing baseline before capture |
+| Category                  | Scripts                                                                                                                                         | Notes                                                                                                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full sweep                | `npm run test:e2e`                                                                                                                              | All Playwright projects                                                                                                                                                          |
+| Host projects             | `:webapp`, `:contract`, `:widget-jupyterlab`, `:widget-vscode`, `:jupyterlab-doc`, `:vscode`                                                    | `:webapp` / `:contract` run a Vite static server on port 15173; `:widget-vscode` / `:vscode` need `MEGANE_E2E_MODE=1` + code-server (see below)                                  |
+| Feature × 5-host matrices | `:modify-node`, `:camera`, `:measurement`, `:subsystems`, `:trajectory-bonds`                                                                   | Each runs the feature on `webapp`, `jupyterlab-doc`, `vscode`, `widget-jupyterlab`, `widget-vscode`. Per-host variants exist (e.g. `:trajectory-bonds:webapp`, `:camera:webapp`) |
+| Single-feature projects   | `:format-loading`, `:playback`, `:sidebar`, `:widget-api`, `:widget-examples`, `:pipeline-editor`, `:pipeline-file`, `:render-modal`, `:phase2` | Webapp host unless the project name encodes another                                                                                                                              |
+| Legacy mjs runner         | `:vscode:legacy`, `:vscode:legacy:update`                                                                                                       | `tests/e2e/vscode_full_screen.test.mjs`                                                                                                                                          |
+| Re-baseline flag          | `MEGANE_E2E_UPDATE=1 npm run test:e2e:<project>`                                                                                                | Unlinks the existing baseline before capture                                                                                                                                     |
 
 When invoking Playwright directly (`npx playwright test ...`), prefix with `PATH="$(pwd)/.venv/bin:$PATH"` so the `jupyterlab-doc` / `widget-jupyterlab` projects can spawn the venv `jupyter`. `uv run make test-all` already does this implicitly. Re-baseline only when the failure is a pixel diff; treat timeouts and runtime errors as real regressions and fix the root cause instead.
 
@@ -86,12 +90,12 @@ The `:vscode` / `:widget-vscode` projects need code-server. In a sandboxed/proxi
 
 ### Lint / Format / Preview
 
-| Command | What it does |
-|---|---|
-| `npm run lint` / `lint:fix` | ESLint over `src/` |
-| `npm run format` / `format:check` | Prettier over `src/` |
-| `node scripts/dev-preview.mjs --screenshot` | Dev preview screenshots |
-| `node scripts/capture-screenshots.mjs` | Hero screenshot for docs |
+| Command                                     | What it does             |
+| ------------------------------------------- | ------------------------ |
+| `npm run lint` / `lint:fix`                 | ESLint over `src/`       |
+| `npm run format` / `format:check`           | Prettier over `src/`     |
+| `node scripts/dev-preview.mjs --screenshot` | Dev preview screenshots  |
+| `node scripts/capture-screenshots.mjs`      | Hero screenshot for docs |
 
 ## LLM Prompt-Eval CI (bench/llm)
 
@@ -115,18 +119,18 @@ Project-specific skills are defined in `.claude/skills/`. Each skill provides in
 
 A SessionStart hook (`.claude/hooks/session-start.sh`) injects a reminder pointing here at the start of every session and asks the agent to verify the skills below appear in the system reminder's `available skills` list.
 
-| Skill | What it covers |
-|---|---|
-| `commit` | Git commit guidelines (English-only messages, conventional style, post-commit CI verification) |
-| `github-cli` | `gh` CLI usage, including the remote-URL workaround for sandboxed envs |
-| `dev-setup` | Verifying / installing the dev toolchain (wasm-pack, maturin, uv, Node 22+) |
-| `build` | Build commands and required ordering (WASM first) |
-| `testing` | Test taxonomy across TypeScript, Rust, Python, and E2E |
-| `e2e-coverage` | Full Playwright matrix runbook across the 5 host platforms |
-| `preview` | Screenshot/video capture for visual review |
-| `pre-release` | Pre-release checklist (tests, version bump, dry-run, tag) |
-| `post-release` | Post-release verification (publish workflows, package availability, docs) |
-| `add-format` | Per-host registration checklist for new file formats (enforces CRITICAL RULE #6) |
+| Skill          | What it covers                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| `commit`       | Git commit guidelines (English-only messages, conventional style, post-commit CI verification) |
+| `github-cli`   | `gh` CLI usage, including the remote-URL workaround for sandboxed envs                         |
+| `dev-setup`    | Verifying / installing the dev toolchain (wasm-pack, maturin, uv, Node 22+)                    |
+| `build`        | Build commands and required ordering (WASM first)                                              |
+| `testing`      | Test taxonomy across TypeScript, Rust, Python, and E2E                                         |
+| `e2e-coverage` | Full Playwright matrix runbook across the 5 host platforms                                     |
+| `preview`      | Screenshot/video capture for visual review                                                     |
+| `pre-release`  | Pre-release checklist (tests, version bump, dry-run, tag)                                      |
+| `post-release` | Post-release verification (publish workflows, package availability, docs)                      |
+| `add-format`   | Per-host registration checklist for new file formats (enforces CRITICAL RULE #6)               |
 
 Total: 10 skills.
 
