@@ -22,6 +22,7 @@
 
 import * as THREE from "three";
 import type { Snapshot } from "../types";
+import { perfMark, perfMeasure } from "../perf";
 
 /** Secondary structure type constants. */
 export const SS_COIL = 0;
@@ -343,38 +344,52 @@ function lerpProfile(a: CrossSection, b: CrossSection, t: number): CrossSection 
 }
 
 /**
- * Build a single continuous ribbon mesh for a chain by sweeping a parameterized
- * cross-section along the smoothed Cα backbone. SS-dependent cross-sections are
- * interpolated per-sample to give smooth tapers at boundaries.
+ * A single continuous ribbon mesh for one chain, plus the frame-invariant data
+ * needed to refresh its vertex positions in place on each trajectory frame.
+ *
+ * Topology (index buffer), vertex colors, and the per-sample cross-section rings
+ * depend only on the chain's Cα count and secondary-structure types — none of
+ * which change between frames. Only the world-space vertex positions and normals
+ * vary with the Cα coordinates, so playback recomputes just those two attributes
+ * and re-uploads them, instead of allocating a fresh geometry every frame.
  */
-function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): THREE.Mesh | null {
-  const ca = readChainPositions(chain, positions);
-  if (ca.length < 2) return null;
+interface ChainRibbon {
+  mesh: THREE.Mesh;
+  positionAttr: THREE.BufferAttribute;
+  normalAttr: THREE.BufferAttribute;
+  /** Cα atom indices into the flat positions array (chain backbone order). */
+  atomIndices: Uint32Array;
+  /** Precomputed cross-section ring per curve sample (frame-invariant). */
+  rings: { x: number; y: number; nx: number; ny: number }[][];
+  nSamples: number;
+  K: number;
+}
+
+/**
+ * Recompute the world-space position and normal of every ribbon vertex for a new
+ * set of atom coordinates and flag the two attributes for re-upload. The index,
+ * color, and ring data are left untouched because they do not depend on the frame.
+ */
+function fillRibbonPositionsNormals(ribbon: ChainRibbon, positions: Float32Array): void {
+  const { atomIndices, rings, nSamples, K, positionAttr, normalAttr } = ribbon;
+
+  const ca: THREE.Vector3[] = new Array(atomIndices.length);
+  for (let i = 0; i < atomIndices.length; i++) {
+    const a = atomIndices[i] * 3;
+    ca[i] = new THREE.Vector3(positions[a], positions[a + 1], positions[a + 2]);
+  }
   const curve = makeCurve(ca);
-  if (!curve) return null;
+  if (!curve) return; // topology is fixed, so a ribbon that built once stays buildable
 
-  const { profiles, colors } = computeRibbonProfile(chain.ssTypes);
-
-  // Total samples: SAMPLES_PER_RESIDUE between each adjacent residue pair, +1 for the final endpoint.
-  const nResidues = ca.length;
-  const nSamples = (nResidues - 1) * SAMPLES_PER_RESIDUE + 1;
   const frames = curve.computeFrenetFrames(nSamples - 1, false);
-
-  const K = CROSS_SECTION_POINTS;
-  const totalVerts = nSamples * K;
-  const positionsArr = new Float32Array(totalVerts * 3);
-  const normalsArr = new Float32Array(totalVerts * 3);
-  const colorsArr = new Float32Array(totalVerts * 3);
-
-  // Each adjacent pair of cross-section rings gets K quads = 2K triangles.
-  const indicesArr = new Uint32Array((nSamples - 1) * K * 6);
+  const posArr = positionAttr.array as Float32Array;
+  const normArr = normalAttr.array as Float32Array;
 
   const vP = new THREE.Vector3();
   const vN = new THREE.Vector3();
   const vB = new THREE.Vector3();
   const tmpA = new THREE.Vector3();
   const tmpB = new THREE.Vector3();
-  const tmpColor = new THREE.Color();
 
   for (let s = 0; s < nSamples; s++) {
     const t = s / (nSamples - 1); // 0..1 along the curve
@@ -386,19 +401,7 @@ function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): THREE.
     vN.copy(N);
     vB.copy(B);
 
-    // Determine which residues we're between and the local interpolation factor.
-    const fResidue = t * (nResidues - 1);
-    const i0 = Math.min(nResidues - 1, Math.floor(fResidue));
-    const i1 = Math.min(nResidues - 1, i0 + 1);
-    const lerpT = fResidue - i0;
-    const cs = lerpProfile(profiles[i0], profiles[i1], lerpT);
-
-    // Vertex color: interpolated between residue colors.
-    tmpColor.copy(colors[i0]).lerp(colors[i1], lerpT);
-
-    // Build the cross-section ring at this sample.
-    const ring = buildCrossSection(K, cs.halfWidth, cs.halfThick, cs.cornerRadius);
-
+    const ring = rings[s];
     const base = s * K;
     for (let k = 0; k < K; k++) {
       const r = ring[k];
@@ -415,12 +418,71 @@ function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): THREE.
       tmpA.divideScalar(nLen);
 
       const v3 = (base + k) * 3;
-      positionsArr[v3] = px;
-      positionsArr[v3 + 1] = py;
-      positionsArr[v3 + 2] = pz;
-      normalsArr[v3] = tmpA.x;
-      normalsArr[v3 + 1] = tmpA.y;
-      normalsArr[v3 + 2] = tmpA.z;
+      posArr[v3] = px;
+      posArr[v3 + 1] = py;
+      posArr[v3 + 2] = pz;
+      normArr[v3] = tmpA.x;
+      normArr[v3 + 1] = tmpA.y;
+      normArr[v3 + 2] = tmpA.z;
+    }
+  }
+
+  positionAttr.needsUpdate = true;
+  normalAttr.needsUpdate = true;
+  // Vertices moved, so the cached bounding sphere would wrongly frustum-cull the
+  // ribbon. Recompute it to match the new geometry.
+  ribbon.mesh.geometry.computeBoundingSphere();
+}
+
+/**
+ * Build a single continuous ribbon mesh for a chain by sweeping a parameterized
+ * cross-section along the smoothed Cα backbone. SS-dependent cross-sections are
+ * interpolated per-sample to give smooth tapers at boundaries.
+ *
+ * Returns a {@link ChainRibbon} carrying the mesh plus the frame-invariant data
+ * (rings, colors baked into the geometry, index buffer) so subsequent frames can
+ * update positions/normals in place via {@link fillRibbonPositionsNormals}.
+ */
+function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): ChainRibbon | null {
+  const ca = readChainPositions(chain, positions);
+  if (ca.length < 2) return null;
+  const curve = makeCurve(ca);
+  if (!curve) return null;
+
+  const { profiles, colors } = computeRibbonProfile(chain.ssTypes);
+
+  // Total samples: SAMPLES_PER_RESIDUE between each adjacent residue pair, +1 for the final endpoint.
+  const nResidues = ca.length;
+  const nSamples = (nResidues - 1) * SAMPLES_PER_RESIDUE + 1;
+
+  const K = CROSS_SECTION_POINTS;
+  const totalVerts = nSamples * K;
+  const positionsArr = new Float32Array(totalVerts * 3);
+  const normalsArr = new Float32Array(totalVerts * 3);
+  const colorsArr = new Float32Array(totalVerts * 3);
+
+  // Each adjacent pair of cross-section rings gets K quads = 2K triangles.
+  const indicesArr = new Uint32Array((nSamples - 1) * K * 6);
+
+  // Precompute the frame-invariant cross-section rings and bake vertex colors:
+  // both depend only on the per-sample interpolated SS profile, not on positions.
+  const rings: { x: number; y: number; nx: number; ny: number }[][] = new Array(nSamples);
+  const tmpColor = new THREE.Color();
+  for (let s = 0; s < nSamples; s++) {
+    const t = s / (nSamples - 1); // 0..1 along the curve
+    // Determine which residues we're between and the local interpolation factor.
+    const fResidue = t * (nResidues - 1);
+    const i0 = Math.min(nResidues - 1, Math.floor(fResidue));
+    const i1 = Math.min(nResidues - 1, i0 + 1);
+    const lerpT = fResidue - i0;
+    const cs = lerpProfile(profiles[i0], profiles[i1], lerpT);
+    rings[s] = buildCrossSection(K, cs.halfWidth, cs.halfThick, cs.cornerRadius);
+
+    // Vertex color: interpolated between residue colors.
+    tmpColor.copy(colors[i0]).lerp(colors[i1], lerpT);
+    const base = s * K;
+    for (let k = 0; k < K; k++) {
+      const v3 = (base + k) * 3;
       colorsArr[v3] = tmpColor.r;
       colorsArr[v3 + 1] = tmpColor.g;
       colorsArr[v3 + 2] = tmpColor.b;
@@ -450,8 +512,13 @@ function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): THREE.
   }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(positionsArr, 3));
-  geo.setAttribute("normal", new THREE.BufferAttribute(normalsArr, 3));
+  const positionAttr = new THREE.BufferAttribute(positionsArr, 3);
+  const normalAttr = new THREE.BufferAttribute(normalsArr, 3);
+  // Positions/normals are rewritten every trajectory frame; hint the driver.
+  positionAttr.setUsage(THREE.DynamicDrawUsage);
+  normalAttr.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("position", positionAttr);
+  geo.setAttribute("normal", normalAttr);
   geo.setAttribute("color", new THREE.BufferAttribute(colorsArr, 3));
   geo.setIndex(new THREE.BufferAttribute(indicesArr, 1));
 
@@ -461,7 +528,19 @@ function buildChainRibbon(chain: ChainBackbone, positions: Float32Array): THREE.
     roughness: 0.55,
     side: THREE.DoubleSide,
   });
-  return new THREE.Mesh(geo, mat);
+
+  const ribbon: ChainRibbon = {
+    mesh: new THREE.Mesh(geo, mat),
+    positionAttr,
+    normalAttr,
+    atomIndices: chain.atomIndices,
+    rings,
+    nSamples,
+    K,
+  };
+  // Fill the initial frame's positions/normals through the shared path.
+  fillRibbonPositionsNormals(ribbon, positions);
+  return ribbon;
 }
 
 // ─── CartoonRenderer class ────────────────────────────────────────────────────
@@ -472,6 +551,7 @@ export class CartoonRenderer {
 
   private snapshot: Snapshot | null = null;
   private chains: ChainBackbone[] = [];
+  private ribbons: ChainRibbon[] = [];
 
   constructor() {
     this.mesh = new THREE.Group();
@@ -485,19 +565,38 @@ export class CartoonRenderer {
     this._rebuild(snapshot.positions);
   }
 
-  /** Update positions for a new trajectory frame (topology unchanged). */
+  /**
+   * Update positions for a new trajectory frame (topology unchanged).
+   *
+   * Rewrites each ribbon's position/normal attributes in place rather than
+   * disposing and reallocating geometry — the index buffer, vertex colors, and
+   * cross-section rings are frame-invariant.
+   */
   updatePositions(positions: Float32Array): void {
-    if (!this.snapshot || this.chains.length === 0) return;
-    this._rebuild(positions);
+    if (!this.snapshot || this.ribbons.length === 0) return;
+    perfMark("megane:cartoon:update:start");
+    for (const ribbon of this.ribbons) {
+      fillRibbonPositionsNormals(ribbon, positions);
+    }
+    perfMark("megane:cartoon:update:end");
+    perfMeasure(
+      "megane:cartoon:update",
+      "megane:cartoon:update:start",
+      "megane:cartoon:update:end",
+    );
   }
 
   private _rebuild(positions: Float32Array): void {
     this._disposeChildren();
     this.mesh.clear();
+    this.ribbons = [];
 
     for (const chain of this.chains) {
       const ribbon = buildChainRibbon(chain, positions);
-      if (ribbon) this.mesh.add(ribbon);
+      if (ribbon) {
+        this.ribbons.push(ribbon);
+        this.mesh.add(ribbon.mesh);
+      }
     }
   }
 
@@ -510,6 +609,7 @@ export class CartoonRenderer {
   dispose(): void {
     this._disposeChildren();
     this.mesh.clear();
+    this.ribbons = [];
   }
 
   private _disposeChildren(): void {
