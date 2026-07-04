@@ -55,9 +55,21 @@ const config: Config = {
       items: [
         {
           type: "docSidebar",
-          sidebarId: "mainSidebar",
+          sidebarId: "useSidebar",
           position: "left",
-          label: "Guide",
+          label: "Use",
+        },
+        {
+          type: "docSidebar",
+          sidebarId: "buildSidebar",
+          position: "left",
+          label: "Build",
+        },
+        {
+          type: "docSidebar",
+          sidebarId: "referenceSidebar",
+          position: "left",
+          label: "Reference",
         },
         { to: "/gallery", label: "Gallery", position: "left" },
         { to: "/demo", label: "Demo", position: "left" },
