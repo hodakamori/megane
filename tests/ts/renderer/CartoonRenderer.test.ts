@@ -120,9 +120,13 @@ describe("buildSegments", () => {
   it("transitions produce separate segments", () => {
     // coil(2), helix(3), sheet(2)
     const types = new Uint8Array([
-      SS_COIL, SS_COIL,
-      SS_HELIX, SS_HELIX, SS_HELIX,
-      SS_SHEET, SS_SHEET,
+      SS_COIL,
+      SS_COIL,
+      SS_HELIX,
+      SS_HELIX,
+      SS_HELIX,
+      SS_SHEET,
+      SS_SHEET,
     ]);
     const segs = buildSegments(types);
     expect(segs.length).toBe(3);
@@ -260,6 +264,90 @@ describe("CartoonRenderer", () => {
     const cr = new CartoonRenderer();
     cr.updatePositions(new Float32Array(12));
     expect(cr.mesh.children.length).toBe(0);
+  });
+
+  it("updatePositions updates geometry in place without reallocating it", () => {
+    const cr = new CartoonRenderer();
+    cr.loadSnapshot(makeLinearSnapshot(6, SS_COIL));
+    const mesh = cr.mesh.children[0] as THREE.Mesh;
+    const geoBefore = mesh.geometry;
+    const posAttrBefore = mesh.geometry.getAttribute("position");
+
+    const newPositions = new Float32Array(6 * 3);
+    for (let i = 0; i < 6; i++) newPositions[i * 3] = i * 4.2;
+    cr.updatePositions(newPositions);
+
+    const meshAfter = cr.mesh.children[0] as THREE.Mesh;
+    // Same mesh, same geometry, same underlying attribute objects → in-place.
+    expect(meshAfter).toBe(mesh);
+    expect(meshAfter.geometry).toBe(geoBefore);
+    expect(meshAfter.geometry.getAttribute("position")).toBe(posAttrBefore);
+  });
+
+  it("updatePositions moves vertices to reflect new coordinates", () => {
+    const cr = new CartoonRenderer();
+    cr.loadSnapshot(makeLinearSnapshot(6, SS_COIL));
+    const posAttr = (cr.mesh.children[0] as THREE.Mesh).geometry.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const firstVertexX = posAttr.getX(0);
+    const versionBefore = posAttr.version;
+
+    // Shift the whole chain by a large amount along +Y.
+    const newPositions = new Float32Array(6 * 3);
+    for (let i = 0; i < 6; i++) {
+      newPositions[i * 3] = i * 3.8;
+      newPositions[i * 3 + 1] = 50;
+    }
+    cr.updatePositions(newPositions);
+
+    // Positions were rewritten and flagged for GPU re-upload (needsUpdate=true
+    // is a write-only setter that bumps the attribute version).
+    expect(posAttr.version).toBeGreaterThan(versionBefore);
+    // The ribbon followed the backbone into the shifted region.
+    let maxY = -Infinity;
+    for (let v = 0; v < posAttr.count; v++) maxY = Math.max(maxY, posAttr.getY(v));
+    expect(maxY).toBeGreaterThan(40);
+    // And the X coordinate of the seam vertex is unchanged (chain only moved in Y).
+    expect(posAttr.getX(0)).toBeCloseTo(firstVertexX, 3);
+  });
+
+  it("updatePositions preserves frame-invariant vertex colors", () => {
+    const snap = makeSnapshot(
+      [0, 1, 2, 3, 4, 5],
+      [65, 65, 65, 65, 65, 65],
+      [1, 2, 3, 4, 5, 6],
+      [SS_COIL, SS_HELIX, SS_HELIX, SS_SHEET, SS_SHEET, SS_COIL],
+    );
+    const positions = new Float32Array(6 * 3);
+    for (let i = 0; i < 6; i++) positions[i * 3] = i * 3.8;
+    const cr = new CartoonRenderer();
+    cr.loadSnapshot({ ...snap, positions });
+    const colorAttr = (cr.mesh.children[0] as THREE.Mesh).geometry.getAttribute(
+      "color",
+    ) as THREE.BufferAttribute;
+    const colorsBefore = Float32Array.from(colorAttr.array as Float32Array);
+
+    const moved = new Float32Array(positions);
+    for (let i = 0; i < 6; i++) moved[i * 3 + 2] = i * 1.5; // add a Z zig-zag
+    cr.updatePositions(moved);
+
+    expect(Array.from(colorAttr.array as Float32Array)).toEqual(Array.from(colorsBefore));
+  });
+
+  it("updatePositions refreshes the geometry bounding sphere", () => {
+    const cr = new CartoonRenderer();
+    cr.loadSnapshot(makeLinearSnapshot(6, SS_COIL));
+    const geo = (cr.mesh.children[0] as THREE.Mesh).geometry;
+    const centerBefore = geo.boundingSphere!.center.clone();
+
+    // Translate the whole chain far along +X.
+    const newPositions = new Float32Array(6 * 3);
+    for (let i = 0; i < 6; i++) newPositions[i * 3] = 1000 + i * 3.8;
+    cr.updatePositions(newPositions);
+
+    expect(geo.boundingSphere).not.toBeNull();
+    expect(geo.boundingSphere!.center.x).toBeGreaterThan(centerBefore.x + 500);
   });
 
   it("dispose clears mesh children and frees geometry", () => {
@@ -435,11 +523,7 @@ describe("computeRibbonProfile", () => {
 
   it("handles multiple sheet runs independently", () => {
     // Two β-strands separated by a helix.
-    const ss = new Uint8Array([
-      SS_SHEET, SS_SHEET, SS_SHEET,
-      SS_HELIX,
-      SS_SHEET, SS_SHEET,
-    ]);
+    const ss = new Uint8Array([SS_SHEET, SS_SHEET, SS_SHEET, SS_HELIX, SS_SHEET, SS_SHEET]);
     const { profiles } = computeRibbonProfile(ss);
     // First strand arrow tip at index 2
     expect(profiles[2].halfWidth).toBe(0);

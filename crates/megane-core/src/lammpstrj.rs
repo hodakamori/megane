@@ -479,7 +479,15 @@ pub fn decode_frame_at(
         return Err("frame offset past end of data".to_string());
     }
     let slice = &text[byte_offset..];
-    let lines: Vec<&str> = slice.lines().collect();
+    // Only this frame is needed, so stop after its header + atom lines instead of
+    // collecting every line to EOF (which made streaming all frames O(n_frames²)).
+    // A LAMMPS dump header is a fixed ~9 lines (TIMESTEP, NUMBER OF ATOMS, BOX
+    // BOUNDS + 3 rows, ATOMS); 16 is a generous upper bound covering triclinic.
+    const HEADER_MARGIN: usize = 16;
+    let lines: Vec<&str> = slice
+        .lines()
+        .take(expected_n_atoms + HEADER_MARGIN)
+        .collect();
     if lines.is_empty() || lines[0].trim() != "ITEM: TIMESTEP" {
         return Err("frame offset is not at an ITEM: TIMESTEP boundary".to_string());
     }

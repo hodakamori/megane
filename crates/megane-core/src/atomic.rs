@@ -99,14 +99,26 @@ pub fn symbol_to_atomic_num(sym: &str) -> u8 {
 /// Used for normalizing element symbols (e.g. "FE" → "Fe", "fe" → "Fe").
 pub fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => {
-            let upper: String = c.to_uppercase().collect();
-            let lower: String = chars.flat_map(|c| c.to_lowercase()).collect();
-            format!("{}{}", upper, lower)
+    let first = match chars.next() {
+        None => return String::new(),
+        Some(c) => c,
+    };
+    // Fast path: element symbols are almost always ASCII (1–2 chars). Build the
+    // result in a single allocation instead of the three the Unicode path needs
+    // (two `collect()` Strings plus the `format!`). For ASCII, ascii case folding
+    // is identical to `to_uppercase`/`to_lowercase`.
+    if s.is_ascii() {
+        let mut out = String::with_capacity(s.len());
+        out.push(first.to_ascii_uppercase());
+        for c in chars {
+            out.push(c.to_ascii_lowercase());
         }
+        return out;
     }
+    // Unicode fallback (rare): preserve the original semantics exactly.
+    let upper: String = first.to_uppercase().collect();
+    let lower: String = chars.flat_map(|c| c.to_lowercase()).collect();
+    format!("{}{}", upper, lower)
 }
 
 // ── Radii ─────────────────────────────────────────────────────────────────
@@ -344,6 +356,13 @@ mod tests {
         assert_eq!(capitalize("FE"), "Fe");
         assert_eq!(capitalize("c"), "C");
         assert_eq!(capitalize(""), "");
+        // Mixed case and longer ASCII symbols normalize to first-upper, rest-lower.
+        assert_eq!(capitalize("cL"), "Cl");
+        assert_eq!(capitalize("Uuo"), "Uuo");
+        // ASCII fast path leaves non-letter characters untouched.
+        assert_eq!(capitalize("h2o"), "H2o");
+        // Non-ASCII input takes the Unicode fallback path.
+        assert_eq!(capitalize("ça"), "Ça");
     }
 
     #[test]
