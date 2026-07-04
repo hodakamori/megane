@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # Platform Support
 
 megane ships in five distributions. They share the same Rust parser core (compiled to WASM and PyO3), but the host UI and the set of registered file types differ. This page is the single reference for **what works on which platform**, and it is descriptive of the current state — including known gaps.

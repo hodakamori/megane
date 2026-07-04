@@ -1,7 +1,3 @@
----
-sidebar_position: 4
----
-
 import LiveViewer from '@site/src/components/LiveViewer';
 
 # Web / React

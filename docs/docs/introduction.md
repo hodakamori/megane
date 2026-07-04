@@ -1,7 +1,3 @@
----
-sidebar_position: 1
----
-
 # Introduction
 
 **megane** is a high-performance molecular viewer that works wherever you do — Jupyter notebooks, React web apps, the command line, and VSCode.
