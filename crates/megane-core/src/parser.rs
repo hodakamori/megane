@@ -605,10 +605,8 @@ pub fn build_index(text: &str) -> Result<PdbIndex, String> {
                 }
                 current_count = 0;
             }
-            "ATOM" | "HETATM" => {
-                if is_countable_atom_line(line) {
-                    current_count += 1;
-                }
+            "ATOM" | "HETATM" if is_countable_atom_line(line) => {
+                current_count += 1;
             }
             _ => {}
         }
