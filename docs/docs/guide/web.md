@@ -2,9 +2,13 @@
 sidebar_position: 4
 ---
 
+import LiveViewer from '@site/src/components/LiveViewer';
+
 # Web / React
 
 megane can be embedded in React applications as a component library. It provides both high-level React components and a framework-agnostic imperative renderer.
+
+<LiveViewer data="caffeine_water" caption="The megane renderer running live in this page — the same engine megane-viewer ships to your app." />
 
 ## Installation
 
