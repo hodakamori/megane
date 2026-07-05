@@ -1,0 +1,143 @@
+## Node Types and Parameters
+
+### load_structure
+Loads a molecular structure file. This is the primary data source.
+- Parameters: `{ type: "load_structure", fileName: string | null, hasTrajectory: boolean, hasCell: boolean }`
+- Outputs: `particle` (always), `trajectory` (if hasTrajectory), `cell` (if hasCell)
+- No inputs
+
+### load_trajectory
+Loads trajectory data from an external file (e.g. XTC).
+- Parameters: `{ type: "load_trajectory", fileName: string | null }`
+- Inputs: `particle` (particle data type)
+- Outputs: `trajectory` (trajectory data type)
+
+### load_vector
+Loads per-atom vector data (forces, velocities).
+- Parameters: `{ type: "load_vector", fileName: string | null }`
+- Outputs: `vector` (vector data type)
+- No inputs
+
+### load_volumetric
+Loads volumetric scalar-field data (e.g. a Gaussian/VASP CUBE file with
+electron density or electrostatic potential).
+- Parameters: `{ type: "load_volumetric", fileName: string | null }`
+- Outputs: `volumetric` (volumetric data type)
+- No inputs
+
+### add_bond
+Detects or infers bonds between atoms.
+- Parameters: `{ type: "add_bond", bondSource: "structure" | "file" | "distance" | "none" }`
+  - "structure": read bonds from structure file
+  - "distance": compute bonds by van der Waals distance
+  - "file": read bonds from separate file
+  - "none": no bonds
+- Inputs: `particle` (particle data type)
+- Outputs: `bond` (bond data type)
+
+### filter
+Filters atoms (and optionally bonds) by a selection query. See the
+"Atom & Bond Selection Query Language" section below for the full, authoritative
+grammar — only the syntax documented there is supported.
+- Parameters: `{ type: "filter", query: string, bond_query?: string }`
+  - `query`: atom selection (e.g. `element == "C"`, `index < 10`, `resname == "ALA"`, `element == "O" or element == "N"`)
+  - `bond_query`: optional bond selection (e.g. `both element != "H"`)
+- Inputs: `in` (accepts particle or bond data type)
+- Outputs: `out` (same type as input)
+
+### modify
+Modifies visual properties (scale, opacity).
+- Parameters: `{ type: "modify", scale: number, opacity: number }`
+  - scale: atom size multiplier (default 1.0)
+  - opacity: transparency 0-1 (default 1.0)
+- Inputs: `in` (accepts particle or bond data type)
+- Outputs: `out` (same type as input)
+
+### replicate
+Builds an OVITO/VESTA-style supercell by copying every atom (and its bonds)
+into an `nx × ny × nz` grid of cell images and enlarging the simulation cell
+to match. Requires a unit cell on the input.
+- Parameters: `{ type: "replicate", nx: number, ny: number, nz: number }`
+  - Each of nx/ny/nz is an integer >= 1 (default 1) — number of repeats along
+    the a/b/c lattice vectors.
+- Inputs: `particle`, `cell`, `trajectory`
+- Outputs: `particle`, `cell`, `trajectory` (replicated)
+
+### color
+Recolors atoms using a palette mode, overriding the default per-element coloring.
+- Parameters: `{ type: "color", mode: "uniform" | "byElement" | "byResidue" | "byChain" | "byBFactor" | "byProperty", uniformColor: string, range?: [number, number] }`
+  - "uniform": every atom gets `uniformColor` (hex string, e.g. "#ff8800")
+  - "byElement" / "byResidue" / "byChain": categorical palette by that property
+  - "byBFactor" / "byProperty": continuous palette over `range` (auto-computed if omitted)
+- Inputs: `in` (particle only — NOT bond)
+- Outputs: `out` (particle)
+
+### representation
+Switches the rendering style for the connected particle stream.
+- Parameters: `{ type: "representation", mode: "atoms" | "licorice" | "cartoon" | "both" | "surface" | "line" }`
+  - "atoms": ball-and-stick / van der Waals spheres (default)
+  - "licorice": equal-radius atoms and bonds drawn as one continuous stick/tube (PyMOL licorice / sticks)
+  - "cartoon": protein backbone cartoon (secondary structure)
+  - "both": atoms and cartoon overlaid
+  - "surface": molecular surface
+  - "line": thin wireframe lines (VMD/PyMOL "lines" style)
+- Inputs: `in` (particle only — NOT bond)
+- Outputs: `out` (particle)
+
+### label_generator
+Generates text labels for atoms.
+- Parameters: `{ type: "label_generator", source: "element" | "resname" | "index" }`
+- Inputs: `particle` (particle data type)
+- Outputs: `label` (label data type)
+
+### polyhedron_generator
+Generates coordination polyhedra automatically (VESTA-style). By default a
+polyhedron is drawn for every metal/metalloid center coordinated to every
+anion-former ligand present in the structure; the user opts OUT specific
+elements via `excludedCenters` / `excludedLigands`.
+- Parameters:
+  ```
+  {
+    type: "polyhedron_generator",
+    excludedCenters: number[],   // Z numbers to exclude from auto-detected centers (e.g. [22] to skip Ti)
+    excludedLigands: number[],   // Z numbers to exclude from auto-detected ligands
+    cutoffTolerance: number,     // multiplier on (r_cov[c]+r_cov[l]); ~1.15 default
+    opacity: number,             // face opacity 0-1
+    showEdges: boolean,
+    edgeColor: string,           // hex color e.g. "#dddddd"
+    edgeWidth: number
+  }
+  ```
+- Inputs: `particle` (particle data type)
+- Outputs: `mesh` (mesh data type)
+
+### surface_mesh
+Computes an OVITO-style alpha-shape surface envelope around the atoms.
+- Parameters: `{ type: "surface_mesh", alphaRadius: number, color: string, opacity: number }`
+  - alphaRadius: probe sphere radius in Å — larger is smoother/coarser,
+    smaller is more detailed (default 3.0)
+  - color: hex color string, e.g. "#4488ff"
+  - opacity: 0-1
+- Inputs: `particle` (particle data type)
+- Outputs: `mesh` (mesh data type)
+
+### vector_overlay
+Visualizes per-atom vectors (forces, velocities) as arrows.
+- Parameters: `{ type: "vector_overlay", scale: number }`
+- Inputs: `vector` (vector data type)
+- Outputs: `vector` (vector data type)
+
+### isosurface
+Renders an isosurface (contour) of volumetric scalar-field data.
+- Parameters: `{ type: "isosurface", isoLevel: number, color: string, opacity: number, showNegative: boolean, negativeColor: string }`
+  - isoLevel: contour level for the positive surface (default 0.05)
+  - showNegative: also draw a second surface at -isoLevel (e.g. for
+    electrostatic potential maps), colored with `negativeColor`
+- Inputs: `volumetric` (volumetric data type)
+- Outputs: `mesh` (mesh data type)
+
+### viewport
+The final rendering sink. Every pipeline MUST have exactly one viewport node. All data flows into this node.
+- Parameters: `{ type: "viewport", perspective: boolean, cellAxesVisible: boolean, pivotMarkerVisible: boolean }`
+- Inputs: `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, `vector` (each accepts its respective data type)
+- No outputs

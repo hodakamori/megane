@@ -46,6 +46,7 @@ docs/docs/api/python/
 workers/llm-proxy/.wrangler/
 workers/llm-proxy/.dev.vars
 docs/docs/api/typescript/
+docs/docs/reference/node-reference.md
 docs/notebooks/
 docs/public/notebooks/
 dev-preview/

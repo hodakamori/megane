@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { serializePipeline, deserializePipeline } from "@/pipeline/serialize";
 import type { PipelineNodeData } from "@/pipeline/execute";
 import type { Node, Edge } from "@xyflow/react";
-import type { SerializedPipeline } from "@/pipeline/types";
+import { NODE_PORTS, defaultParams } from "@/pipeline/types";
+import type { SerializedPipeline, PipelineNodeType } from "@/pipeline/types";
 
 function makeNode(
   id: string,
@@ -58,9 +59,7 @@ describe("serializePipeline", () => {
   });
 
   it("preserves enabled state", () => {
-    const nodes = [
-      makeNode("n1", "filter", { query: "element == \"C\"" }, { x: 0, y: 0 }, false),
-    ];
+    const nodes = [makeNode("n1", "filter", { query: 'element == "C"' }, { x: 0, y: 0 }, false)];
     const result = serializePipeline(nodes, []);
     expect(result.nodes[0].enabled).toBe(false);
   });
@@ -81,12 +80,32 @@ describe("deserializePipeline", () => {
     expect(() => deserializePipeline(json)).toThrow("Unknown node type");
   });
 
+  it("round-trips every supported node type (regression: surface_mesh / load_volumetric / isosurface)", () => {
+    // Regression guard for the previously hardcoded VALID_NODE_TYPES set, which
+    // omitted surface_mesh, load_volumetric, and isosurface and therefore made
+    // deserializePipeline throw "Unknown node type" on any pipeline using them.
+    const allTypes = Object.keys(NODE_PORTS) as PipelineNodeType[];
+    const nodes = allTypes.map((type, i) =>
+      makeNode(`${type}-${i}`, type, defaultParams(type) as Record<string, unknown>, {
+        x: i * 100,
+        y: 0,
+      }),
+    );
+
+    const serialized = serializePipeline(nodes, []);
+    expect(() => deserializePipeline(serialized)).not.toThrow();
+
+    const { nodes: restored } = deserializePipeline(serialized);
+    const restoredTypes = new Set(restored.map((n) => (n.data.params as { type: string }).type));
+    for (const type of allTypes) {
+      expect(restoredTypes.has(type), `${type} was dropped on round-trip`).toBe(true);
+    }
+  });
+
   it("applies default params on deserialize", () => {
     const json: SerializedPipeline = {
       version: 3,
-      nodes: [
-        { id: "n1", type: "filter", position: { x: 0, y: 0 } } as any,
-      ],
+      nodes: [{ id: "n1", type: "filter", position: { x: 0, y: 0 } } as any],
       edges: [],
     };
     const { nodes } = deserializePipeline(json);
@@ -147,9 +166,7 @@ describe("deserializePipeline", () => {
   it("defaults enabled to true when not specified", () => {
     const json: SerializedPipeline = {
       version: 3,
-      nodes: [
-        { id: "n1", type: "viewport", position: { x: 0, y: 0 } } as any,
-      ],
+      nodes: [{ id: "n1", type: "viewport", position: { x: 0, y: 0 } } as any],
       edges: [],
     };
     const { nodes } = deserializePipeline(json);
@@ -163,9 +180,7 @@ describe("deserializePipeline", () => {
         { id: "a", type: "load_structure", position: { x: 0, y: 0 } } as any,
         { id: "b", type: "viewport", position: { x: 200, y: 0 } } as any,
       ],
-      edges: [
-        { source: "a", target: "b", sourceHandle: "particle", targetHandle: "particle" },
-      ],
+      edges: [{ source: "a", target: "b", sourceHandle: "particle", targetHandle: "particle" }],
     };
     const { edges } = deserializePipeline(json);
     expect(edges[0].id).toBe("e-a-particle-b-particle-0");
@@ -175,7 +190,12 @@ describe("deserializePipeline", () => {
 describe("round-trip serialization", () => {
   it("preserves structure through serialize → deserialize (auto-normalizes AddBond)", () => {
     const nodes = [
-      makeNode("n1", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: true }, { x: 10, y: 20 }),
+      makeNode(
+        "n1",
+        "load_structure",
+        { fileName: "test.pdb", hasTrajectory: false, hasCell: true },
+        { x: 10, y: 20 },
+      ),
       makeNode("n2", "filter", { query: 'element == "C"' }, { x: 100, y: 20 }),
       makeNode("n3", "viewport", { perspective: true, cellAxesVisible: false }, { x: 200, y: 20 }),
       makeNode("ab", "add_bond", { bondSource: "structure" }, { x: 50, y: 100 }),
@@ -219,11 +239,27 @@ describe("deserializePipeline normalization", () => {
     const json: SerializedPipeline = {
       version: 3,
       nodes: [
-        { id: "load-1", type: "load_structure", fileName: "x.pdb", hasTrajectory: false, hasCell: true } as any,
-        { id: "viewport-1", type: "viewport", cellAxesVisible: false, pivotMarkerVisible: false } as any,
+        {
+          id: "load-1",
+          type: "load_structure",
+          fileName: "x.pdb",
+          hasTrajectory: false,
+          hasCell: true,
+        } as any,
+        {
+          id: "viewport-1",
+          type: "viewport",
+          cellAxesVisible: false,
+          pivotMarkerVisible: false,
+        } as any,
       ],
       edges: [
-        { source: "load-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+        {
+          source: "load-1",
+          target: "viewport-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
       ],
     };
     const { nodes, edges } = deserializePipeline(json);
@@ -232,11 +268,20 @@ describe("deserializePipeline normalization", () => {
     expect(addBond, "AddBond node should be auto-injected").toBeDefined();
 
     const hasEdge = (s: string, sh: string, t: string, th: string) =>
-      edges.some((e) => e.source === s && e.sourceHandle === sh && e.target === t && e.targetHandle === th);
+      edges.some(
+        (e) => e.source === s && e.sourceHandle === sh && e.target === t && e.targetHandle === th,
+      );
 
-    expect(hasEdge("load-1", "particle", addBond!.id, "particle"), "loader → AddBond.particle").toBe(true);
-    expect(hasEdge(addBond!.id, "bond", "viewport-1", "bond"), "AddBond.bond → viewport.bond").toBe(true);
-    expect(hasEdge("load-1", "cell", "viewport-1", "cell"), "loader.cell → viewport.cell").toBe(true);
+    expect(
+      hasEdge("load-1", "particle", addBond!.id, "particle"),
+      "loader → AddBond.particle",
+    ).toBe(true);
+    expect(hasEdge(addBond!.id, "bond", "viewport-1", "bond"), "AddBond.bond → viewport.bond").toBe(
+      true,
+    );
+    expect(hasEdge("load-1", "cell", "viewport-1", "cell"), "loader.cell → viewport.cell").toBe(
+      true,
+    );
 
     // Viewport guide settings (cellAxesVisible / pivotMarkerVisible) must
     // be preserved, not overwritten by defaults.
@@ -249,11 +294,27 @@ describe("deserializePipeline normalization", () => {
     const json: SerializedPipeline = {
       version: 3,
       nodes: [
-        { id: "load-1", type: "load_structure", fileName: "traj.xyz", hasTrajectory: true, hasCell: false } as any,
-        { id: "viewport-1", type: "viewport", cellAxesVisible: true, pivotMarkerVisible: true } as any,
+        {
+          id: "load-1",
+          type: "load_structure",
+          fileName: "traj.xyz",
+          hasTrajectory: true,
+          hasCell: false,
+        } as any,
+        {
+          id: "viewport-1",
+          type: "viewport",
+          cellAxesVisible: true,
+          pivotMarkerVisible: true,
+        } as any,
       ],
       edges: [
-        { source: "load-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+        {
+          source: "load-1",
+          target: "viewport-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
       ],
     };
     const { edges } = deserializePipeline(json);
@@ -273,13 +334,29 @@ describe("deserializePipeline normalization", () => {
     const json: SerializedPipeline = {
       version: 3,
       nodes: [
-        { id: "load-1", type: "load_structure", fileName: "x.pdb", hasTrajectory: false, hasCell: true } as any,
+        {
+          id: "load-1",
+          type: "load_structure",
+          fileName: "x.pdb",
+          hasTrajectory: false,
+          hasCell: true,
+        } as any,
         { id: "addbond-1", type: "add_bond", bondSource: "structure" } as any,
         { id: "viewport-1", type: "viewport" } as any,
       ],
       edges: [
-        { source: "load-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-        { source: "load-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+        {
+          source: "load-1",
+          target: "addbond-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+        {
+          source: "load-1",
+          target: "viewport-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
         { source: "load-1", target: "viewport-1", sourceHandle: "cell", targetHandle: "cell" },
         { source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
       ],

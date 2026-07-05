@@ -60,6 +60,7 @@ const sidebars: SidebarsConfig = {
   ],
 
   referenceSidebar: [
+    "reference/node-reference",
     "platform-support",
     {
       type: "doc",

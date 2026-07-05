@@ -6,24 +6,13 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { PipelineNodeData } from "./execute";
 import type { SerializedPipeline, PipelineNodeType } from "./types";
-import { defaultParams } from "./types";
+import { defaultParams, NODE_PORTS } from "./types";
 
-const VALID_NODE_TYPES: Set<string> = new Set([
-  "load_structure",
-  "load_trajectory",
-  "load_vector",
-  "streaming",
-  "add_bond",
-  "viewport",
-  "filter",
-  "modify",
-  "replicate",
-  "color",
-  "representation",
-  "label_generator",
-  "polyhedron_generator",
-  "vector_overlay",
-]);
+// Derive the valid node types from the authoritative NODE_PORTS record so this
+// set can never drift out of sync with the node types the app supports. (A
+// previously hardcoded list was missing surface_mesh, load_volumetric, and
+// isosurface, which made deserializePipeline throw on any pipeline using them.)
+const VALID_NODE_TYPES: Set<string> = new Set(Object.keys(NODE_PORTS));
 
 /**
  * Serialize xyflow nodes and edges into the portable JSON format.
