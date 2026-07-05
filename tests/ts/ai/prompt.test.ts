@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
-import { buildSystemPrompt } from "@/ai/prompt";
+import { buildSystemPrompt, renderNodeSchemaSection } from "@/ai/prompt";
 import { collectPipelineErrors } from "@/ai/validatePipeline";
 import type { SerializedPipeline } from "@/pipeline/types";
 
@@ -42,6 +44,19 @@ describe("buildSystemPrompt", () => {
     for (const t of nodeTypes) {
       expect(prompt).toContain(t);
     }
+  });
+
+  it("renders the node schema section byte-identically to the frozen fixture", () => {
+    // The `## Node Types and Parameters` section is generated from the node
+    // catalog (src/pipeline/catalog.ts). This fixture is the exact text that
+    // section had when it was hand-written, so this test guarantees the
+    // refactor changed nothing the LLM sees. If you intentionally reword a node
+    // description/param, regenerate the fixture in the same commit.
+    const fixturePath = resolve(process.cwd(), "tests/ts/ai/__fixtures__/node-schema-section.txt");
+    const expected = readFileSync(fixturePath, "utf8");
+    expect(renderNodeSchemaSection()).toBe(expected);
+    // And the generated section must actually be spliced into the full prompt.
+    expect(prompt).toContain(expected);
   });
 
   it("includes the schema version 3 marker", () => {

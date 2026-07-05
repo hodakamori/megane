@@ -4,7 +4,8 @@
   "scripts": {
     "api:ts": "typedoc",
     "api:py": "python3 scripts/generate-python-api.py",
-    "api": "npm run api:ts && npm run api:py",
+    "api:nodes": "node ../scripts/generate-node-reference.mjs",
+    "api": "npm run api:ts && npm run api:py && npm run api:nodes",
     "dev": "docusaurus start",
     "build": "npm run api && docusaurus build",
     "preview": "docusaurus serve",
