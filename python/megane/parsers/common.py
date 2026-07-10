@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -72,3 +73,94 @@ class InMemoryTrajectory:
                 raise ValueError(f"Frame index {index} is out of range for trajectory with {self.n_frames} frames.")
             return self.cells[index]
         return self.box
+
+
+def trajectory_from_structure_result(
+    result: Any,
+    positions: np.ndarray,
+    elements: np.ndarray,
+    box_3x3: np.ndarray,
+    n_atoms: int,
+    timestep_ps: float = 0.0,
+) -> InMemoryTrajectory:
+    """Build an :class:`InMemoryTrajectory` from a PyO3 ``PyStructure`` result.
+
+    Handles both *uniform* multi-frame structures (rectangular ``frame_positions``
+    fast path) and *heterogeneous* ones whose extra frames vary in atom count,
+    cell, or elements (flat, jagged buffers sliced by ``frame_atom_offsets``).
+    Frame 0 lives in ``positions``/``elements``/``box_3x3`` and is prepended so
+    all frames are playable. Shared by every structure-lane trajectory loader
+    (.traj, multi-frame XYZ, multi-MODEL PDB) so the unpacking stays in one place.
+
+    Args:
+        result: PyO3 structure parse result (``megane_parser.parse_*`` output).
+        positions: Frame-0 positions, shape ``(n_atoms, 3)`` or flat ``(n_atoms*3,)``.
+        elements: Frame-0 atomic numbers, shape ``(n_atoms,)``.
+        box_3x3: Frame-0 unit cell, shape ``(3, 3)``.
+        n_atoms: Frame-0 atom count.
+        timestep_ps: Playback timestep in ps (formats without one pass 0.0).
+
+    Returns:
+        An :class:`InMemoryTrajectory` covering every frame.
+    """
+    positions = np.asarray(positions, dtype=np.float32).reshape(n_atoms, 3)
+    elements = np.asarray(elements, dtype=np.uint8)
+    box_3x3 = np.asarray(box_3x3, dtype=np.float32).reshape(3, 3)
+    extra = int(result.n_frames)
+
+    if getattr(result, "heterogeneous", False):
+        # Heterogeneous: slice the flat, jagged extra-frame buffers by offset.
+        offsets = np.asarray(result.frame_atom_offsets, dtype=np.int64)  # len extra+1
+        flat = np.asarray(result.frame_positions_flat, dtype=np.float32)
+        max_atoms = int(getattr(result, "max_atoms", n_atoms))
+
+        frames_list: list[np.ndarray] = [positions]
+        for i in range(extra):
+            a, b = int(offsets[i]) * 3, int(offsets[i + 1]) * 3
+            frames_list.append(flat[a:b].reshape(-1, 3))
+
+        # Per-frame elements: empty when topology is constant → reuse frame 0.
+        frame_elem_flat = np.asarray(result.frame_elements, dtype=np.uint8)
+        if frame_elem_flat.size > 0:
+            elements_list: list[np.ndarray] | None = [elements]
+            for i in range(extra):
+                a, b = int(offsets[i]), int(offsets[i + 1])
+                elements_list.append(frame_elem_flat[a:b])
+        else:
+            elements_list = None
+
+        # Per-frame cells: empty when the cell is constant → reuse frame 0.
+        frame_cells_flat = np.asarray(result.frame_cells, dtype=np.float32)
+        if frame_cells_flat.size > 0:
+            extra_cells = frame_cells_flat.reshape(extra, 3, 3)
+            cells = np.concatenate([box_3x3.reshape(1, 3, 3), extra_cells], axis=0)
+        else:
+            cells = None
+
+        return InMemoryTrajectory(
+            _frames=np.empty((0, 0, 3), dtype=np.float32),
+            n_frames=len(frames_list),
+            n_atoms=n_atoms,
+            timestep_ps=timestep_ps,
+            box=box_3x3,
+            heterogeneous=True,
+            max_atoms=max_atoms,
+            frames_list=frames_list,
+            elements_list=elements_list,
+            cells=cells,
+        )
+
+    # Uniform fast path: rectangular reshape + concatenate.
+    if extra > 0:
+        extras = np.asarray(result.frame_positions, dtype=np.float32).reshape(extra, n_atoms, 3)
+        frames = np.concatenate([positions.reshape(1, n_atoms, 3), extras], axis=0)
+    else:
+        frames = positions.reshape(1, n_atoms, 3).copy()
+
+    return InMemoryTrajectory(
+        _frames=frames,
+        n_frames=frames.shape[0],
+        n_atoms=n_atoms,
+        timestep_ps=timestep_ps,
+        box=box_3x3,
+    )

@@ -128,6 +128,8 @@ export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
 export interface WasmStructureFrameDecoder extends WasmFrameDecoder {
   /** Number of EXTRA frames (excludes the eager snapshot frame 0). */
   readonly n_frames: number;
+  /** True when frames vary in atom count / cell — host reparses eagerly. */
+  readonly heterogeneous: boolean;
   /** Parse frame 0 (the eager snapshot) from the held bytes — no re-read. */
   frame0(): WasmParseResult;
 }
@@ -143,6 +145,12 @@ export interface StructureIndexResult {
   nAtoms: number;
   /** Number of decodable EXTRA frames (excludes the eager snapshot frame 0). */
   nFrames: number;
+  /**
+   * True when the file is heterogeneous (frames vary in atom count / cell). The
+   * lazy positions-only decoder cannot represent such frames, so the caller
+   * discards the decoder and reparses the whole file eagerly.
+   */
+  heterogeneous: boolean;
 }
 
 /** Lightweight trajectory index (from `indexTrajectoryCore`) — no bulk coordinates. */
@@ -558,6 +566,7 @@ export function indexStructureCore(
   const index: StructureIndexResult = {
     nAtoms: decoder.n_atoms,
     nFrames: decoder.n_frames,
+    heterogeneous: decoder.heterogeneous === true,
   };
   const frame0 = parseWithFn(() => decoder.frame0(), "");
   return { decoder, index, frame0 };

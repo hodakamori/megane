@@ -136,6 +136,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     StructureFrameDecoder: class {
       n_atoms = 3;
       n_frames = 2;
+      heterogeneous = true;
       frame0() {
         return mockStructResult(3, 0);
       }
@@ -238,5 +239,15 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     expect(await sync.indexStructureLazy(fakeFile("m.xyz"), "xyz")).toBeNull();
     expect(await sync.parseStructurePrefix(fakeFile("m.xyz"), "xyz")).toBeNull();
     expect(sync.shouldUseLazyStructure("xyz", 1024 * 1024 * 1024)).toBe(false);
+  });
+
+  it("indexStructureCore surfaces the decoder's heterogeneous flag", async () => {
+    const core = await import("@/parsers/parseCore");
+    await core.ensureInit();
+    const { decoder, index } = core.indexStructureCore(new Uint8Array([1]), "xyz");
+    // The mock decoder reports heterogeneous=true → the host will reparse eagerly.
+    expect(index.heterogeneous).toBe(true);
+    expect(index.nFrames).toBe(2);
+    decoder.free();
   });
 });

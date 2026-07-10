@@ -53,3 +53,50 @@ def test_view_traj_single_path_xyz():
 
     viewer = megane.view_traj(str(FIXTURES / "water_multiframe.xyz"))
     assert viewer.total_frames == 3
+
+
+def test_uniform_xyz_is_not_heterogeneous():
+    """A constant-atom multi-frame XYZ keeps the uniform fast path."""
+    _, trajectory = load_xyz_trajectory(str(FIXTURES / "water_multiframe.xyz"))
+    assert trajectory.heterogeneous is False
+    assert trajectory.frames_list is None
+
+
+def test_variable_atom_count_xyz():
+    """A multi-frame XYZ whose atom count changes is loaded as a heterogeneous
+    trajectory with per-frame atom counts and elements (previously dropped)."""
+    structure, trajectory = load_xyz_trajectory(str(FIXTURES / "hetero_atoms.xyz"))
+
+    # Frame 0 defines the base topology (2 atoms).
+    assert structure.n_atoms == 2
+    assert trajectory.heterogeneous is True
+    assert trajectory.n_frames == 3
+    assert trajectory.max_atoms == 3
+
+    # Per-frame atom counts: 2, 3, 2.
+    assert trajectory.n_atoms_at(0) == 2
+    assert trajectory.n_atoms_at(1) == 3
+    assert trajectory.n_atoms_at(2) == 2
+
+    # Frame 1 grew an oxygen; per-frame elements reflect it.
+    elems1 = trajectory.get_elements(1)
+    assert elems1 is not None
+    assert elems1.tolist() == [1, 1, 8]  # H, H, O
+
+    frame1 = trajectory.get_frame(1)
+    assert frame1.shape == (3, 3)
+    np.testing.assert_allclose(frame1[2], [1.6, 0.0, 0.0], atol=1e-5)
+
+
+def test_variable_cell_xyz():
+    """A constant-topology XYZ with per-frame Lattice= changes exposes per-frame
+    cells and leaves elements constant."""
+    _, trajectory = load_xyz_trajectory(str(FIXTURES / "hetero_cell.xyz"))
+
+    assert trajectory.heterogeneous is True
+    # Topology constant → no per-frame element table.
+    assert trajectory.get_elements(1) is None
+    # Per-frame cell grows 10 → 12 → 14 on the diagonal.
+    assert trajectory.get_cell(0)[0, 0] == 10.0
+    assert trajectory.get_cell(1)[0, 0] == 12.0
+    assert trajectory.get_cell(2)[0, 0] == 14.0

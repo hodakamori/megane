@@ -7,7 +7,7 @@ import logging
 import numpy as np
 
 from megane import megane_parser
-from megane.parsers.common import InMemoryTrajectory
+from megane.parsers.common import InMemoryTrajectory, trajectory_from_structure_result
 from megane.parsers.pdb import Structure
 
 __all__ = ["load_xyz_trajectory", "InMemoryTrajectory"]
@@ -51,23 +51,19 @@ def load_xyz_trajectory(path: str) -> tuple[Structure, InMemoryTrajectory]:
         box=box_matrix,
     )
 
-    # Rust returns frame 0 in `positions` and additional frames in
-    # `frame_positions`; prepend frame 0 so all frames are playable.
-    extra = result.n_frames
-    if extra > 0:
-        extras = np.asarray(result.frame_positions, dtype=np.float32).reshape(extra, n_atoms, 3)
-        frames = np.concatenate([positions.reshape(1, n_atoms, 3), extras], axis=0)
+    # Frame 0 lives in `positions`; extra frames are unpacked (rectangular when
+    # uniform, jagged when heterogeneous — variable atom count / cell / elements)
+    # by the shared structure-lane helper.
+    box_3x3 = box_matrix.reshape(3, 3)
+    trajectory = trajectory_from_structure_result(result, positions, elements, box_3x3, n_atoms)
+
+    if trajectory.heterogeneous:
+        logger.info(
+            "Loaded heterogeneous XYZ: %d frames, %d..%d atoms",
+            trajectory.n_frames,
+            min(f.shape[0] for f in trajectory.frames_list),
+            max(f.shape[0] for f in trajectory.frames_list),
+        )
     else:
-        frames = positions.reshape(1, n_atoms, 3).copy()
-    n_frames = frames.shape[0]
-
-    trajectory = InMemoryTrajectory(
-        _frames=frames,
-        n_frames=n_frames,
-        n_atoms=n_atoms,
-        timestep_ps=0.0,
-        box=box_matrix,
-    )
-
-    logger.info("Loaded XYZ: %d frames, %d atoms", n_frames, n_atoms)
+        logger.info("Loaded XYZ: %d frames, %d atoms", trajectory.n_frames, n_atoms)
     return structure, trajectory

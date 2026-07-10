@@ -691,6 +691,7 @@ pub struct StructureFrameDecoder {
     offsets: Vec<usize>,
     n_atoms: usize,
     n_frames: u32,
+    heterogeneous: bool,
 }
 
 #[wasm_bindgen]
@@ -699,14 +700,14 @@ impl StructureFrameDecoder {
     #[wasm_bindgen(constructor)]
     pub fn new(data: Vec<u8>, kind: &str) -> Result<StructureFrameDecoder, JsError> {
         let text = String::from_utf8(data).map_err(|_| JsError::new("file is not valid UTF-8"))?;
-        let (offsets, n_atoms) = match kind {
+        let (offsets, n_atoms, heterogeneous) = match kind {
             "xyz" => {
                 let idx = xyz::build_index(&text).map_err(|e| JsError::new(&e))?;
-                (idx.offsets, idx.n_atoms)
+                (idx.offsets, idx.n_atoms, idx.heterogeneous)
             }
             "pdb" => {
                 let idx = parser::build_index(&text).map_err(|e| JsError::new(&e))?;
-                (idx.offsets, idx.n_atoms)
+                (idx.offsets, idx.n_atoms, idx.heterogeneous)
             }
             _ => return Err(JsError::new("unsupported structure decoder kind")),
         };
@@ -717,6 +718,7 @@ impl StructureFrameDecoder {
             offsets,
             n_atoms,
             n_frames,
+            heterogeneous,
         })
     }
 
@@ -728,6 +730,15 @@ impl StructureFrameDecoder {
     #[wasm_bindgen(getter)]
     pub fn n_frames(&self) -> u32 {
         self.n_frames
+    }
+
+    /// True when the file is heterogeneous (a frame's atom count or per-frame
+    /// cell differs from frame 0). The positions-only lazy decode below cannot
+    /// represent such frames, so the host discards this decoder and reparses the
+    /// whole file eagerly (which builds the full `HeteroFrames` side table).
+    #[wasm_bindgen(getter)]
+    pub fn heterogeneous(&self) -> bool {
+        self.heterogeneous
     }
 
     /// Parse frame 0 (the eager snapshot: topology + frame-0 coordinates) from

@@ -406,8 +406,19 @@ export function useMeganeLocal(): MeganeLocalState {
         await applyTop();
         // ── Phase 2 (background): full index → upgrade to streaming ──
         void indexStructureLazy(file, kind)
-          .then((indexed) => {
+          .then(async (indexed) => {
             if (!indexed) return; // frame 0 already shown; no streaming available
+            // Heterogeneous files can't ride the positions-only lazy path — the
+            // per-frame atom count / cell would be lost. Discard the lazy handle
+            // and reparse eagerly so the full HeteroFrames side table is built.
+            if (indexed.handle.index.heterogeneous) {
+              disposeTrajectoryLazy(indexed.handle.trajectoryId);
+              if (myToken !== loadTokenRef.current) return;
+              const result = await parseStructureFile(file);
+              if (myToken !== loadTokenRef.current) return;
+              await applyStructureResult(result, file.name, topFile);
+              return;
+            }
             if (indexed.handle.index.nFrames <= 0) {
               disposeTrajectoryLazy(indexed.handle.trajectoryId); // single frame — nothing to stream
               return;
@@ -422,6 +433,11 @@ export function useMeganeLocal(): MeganeLocalState {
       const indexed = await indexStructureLazy(file, kind);
       if (!indexed) return false;
       const { handle, frame0 } = indexed;
+      // Heterogeneous → reparse eagerly (see Phase 2 note above).
+      if (handle.index.heterogeneous) {
+        disposeTrajectoryLazy(handle.trajectoryId);
+        return false; // caller's eager parse path handles it
+      }
       if (handle.index.nFrames <= 0) {
         disposeTrajectoryLazy(handle.trajectoryId);
         applyResult(
@@ -441,7 +457,7 @@ export function useMeganeLocal(): MeganeLocalState {
       await applyTop();
       return true;
     },
-    [applyResult, attachStreamingProvider],
+    [applyResult, attachStreamingProvider, applyStructureResult],
   );
 
   const loadFile = useCallback(

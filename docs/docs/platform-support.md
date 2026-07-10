@@ -38,7 +38,7 @@ Legend:
 
 Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
 
-Note: ASE `.traj` supports **heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC), unit cell (variable-cell / NPT), or elements (reactions). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected.
+Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
 ### Trajectory formats
 
