@@ -101,10 +101,7 @@ impl PyStructure {
         // `frame_positions` is left empty and the flat + offsets arrays are used.
         let hetero = data.hetero;
         let heterogeneous = hetero.is_some();
-        let max_atoms = hetero
-            .as_ref()
-            .map(|h| h.max_atoms as usize)
-            .unwrap_or(n);
+        let max_atoms = hetero.as_ref().map(|h| h.max_atoms as usize).unwrap_or(n);
         let stride = n * 3;
         let frame_flat = data.frame_positions_flat;
 
@@ -126,28 +123,23 @@ impl PyStructure {
             (n_frames, frame_array, Array1::<f32>::from_vec(vec![]))
         };
 
-        let (
-            frame_atom_offsets,
-            frame_elements,
-            frame_cells,
-            frame_bond_offsets,
-            frame_bonds,
-        ) = match hetero {
-            Some(h) => (
-                Array1::from_vec(h.atom_offsets),
-                Array1::from_vec(h.elements_flat),
-                Array1::from_vec(h.cells_flat),
-                Array1::from_vec(h.bond_offsets),
-                Array1::from_vec(h.bonds_flat),
-            ),
-            None => (
-                Array1::<u32>::from_vec(vec![]),
-                Array1::<u8>::from_vec(vec![]),
-                Array1::<f32>::from_vec(vec![]),
-                Array1::<u32>::from_vec(vec![]),
-                Array1::<u32>::from_vec(vec![]),
-            ),
-        };
+        let (frame_atom_offsets, frame_elements, frame_cells, frame_bond_offsets, frame_bonds) =
+            match hetero {
+                Some(h) => (
+                    Array1::from_vec(h.atom_offsets),
+                    Array1::from_vec(h.elements_flat),
+                    Array1::from_vec(h.cells_flat),
+                    Array1::from_vec(h.bond_offsets),
+                    Array1::from_vec(h.bonds_flat),
+                ),
+                None => (
+                    Array1::<u32>::from_vec(vec![]),
+                    Array1::<u8>::from_vec(vec![]),
+                    Array1::<f32>::from_vec(vec![]),
+                    Array1::<u32>::from_vec(vec![]),
+                    Array1::<u32>::from_vec(vec![]),
+                ),
+            };
 
         Ok(Self {
             n_atoms: n,

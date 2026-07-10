@@ -635,9 +635,12 @@ mod tests {
         assert_eq!(result.positions.len(), 9); // 3 atoms * 3 coords
         assert!(result.elements.contains(&8)); // oxygen
         assert!(result.elements.contains(&1)); // hydrogen
-        // Regression guard: a uniform trajectory must NOT allocate the hetero
-        // side-table (this is what keeps the fast path allocation-identical).
-        assert!(result.hetero.is_none(), "uniform .traj must stay on fast path");
+                                               // Regression guard: a uniform trajectory must NOT allocate the hetero
+                                               // side-table (this is what keeps the fast path allocation-identical).
+        assert!(
+            result.hetero.is_none(),
+            "uniform .traj must stay on fast path"
+        );
     }
 
     /// Read a fixture, or return `None` (skipping the test) if it's missing.
@@ -677,7 +680,10 @@ mod tests {
         // The per-frame cell diagonal grows (L = 10 + 0.5*frame).
         let cell0 = result.box_matrix.expect("frame 0 cell")[0];
         let cell_last = result.frame_cell(3).expect("frame 3 cell")[0];
-        assert!(cell_last > cell0, "cell should expand: {cell_last} > {cell0}");
+        assert!(
+            cell_last > cell0,
+            "cell should expand: {cell_last} > {cell0}"
+        );
     }
 
     #[test]
@@ -692,7 +698,7 @@ mod tests {
         assert!(h.varies_atoms);
         assert!(h.varies_topology); // atom-count change implies topology change
         assert_eq!(h.max_atoms, 15); // last frame = 5 waters
-        // atom_offsets must be strictly increasing (jagged frames).
+                                     // atom_offsets must be strictly increasing (jagged frames).
         for w in h.atom_offsets.windows(2) {
             assert!(w[1] > w[0], "atom_offsets must be monotonic");
         }
