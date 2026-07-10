@@ -134,6 +134,11 @@ export default defineConfig({
       use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
     },
     {
+      name: "heterogeneous-traj",
+      testMatch: /heterogeneous-traj\.spec\.ts$/,
+      use: { baseURL: `http://127.0.0.1:${PORT_WEBAPP}` },
+    },
+    {
       name: "trajectory-bonds-vdw-leak",
       testMatch: /trajectory-bonds-vdw-leak\.spec\.ts$/,
       timeout: 120_000,

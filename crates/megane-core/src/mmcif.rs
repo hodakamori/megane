@@ -434,6 +434,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         ca_res_nums,
         ca_ss_type,
         symmetry_ops: crate::cif::extract_symmetry_ops(text),
+        hetero: None,
     })
 }
 

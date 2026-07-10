@@ -176,6 +176,7 @@ fn parse_v3000_ctab(lines: &[&str]) -> Result<crate::parser::ParsedStructure, St
         ca_res_nums: vec![],
         ca_ss_type: vec![],
         symmetry_ops: Vec::new(),
+        hetero: None,
     })
 }
 
@@ -308,6 +309,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         ca_res_nums: vec![],
         ca_ss_type: vec![],
         symmetry_ops: Vec::new(),
+        hetero: None,
     })
 }
 

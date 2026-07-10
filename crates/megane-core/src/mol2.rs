@@ -223,6 +223,7 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
         ca_res_nums: vec![],
         ca_ss_type: vec![],
         symmetry_ops: Vec::new(),
+        hetero: None,
     })
 }
 

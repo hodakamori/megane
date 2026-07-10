@@ -60,11 +60,26 @@ export interface VectorChannel {
   frames: VectorFrame[];
 }
 
-/** Decoded trajectory frame. */
+/** Decoded trajectory frame.
+ *
+ * For *uniform* trajectories (the common case) a frame carries only
+ * `positions`; the renderer reuses the base snapshot's elements/bonds/cell.
+ * For *heterogeneous* trajectories (atom count / cell / elements change between
+ * frames), the optional fields below are populated per frame so the renderer
+ * can swap topology on playback. `undefined` means "reuse the snapshot".
+ */
 export interface Frame {
   frameId: number;
   nAtoms: number;
-  positions: Float32Array;
+  positions: Float32Array; // length = nAtoms * 3
+  /** Per-frame atomic numbers (length nAtoms). Set only when topology varies. */
+  elements?: Uint8Array;
+  /** Per-frame bond pairs [a0,b0,…] (length nBonds*2). Set only when topology varies. */
+  bonds?: Uint32Array;
+  /** Number of bonds in `bonds`. */
+  nBonds?: number;
+  /** Per-frame 3×3 cell (length 9). Set only when the cell varies. */
+  box?: Float32Array | null;
 }
 
 /** Trajectory metadata. */
@@ -74,6 +89,14 @@ export interface TrajectoryMeta {
   nAtoms: number;
   pdbName?: string;
   xtcName?: string;
+  /** Max atom count across all frames — drives one-time GPU buffer sizing.
+   *  Undefined (== nAtoms) for uniform trajectories. */
+  maxAtoms?: number;
+  /** True when frames differ in atom count, cell, or elements. */
+  heterogeneous?: boolean;
+  variesAtoms?: boolean;
+  variesCell?: boolean;
+  variesTopology?: boolean;
 }
 
 /** Interface for atom rendering backends. */

@@ -65,6 +65,17 @@ interface WasmParseResult {
   ca_chain_ids(): Uint8Array;
   ca_res_nums(): Uint32Array;
   ca_ss_type(): Uint8Array;
+  // Heterogeneous-trajectory side table (all empty/false for uniform files).
+  heterogeneous: boolean;
+  varies_atoms: boolean;
+  varies_cell: boolean;
+  varies_topology: boolean;
+  max_atoms: number;
+  frame_atom_offsets(): Uint32Array;
+  frame_elements(): Uint8Array;
+  frame_cells(): Float32Array;
+  frame_bond_offsets(): Uint32Array;
+  frame_bonds(): Uint32Array;
   free(): void;
 }
 
@@ -288,11 +299,51 @@ export function parseWithFn(parseFn: ParseFn, text: string): StructureParseResul
     ...(symmetryOps && { symmetryOps }),
   };
 
+  const heterogeneous = result.heterogeneous === true;
+  const frames: Frame[] = heterogeneous
+    ? extractHeteroFrames(result)
+    : extractUniformFrames(result);
+
+  const labels: string[] | null = result.has_atom_labels ? result.atom_labels.split("\n") : null;
+
+  const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
+    result.vector_channel_data(),
+  );
+
+  const heteroMeta = heterogeneous
+    ? {
+        maxAtoms: result.max_atoms,
+        heterogeneous: true as const,
+        variesAtoms: result.varies_atoms,
+        variesCell: result.varies_cell,
+        variesTopology: result.varies_topology,
+      }
+    : undefined;
+
+  result.free();
+
+  const meta: TrajectoryMeta | null =
+    frames.length > 0
+      ? {
+          nFrames: frames.length + 1,
+          timestepPs: 1.0,
+          nAtoms: snapshot.nAtoms,
+          ...heteroMeta,
+        }
+      : null;
+
+  return { snapshot, frames, meta, labels, vectorChannels };
+}
+
+/**
+ * Extract extra frames for a *uniform* structure trajectory — the fast path.
+ * One wasm→JS copy for all frames; each frame is a zero-copy `subarray` view
+ * into that single backing buffer (kept alive by the views). Frames are
+ * read-only downstream, so sharing one buffer is safe.
+ */
+function extractUniformFrames(result: WasmParseResult): Frame[] {
   const frames: Frame[] = [];
   if (result.n_frames > 0) {
-    // One wasm→JS copy for all extra frames; each frame is a zero-copy view
-    // (subarray) into that single backing buffer, kept alive by the views.
-    // Frames are read-only downstream, so sharing one buffer is safe.
     const allData = result.frame_data();
     const stride = result.n_atoms * 3;
     for (let i = 0; i < result.n_frames; i++) {
@@ -303,21 +354,52 @@ export function parseWithFn(parseFn: ParseFn, text: string): StructureParseResul
       });
     }
   }
+  return frames;
+}
 
-  const labels: string[] | null = result.has_atom_labels ? result.atom_labels.split("\n") : null;
+/**
+ * Extract extra frames for a *heterogeneous* trajectory (atom count / cell /
+ * elements vary). Positions are jagged, sliced by `frame_atom_offsets`; the
+ * optional per-frame `elements`/`bonds`/`box` are attached only for the
+ * channels that actually vary (empty wasm arrays ⇒ reuse the snapshot).
+ */
+function extractHeteroFrames(result: WasmParseResult): Frame[] {
+  const frames: Frame[] = [];
+  const nFrames = result.n_frames;
+  if (nFrames === 0) return frames;
 
-  const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
-    result.vector_channel_data(),
-  );
+  // One wasm→JS copy of each channel; per-frame views subarray into these.
+  const allPos = result.frame_data();
+  const offsets = result.frame_atom_offsets(); // atoms, length nFrames+1
+  const elemsFlat = result.frame_elements(); // empty ⇒ topology constant
+  const cellsFlat = result.frame_cells(); // empty ⇒ cell constant
+  const bondOffsets = result.frame_bond_offsets(); // pairs, empty ⇒ topology constant
+  const bondsFlat = result.frame_bonds();
 
-  result.free();
+  const hasElems = elemsFlat.length > 0;
+  const hasCells = cellsFlat.length > 0;
+  const hasBonds = bondsFlat.length > 0 && bondOffsets.length > 0;
 
-  const meta: TrajectoryMeta | null =
-    frames.length > 0
-      ? { nFrames: frames.length + 1, timestepPs: 1.0, nAtoms: snapshot.nAtoms }
-      : null;
-
-  return { snapshot, frames, meta, labels, vectorChannels };
+  for (let i = 0; i < nFrames; i++) {
+    const a = offsets[i];
+    const b = offsets[i + 1];
+    const nAtoms = b - a;
+    const frame: Frame = {
+      frameId: i + 1,
+      nAtoms,
+      positions: allPos.subarray(a * 3, b * 3),
+    };
+    if (hasElems) frame.elements = elemsFlat.subarray(a, b);
+    if (hasCells) frame.box = cellsFlat.subarray(i * 9, i * 9 + 9);
+    if (hasBonds) {
+      const ba = bondOffsets[i];
+      const bb = bondOffsets[i + 1];
+      frame.bonds = bondsFlat.subarray(ba * 2, bb * 2);
+      frame.nBonds = bb - ba;
+    }
+    frames.push(frame);
+  }
+  return frames;
 }
 
 /**

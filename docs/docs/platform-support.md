@@ -38,6 +38,8 @@ Legend:
 
 Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
 
+Note: ASE `.traj` supports **heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC), unit cell (variable-cell / NPT), or elements (reactions). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected.
+
 ### Trajectory formats
 
 | Format | Extensions | Standalone | Jupyter widget | JupyterLab | VSCode | Python |

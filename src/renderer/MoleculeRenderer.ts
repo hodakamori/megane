@@ -535,17 +535,39 @@ export class MoleculeRenderer {
     this.fitToView(snapshot);
   }
 
-  /** Update positions from a trajectory frame. */
+  /** Update positions from a trajectory frame.
+   *
+   * Fast path (uniform trajectory): the frame carries only positions, so this
+   * is a positions-only update reusing the frame-0 snapshot's topology and
+   * cell — allocation-free, exactly as before.
+   *
+   * Slow path (heterogeneous trajectory): the frame additionally carries
+   * `elements`/`bonds`/`box`, so the atom/bond meshes and unit cell are rebuilt
+   * to match this frame's differing atom count, elements, or cell.
+   */
   updateFrame(frame: Frame): void {
     if (!this.snapshot || !this.atomRenderer || !this.bondRenderer) return;
     if (!this.currentPositions || this.currentPositions.length < frame.positions.length) {
       this.currentPositions = new Float32Array(frame.positions.length);
     }
     this.currentPositions.set(frame.positions);
-    this.atomRenderer.updatePositions(frame.positions);
-    this.labelOverlay?.setPositions(frame.positions);
-    this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
-    this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
+
+    if (frame.elements !== undefined) {
+      // Heterogeneous topology: rebuild atoms + bonds for this frame.
+      this.updateFrameTopology(frame);
+    } else {
+      // Uniform fast path: positions only.
+      this.atomRenderer.updatePositions(frame.positions);
+      this.labelOverlay?.setPositions(frame.positions);
+      this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
+      this.bondRenderer.updatePositions(frame.positions, this.snapshot.bonds, this.snapshot.nBonds);
+    }
+
+    // Per-frame unit cell (heterogeneous cell), independent of topology.
+    if (frame.box) {
+      this.updateFrameCell(frame.box);
+    }
+
     this.cartoonRenderer?.updatePositions(frame.positions);
     if (this.surfaceRenderer?.mesh.visible) {
       this.surfaceRenderer.updatePositions(frame.positions);
@@ -561,6 +583,62 @@ export class MoleculeRenderer {
     if (_ready) {
       const idx = (frame as Frame & { index?: number }).index;
       _ready.frame = typeof idx === "number" ? idx : (_ready.frame ?? 0);
+    }
+  }
+
+  /**
+   * Rebuild the atom and bond geometry for a heterogeneous trajectory frame
+   * whose atom count / elements differ from frame 0. The atom mesh's
+   * pre-allocated instance buffers grow on demand (they never shrink), so this
+   * only rewrites radii/colors and flips `instanceCount`; the bond mesh is
+   * rebuilt from the frame's own bonds. Only reached on the slow path.
+   */
+  private updateFrameTopology(frame: Frame): void {
+    const snapshot = this.snapshot!;
+    const elements = frame.elements!;
+    const synth: Snapshot = {
+      ...snapshot,
+      nAtoms: frame.nAtoms,
+      positions: frame.positions,
+      elements,
+      // Frame-0 backbone/cartoon data does not apply to a re-topologised frame.
+      caIndices: undefined,
+      caChainIds: undefined,
+      caResNums: undefined,
+      caSsType: undefined,
+    };
+    this.atomRenderer!.loadSnapshot(synth);
+    if (this.currentColorOverrides) {
+      (this.atomRenderer as ImpostorAtomMesh).applyColorOverrides?.(this.currentColorOverrides);
+    }
+    if (this.atomScale !== 1.0 && this.atomRenderer!.setScale) {
+      this.atomRenderer!.setScale(this.atomScale, synth);
+    }
+    this.labelOverlay?.setAtomData(elements, frame.nAtoms);
+    this.labelOverlay?.setPositions(frame.positions);
+    this.arrowRenderer?.setAtomPositions(frame.positions, frame.nAtoms);
+
+    // Bonds: prefer the frame's own inferred bonds; fall back to frame 0.
+    const bonds = frame.bonds ?? snapshot.bonds;
+    this.updateBondsExt(bonds, null, frame.positions, elements, frame.nAtoms);
+  }
+
+  /** Redraw the simulation cell for a heterogeneous per-frame cell. */
+  private updateFrameCell(box: Float32Array): void {
+    if (!box.some((v) => v !== 0)) return;
+    if (!this.cellRenderer) {
+      this.cellRenderer = new CellRenderer();
+      this.scene.add(this.cellRenderer.mesh);
+    }
+    this.cellRenderer.loadBox(box);
+    try {
+      if (!this.cellAxesRenderer) {
+        this.cellAxesRenderer = new CellAxesRenderer();
+      }
+      this.cellAxesRenderer.loadBox(box);
+    } catch (e) {
+      console.warn("CellAxesRenderer per-frame update error:", e);
+      this.cellAxesRenderer = null;
     }
   }
 

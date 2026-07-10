@@ -396,6 +396,10 @@ export function MeganeViewer({
       data-testid="megane-viewer"
       data-megane-context={testContext}
       data-atom-count={snapshot?.nAtoms ?? 0}
+      // Atom count of the currently displayed frame. Differs from
+      // data-atom-count only for heterogeneous trajectories whose per-frame
+      // atom count changes; falls back to the snapshot for uniform ones.
+      data-frame-atoms={frame?.nAtoms ?? snapshot?.nAtoms ?? 0}
       data-bond-count={bondCount}
       data-total-frames={totalFrames}
       data-current-frame={currentFrame}
