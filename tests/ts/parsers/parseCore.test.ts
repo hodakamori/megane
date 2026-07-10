@@ -317,6 +317,42 @@ describe("extractFrames", () => {
   });
 });
 
+describe("remapTrajectoryTypesToElements", () => {
+  it("maps LAMMPS type ids to atomic numbers via frame 0 / structure", async () => {
+    const { remapTrajectoryTypesToElements } = await import("@/parsers/parseCore");
+    // Frame 0: 2 atoms of types [1, 2]; structure elements are [6, 8] (C, O).
+    // Frame 1 grows a third atom of type 1 → should become carbon (6).
+    const frames = [
+      { frameId: 0, nAtoms: 2, positions: new Float32Array(6), elements: Uint8Array.from([1, 2]) },
+      {
+        frameId: 1,
+        nAtoms: 3,
+        positions: new Float32Array(9),
+        elements: Uint8Array.from([1, 2, 1]),
+      },
+    ];
+    remapTrajectoryTypesToElements(frames, Uint8Array.from([6, 8]));
+    expect(Array.from(frames[0].elements!)).toEqual([6, 8]);
+    expect(Array.from(frames[1].elements!)).toEqual([6, 8, 6]);
+  });
+
+  it("falls back to element 0 for a type absent from frame 0", async () => {
+    const { remapTrajectoryTypesToElements } = await import("@/parsers/parseCore");
+    const frames = [
+      { frameId: 0, nAtoms: 1, positions: new Float32Array(3), elements: Uint8Array.from([1]) },
+      { frameId: 1, nAtoms: 2, positions: new Float32Array(6), elements: Uint8Array.from([1, 9]) },
+    ];
+    remapTrajectoryTypesToElements(frames, Uint8Array.from([7]));
+    expect(Array.from(frames[1].elements!)).toEqual([7, 0]); // type 9 unknown → 0
+  });
+
+  it("is a no-op when frames carry no per-frame elements", async () => {
+    const { remapTrajectoryTypesToElements } = await import("@/parsers/parseCore");
+    const frames = [{ frameId: 0, nAtoms: 1, positions: new Float32Array(3) }];
+    expect(() => remapTrajectoryTypesToElements(frames, Uint8Array.from([6]))).not.toThrow();
+  });
+});
+
 describe("collectResultBuffers", () => {
   it("deduplicates the shared frame buffer for a structure result", () => {
     const { result } = makeStructureResult({ nAtoms: 2, nFrames: 3, hasBox: true });

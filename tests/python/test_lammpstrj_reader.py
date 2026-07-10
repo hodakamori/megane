@@ -51,3 +51,31 @@ def test_atom_ordering():
     np.testing.assert_allclose(frame0[0], [5.0, 5.0, 5.0], atol=1e-3)
     np.testing.assert_allclose(frame0[1], [5.757, 5.586, 5.0], atol=1e-3)
     np.testing.assert_allclose(frame0[2], [4.243, 5.586, 5.0], atol=1e-3)
+
+
+def test_uniform_lammpstrj_is_not_heterogeneous():
+    """A constant-atom dump keeps the uniform fast path."""
+    trajectory = load_lammpstrj(str(FIXTURES / "water.lammpstrj"))
+    assert trajectory.heterogeneous is False
+
+
+def test_variable_atom_count_lammpstrj():
+    """A dump whose atom count grows between frames loads as heterogeneous with
+    per-frame atom counts and type ids (previously raised)."""
+    trajectory = load_lammpstrj(str(FIXTURES / "hetero_atoms.lammpstrj"))
+
+    assert trajectory.heterogeneous is True
+    assert trajectory.n_frames == 2
+    assert trajectory.n_atoms == 2  # frame-0 base
+    assert trajectory.max_atoms == 3
+    assert trajectory.n_atoms_at(0) == 2
+    assert trajectory.n_atoms_at(1) == 3
+
+    # Per-frame type ids: frame 1 gains a type-2 atom.
+    elems1 = trajectory.get_elements(1)
+    assert elems1 is not None
+    assert elems1.tolist() == [1, 1, 2]
+
+    frame1 = trajectory.get_frame(1)
+    assert frame1.shape == (3, 3)
+    np.testing.assert_allclose(frame1[2], [3.0, 0.0, 0.0], atol=1e-5)

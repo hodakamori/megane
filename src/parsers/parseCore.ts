@@ -130,6 +130,8 @@ export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
   readonly vector_channel_count: number;
   /** Newline-joined channel names (velocity/force), in decode order. */
   readonly vector_channel_names: string;
+  /** True when the dump's atom count varies — host reparses eagerly. */
+  readonly heterogeneous: boolean;
   decode_frame_vectors(frame: number): Float32Array;
 }
 
@@ -172,6 +174,12 @@ export interface TrajectoryIndexResult {
   times: Float32Array;
   /** Embedded per-atom vector channel names (LAMMPS velocity/force); empty otherwise. */
   vectorChannelNames: string[];
+  /**
+   * True when the trajectory's atom count varies between frames (LAMMPS dump).
+   * The positions-only lazy decoder cannot stream such frames, so the caller
+   * discards the decoder and reparses the whole file eagerly.
+   */
+  heterogeneous: boolean;
 }
 
 type ParseFn = (text: string) => WasmParseResult;
@@ -506,6 +514,41 @@ export function extractFrames(
   return { frames, meta, vectorChannels };
 }
 
+/**
+ * Remap a heterogeneous LAMMPS-dump trajectory's per-frame element ids in place.
+ *
+ * A LAMMPS dump carries integer atom *types*, not elements. When the atom count
+ * varies (GCMC / deposition) the trajectory lane emits those raw type ids as
+ * each frame's `elements`; this rewrites them to real atomic numbers using the
+ * `type → element` correspondence established by frame 0 against the separately
+ * loaded structure (whose `structureElements` line up 1:1 with frame-0 atoms).
+ * Types absent from frame 0 fall back to element 0 (unknown / gray).
+ *
+ * Mutates each frame's `elements` in place (they are disjoint JS-owned views).
+ * A no-op unless the frames actually carry per-frame elements.
+ */
+export function remapTrajectoryTypesToElements(
+  frames: Frame[],
+  structureElements: Uint8Array,
+): void {
+  if (frames.length === 0 || !frames[0].elements) return;
+  const typeToElement = new Map<number, number>();
+  const frame0Types = frames[0].elements;
+  const n = Math.min(frame0Types.length, structureElements.length);
+  for (let i = 0; i < n; i++) {
+    if (!typeToElement.has(frame0Types[i])) {
+      typeToElement.set(frame0Types[i], structureElements[i]);
+    }
+  }
+  for (const frame of frames) {
+    const elems = frame.elements;
+    if (!elems) continue;
+    for (let i = 0; i < elems.length; i++) {
+      elems[i] = typeToElement.get(elems[i]) ?? 0;
+    }
+  }
+}
+
 /** Input for the structure parse core (already read from the File). */
 export interface StructureParseInput {
   ext: string;
@@ -594,6 +637,7 @@ export function indexTrajectoryCore(
     box: decoder.has_box ? decoder.box_matrix() : null,
     times: kind === "xtc" ? (decoder as WasmXtcDecoder).times() : new Float32Array(0),
     vectorChannelNames,
+    heterogeneous: kind === "lammpstrj" && (decoder as WasmLammpstrjDecoder).heterogeneous === true,
   };
   return { decoder, index };
 }

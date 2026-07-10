@@ -122,6 +122,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
       has_box = false;
       vector_channel_count = 0;
       vector_channel_names = "";
+      heterogeneous = false;
       box_matrix() {
         return new Float32Array(9);
       }

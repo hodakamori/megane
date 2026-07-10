@@ -696,6 +696,7 @@ pub struct LammpstrjDecoder {
     box_matrix: Vec<f32>,
     /// Newline-joined vector channel names (velocity/force), in decode order.
     vector_channel_names: Vec<String>,
+    heterogeneous: bool,
 }
 
 #[wasm_bindgen]
@@ -715,6 +716,7 @@ impl LammpstrjDecoder {
             has_box,
             box_matrix,
             vector_channel_names: idx.vector_channel_names,
+            heterogeneous: idx.heterogeneous,
         })
     }
 
@@ -725,6 +727,12 @@ impl LammpstrjDecoder {
     #[wasm_bindgen(getter)]
     pub fn n_frames(&self) -> u32 {
         self.n_frames
+    }
+    /// True when the dump's atom count varies between frames — the host must
+    /// discard this positions-only decoder and reparse the dump eagerly.
+    #[wasm_bindgen(getter)]
+    pub fn heterogeneous(&self) -> bool {
+        self.heterogeneous
     }
     #[wasm_bindgen(getter)]
     pub fn timestep_ps(&self) -> f32 {
