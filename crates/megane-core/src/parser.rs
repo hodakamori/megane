@@ -15,6 +15,48 @@ pub struct Atom {
     pub element: u8,
 }
 
+/// Per-frame topology for *heterogeneous* trajectories — those whose frames
+/// differ in atom count, unit cell, or elements/bonds. `None` on
+/// [`ParsedStructure`] means the trajectory is *uniform* (the common case) and
+/// the fast fixed-stride path is used everywhere; nothing here is allocated.
+///
+/// Every channel is independently optional: a constant-atom NPT run with a
+/// changing cell fills only `cells_flat`, keeps the fixed-stride positions
+/// path, and reuses frame-0 elements/bonds (`elements_flat`/`bonds_flat` empty).
+///
+/// All indices below address the EXTRA frames (frame 0 lives in
+/// [`ParsedStructure::positions`]/`elements`/`bonds`/`box_matrix`), matching the
+/// `frame_positions_flat` convention.
+pub struct HeteroFrames {
+    /// Prefix-sum of atom counts over EXTRA frames, in atoms. Length
+    /// `extra_count + 1`; extra frame `i` occupies
+    /// `frame_positions_flat[atom_offsets[i]*3 .. atom_offsets[i+1]*3)`.
+    /// Always populated (this is what makes jagged positions sliceable).
+    pub atom_offsets: Vec<u32>,
+    /// Concatenated per-extra-frame atomic numbers, sliced by `atom_offsets`.
+    /// Empty when topology is constant (host reuses frame-0 `elements`).
+    pub elements_flat: Vec<u8>,
+    /// Per-extra-frame row-major 3×3 cell, 9 floats each; length
+    /// `extra_count * 9`. Empty when the cell is constant (host reuses
+    /// frame-0 `box_matrix`).
+    pub cells_flat: Vec<f32>,
+    /// Prefix-sum of bond counts over EXTRA frames, in *pairs*. Length
+    /// `extra_count + 1` when populated, else empty (topology constant).
+    pub bond_offsets: Vec<u32>,
+    /// Concatenated per-extra-frame inferred bonds `[a0,b0,a1,b1,…]`, sliced by
+    /// `bond_offsets` (×2). Empty when topology is constant.
+    pub bonds_flat: Vec<u32>,
+    /// Atom count changes between frames.
+    pub varies_atoms: bool,
+    /// Unit cell changes between frames.
+    pub varies_cell: bool,
+    /// Elements (and hence inferred bonds) change between frames.
+    pub varies_topology: bool,
+    /// Maximum atom count across ALL frames (incl. frame 0). Drives one-time
+    /// GPU buffer sizing on the host so per-frame updates never reallocate.
+    pub max_atoms: u32,
+}
+
 /// Common result type for all structure format parsers.
 pub struct ParsedStructure {
     pub n_atoms: usize,
@@ -53,23 +95,81 @@ pub struct ParsedStructure {
     /// no space-group information. The parser does NOT apply these — it always
     /// returns the asymmetric unit; symmetry expansion is a downstream feature.
     pub symmetry_ops: Vec<String>,
+    /// Per-frame topology for heterogeneous trajectories. `None` (the common
+    /// case) means uniform: fixed atom count/topology/cell across all frames,
+    /// and every consumer takes the fast fixed-stride path.
+    pub hetero: Option<HeteroFrames>,
 }
 
 impl ParsedStructure {
     /// Number of EXTRA frames stored in `frame_positions_flat` (frame 0 is in `positions`).
     pub fn extra_frame_count(&self) -> usize {
-        if self.n_atoms == 0 {
-            0
-        } else {
-            self.frame_positions_flat.len() / (self.n_atoms * 3)
+        match &self.hetero {
+            // Heterogeneous: frame count is the number of atom-offset segments,
+            // independent of any single atom count (positions may be jagged).
+            Some(h) => h.atom_offsets.len().saturating_sub(1),
+            None if self.n_atoms == 0 => 0,
+            None => self.frame_positions_flat.len() / (self.n_atoms * 3),
         }
     }
 
     /// Flat `[x0,y0,z0,…]` slice for EXTRA frame `i` (overall frame `i + 1`).
     /// Panics if `i >= extra_frame_count()`.
     pub fn frame(&self, i: usize) -> &[f32] {
-        let stride = self.n_atoms * 3;
-        &self.frame_positions_flat[i * stride..(i + 1) * stride]
+        match &self.hetero {
+            Some(h) => {
+                let a = h.atom_offsets[i] as usize * 3;
+                let b = h.atom_offsets[i + 1] as usize * 3;
+                &self.frame_positions_flat[a..b]
+            }
+            None => {
+                let stride = self.n_atoms * 3;
+                &self.frame_positions_flat[i * stride..(i + 1) * stride]
+            }
+        }
+    }
+
+    /// Atom count of EXTRA frame `i`. For uniform trajectories this is always
+    /// `n_atoms`; for heterogeneous ones it is derived from `atom_offsets`.
+    pub fn frame_atom_count(&self, i: usize) -> usize {
+        match &self.hetero {
+            Some(h) => (h.atom_offsets[i + 1] - h.atom_offsets[i]) as usize,
+            None => self.n_atoms,
+        }
+    }
+
+    /// Atomic numbers for EXTRA frame `i`, or `None` when topology is constant
+    /// (the caller should reuse frame-0 `elements`).
+    pub fn frame_elements(&self, i: usize) -> Option<&[u8]> {
+        let h = self.hetero.as_ref()?;
+        if h.elements_flat.is_empty() {
+            return None;
+        }
+        let a = h.atom_offsets[i] as usize;
+        let b = h.atom_offsets[i + 1] as usize;
+        Some(&h.elements_flat[a..b])
+    }
+
+    /// Row-major 3×3 cell for EXTRA frame `i`, or `None` when the cell is
+    /// constant (reuse frame-0 `box_matrix`).
+    pub fn frame_cell(&self, i: usize) -> Option<&[f32]> {
+        let h = self.hetero.as_ref()?;
+        if h.cells_flat.is_empty() {
+            return None;
+        }
+        Some(&h.cells_flat[i * 9..i * 9 + 9])
+    }
+
+    /// Inferred bonds `[a,b,…]` for EXTRA frame `i`, or `None` when topology is
+    /// constant (reuse frame-0 `bonds`).
+    pub fn frame_bonds(&self, i: usize) -> Option<&[u32]> {
+        let h = self.hetero.as_ref()?;
+        if h.bonds_flat.is_empty() || h.bond_offsets.is_empty() {
+            return None;
+        }
+        let a = h.bond_offsets[i] as usize * 2;
+        let b = h.bond_offsets[i + 1] as usize * 2;
+        Some(&h.bonds_flat[a..b])
     }
 }
 
@@ -532,6 +632,7 @@ fn parse_impl(text: &str, frame0_only: bool) -> Result<ParsedStructure, String> 
         ca_res_nums,
         ca_ss_type,
         symmetry_ops: Vec::new(),
+        hetero: None,
     })
 }
 

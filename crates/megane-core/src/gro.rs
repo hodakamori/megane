@@ -153,6 +153,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
         ca_res_nums: vec![],
         ca_ss_type: vec![],
         symmetry_ops: Vec::new(),
+        hetero: None,
     })
 }
 

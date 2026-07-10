@@ -20,12 +20,45 @@ struct PyStructure {
     bond_orders: Py<PyArray1<u8>>,
     #[pyo3(get)]
     box_matrix: Py<PyArray2<f32>>,
+    /// Extra-frame positions reshaped to `(n_frames, n_atoms*3)`. Populated only
+    /// for *uniform* trajectories; empty when `heterogeneous` (use the flat
+    /// arrays below, which can represent jagged frames).
     #[pyo3(get)]
     frame_positions: Py<PyArray2<f32>>,
     /// Crystallographic symmetry operations as a list of `x,y,z` strings.
     /// Empty for formats that carry no space-group information.
     #[pyo3(get)]
     symmetry_ops: Vec<String>,
+    /// True when frames differ in atom count, cell, or elements. When false the
+    /// consumer uses the rectangular `frame_positions` fast path.
+    #[pyo3(get)]
+    heterogeneous: bool,
+    /// Maximum atom count across all frames.
+    #[pyo3(get)]
+    max_atoms: usize,
+    /// Flat extra-frame positions `[x,y,z,…]` (jagged), sliced by
+    /// `frame_atom_offsets`. Empty for uniform trajectories.
+    #[pyo3(get)]
+    frame_positions_flat: Py<PyArray1<f32>>,
+    /// Prefix-sum atom offsets over extra frames (length `n_frames+1`).
+    #[pyo3(get)]
+    frame_atom_offsets: Py<PyArray1<u32>>,
+    /// Concatenated per-extra-frame atomic numbers. Empty when topology is
+    /// constant (reuse `elements`).
+    #[pyo3(get)]
+    frame_elements: Py<PyArray1<u8>>,
+    /// Per-extra-frame cells, flat (9 floats each; reshape to `(-1,3,3)`).
+    /// Empty when the cell is constant (reuse `box_matrix`).
+    #[pyo3(get)]
+    frame_cells: Py<PyArray1<f32>>,
+    /// Prefix-sum bond offsets (in pairs) over extra frames. Empty when
+    /// topology is constant.
+    #[pyo3(get)]
+    frame_bond_offsets: Py<PyArray1<u32>>,
+    /// Concatenated per-extra-frame bonds `[a,b,…]`. Empty when topology is
+    /// constant.
+    #[pyo3(get)]
+    frame_bonds: Py<PyArray1<u32>>,
 }
 
 impl PyStructure {
@@ -62,17 +95,51 @@ impl PyStructure {
         })?;
 
         // Frame positions for multi-frame formats (e.g. .traj). Core already stores
-        // the extra frames as one contiguous buffer — reshape it directly. Derive the
-        // frame count from the moved buffer to avoid borrowing `data` after the earlier
-        // partial moves (bond_orders, box_matrix, elements).
+        // the extra frames as one contiguous buffer. For *uniform* trajectories it
+        // reshapes directly to (n_frames, n_atoms*3) — the existing fast path. For
+        // *heterogeneous* ones the frames are jagged and cannot be rectangular, so
+        // `frame_positions` is left empty and the flat + offsets arrays are used.
+        let hetero = data.hetero;
+        let heterogeneous = hetero.is_some();
+        let max_atoms = hetero.as_ref().map(|h| h.max_atoms as usize).unwrap_or(n);
         let stride = n * 3;
         let frame_flat = data.frame_positions_flat;
-        let n_frames = frame_flat.len().checked_div(stride).unwrap_or(0);
-        let frame_array = Array2::from_shape_vec((n_frames, stride), frame_flat).map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({n_frames}, {stride}): {e}"
-            ))
-        })?;
+
+        let (n_frames, frame_array, frame_flat_arr) = if let Some(h) = &hetero {
+            let n_frames = h.atom_offsets.len().saturating_sub(1);
+            // Rectangular reshape is impossible; expose the raw flat buffer instead.
+            let empty = Array2::<f32>::from_shape_vec((0, 0), vec![]).map_err(|e| {
+                PyValueError::new_err(format!("failed to create empty frame array: {e}"))
+            })?;
+            (n_frames, empty, Array1::from_vec(frame_flat))
+        } else {
+            let n_frames = frame_flat.len().checked_div(stride).unwrap_or(0);
+            let frame_array =
+                Array2::from_shape_vec((n_frames, stride), frame_flat).map_err(|e| {
+                    PyValueError::new_err(format!(
+                        "failed to reshape frame_positions into ({n_frames}, {stride}): {e}"
+                    ))
+                })?;
+            (n_frames, frame_array, Array1::<f32>::from_vec(vec![]))
+        };
+
+        let (frame_atom_offsets, frame_elements, frame_cells, frame_bond_offsets, frame_bonds) =
+            match hetero {
+                Some(h) => (
+                    Array1::from_vec(h.atom_offsets),
+                    Array1::from_vec(h.elements_flat),
+                    Array1::from_vec(h.cells_flat),
+                    Array1::from_vec(h.bond_offsets),
+                    Array1::from_vec(h.bonds_flat),
+                ),
+                None => (
+                    Array1::<u32>::from_vec(vec![]),
+                    Array1::<u8>::from_vec(vec![]),
+                    Array1::<f32>::from_vec(vec![]),
+                    Array1::<u32>::from_vec(vec![]),
+                    Array1::<u32>::from_vec(vec![]),
+                ),
+            };
 
         Ok(Self {
             n_atoms: n,
@@ -84,6 +151,14 @@ impl PyStructure {
             box_matrix: box_array.into_pyarray(py).into(),
             frame_positions: frame_array.into_pyarray(py).into(),
             symmetry_ops: data.symmetry_ops,
+            heterogeneous,
+            max_atoms,
+            frame_positions_flat: frame_flat_arr.into_pyarray(py).into(),
+            frame_atom_offsets: frame_atom_offsets.into_pyarray(py).into(),
+            frame_elements: frame_elements.into_pyarray(py).into(),
+            frame_cells: frame_cells.into_pyarray(py).into(),
+            frame_bond_offsets: frame_bond_offsets.into_pyarray(py).into(),
+            frame_bonds: frame_bonds.into_pyarray(py).into(),
         })
     }
 }

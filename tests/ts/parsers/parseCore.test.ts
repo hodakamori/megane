@@ -118,6 +118,122 @@ describe("parseWithFn", () => {
   });
 });
 
+/**
+ * Build a heterogeneous structure result: 2 extra frames with differing atom
+ * counts (2 then 3 atoms), per-frame elements, cells, and bonds.
+ */
+function makeHeteroResult() {
+  const free = vi.fn();
+  const nAtoms0 = 2; // frame 0 (the snapshot)
+  const positions0 = Float32Array.from({ length: nAtoms0 * 3 }, (_, i) => i);
+  // Extra frames: frame1 = 2 atoms, frame2 = 3 atoms.
+  const atomOffsets = Uint32Array.from([0, 2, 5]); // prefix sum over extra frames
+  const framePos = Float32Array.from({ length: 5 * 3 }, (_, i) => 100 + i);
+  const frameElems = Uint8Array.from([6, 6, 7, 7, 7]); // C,C then N,N,N
+  const frameCells = Float32Array.from({ length: 2 * 9 }, (_, i) => i);
+  const bondOffsets = Uint32Array.from([0, 1, 2]); // 1 bond each frame (pairs)
+  const frameBonds = Uint32Array.from([0, 1, 1, 2]);
+  return {
+    result: {
+      n_atoms: nAtoms0,
+      n_bonds: 1,
+      n_file_bonds: 0,
+      n_frames: 2,
+      has_box: true,
+      has_atom_labels: false,
+      has_chain_ids: false,
+      has_bfactors: false,
+      atom_labels: "",
+      vector_channel_count: 0,
+      vector_channel_meta: "[]",
+      ca_count: 0,
+      symmetry_op_count: 0,
+      symmetry_ops: "",
+      positions: () => positions0,
+      elements: () => Uint8Array.from({ length: nAtoms0 }, () => 6),
+      bonds: () => Uint32Array.from([0, 1]),
+      bond_orders: () => Uint8Array.from([1]),
+      box_matrix: () => Float32Array.from({ length: 9 }, (_, i) => i),
+      frame_data: () => framePos,
+      chain_ids: () => new Uint8Array(),
+      bfactors: () => new Float32Array(),
+      vector_channel_data: () => new Float32Array(),
+      ca_indices: () => new Uint32Array(),
+      ca_chain_ids: () => new Uint8Array(),
+      ca_res_nums: () => new Uint32Array(),
+      ca_ss_type: () => new Uint8Array(),
+      // Heterogeneous side table.
+      heterogeneous: true,
+      varies_atoms: true,
+      varies_cell: true,
+      varies_topology: true,
+      max_atoms: 3,
+      frame_atom_offsets: () => atomOffsets,
+      frame_elements: () => frameElems,
+      frame_cells: () => frameCells,
+      frame_bond_offsets: () => bondOffsets,
+      frame_bonds: () => frameBonds,
+      free,
+    },
+    free,
+  };
+}
+
+describe("parseWithFn heterogeneous", () => {
+  it("keeps uniform frames free of per-frame topology (fast path)", () => {
+    const { result } = makeStructureResult({ nAtoms: 2, nFrames: 2 });
+    const out = parseWithFn(() => result as never, "");
+    expect(out.meta?.heterogeneous).toBeUndefined();
+    expect(out.frames[0].elements).toBeUndefined();
+    expect(out.frames[0].box).toBeUndefined();
+  });
+
+  it("builds jagged frames carrying per-frame elements/bonds/box", () => {
+    const { result } = makeHeteroResult();
+    const out = parseWithFn(() => result as never, "");
+    expect(out.frames).toHaveLength(2);
+    // Frame 1: 2 atoms; frame 2: 3 atoms (jagged).
+    expect(out.frames[0].nAtoms).toBe(2);
+    expect(out.frames[1].nAtoms).toBe(3);
+    expect(Array.from(out.frames[0].positions)).toEqual([100, 101, 102, 103, 104, 105]);
+    expect(Array.from(out.frames[1].positions)).toEqual([
+      106, 107, 108, 109, 110, 111, 112, 113, 114,
+    ]);
+    // Per-frame elements sliced by offsets.
+    expect(Array.from(out.frames[0].elements!)).toEqual([6, 6]);
+    expect(Array.from(out.frames[1].elements!)).toEqual([7, 7, 7]);
+    // Per-frame cell (9 floats each).
+    expect(out.frames[0].box!.length).toBe(9);
+    expect(Array.from(out.frames[1].box!)).toEqual([9, 10, 11, 12, 13, 14, 15, 16, 17]);
+    // Per-frame bonds.
+    expect(Array.from(out.frames[0].bonds!)).toEqual([0, 1]);
+    expect(out.frames[1].nBonds).toBe(1);
+    // Meta flags.
+    expect(out.meta?.heterogeneous).toBe(true);
+    expect(out.meta?.maxAtoms).toBe(3);
+    expect(out.meta?.variesAtoms).toBe(true);
+    expect(out.meta?.nFrames).toBe(3);
+  });
+
+  it("omits topology channels that do not vary (cell-only heterogeneity)", () => {
+    const { result } = makeHeteroResult();
+    // Simulate a var-cell-only trajectory: no per-frame elements/bonds.
+    result.frame_elements = () => new Uint8Array();
+    result.frame_bonds = () => new Uint32Array();
+    result.frame_bond_offsets = () => new Uint32Array();
+    result.varies_atoms = false;
+    result.varies_topology = false;
+    // Same atom count each frame for a valid cell-only case.
+    result.frame_atom_offsets = () => Uint32Array.from([0, 2, 4]);
+    result.frame_data = () => Float32Array.from({ length: 4 * 3 }, (_, i) => 100 + i);
+    const out = parseWithFn(() => result as never, "");
+    expect(out.frames[0].elements).toBeUndefined();
+    expect(out.frames[0].bonds).toBeUndefined();
+    // Cell still present.
+    expect(out.frames[0].box!.length).toBe(9);
+  });
+});
+
 function makeXtcResult(nAtoms: number, nFrames: number) {
   const frameData = Float32Array.from({ length: nFrames * nAtoms * 3 }, (_, i) => i);
   const free = vi.fn();

@@ -69,6 +69,17 @@ pub struct ParseResult {
     ca_ss_type: Vec<u8>,
     // Crystallographic symmetry operations (newline-delimited `x,y,z` strings).
     symmetry_ops: String,
+    // Heterogeneous-trajectory side table (empty/false for uniform trajectories).
+    heterogeneous: bool,
+    varies_atoms: bool,
+    varies_cell: bool,
+    varies_topology: bool,
+    max_atoms: u32,
+    frame_atom_offsets: Vec<u32>,
+    frame_elements: Vec<u8>,
+    frame_cells: Vec<f32>,
+    frame_bond_offsets: Vec<u32>,
+    frame_bonds: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -221,6 +232,68 @@ impl ParseResult {
     pub fn symmetry_ops(&self) -> String {
         self.symmetry_ops.clone()
     }
+
+    /// True when the trajectory's frames differ in atom count, cell, or
+    /// elements. When false the host takes the fast fixed-topology path and
+    /// all `frame_*` heterogeneous getters below are empty.
+    #[wasm_bindgen(getter)]
+    pub fn heterogeneous(&self) -> bool {
+        self.heterogeneous
+    }
+
+    /// True when the per-frame atom count changes.
+    #[wasm_bindgen(getter)]
+    pub fn varies_atoms(&self) -> bool {
+        self.varies_atoms
+    }
+
+    /// True when the per-frame unit cell changes.
+    #[wasm_bindgen(getter)]
+    pub fn varies_cell(&self) -> bool {
+        self.varies_cell
+    }
+
+    /// True when per-frame elements/bonds change.
+    #[wasm_bindgen(getter)]
+    pub fn varies_topology(&self) -> bool {
+        self.varies_topology
+    }
+
+    /// Maximum atom count across all frames (drives host GPU buffer sizing).
+    #[wasm_bindgen(getter)]
+    pub fn max_atoms(&self) -> u32 {
+        self.max_atoms
+    }
+
+    /// Prefix-sum atom offsets (in atoms) over the EXTRA frames; length
+    /// `n_frames + 1`. Empty for uniform trajectories.
+    pub fn frame_atom_offsets(&self) -> Uint32Array {
+        Uint32Array::from(&self.frame_atom_offsets[..])
+    }
+
+    /// Concatenated per-extra-frame atomic numbers, sliced by
+    /// `frame_atom_offsets`. Empty when topology is constant (reuse frame 0).
+    pub fn frame_elements(&self) -> Uint8Array {
+        Uint8Array::from(&self.frame_elements[..])
+    }
+
+    /// Per-extra-frame row-major 3×3 cells (9 floats each). Empty when the cell
+    /// is constant (reuse `box_matrix`).
+    pub fn frame_cells(&self) -> Float32Array {
+        Float32Array::from(&self.frame_cells[..])
+    }
+
+    /// Prefix-sum bond offsets (in pairs) over the EXTRA frames; length
+    /// `n_frames + 1` when populated. Empty when topology is constant.
+    pub fn frame_bond_offsets(&self) -> Uint32Array {
+        Uint32Array::from(&self.frame_bond_offsets[..])
+    }
+
+    /// Concatenated per-extra-frame bonds `[a0,b0,…]`, sliced by
+    /// `frame_bond_offsets` (×2). Empty when topology is constant.
+    pub fn frame_bonds(&self) -> Uint32Array {
+        Uint32Array::from(&self.frame_bonds[..])
+    }
 }
 
 impl ParseResult {
@@ -241,10 +314,51 @@ impl ParseResult {
         // buffer to avoid borrowing `data` after earlier partial moves.
         let n_atoms_usize = data.n_atoms;
         let frame_data: Vec<f32> = data.frame_positions_flat;
-        let n_frames = if n_atoms_usize == 0 {
-            0
-        } else {
-            (frame_data.len() / (n_atoms_usize * 3)) as u32
+        // Unpack the heterogeneous side table (None → uniform fast path).
+        let hetero = data.hetero;
+        let n_frames = match &hetero {
+            // Heterogeneous frames are jagged, so derive the count from the
+            // atom-offset segments rather than a fixed stride.
+            Some(h) => h.atom_offsets.len().saturating_sub(1) as u32,
+            None if n_atoms_usize == 0 => 0,
+            None => (frame_data.len() / (n_atoms_usize * 3)) as u32,
+        };
+        let (
+            heterogeneous,
+            varies_atoms,
+            varies_cell,
+            varies_topology,
+            max_atoms,
+            frame_atom_offsets,
+            frame_elements,
+            frame_cells,
+            frame_bond_offsets,
+            frame_bonds,
+        ) = match hetero {
+            Some(h) => (
+                true,
+                h.varies_atoms,
+                h.varies_cell,
+                h.varies_topology,
+                h.max_atoms,
+                h.atom_offsets,
+                h.elements_flat,
+                h.cells_flat,
+                h.bond_offsets,
+                h.bonds_flat,
+            ),
+            None => (
+                false,
+                false,
+                false,
+                false,
+                n_atoms_usize as u32,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
         };
         let has_atom_labels = data.atom_labels.is_some();
         let atom_labels = data.atom_labels.map(|l| l.join("\n")).unwrap_or_default();
@@ -283,6 +397,16 @@ impl ParseResult {
             ca_res_nums: data.ca_res_nums,
             ca_ss_type: data.ca_ss_type,
             symmetry_ops: data.symmetry_ops.join("\n"),
+            heterogeneous,
+            varies_atoms,
+            varies_cell,
+            varies_topology,
+            max_atoms,
+            frame_atom_offsets,
+            frame_elements,
+            frame_cells,
+            frame_bond_offsets,
+            frame_bonds,
         }
     }
 }
