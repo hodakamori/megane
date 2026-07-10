@@ -75,6 +75,22 @@ class InMemoryTrajectory:
         return self.box
 
 
+def encode_trajectory_frame(traj: InMemoryTrajectory, idx: int) -> bytes:
+    """Encode frame ``idx`` of a trajectory as a binary MSG_FRAME message.
+
+    For a *uniform* trajectory this is positions-only and byte-identical to the
+    original wire format. For a *heterogeneous* trajectory it additionally carries
+    the frame's per-atom elements (when the topology varies) and unit cell (when
+    the cell varies), so the host viewer can swap atoms / cell as it plays back.
+    """
+    from megane.protocol import encode_frame
+
+    positions = traj.get_frame(idx)
+    elements = traj.get_elements(idx) if traj.heterogeneous else None
+    box = traj.get_cell(idx) if (traj.heterogeneous and traj.cells is not None) else None
+    return encode_frame(idx, positions, elements=elements, box=box)
+
+
 def trajectory_from_structure_result(
     result: Any,
     positions: np.ndarray,

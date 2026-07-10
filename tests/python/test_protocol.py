@@ -8,9 +8,12 @@ import numpy as np
 from megane.parsers.pdb import Structure, load_pdb
 from megane.protocol import (
     MAGIC,
+    MSG_FRAME,
     MSG_SNAPSHOT,
     HAS_BOND_ORDERS,
     HAS_BOX,
+    HAS_FRAME_ELEMENTS,
+    encode_frame,
     encode_snapshot,
 )
 
@@ -215,3 +218,37 @@ def test_encode_snapshot_100k_atoms():
     if flags & HAS_BOND_ORDERS:
         bond_orders = np.frombuffer(data[offset : offset + n_bonds], dtype=np.uint8)
         np.testing.assert_array_equal(bond_orders, np.ones(n_bonds, dtype=np.uint8))
+
+
+def test_encode_frame_positions_only_backward_compat():
+    """A positions-only frame carries no flags and the legacy layout."""
+    positions = np.arange(6, dtype=np.float32).reshape(2, 3)
+    data = encode_frame(3, positions)
+    assert data[:4] == MAGIC
+    msg_type, flags = struct.unpack("<BB", data[4:6])
+    assert msg_type == MSG_FRAME
+    assert flags == 0
+    frame_id, n_atoms = struct.unpack("<II", data[8:16])
+    assert frame_id == 3
+    assert n_atoms == 2
+    # Header(8) + frame_header(8) + positions(2*3*4) and nothing else.
+    assert len(data) == 8 + 8 + 2 * 3 * 4
+
+
+def test_encode_frame_with_elements_and_box():
+    """Per-frame elements and cell are appended behind their flags."""
+    positions = np.zeros((2, 3), dtype=np.float32)
+    elements = np.array([6, 8], dtype=np.uint8)
+    box = np.eye(3, dtype=np.float32) * 12.0
+    data = encode_frame(1, positions, elements=elements, box=box)
+
+    _, _, flags, _ = struct.unpack("<IBBH", data[:8])
+    assert flags == (HAS_FRAME_ELEMENTS | HAS_BOX)
+
+    offset = 16 + 2 * 3 * 4  # header + frame_header + positions
+    # elements padded to 4 bytes.
+    elem = np.frombuffer(data[offset : offset + 2], dtype=np.uint8)
+    assert elem.tolist() == [6, 8]
+    offset += 4  # ceil(2/4)*4
+    box_out = np.frombuffer(data[offset : offset + 36], dtype=np.float32).reshape(3, 3)
+    np.testing.assert_allclose(box_out, box)

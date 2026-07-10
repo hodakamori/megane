@@ -75,35 +75,44 @@ describe("decodeSnapshot", () => {
     let offset = 0;
 
     // Header
-    view.setUint32(offset, MAGIC, true); offset += 4;
-    view.setUint8(offset, MSG_SNAPSHOT); offset += 1;
-    view.setUint8(offset, flags); offset += 1;
+    view.setUint32(offset, MAGIC, true);
+    offset += 4;
+    view.setUint8(offset, MSG_SNAPSHOT);
+    offset += 1;
+    view.setUint8(offset, flags);
+    offset += 1;
     offset += 2; // reserved
 
     // nAtoms, nBonds
-    view.setUint32(offset, nAtoms, true); offset += 4;
-    view.setUint32(offset, nBonds, true); offset += 4;
+    view.setUint32(offset, nAtoms, true);
+    offset += 4;
+    view.setUint32(offset, nBonds, true);
+    offset += 4;
 
     // Positions
     for (let i = 0; i < positions.length; i++) {
-      view.setFloat32(offset, positions[i], true); offset += 4;
+      view.setFloat32(offset, positions[i], true);
+      offset += 4;
     }
 
     // Elements
     for (let i = 0; i < elements.length; i++) {
-      view.setUint8(offset, elements[i]); offset += 1;
+      view.setUint8(offset, elements[i]);
+      offset += 1;
     }
     offset += elemPadding;
 
     // Bonds
     for (let i = 0; i < bonds.length; i++) {
-      view.setUint32(offset, bonds[i], true); offset += 4;
+      view.setUint32(offset, bonds[i], true);
+      offset += 4;
     }
 
     // Bond orders
     if (bondOrders) {
       for (let i = 0; i < bondOrders.length; i++) {
-        view.setUint8(offset, bondOrders[i]); offset += 1;
+        view.setUint8(offset, bondOrders[i]);
+        offset += 1;
       }
       const boPadding = (4 - (offset % 4)) % 4;
       offset += boPadding;
@@ -112,7 +121,8 @@ describe("decodeSnapshot", () => {
     // Box
     if (box) {
       for (let i = 0; i < 9; i++) {
-        view.setFloat32(offset, box[i], true); offset += 4;
+        view.setFloat32(offset, box[i], true);
+        offset += 4;
       }
     }
 
@@ -242,19 +252,25 @@ describe("decodeFrame", () => {
     let offset = 0;
 
     // Header
-    view.setUint32(offset, MAGIC, true); offset += 4;
-    view.setUint8(offset, MSG_FRAME); offset += 1;
-    view.setUint8(offset, 0); offset += 1;
+    view.setUint32(offset, MAGIC, true);
+    offset += 4;
+    view.setUint8(offset, MSG_FRAME);
+    offset += 1;
+    view.setUint8(offset, 0);
+    offset += 1;
     offset += 2; // reserved
 
     // frameId
-    view.setUint32(offset, 42, true); offset += 4;
+    view.setUint32(offset, 42, true);
+    offset += 4;
     // nAtoms
-    view.setUint32(offset, nAtoms, true); offset += 4;
+    view.setUint32(offset, nAtoms, true);
+    offset += 4;
     // positions
     const positions = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
     for (const p of positions) {
-      view.setFloat32(offset, p, true); offset += 4;
+      view.setFloat32(offset, p, true);
+      offset += 4;
     }
 
     const frame = decodeFrame(buf);
@@ -263,6 +279,49 @@ describe("decodeFrame", () => {
     for (let i = 0; i < positions.length; i++) {
       expect(frame.positions[i]).toBeCloseTo(positions[i], 5);
     }
+    // No flags → no per-frame elements/box.
+    expect(frame.elements).toBeUndefined();
+    expect(frame.box).toBeUndefined();
+  });
+
+  it("decodes per-frame elements and box behind flags", () => {
+    const nAtoms = 2;
+    const HAS_BOX = 0x02;
+    const HAS_FRAME_ELEMENTS = 0x04;
+    const elemPad = Math.ceil(nAtoms / 4) * 4; // padded elements block
+    const buf = new ArrayBuffer(8 + 4 + 4 + nAtoms * 12 + elemPad + 9 * 4);
+    const view = new DataView(buf);
+    let offset = 0;
+    view.setUint32(offset, MAGIC, true);
+    offset += 4;
+    view.setUint8(offset, MSG_FRAME);
+    offset += 1;
+    view.setUint8(offset, HAS_BOX | HAS_FRAME_ELEMENTS);
+    offset += 1;
+    offset += 2; // reserved
+    view.setUint32(offset, 7, true);
+    offset += 4; // frameId
+    view.setUint32(offset, nAtoms, true);
+    offset += 4; // nAtoms
+    for (const p of [1, 2, 3, 4, 5, 6]) {
+      view.setFloat32(offset, p, true);
+      offset += 4;
+    }
+    // elements (padded): C(6), O(8)
+    view.setUint8(offset, 6);
+    view.setUint8(offset + 1, 8);
+    offset += elemPad;
+    // box diagonal 11
+    for (let i = 0; i < 9; i++) {
+      view.setFloat32(offset, i === 0 || i === 4 || i === 8 ? 11 : 0, true);
+      offset += 4;
+    }
+
+    const frame = decodeFrame(buf);
+    expect(frame.nAtoms).toBe(2);
+    expect(Array.from(frame.elements!)).toEqual([6, 8]);
+    expect(frame.box![0]).toBeCloseTo(11, 5);
+    expect(frame.box![4]).toBeCloseTo(11, 5);
   });
 });
 
@@ -311,10 +370,12 @@ describe("decodeMetadata", () => {
 
     // File names
     let pos = 20;
-    view.setUint16(pos, pdbBytes.length, true); pos += 2;
+    view.setUint16(pos, pdbBytes.length, true);
+    pos += 2;
     new Uint8Array(buf, pos, pdbBytes.length).set(pdbBytes);
     pos += pdbBytes.length;
-    view.setUint16(pos, xtcBytes.length, true); pos += 2;
+    view.setUint16(pos, xtcBytes.length, true);
+    pos += 2;
     new Uint8Array(buf, pos, xtcBytes.length).set(xtcBytes);
 
     const meta = decodeMetadata(buf);

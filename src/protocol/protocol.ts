@@ -15,6 +15,7 @@ export const MSG_METADATA = 2;
 
 const HAS_BOND_ORDERS = 0x01;
 const HAS_BOX = 0x02;
+const HAS_FRAME_ELEMENTS = 0x04;
 
 export function decodeHeader(buffer: ArrayBuffer): {
   msgType: number;
@@ -85,6 +86,7 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
 
 export function decodeFrame(buffer: ArrayBuffer): Frame {
   const view = new DataView(buffer);
+  const flags = view.getUint8(5);
   let offset = 8; // skip header
 
   const frameId = view.getUint32(offset, true);
@@ -93,8 +95,23 @@ export function decodeFrame(buffer: ArrayBuffer): Frame {
   offset += 4;
 
   const positions = new Float32Array(buffer, offset, nAtoms * 3);
+  offset += nAtoms * 3 * 4;
 
-  return { frameId, nAtoms, positions };
+  // Optional per-frame elements (heterogeneous topology), padded to 4 bytes.
+  let elements: Uint8Array | undefined;
+  if (flags & HAS_FRAME_ELEMENTS) {
+    elements = new Uint8Array(buffer, offset, nAtoms);
+    offset += Math.ceil(nAtoms / 4) * 4;
+  }
+
+  // Optional per-frame unit cell (heterogeneous cell).
+  let box: Float32Array | undefined;
+  if (flags & HAS_BOX) {
+    box = new Float32Array(buffer, offset, 9);
+    offset += 9 * 4;
+  }
+
+  return { frameId, nAtoms, positions, ...(elements ? { elements } : {}), ...(box ? { box } : {}) };
 }
 
 export function decodeMetadata(buffer: ArrayBuffer): TrajectoryMeta {

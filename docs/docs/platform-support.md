@@ -54,6 +54,18 @@ Note: **Heterogeneous frames** — trajectories whose frames differ in atom coun
 opening a structure file (PDB, GRO, …) first or by wiring a Load Structure
 node in the always-mounted pipeline editor.
 
+Note: **Heterogeneous frames** apply to the trajectory formats too. XTC, DCD, and
+AMBER NetCDF carry a fixed atom count but a **per-frame unit cell** (variable-cell
+/ NPT), now animated during playback instead of collapsed to one box. **LAMMPS
+dump** additionally supports a **variable atom count** and per-frame atom type
+(GCMC / deposition / evaporation): frame 0 defines the base topology (its type ids
+are mapped to elements via the loaded structure) and the viewer adds/removes atoms
+per frame. Constant-cell, constant-atom trajectories keep the fixed-stride fast
+path. Large variable-atom LAMMPS dumps that would otherwise stream lazily fall
+back to an eager parse so no frame is dropped. The Python-hosted viewers (Jupyter
+widget, JupyterLab) receive the per-frame elements/cell over the streaming
+protocol as well.
+
 ### Topology formats
 
 Topology files carry bond information but no coordinates. They are used with

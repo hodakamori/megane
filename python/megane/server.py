@@ -14,8 +14,9 @@ from typing import TYPE_CHECKING, Optional
 from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
+from megane.parsers.common import encode_trajectory_frame
 from megane.parsers.pdb import Structure, load_pdb
-from megane.protocol import encode_frame, encode_metadata, encode_snapshot
+from megane.protocol import encode_metadata, encode_snapshot
 
 if TYPE_CHECKING:
     from megane.parsers.common import InMemoryTrajectory
@@ -176,8 +177,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             """Stream frames at the given FPS. Runs as a cancellable task."""
             delay = 1.0 / max(fps, 1)
             for i in range(start, end, max(stride, 1)):
-                positions = traj.get_frame(i)
-                await websocket.send_bytes(encode_frame(i, positions))
+                await websocket.send_bytes(encode_trajectory_frame(traj, i))
                 await asyncio.sleep(delay)
 
         while True:
@@ -193,8 +193,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             if cmd == "request_frame" and traj is not None:
                 frame_idx = msg.get("frame")
                 if isinstance(frame_idx, int) and 0 <= frame_idx < traj.n_frames:
-                    positions = traj.get_frame(frame_idx)
-                    await websocket.send_bytes(encode_frame(frame_idx, positions))
+                    await websocket.send_bytes(encode_trajectory_frame(traj, frame_idx))
 
             elif cmd == "stream" and traj is not None:
                 # Cancel any existing stream

@@ -68,6 +68,8 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
       );
     } else if (msgType === MSG_FRAME) {
       const frame = decodeFrame(buffer);
+      // positions/elements/box are all views into the one message buffer, so a
+      // single transfer of that backing buffer moves them all.
       const transfers: ArrayBuffer[] = [frame.positions.buffer as ArrayBuffer];
       ctx.postMessage(
         {
@@ -77,6 +79,8 @@ ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
             frameId: frame.frameId,
             nAtoms: frame.nAtoms,
             positions: frame.positions,
+            elements: frame.elements,
+            box: frame.box,
           },
         } satisfies WorkerResponse,
         transfers,
