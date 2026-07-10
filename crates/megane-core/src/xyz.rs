@@ -131,13 +131,7 @@ pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, first_n_atoms, &empty_bonds);
 
-    let atom_labels = first_labels.and_then(|labels| {
-        if labels.iter().any(|l| !l.is_empty()) {
-            Some(labels)
-        } else {
-            None
-        }
-    });
+    let atom_labels = first_labels.filter(|labels| labels.iter().any(|l| !l.is_empty()));
 
     Ok(crate::parser::ParsedStructure {
         n_atoms: first_n_atoms,
