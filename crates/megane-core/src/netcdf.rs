@@ -319,24 +319,40 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
         1.0
     };
 
-    // read cell_lengths for box matrix (first frame, orthorhombic diagonal)
-    let box_matrix: Option<[f32; 9]> = if let Some(cl) = cell_len_var {
+    // Read per-frame cell_lengths (orthorhombic diagonal). `cell_lengths` is a
+    // record variable, so frame `i`'s value lives at `cl.begin + i*recsize`.
+    // Frame 0 is the representative `box_matrix`; a per-frame side table is built
+    // only when the cell actually changes (variable-cell / NPT runs).
+    let mut box_matrix: Option<[f32; 9]> = None;
+    let mut per_frame_cells: Vec<[f32; 9]> = Vec::new();
+    let mut varies_cell = false;
+    if let Some(cl) = cell_len_var {
         if cl.nc_type == NC_DOUBLE && cl.vsize >= 24 {
-            let base = cl.begin as usize;
-            if base + 24 <= data.len() {
+            let cl_begin = cl.begin as usize;
+            for i in 0..n_frames {
+                let base = cl_begin.saturating_add(i.saturating_mul(recsize));
+                if base + 24 > data.len() {
+                    break;
+                }
                 let a = r.read_f64_at(base)? as f32;
                 let b = r.read_f64_at(base + 8)? as f32;
                 let c = r.read_f64_at(base + 16)? as f32;
-                Some([a, 0.0, 0.0, 0.0, b, 0.0, 0.0, 0.0, c])
-            } else {
-                None
+                let m = [a, 0.0, 0.0, 0.0, b, 0.0, 0.0, 0.0, c];
+                if i == 0 {
+                    box_matrix = Some(m);
+                }
+                if !varies_cell && Some(m) != box_matrix {
+                    varies_cell = true;
+                    per_frame_cells.extend(std::iter::repeat_n(box_matrix.unwrap_or([0.0; 9]), i));
+                }
+                if varies_cell {
+                    per_frame_cells.push(m);
+                }
             }
-        } else {
-            None
         }
-    } else {
-        None
-    };
+    }
+
+    let hetero = crate::trajectory::build_cell_hetero(varies_cell, per_frame_cells, n_atoms);
 
     Ok(TrajectoryData {
         n_atoms,
@@ -345,6 +361,7 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
         box_matrix,
         frame_positions_flat,
         vector_channels: vec![],
+        hetero,
     })
 }
 
@@ -650,9 +667,34 @@ mod tests {
         assert!((bm[0] - 10.0).abs() < 1e-3, "a");
         assert!((bm[4] - 10.0).abs() < 1e-3, "b");
         assert!((bm[8] - 10.0).abs() < 1e-3, "c");
+        // Constant cell → uniform fast path, no side table.
+        assert!(result.hetero.is_none());
 
         let f1 = result.frame(1);
         assert!((f1[0] - 0.1).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_parse_netcdf_variable_cell() {
+        let n_atoms = 2usize;
+        let frames = vec![
+            vec![0.0, 0.0, 0.0, 1.5, 0.0, 0.0],
+            vec![0.1, 0.0, 0.0, 1.6, 0.0, 0.0],
+        ];
+        let times = vec![0.0f32, 1.0f32];
+        // The cell shrinks between frames (NPT-style).
+        let cells: Vec<[f64; 3]> = vec![[10.0, 10.0, 10.0], [9.0, 9.0, 9.0]];
+
+        let data = build_netcdf(n_atoms, &frames, &times, Some(&cells));
+        let result = parse_netcdf(&data).expect("parse variable-cell NetCDF");
+
+        // box_matrix is frame 0; the side table carries both per-frame cells.
+        assert!((result.box_matrix.unwrap()[0] - 10.0).abs() < 1e-3);
+        let h = result.hetero.as_ref().expect("cell side table");
+        assert!(h.varies_cell);
+        assert!(!h.varies_atoms);
+        assert!((result.frame_cell(0).unwrap()[0] - 10.0).abs() < 1e-3);
+        assert!((result.frame_cell(1).unwrap()[0] - 9.0).abs() < 1e-3);
     }
 
     #[test]

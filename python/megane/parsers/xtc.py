@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import logging
 
-import numpy as np
-
 from megane import megane_parser
-from megane.parsers.common import InMemoryTrajectory
+from megane.parsers.common import InMemoryTrajectory, trajectory_from_traj_result
 
 logger = logging.getLogger(__name__)
 
@@ -37,23 +35,14 @@ def load_trajectory(pdb_path: str, xtc_path: str) -> InMemoryTrajectory:
     result = megane_parser.parse_xtc(xtc_bytes)
 
     n_atoms = result.n_atoms
-    n_frames = result.n_frames
-
     if n_atoms != pdb_result.n_atoms:
         raise ValueError(f"Atom count mismatch: PDB has {pdb_result.n_atoms} atoms, XTC has {n_atoms} atoms.")
 
-    # Convert flat frame_positions (n_frames, n_atoms*3) to array of shape (n_frames, n_atoms, 3)
-    frame_data = np.asarray(result.frame_positions, dtype=np.float32).reshape(n_frames, n_atoms, 3)
-    frames = frame_data
-
-    box_matrix = np.asarray(result.box_matrix, dtype=np.float32)
-
-    logger.info("Loaded XTC trajectory: %d frames, %d atoms", n_frames, n_atoms)
-
-    return InMemoryTrajectory(
-        _frames=frames,
-        n_frames=n_frames,
-        n_atoms=n_atoms,
-        timestep_ps=result.timestep_ps,
-        box=box_matrix,
+    trajectory = trajectory_from_traj_result(result)
+    logger.info(
+        "Loaded XTC trajectory: %d frames, %d atoms%s",
+        trajectory.n_frames,
+        n_atoms,
+        " (variable cell)" if trajectory.heterogeneous else "",
     )
+    return trajectory

@@ -89,6 +89,15 @@ interface WasmXtcResult {
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
   vector_channel_data(): Float32Array;
+  // Heterogeneous side table (all empty/false on the uniform fast path).
+  heterogeneous: boolean;
+  varies_atoms: boolean;
+  varies_cell: boolean;
+  varies_topology: boolean;
+  max_atoms: number;
+  frame_atom_offsets(): Uint32Array;
+  frame_elements(): Uint8Array;
+  frame_cells(): Float32Array;
   free(): void;
 }
 
@@ -419,6 +428,8 @@ export function extractFrames(
   expectedNAtoms: number,
   formatLabel: string,
 ): XTCParseResult {
+  // Frame 0 defines the base topology; its atom count must match the loaded
+  // structure even for heterogeneous (variable-atom) trajectories.
   if (result.n_atoms !== expectedNAtoms) {
     const msg = `${formatLabel} atom count (${result.n_atoms}) does not match structure (${expectedNAtoms})`;
     result.free();
@@ -429,21 +440,62 @@ export function extractFrames(
   // (subarray) into that single backing buffer. Frames are read-only downstream,
   // so sharing one buffer is safe. Keep `allData` alive via these views.
   const allData = result.frame_data();
-  const stride = result.n_atoms * 3;
+  const nFrames = result.n_frames;
   const frames: Frame[] = [];
+  const heterogeneous = result.heterogeneous === true;
 
-  for (let i = 0; i < result.n_frames; i++) {
-    frames.push({
-      frameId: i,
-      nAtoms: result.n_atoms,
-      positions: allData.subarray(i * stride, (i + 1) * stride),
-    });
+  if (heterogeneous) {
+    // Slice jagged positions by per-frame atom offsets (empty ⇒ fixed atom
+    // count, e.g. per-frame-cell XTC/DCD/NetCDF); attach the per-frame cell
+    // (empty ⇒ constant cell) and per-frame element/type ids (empty ⇒ constant
+    // topology). The renderer swaps cell / re-topologises only when a frame
+    // carries those optional fields.
+    const offsets = result.frame_atom_offsets(); // atoms, length nFrames+1 or empty
+    const cellsFlat = result.frame_cells(); // 9 floats/frame or empty
+    const elemsFlat = result.frame_elements(); // per-frame ids or empty
+    const hasOffsets = offsets.length > 0;
+    const hasCells = cellsFlat.length > 0;
+    const hasElems = elemsFlat.length > 0;
+    for (let i = 0; i < nFrames; i++) {
+      const aAtoms = hasOffsets ? offsets[i] : i * result.n_atoms;
+      const bAtoms = hasOffsets ? offsets[i + 1] : (i + 1) * result.n_atoms;
+      const frame: Frame = {
+        frameId: i,
+        nAtoms: bAtoms - aAtoms,
+        positions: allData.subarray(aAtoms * 3, bAtoms * 3),
+      };
+      if (hasElems) {
+        frame.elements = elemsFlat.subarray(aAtoms, bAtoms);
+      }
+      if (hasCells) {
+        frame.box = cellsFlat.subarray(i * 9, i * 9 + 9);
+      }
+      frames.push(frame);
+    }
+  } else {
+    const stride = result.n_atoms * 3;
+    for (let i = 0; i < nFrames; i++) {
+      frames.push({
+        frameId: i,
+        nAtoms: result.n_atoms,
+        positions: allData.subarray(i * stride, (i + 1) * stride),
+      });
+    }
   }
 
   const meta: TrajectoryMeta = {
-    nFrames: result.n_frames,
+    nFrames,
     timestepPs: result.timestep_ps,
     nAtoms: result.n_atoms,
+    ...(heterogeneous
+      ? {
+          heterogeneous: true,
+          maxAtoms: result.max_atoms,
+          variesAtoms: result.varies_atoms,
+          variesCell: result.varies_cell,
+          variesTopology: result.varies_topology,
+        }
+      : {}),
   };
 
   const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>

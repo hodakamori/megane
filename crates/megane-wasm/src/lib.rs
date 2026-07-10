@@ -423,6 +423,15 @@ pub struct XtcParseResult {
     vector_channel_count: u32,
     vector_channel_meta: String,
     vector_channel_data: Vec<f32>,
+    // Heterogeneous side table (empty/false for the uniform fast path).
+    heterogeneous: bool,
+    varies_atoms: bool,
+    varies_cell: bool,
+    varies_topology: bool,
+    max_atoms: u32,
+    frame_atom_offsets: Vec<u32>,
+    frame_elements: Vec<u8>,
+    frame_cells: Vec<f32>,
 }
 
 #[wasm_bindgen]
@@ -472,37 +481,124 @@ impl XtcParseResult {
     pub fn vector_channel_data(&self) -> Float32Array {
         Float32Array::from(&self.vector_channel_data[..])
     }
+
+    /// True when frames vary in cell (all formats) or atom count / type (LAMMPS).
+    /// When false, the `frame_*` heterogeneous getters below are empty.
+    #[wasm_bindgen(getter)]
+    pub fn heterogeneous(&self) -> bool {
+        self.heterogeneous
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn varies_atoms(&self) -> bool {
+        self.varies_atoms
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn varies_cell(&self) -> bool {
+        self.varies_cell
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn varies_topology(&self) -> bool {
+        self.varies_topology
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn max_atoms(&self) -> u32 {
+        self.max_atoms
+    }
+
+    /// Prefix-sum of per-frame atom counts (length n_frames+1). Empty when the
+    /// atom count is fixed (positions are fixed-stride).
+    pub fn frame_atom_offsets(&self) -> Uint32Array {
+        Uint32Array::from(&self.frame_atom_offsets[..])
+    }
+
+    /// Concatenated per-frame element/type ids. Empty when topology is constant.
+    pub fn frame_elements(&self) -> Uint8Array {
+        Uint8Array::from(&self.frame_elements[..])
+    }
+
+    /// Concatenated per-frame row-major 3×3 cells (9 floats each). Empty when the
+    /// cell is constant across the trajectory.
+    pub fn frame_cells(&self) -> Float32Array {
+        Float32Array::from(&self.frame_cells[..])
+    }
+}
+
+impl XtcParseResult {
+    /// Build the FFI result from a core `TrajectoryData`, unpacking its optional
+    /// heterogeneous side table. Shared by every trajectory `parse_*` so the
+    /// uniform fast path (empty side table) stays byte-identical.
+    fn from_trajectory(data: megane_core::trajectory::TrajectoryData) -> Self {
+        let has_box = data.box_matrix.is_some();
+        let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        let n_atoms = data.n_atoms as u32;
+        let n_frames = data.n_frames as u32;
+        let timestep_ps = data.timestep_ps;
+        let vector_channel_count = data.vector_channels.len() as u32;
+        let (vector_channel_meta, vector_channel_data) =
+            serialize_vector_channels(&data.vector_channels);
+        let frame_data = data.frame_positions_flat;
+        let (
+            heterogeneous,
+            varies_atoms,
+            varies_cell,
+            varies_topology,
+            max_atoms,
+            frame_atom_offsets,
+            frame_elements,
+            frame_cells,
+        ) = match data.hetero {
+            Some(h) => (
+                true,
+                h.varies_atoms,
+                h.varies_cell,
+                h.varies_topology,
+                h.max_atoms,
+                h.atom_offsets,
+                h.elements_flat,
+                h.cells_flat,
+            ),
+            None => (
+                false,
+                false,
+                false,
+                false,
+                n_atoms,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            ),
+        };
+        Self {
+            n_atoms,
+            n_frames,
+            timestep_ps,
+            has_box,
+            box_matrix,
+            frame_data,
+            vector_channel_count,
+            vector_channel_meta,
+            vector_channel_data,
+            heterogeneous,
+            varies_atoms,
+            varies_cell,
+            varies_topology,
+            max_atoms,
+            frame_atom_offsets,
+            frame_elements,
+            frame_cells,
+        }
+    }
 }
 
 /// Parse an XTC trajectory binary and return frame data.
 #[wasm_bindgen]
 pub fn parse_xtc_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
     let xtc_data = xtc::parse_xtc(data).map_err(|e| JsError::new(&e))?;
-
-    let has_box = xtc_data.box_matrix.is_some();
-    let box_matrix = match xtc_data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => Vec::new(),
-    };
-
-    // Contiguous already — move it out, no flatten copy.
-    let frame_data: Vec<f32> = xtc_data.frame_positions_flat;
-
-    let vector_channel_count = xtc_data.vector_channels.len() as u32;
-    let (vector_channel_meta, vector_channel_data) =
-        serialize_vector_channels(&xtc_data.vector_channels);
-
-    Ok(XtcParseResult {
-        n_atoms: xtc_data.n_atoms as u32,
-        n_frames: xtc_data.n_frames as u32,
-        timestep_ps: xtc_data.timestep_ps,
-        has_box,
-        box_matrix,
-        frame_data,
-        vector_channel_count,
-        vector_channel_meta,
-        vector_channel_data,
-    })
+    Ok(XtcParseResult::from_trajectory(xtc_data))
 }
 
 /// Persistent XTC decoder for lazy/streaming playback.
@@ -973,62 +1069,14 @@ pub fn extract_labels(text: &str, format: &str) -> String {
 #[wasm_bindgen]
 pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
     let data = lammpstrj::parse_lammpstrj(text).map_err(|e| JsError::new(&e))?;
-
-    let has_box = data.box_matrix.is_some();
-    let box_matrix = match data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => Vec::new(),
-    };
-
-    // Contiguous already — move it out, no flatten copy.
-    let frame_data: Vec<f32> = data.frame_positions_flat;
-
-    let vector_channel_count = data.vector_channels.len() as u32;
-    let (vector_channel_meta, vector_channel_data) =
-        serialize_vector_channels(&data.vector_channels);
-
-    Ok(XtcParseResult {
-        n_atoms: data.n_atoms as u32,
-        n_frames: data.n_frames as u32,
-        timestep_ps: data.timestep_ps,
-        has_box,
-        box_matrix,
-        frame_data,
-        vector_channel_count,
-        vector_channel_meta,
-        vector_channel_data,
-    })
+    Ok(XtcParseResult::from_trajectory(data))
 }
 
 /// Parse a DCD trajectory binary (CHARMM/NAMD/X-PLOR) and return frame data.
 #[wasm_bindgen]
 pub fn parse_dcd_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
     let dcd_data = dcd::parse_dcd(data).map_err(|e| JsError::new(&e))?;
-
-    let has_box = dcd_data.box_matrix.is_some();
-    let box_matrix = match dcd_data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => Vec::new(),
-    };
-
-    // Contiguous already — move it out, no flatten copy.
-    let frame_data: Vec<f32> = dcd_data.frame_positions_flat;
-
-    let vector_channel_count = dcd_data.vector_channels.len() as u32;
-    let (vector_channel_meta, vector_channel_data) =
-        serialize_vector_channels(&dcd_data.vector_channels);
-
-    Ok(XtcParseResult {
-        n_atoms: dcd_data.n_atoms as u32,
-        n_frames: dcd_data.n_frames as u32,
-        timestep_ps: dcd_data.timestep_ps,
-        has_box,
-        box_matrix,
-        frame_data,
-        vector_channel_count,
-        vector_channel_meta,
-        vector_channel_data,
-    })
+    Ok(XtcParseResult::from_trajectory(dcd_data))
 }
 
 /// Parse an ASE .traj file (ULM binary format) and return structured data.
@@ -1042,31 +1090,7 @@ pub fn parse_traj(data: &[u8]) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_netcdf_file(data: &[u8]) -> Result<XtcParseResult, JsError> {
     let traj_data = netcdf::parse_netcdf(data).map_err(|e| JsError::new(&e))?;
-
-    let has_box = traj_data.box_matrix.is_some();
-    let box_matrix = match traj_data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => Vec::new(),
-    };
-
-    // Contiguous already — move it out, no flatten copy.
-    let frame_data: Vec<f32> = traj_data.frame_positions_flat;
-
-    let vector_channel_count = traj_data.vector_channels.len() as u32;
-    let (vector_channel_meta, vector_channel_data) =
-        serialize_vector_channels(&traj_data.vector_channels);
-
-    Ok(XtcParseResult {
-        n_atoms: traj_data.n_atoms as u32,
-        n_frames: traj_data.n_frames as u32,
-        timestep_ps: traj_data.timestep_ps,
-        has_box,
-        box_matrix,
-        frame_data,
-        vector_channel_count,
-        vector_channel_meta,
-        vector_channel_data,
-    })
+    Ok(XtcParseResult::from_trajectory(traj_data))
 }
 
 /// Parse a CHARMM/NAMD PSF topology file and extract bond pairs.

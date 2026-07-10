@@ -164,3 +164,78 @@ def trajectory_from_structure_result(
         timestep_ps=timestep_ps,
         box=box_3x3,
     )
+
+
+def trajectory_from_traj_result(result: Any) -> InMemoryTrajectory:
+    """Build an :class:`InMemoryTrajectory` from a PyO3 ``PyTrajectoryData``.
+
+    Handles both *uniform* trajectory-lane formats (rectangular ``frame_positions``
+    fast path) and *heterogeneous* ones whose frames vary in unit cell (XTC / DCD /
+    NetCDF) or atom count / element type (LAMMPS dump). Unlike the structure lane,
+    frame 0 lives *inside* the flat buffer, so ``frame_atom_offsets`` (when present)
+    addresses all frames. Shared by every trajectory-lane reader.
+
+    Args:
+        result: PyO3 trajectory parse result (``megane_parser.parse_{xtc,dcd,
+            lammpstrj,netcdf}`` output).
+
+    Returns:
+        An :class:`InMemoryTrajectory` covering every frame.
+    """
+    n_atoms = int(result.n_atoms)
+    n_frames = int(result.n_frames)
+    box_3x3 = np.asarray(result.box_matrix, dtype=np.float32).reshape(3, 3)
+
+    if not getattr(result, "heterogeneous", False):
+        frames = np.asarray(result.frame_positions, dtype=np.float32).reshape(n_frames, n_atoms, 3)
+        return InMemoryTrajectory(
+            _frames=frames,
+            n_frames=n_frames,
+            n_atoms=n_atoms,
+            timestep_ps=float(result.timestep_ps),
+            box=box_3x3,
+        )
+
+    flat = np.asarray(result.frame_positions_flat, dtype=np.float32)
+    offsets = np.asarray(result.frame_atom_offsets, dtype=np.int64)  # empty ⇒ fixed atom count
+    max_atoms = int(getattr(result, "max_atoms", n_atoms))
+
+    frames_list: list[np.ndarray] = []
+    if offsets.size > 0:
+        for i in range(n_frames):
+            a, b = int(offsets[i]) * 3, int(offsets[i + 1]) * 3
+            frames_list.append(flat[a:b].reshape(-1, 3))
+    else:
+        stride = n_atoms * 3
+        for i in range(n_frames):
+            frames_list.append(flat[i * stride : (i + 1) * stride].reshape(n_atoms, 3))
+
+    # Per-frame elements (LAMMPS type/element ids), empty when topology constant.
+    frame_elem_flat = np.asarray(result.frame_elements, dtype=np.uint8)
+    if frame_elem_flat.size > 0 and offsets.size > 0:
+        elements_list: list[np.ndarray] | None = [
+            frame_elem_flat[int(offsets[i]) : int(offsets[i + 1])] for i in range(n_frames)
+        ]
+    else:
+        elements_list = None
+
+    # Per-frame cells; frame 0 is `box_3x3`. In the trajectory lane the flat cells
+    # cover ALL frames (frame 0 included), unlike the structure lane.
+    frame_cells_flat = np.asarray(result.frame_cells, dtype=np.float32)
+    if frame_cells_flat.size > 0:
+        cells = frame_cells_flat.reshape(n_frames, 3, 3)
+    else:
+        cells = None
+
+    return InMemoryTrajectory(
+        _frames=np.empty((0, 0, 3), dtype=np.float32),
+        n_frames=n_frames,
+        n_atoms=n_atoms,
+        timestep_ps=float(result.timestep_ps),
+        box=box_3x3,
+        heterogeneous=True,
+        max_atoms=max_atoms,
+        frames_list=frames_list,
+        elements_list=elements_list,
+        cells=cells,
+    )

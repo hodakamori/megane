@@ -248,6 +248,15 @@ function makeXtcResult(nAtoms: number, nFrames: number) {
       box_matrix: () => new Float32Array(9),
       frame_data: () => frameData,
       vector_channel_data: () => new Float32Array(),
+      // Uniform fast path: no side table.
+      heterogeneous: false,
+      varies_atoms: false,
+      varies_cell: false,
+      varies_topology: false,
+      max_atoms: nAtoms,
+      frame_atom_offsets: () => new Uint32Array(0),
+      frame_elements: () => new Uint8Array(0),
+      frame_cells: () => new Float32Array(0),
       free,
     },
     free,
@@ -269,6 +278,42 @@ describe("extractFrames", () => {
     const { result, free } = makeXtcResult(2, 1);
     expect(() => extractFrames(result as never, 5, "XTC")).toThrow(/atom count/);
     expect(free).toHaveBeenCalledOnce();
+  });
+
+  it("attaches a per-frame box for a variable-cell trajectory (XTC/DCD/NetCDF)", () => {
+    // Fixed atom count (frame_atom_offsets empty) but the cell changes each frame.
+    const { result } = makeXtcResult(2, 2);
+    result.heterogeneous = true;
+    result.varies_cell = true;
+    result.frame_cells = () =>
+      Float32Array.from([10, 0, 0, 0, 10, 0, 0, 0, 10, 12, 0, 0, 0, 12, 0, 0, 0, 12]);
+    const out = extractFrames(result as never, 2, "DCD");
+    expect(out.frames).toHaveLength(2);
+    // Fixed atom count, so positions still slice by stride.
+    expect(out.frames[0].nAtoms).toBe(2);
+    expect(out.frames[0].box![0]).toBe(10);
+    expect(out.frames[1].box![0]).toBe(12);
+    expect(out.frames[0].elements).toBeUndefined(); // topology constant
+    expect(out.meta.heterogeneous).toBe(true);
+    expect(out.meta.variesCell).toBe(true);
+  });
+
+  it("slices jagged positions + per-frame elements for a variable-atom trajectory", () => {
+    // Frame 0 has 2 atoms, frame 1 has 3 (LAMMPS-style growth).
+    const { result } = makeXtcResult(2, 2);
+    result.heterogeneous = true;
+    result.varies_atoms = true;
+    result.varies_topology = true;
+    result.max_atoms = 3;
+    result.frame_atom_offsets = () => Uint32Array.from([0, 2, 5]);
+    result.frame_elements = () => Uint8Array.from([1, 1, 1, 6, 8]);
+    result.frame_data = () => Float32Array.from({ length: 5 * 3 }, (_, i) => i);
+    const out = extractFrames(result as never, 2, "LAMMPS dump");
+    expect(out.frames[0].nAtoms).toBe(2);
+    expect(out.frames[1].nAtoms).toBe(3);
+    expect(Array.from(out.frames[1].positions)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    expect(Array.from(out.frames[1].elements!)).toEqual([1, 6, 8]);
+    expect(out.meta.maxAtoms).toBe(3);
   });
 });
 

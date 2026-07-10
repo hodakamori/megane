@@ -244,46 +244,7 @@ fn parse_amber(py: Python<'_>, prmtop: &str, inpcrd: &str) -> PyResult<PyStructu
 #[pyfunction]
 fn parse_xtc(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     let traj = megane_core::xtc::parse_xtc(data).map_err(PyValueError::new_err)?;
-
-    let box_vec = match traj.box_matrix {
-        Some(m) => m.to_vec(),
-        None => vec![0.0f32; 9],
-    };
-    if box_vec.len() != 9 {
-        return Err(PyValueError::new_err(format!(
-            "box_matrix has length {}, but expected 9 elements for a 3x3 matrix",
-            box_vec.len()
-        )));
-    }
-    let box_array = Array2::from_shape_vec((3, 3), box_vec).map_err(|e| {
-        PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
-    })?;
-
-    let stride = traj.n_atoms * 3;
-    let expected_len = traj.n_frames * stride;
-    if traj.frame_positions_flat.len() != expected_len {
-        return Err(PyValueError::new_err(format!(
-            "frame_positions has length {}, but expected {} (n_frames * n_atoms * 3)",
-            traj.frame_positions_flat.len(),
-            expected_len
-        )));
-    }
-    // Core already stores frames contiguously — reshape without a flatten copy.
-    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
-        .map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({}, {}): {e}",
-                traj.n_frames, stride
-            ))
-        })?;
-
-    Ok(PyTrajectoryData {
-        n_atoms: traj.n_atoms,
-        n_frames: traj.n_frames,
-        timestep_ps: traj.timestep_ps,
-        box_matrix: box_array.into_pyarray(py).into(),
-        frame_positions: frame_array.into_pyarray(py).into(),
-    })
+    py_trajectory_from_data(py, traj)
 }
 
 /// Parse an ASE .traj file (binary) and return structured data.
@@ -293,7 +254,11 @@ fn parse_traj(py: Python<'_>, data: &[u8]) -> PyResult<PyStructure> {
     PyStructure::from_parsed(py, parsed)
 }
 
-/// Parsed trajectory data exposed to Python (shared by XTC and LAMMPS dump).
+/// Parsed trajectory data exposed to Python (shared by XTC / DCD / LAMMPS dump /
+/// NetCDF). Uniform trajectories use the rectangular `frame_positions` fast path;
+/// heterogeneous ones (variable cell for all formats, variable atom count / type
+/// for LAMMPS dump) leave `frame_positions` empty and fill the flat side-table
+/// arrays instead — mirrors `PyStructure`.
 #[pyclass]
 struct PyTrajectoryData {
     #[pyo3(get)]
@@ -304,104 +269,132 @@ struct PyTrajectoryData {
     timestep_ps: f32,
     #[pyo3(get)]
     box_matrix: Py<PyArray2<f32>>,
+    /// Rectangular `(n_frames, n_atoms*3)` positions — populated only when the
+    /// trajectory is uniform (empty otherwise).
     #[pyo3(get)]
     frame_positions: Py<PyArray2<f32>>,
+    #[pyo3(get)]
+    heterogeneous: bool,
+    #[pyo3(get)]
+    varies_atoms: bool,
+    #[pyo3(get)]
+    varies_cell: bool,
+    #[pyo3(get)]
+    varies_topology: bool,
+    #[pyo3(get)]
+    max_atoms: usize,
+    /// Flat jagged positions (heterogeneous only), sliced by `frame_atom_offsets`.
+    #[pyo3(get)]
+    frame_positions_flat: Py<PyArray1<f32>>,
+    /// Prefix-sum of per-frame atom counts, length `n_frames+1` (empty when the
+    /// atom count is fixed).
+    #[pyo3(get)]
+    frame_atom_offsets: Py<PyArray1<u32>>,
+    /// Concatenated per-frame element/type ids (empty when topology is constant).
+    #[pyo3(get)]
+    frame_elements: Py<PyArray1<u8>>,
+    /// Per-frame row-major 3×3 cells (empty when the cell is constant).
+    #[pyo3(get)]
+    frame_cells: Py<PyArray1<f32>>,
+}
+
+/// Build a `PyTrajectoryData` from a core `TrajectoryData`, taking the uniform
+/// rectangular fast path or the jagged hetero path. Shared by every trajectory
+/// `parse_*` so the uniform boundary transfer is unchanged.
+fn py_trajectory_from_data(
+    py: Python<'_>,
+    traj: megane_core::trajectory::TrajectoryData,
+) -> PyResult<PyTrajectoryData> {
+    let box_vec = match traj.box_matrix {
+        Some(m) => m.to_vec(),
+        None => vec![0.0f32; 9],
+    };
+    let box_array = Array2::from_shape_vec((3, 3), box_vec).map_err(|e| {
+        PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
+    })?;
+
+    let empty_f32 = || Array1::<f32>::from_vec(Vec::new()).into_pyarray(py).into();
+    let empty_u32 = || Array1::<u32>::from_vec(Vec::new()).into_pyarray(py).into();
+    let empty_u8 = || Array1::<u8>::from_vec(Vec::new()).into_pyarray(py).into();
+
+    if let Some(h) = traj.hetero {
+        // Heterogeneous: flat jagged positions + side-table arrays; the
+        // rectangular `frame_positions` stays empty.
+        let frame_positions = Array2::<f32>::zeros((0, 0)).into_pyarray(py).into();
+        return Ok(PyTrajectoryData {
+            n_atoms: traj.n_atoms,
+            n_frames: traj.n_frames,
+            timestep_ps: traj.timestep_ps,
+            box_matrix: box_array.into_pyarray(py).into(),
+            frame_positions,
+            heterogeneous: true,
+            varies_atoms: h.varies_atoms,
+            varies_cell: h.varies_cell,
+            varies_topology: h.varies_topology,
+            max_atoms: h.max_atoms as usize,
+            frame_positions_flat: Array1::from_vec(traj.frame_positions_flat)
+                .into_pyarray(py)
+                .into(),
+            frame_atom_offsets: Array1::from_vec(h.atom_offsets).into_pyarray(py).into(),
+            frame_elements: Array1::from_vec(h.elements_flat).into_pyarray(py).into(),
+            frame_cells: Array1::from_vec(h.cells_flat).into_pyarray(py).into(),
+        });
+    }
+
+    // Uniform fast path: rectangular reshape without a flatten copy.
+    let stride = traj.n_atoms * 3;
+    let expected_len = traj.n_frames * stride;
+    if traj.frame_positions_flat.len() != expected_len {
+        return Err(PyValueError::new_err(format!(
+            "frame_positions has length {}, but expected {expected_len} (n_frames * n_atoms * 3)",
+            traj.frame_positions_flat.len(),
+        )));
+    }
+    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
+        .map_err(|e| {
+            PyValueError::new_err(format!(
+                "failed to reshape frame_positions into ({}, {stride}): {e}",
+                traj.n_frames,
+            ))
+        })?;
+
+    Ok(PyTrajectoryData {
+        n_atoms: traj.n_atoms,
+        n_frames: traj.n_frames,
+        timestep_ps: traj.timestep_ps,
+        box_matrix: box_array.into_pyarray(py).into(),
+        frame_positions: frame_array.into_pyarray(py).into(),
+        heterogeneous: false,
+        varies_atoms: false,
+        varies_cell: false,
+        varies_topology: false,
+        max_atoms: traj.n_atoms,
+        frame_positions_flat: empty_f32(),
+        frame_atom_offsets: empty_u32(),
+        frame_elements: empty_u8(),
+        frame_cells: empty_f32(),
+    })
 }
 
 /// Parse a DCD trajectory binary (CHARMM/NAMD/X-PLOR) and return frame data.
 #[pyfunction]
 fn parse_dcd(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     let traj = megane_core::dcd::parse_dcd(data).map_err(PyValueError::new_err)?;
-
-    let box_vec = match traj.box_matrix {
-        Some(m) => m.to_vec(),
-        None => vec![0.0f32; 9],
-    };
-    let box_array = Array2::from_shape_vec((3, 3), box_vec).map_err(|e| {
-        PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
-    })?;
-
-    let stride = traj.n_atoms * 3;
-    // Core already stores frames contiguously — reshape without a flatten copy.
-    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
-        .map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({}, {}): {e}",
-                traj.n_frames, stride
-            ))
-        })?;
-
-    Ok(PyTrajectoryData {
-        n_atoms: traj.n_atoms,
-        n_frames: traj.n_frames,
-        timestep_ps: traj.timestep_ps,
-        box_matrix: box_array.into_pyarray(py).into(),
-        frame_positions: frame_array.into_pyarray(py).into(),
-    })
+    py_trajectory_from_data(py, traj)
 }
 
 /// Parse a LAMMPS dump trajectory text and return frame data.
 #[pyfunction]
 fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
     let data = megane_core::lammpstrj::parse_lammpstrj(text).map_err(PyValueError::new_err)?;
-
-    let box_vec = match data.box_matrix {
-        Some(m) => m.to_vec(),
-        None => vec![0.0f32; 9],
-    };
-    let box_array = Array2::from_shape_vec((3, 3), box_vec).map_err(|e| {
-        PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
-    })?;
-
-    // Core already stores frames contiguously as (n_frames, n_atoms * 3) — reshape directly.
-    let stride = data.n_atoms * 3;
-    let frame_array = Array2::from_shape_vec((data.n_frames, stride), data.frame_positions_flat)
-        .map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({}, {}): {e}",
-                data.n_frames, stride
-            ))
-        })?;
-
-    Ok(PyTrajectoryData {
-        n_atoms: data.n_atoms,
-        n_frames: data.n_frames,
-        timestep_ps: data.timestep_ps,
-        box_matrix: box_array.into_pyarray(py).into(),
-        frame_positions: frame_array.into_pyarray(py).into(),
-    })
+    py_trajectory_from_data(py, data)
 }
 
 /// Parse an AMBER NetCDF trajectory binary and return frame data.
 #[pyfunction]
 fn parse_netcdf(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
     let traj = megane_core::netcdf::parse_netcdf(data).map_err(PyValueError::new_err)?;
-
-    let box_vec = match traj.box_matrix {
-        Some(m) => m.to_vec(),
-        None => vec![0.0f32; 9],
-    };
-    let box_array = Array2::from_shape_vec((3, 3), box_vec).map_err(|e| {
-        PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
-    })?;
-
-    let stride = traj.n_atoms * 3;
-    // Core already stores frames contiguously — reshape without a flatten copy.
-    let frame_array = Array2::from_shape_vec((traj.n_frames, stride), traj.frame_positions_flat)
-        .map_err(|e| {
-            PyValueError::new_err(format!(
-                "failed to reshape frame_positions into ({}, {}): {e}",
-                traj.n_frames, stride
-            ))
-        })?;
-
-    Ok(PyTrajectoryData {
-        n_atoms: traj.n_atoms,
-        n_frames: traj.n_frames,
-        timestep_ps: traj.timestep_ps,
-        box_matrix: box_array.into_pyarray(py).into(),
-        frame_positions: frame_array.into_pyarray(py).into(),
-    })
+    py_trajectory_from_data(py, traj)
 }
 
 /// Parse a CHARMM/NAMD PSF topology file and return bond pairs.

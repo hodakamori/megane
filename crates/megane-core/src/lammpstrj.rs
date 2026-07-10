@@ -826,6 +826,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         box_matrix,
         frame_positions_flat,
         vector_channels,
+        hetero: None,
     })
 }
 
