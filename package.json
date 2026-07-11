@@ -47,6 +47,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:render": "node scripts/smoke-render.mjs",
+    "profile:render-fps": "node scripts/profile-render-fps.mjs",
     "test:e2e": "playwright test",
     "test:e2e:webapp": "playwright test --project=webapp",
     "test:e2e:contract": "playwright test --project=contract",
