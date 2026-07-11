@@ -131,8 +131,9 @@ A SessionStart hook (`.claude/hooks/session-start.sh`) injects a reminder pointi
 | `pre-release`  | Pre-release checklist (tests, version bump, dry-run, tag)                                      |
 | `post-release` | Post-release verification (publish workflows, package availability, docs)                      |
 | `add-format`   | Per-host registration checklist for new file formats (enforces CRITICAL RULE #6)               |
+| `add-node`     | Registration checklist for new visual-pipeline node types (types, catalog, executor, UI, builders) |
 
-Total: 10 skills.
+Total: 11 skills.
 
 ## Architecture
 

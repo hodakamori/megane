@@ -187,7 +187,11 @@ interface AtomRenderer {
 
 ### Adding a New Pipeline Node
 
-The most common extension. Here are the steps, using a hypothetical "ColorByProperty" node as an example:
+The most common extension. The overview below lists the steps; for a complete,
+copy-paste walkthrough (every touch-point, the rules, the base classes, and how
+to test) see [Writing a Custom Pipeline Node](/dev/custom-nodes).
+
+Here are the steps, using a hypothetical "ColorByProperty" node as an example:
 
 **1. Define the node type** in `src/pipeline/types.ts`:
 - Add `"color_by_property"` to the `PipelineNodeType` union
