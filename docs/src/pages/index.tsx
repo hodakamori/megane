@@ -266,7 +266,7 @@ function PillarSection() {
           megane with any widget in the Jupyter ecosystem.
         </p>
         <p>
-          <strong>Framework-agnostic</strong> — <code>MoleculeRenderer</code> is a plain
+          <strong>Vue / Svelte / vanilla JS</strong> — <code>MoleculeRenderer</code> is a plain
           Three.js class. Mount it in Vue, Svelte, or a vanilla <code>{"<div>"}</code>.
         </p>
       </section>
