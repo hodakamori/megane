@@ -57,11 +57,12 @@ def load_traj(path: str) -> tuple[Structure, InMemoryTrajectory]:
     trajectory = trajectory_from_structure_result(result, positions, elements, box_3x3, n_atoms)
 
     if trajectory.heterogeneous:
+        counts = [f.shape[0] for f in (trajectory.frames_list or [])]
         logger.info(
             "Loaded heterogeneous .traj: %d frames, %d..%d atoms",
             trajectory.n_frames,
-            min(f.shape[0] for f in trajectory.frames_list),
-            max(f.shape[0] for f in trajectory.frames_list),
+            min(counts),
+            max(counts),
         )
     else:
         logger.info(

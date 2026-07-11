@@ -33,11 +33,12 @@ def load_lammpstrj(dump_path: str) -> InMemoryTrajectory:
     trajectory = trajectory_from_traj_result(result)
 
     if trajectory.heterogeneous:
+        counts = [f.shape[0] for f in (trajectory.frames_list or [])]
         logger.info(
             "Loaded heterogeneous LAMMPS dump: %d frames, %d..%d atoms",
             trajectory.n_frames,
-            min(f.shape[0] for f in trajectory.frames_list),
-            max(f.shape[0] for f in trajectory.frames_list),
+            min(counts),
+            max(counts),
         )
     else:
         logger.info(
