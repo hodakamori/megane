@@ -35,6 +35,7 @@ import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE, LICORICE_RADIUS } from "../constants";
 import { pickAtPixel, projectToScreen } from "./Picking";
 import { computeMeasurement } from "./Selection";
+import { FpsCounter } from "./FpsCounter";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
 import {
   fitCameraToView,
@@ -68,6 +69,15 @@ const _testMode = (() => {
   }
   return false;
 })();
+
+/**
+ * True when running under E2E (via `?test=1`, `__MEGANE_TEST__`, or an iframed
+ * host inheriting it from the parent). Consumers use this to keep non-
+ * deterministic UI (e.g. the live FPS readout) stable for screenshot baselines.
+ */
+export function isMeganeTestMode(): boolean {
+  return _testMode;
+}
 
 interface MeganeTestReady {
   firstFrame: boolean;
@@ -203,6 +213,7 @@ export class MoleculeRenderer {
   private pivotMarker: PivotMarker | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
+  private fpsCounter = new FpsCounter();
   private snapshot: Snapshot | null = null;
   private lastExtent: ViewExtent = { maxExtent: 1, extentX: 1, extentY: 1 };
   private currentPositions: Float32Array | null = null;
@@ -1410,6 +1421,19 @@ export class MoleculeRenderer {
     return this.renderer;
   }
 
+  /**
+   * Live rendering stats for the performance HUD: current FPS (updated by the
+   * rAF loop) and the draw-call count of the most recent frame. megane draws
+   * with instanced meshes, so draw calls — not a scene mesh-object count — are
+   * the meaningful GPU-load metric.
+   */
+  getStats(): { fps: number; drawCalls: number } {
+    return {
+      fps: this.fpsCounter.fps,
+      drawCalls: this.renderer?.info.render.calls ?? 0,
+    };
+  }
+
   /** Get the label overlay canvas. */
   getLabelOverlay(): LabelOverlay | null {
     return this.labelOverlay;
@@ -1739,8 +1763,13 @@ export class MoleculeRenderer {
 
     _signalRender(this.snapshot != null);
 
+    // Update the live FPS counter (drives the performance HUD; cheap and
+    // always on, unlike the __MEGANE_PERF__-gated frame buffer below).
+    const now = performance.now();
+    this.fpsCounter.tick(now);
+
     // Performance hooks (no-op unless window.__MEGANE_PERF__ is set)
-    perfPushFrame(performance.now());
+    perfPushFrame(now);
     if (this.firstFramePending) {
       this.firstFramePending = false;
       perfMark("megane:mount:firstFrame");
