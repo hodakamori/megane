@@ -25,37 +25,32 @@ Instead of mesh-based spheres (32+ triangles each), atoms are rendered as **scre
 
 ## System Overview
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Rust / WASM Parsers  (crates/megane-core/ → megane-wasm/)  │
-│  PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data,    │
-│  AMBER prmtop, XTC, DCD, AMBER NetCDF, ASE .traj,           │
-│  .lammpstrj/.dump                                           │
-│  → Snapshot { positions, elements, bonds, box }             │
-└────────────────────────────┬────────────────────────────────┘
-                             │  wasm-bindgen FFI
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Pipeline Engine  (src/pipeline/)                           │
-│                                                             │
-│  executePipeline() → topological sort → per-node executor   │
-│                                                             │
-│  LoadStructure → Filter → Modify → Color → Representation │
-│                       → AddBond → Viewport                  │
-│       │            │         │         │          │         │
-│  ParticleData  ParticleData  ...    BondData  ViewportState │
-└────────────────────────────┬────────────────────────────────┘
-                             │  applyViewportState()
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Renderer  (src/renderer/)                                  │
-│                                                             │
-│  MoleculeRenderer orchestrates:                             │
-│    ImpostorAtomMesh   (billboard quads + ray-sphere shader) │
-│    ImpostorBondMesh   (billboard quads + cylinder shader)   │
-│    CellRenderer, LabelOverlay, ArrowRenderer, ...           │
-│    StructureLayer     (multi-structure overlay)             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph parsers["Rust / WASM Parsers (crates/megane-core/ to megane-wasm/)"]
+        direction TB
+        formats["PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF,<br/>LAMMPS data, AMBER prmtop, XTC, DCD,<br/>AMBER NetCDF, ASE .traj, .lammpstrj/.dump"]
+        snapshot["Snapshot: positions, elements, bonds, box"]
+        formats --> snapshot
+    end
+
+    subgraph engine["Pipeline Engine (src/pipeline/)"]
+        direction TB
+        exec["executePipeline() to topological sort to per-node executor"]
+        flow["LoadStructure to Filter to Modify to Color to Representation<br/>AddBond, Viewport"]
+        outputs["ParticleData, BondData, ..., ViewportState"]
+        exec --> flow --> outputs
+    end
+
+    subgraph renderer["Renderer (src/renderer/)"]
+        direction TB
+        orch["MoleculeRenderer orchestrates:"]
+        meshes["ImpostorAtomMesh (billboard quads + ray-sphere shader)<br/>ImpostorBondMesh (billboard quads + cylinder shader)<br/>CellRenderer, LabelOverlay, ArrowRenderer, ...<br/>StructureLayer (multi-structure overlay)"]
+        orch --> meshes
+    end
+
+    parsers -- "wasm-bindgen FFI" --> engine
+    engine -- "applyViewportState()" --> renderer
 ```
 
 ## Pipeline Data Types
