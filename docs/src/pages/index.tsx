@@ -11,6 +11,7 @@ const GITHUB_URL = "https://github.com/hodakamori/megane";
 
 const MODES: { id: HeroMode; label: string }[] = [
   { id: "molecular", label: "Caffeine · water" },
+  { id: "protein", label: "Protein" },
   { id: "perovskite", label: "Perovskite" },
   { id: "quartz", label: "Quartz" },
 ];

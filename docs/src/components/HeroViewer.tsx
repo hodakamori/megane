@@ -15,13 +15,19 @@ import styles from "./HeroViewer.module.css";
  * Colors are literal (not --ifm-* tokens): the hero is always dark regardless
  * of the docs color mode.
  */
-export type HeroMode = "molecular" | "perovskite" | "quartz";
+export type HeroMode = "molecular" | "protein" | "perovskite" | "quartz";
 
-/** Structure per mode, plus whether to overlay coordination polyhedra. */
-const MODE_DATA: Record<HeroMode, { data: string; polyhedra: boolean }> = {
-  molecular: { data: "caffeine_water", polyhedra: false },
-  perovskite: { data: "perovskite_srtio3", polyhedra: true },
-  quartz: { data: "quartz_sio2", polyhedra: true },
+/** How each mode is rendered:
+ *  - "molecular": ball-and-stick atoms
+ *  - "polyhedra": atoms + coordination polyhedra overlay (crystals)
+ *  - "cartoon":   protein ribbon + translucent molecular-surface mesh overlay */
+type ModeKind = "molecular" | "polyhedra" | "cartoon";
+
+const MODE_DATA: Record<HeroMode, { data: string; kind: ModeKind }> = {
+  molecular: { data: "caffeine_water", kind: "molecular" },
+  protein: { data: "ubiquitin", kind: "cartoon" },
+  perovskite: { data: "perovskite_srtio3", kind: "polyhedra" },
+  quartz: { data: "quartz_sio2", kind: "polyhedra" },
 };
 
 const HERO_BG = 0x0a0c10;
@@ -30,7 +36,7 @@ async function fetchSnapshot(url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`snapshot ${res.status}`);
   const snap = await res.json();
-  return {
+  const out: any = {
     nAtoms: snap.nAtoms,
     nBonds: snap.nBonds,
     nFileBonds: snap.nFileBonds,
@@ -40,6 +46,14 @@ async function fetchSnapshot(url: string) {
     bondOrders: snap.bondOrders ? new Uint8Array(snap.bondOrders) : null,
     box: snap.box ? new Float32Array(snap.box) : null,
   };
+  // Cα backbone + secondary structure for cartoon-ribbon rendering.
+  if (snap.caIndices) {
+    out.caIndices = new Uint32Array(snap.caIndices);
+    out.caChainIds = new Uint8Array(snap.caChainIds);
+    out.caResNums = new Uint32Array(snap.caResNums);
+    out.caSsType = new Uint8Array(snap.caSsType);
+  }
+  return out;
 }
 
 export default function HeroViewer({ mode }: { mode: HeroMode }) {
@@ -50,6 +64,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
 
   const modeInfo = MODE_DATA[mode] ?? MODE_DATA.molecular;
   const resolvedSrc = useBaseUrl(`/data/${modeInfo.data}.json`);
+  const kind = modeInfo.kind;
 
   // Mount the renderer once (lazy: on intersection + idle).
   useEffect(() => {
@@ -137,7 +152,8 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
         // loadSnapshot may reset the clear color — keep the dark hero bg.
         renderer.setBackgroundColor(HERO_BG);
 
-        if (modeInfo.polyhedra) {
+        if (kind === "polyhedra") {
+          renderer.setRepresentationType?.("atoms");
           const { executePolyhedronGenerator } = await import(
             "../../../src/pipeline/executors/polyhedronGenerator"
           );
@@ -169,7 +185,26 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
           if (mesh && !cancelled && rendererRef.current) {
             renderer.loadPolyhedra(mesh);
           }
+        } else if (kind === "cartoon") {
+          // Ribbon backbone + a translucent molecular-surface mesh overlay
+          // (reuses the polyhedra overlay slot, which renders any MeshData).
+          renderer.setRepresentationType?.("cartoon");
+          const { buildSurfaceMeshData } = await import(
+            "../../../src/renderer/alphaSurface"
+          );
+          if (cancelled || !rendererRef.current) return;
+          const surface = buildSurfaceMeshData(
+            snapshot.positions,
+            snapshot.nAtoms,
+            3.0,
+            "#3ad6c8",
+            0.16,
+          );
+          if (surface && !cancelled && rendererRef.current) {
+            renderer.loadPolyhedra(surface);
+          }
         } else {
+          renderer.setRepresentationType?.("atoms");
           renderer.clearPolyhedra?.();
         }
         setReady(true);
