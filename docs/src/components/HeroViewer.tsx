@@ -119,7 +119,9 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
     };
   }, []);
 
-  // Load / swap the structure whenever the mode's source changes (once mounted).
+  // Load / swap the structure whenever the mode changes (once mounted). The
+  // crystal additionally renders VESTA-style coordination polyhedra (TiO6
+  // octahedra); the molecular view clears them.
   useEffect(() => {
     if (!mounted) return;
     let cancelled = false;
@@ -132,6 +134,41 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
         renderer.loadSnapshot(snapshot);
         // loadSnapshot may reset the clear color — keep the dark hero bg.
         renderer.setBackgroundColor(HERO_BG);
+
+        if (mode === "crystal") {
+          const { executePolyhedronGenerator } = await import(
+            "../../../src/pipeline/executors/polyhedronGenerator"
+          );
+          if (cancelled || !rendererRef.current) return;
+          const particle: any = {
+            type: "particle",
+            source: snapshot,
+            sourceNodeId: "hero",
+            indices: null,
+            scaleOverrides: null,
+            opacityOverrides: null,
+            colorOverrides: null,
+          };
+          const inputs: any = new Map([["particle", [particle]]]);
+          const params: any = {
+            type: "polyhedron_generator",
+            // Exclude Sr (Z=38) so only the classic corner-sharing TiO6
+            // octahedra render, not the SrO12 cuboctahedra.
+            excludedCenters: [38],
+            excludedLigands: [],
+            cutoffTolerance: 1.15,
+            opacity: 0.72,
+            showEdges: true,
+            edgeColor: "#cfd6df",
+            edgeWidth: 2,
+          };
+          const mesh = executePolyhedronGenerator(params, inputs).get("mesh");
+          if (mesh && !cancelled && rendererRef.current) {
+            renderer.loadPolyhedra(mesh);
+          }
+        } else {
+          renderer.clearPolyhedra?.();
+        }
         setReady(true);
       } catch {
         /* decorative backdrop — ignore load failures */
@@ -140,7 +177,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
     return () => {
       cancelled = true;
     };
-  }, [mounted, resolvedSrc]);
+  }, [mounted, resolvedSrc, mode]);
 
   return (
     <div

@@ -69,7 +69,6 @@ function Hero({
             {m.label}
           </button>
         ))}
-        <span className={styles.heroMetric}>● 1,048,576 atoms · 60fps</span>
       </div>
     </header>
   );
