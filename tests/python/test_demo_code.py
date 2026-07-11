@@ -50,11 +50,11 @@ def test_frame_index_assignment():
     assert len(viewer._frame_data) > 0
 
 
-# ─── Integrations Guide: selected_atoms & events ────────────────────
+# ─── ipywidgets Events Guide: selected_atoms & events ───────────────
 
 
 def test_selected_atoms_trait():
-    """docs/guide/integrations.md: viewer.selected_atoms = [0, 1]."""
+    """docs/guide/ipywidgets-events.md: viewer.selected_atoms = [0, 1]."""
     viewer = megane.MolecularViewer()
     with pytest.warns(DeprecationWarning):
         viewer.load(str(FIXTURES / "1crn.pdb"))
@@ -63,7 +63,7 @@ def test_selected_atoms_trait():
 
 
 def test_event_callback_frame_change():
-    """docs/guide/integrations.md: @viewer.on_event('frame_change')."""
+    """docs/guide/ipywidgets-events.md: @viewer.on_event('frame_change')."""
     viewer = megane.MolecularViewer()
     with pytest.warns(DeprecationWarning):
         viewer.load(
@@ -82,7 +82,7 @@ def test_event_callback_frame_change():
 
 
 def test_event_callback_off_event():
-    """docs/guide/integrations.md: viewer.off_event() removes callbacks."""
+    """docs/guide/ipywidgets-events.md: viewer.off_event() removes callbacks."""
     viewer = megane.MolecularViewer()
     with pytest.warns(DeprecationWarning):
         viewer.load(
@@ -104,7 +104,7 @@ def test_event_callback_off_event():
 
 
 def test_event_callback_selection_change():
-    """docs/guide/integrations.md: selection_change event fires on selected_atoms change."""
+    """docs/guide/ipywidgets-events.md: selection_change event fires on selected_atoms change."""
     viewer = megane.MolecularViewer()
     with pytest.warns(DeprecationWarning):
         viewer.load(str(FIXTURES / "1crn.pdb"))

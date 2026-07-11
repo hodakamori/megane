@@ -19,9 +19,9 @@ megane ships in six distributions, grouped by what you want to do — **view** y
 |----------|--------------|---------|------------|
 | **View** | Standalone web app | `pip install megane`, then `megane serve` | [Standalone web app](./guide/cli) |
 | **View** | Jupyter widget | `pip install megane` | [Jupyter widget](./guide/jupyter) |
-| **View** | JupyterLab extension | `pip install megane` | [Platform Support](./platform-support) |
-| **View** | VS Code extension | Install the megane extension | [Pipeline editor](./guide/pipeline) |
-| **Embed** | React component (npm) | `npm install megane-viewer` | [React component (npm)](./guide/web) |
+| **View** | JupyterLab extension | `pip install megane` | [JupyterLab extension](./guide/jupyterlab) |
+| **View** | VS Code extension | Install the megane extension | [VS Code extension](./guide/vscode) |
+| **Embed** | React component | `npm install megane-viewer` | [React component](./guide/web) |
 | **Parse** | Python package | `pip install megane` | [Python Pipeline API](./guide/pipeline/python) |
 
 For a side-by-side comparison of which formats and UI features each distribution supports — including known gaps — see [Platform Support](./platform-support).
@@ -67,4 +67,4 @@ All environments share the same parser and pipeline execution engine — a pipel
 
 - [Installation & Quick Start](./getting-started) — get megane running in 2 minutes
 - [Gallery](/gallery) — live 3D examples with copy-paste code
-- [Live Demo](/demo) — interactive viewer in the browser
+- [Live Demo](https://hodakamori.github.io/megane/app/) — interactive viewer in the browser

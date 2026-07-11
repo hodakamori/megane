@@ -55,40 +55,13 @@
   width: 100%;
 }
 
-.heroViewerDesktop {
+.heroDemoGif {
   display: block;
-}
-
-.heroViewerMobile {
-  display: none;
-}
-
-@media (max-width: 959px) {
-  .heroViewerDesktop {
-    display: none;
-  }
-  .heroViewerMobile {
-    display: block;
-  }
-}
-
-.mobileDemoCard {
-  text-align: center;
-  padding: 32px 24px;
+  width: 100%;
+  height: auto;
   border-radius: 12px;
-  background: var(--ifm-color-emphasis-100);
-  border: 1px solid var(--ifm-color-emphasis-300);
-}
-
-.mobileDemoIcon {
-  font-size: 3rem;
-  margin-bottom: 12px;
-}
-
-.mobileDemoText {
-  color: var(--ifm-color-emphasis-700);
-  margin-bottom: 16px;
-  font-size: 0.95rem;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 /* Quick Start Paths */

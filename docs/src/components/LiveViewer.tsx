@@ -6,8 +6,7 @@ import styles from "./LiveViewer.module.css";
 /**
  * LiveViewer — an inline, real 3D megane preview for use inside guides.
  *
- * Unlike <FullViewerDemo> (which embeds the whole app in an iframe), this
- * mounts the actual `MoleculeRenderer` directly from the viewer source, the
+ * It mounts the actual `MoleculeRenderer` directly from the viewer source, the
  * same way the Gallery does. It is lazy: the WebGL context is only created
  * once the block scrolls into view, so a page can host several without a
  * startup cost.
