@@ -47,6 +47,21 @@ test.describe("webapp: caffeine_water default", () => {
     await expectViewerRegionMatch(page, PLATFORM, "default-view-viewer");
   });
 
+  test("performance HUD reports atom/bond/draw counts", async ({ page }) => {
+    const hud = page.locator('[data-testid="perf-hud"]');
+    await expect(hud).toBeVisible();
+    // Atom / bond counts come straight from the loaded snapshot.
+    await expect(page.locator('[data-testid="perf-hud-atoms"]')).toHaveText(
+      `Atoms ${ATOM_COUNT_CAFFEINE}`,
+    );
+    await expect(page.locator('[data-testid="perf-hud-bonds"]')).toContainText("Bonds");
+    // Draw calls come from the renderer once a frame has been drawn (> 0).
+    const drawsText = await page.locator('[data-testid="perf-hud-draws"]').textContent();
+    expect(Number(drawsText?.replace(/\D/g, ""))).toBeGreaterThan(0);
+    // FPS is frozen to a placeholder under test mode for deterministic baselines.
+    await expect(page.locator('[data-testid="perf-hud-fps"]')).toHaveText("-- FPS");
+  });
+
   test("frame slider seek advances renderer state", async ({ page }) => {
     const before = await getReadyState(page);
 

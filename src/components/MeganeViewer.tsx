@@ -15,7 +15,8 @@ import { Timeline } from "./Timeline";
 import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MeasurementListPanel } from "./MeasurementListPanel";
-import { MoleculeRenderer } from "../renderer/MoleculeRenderer";
+import { PerfHud } from "./PerfHud";
+import { MoleculeRenderer, isMeganeTestMode } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
 import type { StructureParseResult } from "../parsers/structure";
 import { processPbcBonds } from "../pipeline/executors/addBond";
@@ -391,6 +392,11 @@ export function MeganeViewer({
     useViewStateStore.getState().clearViewState();
   }, []);
 
+  const getRenderStats = useCallback(() => rendererRef.current?.getStats() ?? null, []);
+  // Freeze the live FPS digits under E2E so screenshot baselines stay
+  // deterministic; the feature is fully live in production.
+  const hudStable = isMeganeTestMode();
+
   return (
     <div
       data-testid="megane-viewer"
@@ -452,6 +458,12 @@ export function MeganeViewer({
       >
         Reset View
       </button>
+      <PerfHud
+        atomCount={snapshot?.nAtoms ?? 0}
+        bondCount={bondCount}
+        getStats={getRenderStats}
+        stable={hudStable}
+      />
       <PipelineEditor
         collapsed={pipelineCollapsed}
         onToggleCollapse={handleTogglePipeline}
