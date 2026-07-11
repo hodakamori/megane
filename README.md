@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">Spectacles for atomistic data.</p>
-<p align="center"><em>1M+ atoms at 60fps. Visual pipelines. Jupyter, browser, React, VSCode.</em></p>
+<p align="center"><em>1M+ atoms at 60fps. Visual pipelines. Jupyter widget, standalone web app, React component, VS Code extension.</em></p>
 
 <p align="center">
   <a href="https://github.com/hodakamori/megane/actions/workflows/ci.yml"><img src="https://github.com/hodakamori/megane/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -32,7 +32,7 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, CLI server, React component, and VSCode extension. Rust-based parsers for 15 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 15 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
 - **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 16 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
@@ -46,13 +46,13 @@ Trajectory streaming works over WebSocket via a binary protocol. Load an XTC fil
 
 One codebase, every environment.
 
-| Environment | How | Install |
+| Distribution | How | Install |
 |---|---|---|
-| **Jupyter** | anywidget inline viewer | `pip install megane` |
-| **JupyterLab** | Open .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .dcd, .nc, .lammpstrj/.dump, .megane.json from the file browser | `pip install megane` |
-| **Browser** | `megane serve` local server | `pip install megane` |
-| **React** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VSCode** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .lammpstrj, .dump, .dcd, .nc, .megane.json | Extension |
+| **Jupyter widget** | anywidget inline viewer | `pip install megane` |
+| **JupyterLab extension** | Open .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .dcd, .nc, .lammpstrj/.dump, .megane.json from the file browser | `pip install megane` |
+| **Standalone web app** | `megane serve` in the browser | `pip install megane` |
+| **React component (npm)** | `<MeganeViewer />` component | `npm install megane-viewer` |
+| **VS Code extension** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .lammpstrj, .dump, .dcd, .nc, .megane.json | Extension |
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
@@ -96,7 +96,7 @@ npm install megane-viewer
 
 ## Quick Start
 
-### Jupyter Notebook
+### Jupyter widget
 
 ```python
 import megane
@@ -114,7 +114,7 @@ viewer.frame_index = 50  # jump to frame 50
 
 For advanced usage (filtering, multi-layer rendering, custom pipelines), see the [Pipeline API](https://hodakamori.github.io/megane/guide/pipeline#python-pipeline-api).
 
-### CLI (Docker)
+### Standalone web app (`megane serve`)
 
 ```bash
 docker build -t megane .
@@ -130,7 +130,7 @@ docker run --rm -p 8080:8080 -v ./mydata:/data megane \
   megane serve /data/protein.pdb --port 8080 --no-browser
 ```
 
-### React
+### React component (npm)
 
 ```tsx
 import { useCallback } from "react";
@@ -251,7 +251,7 @@ python/megane/           Python backend
   parsers/               Python wrappers for 13 of the 15 supported formats (mmCIF and AMBER prmtop are accessible via the raw megane_parser PyO3 extension)
   pipeline.py            Pipeline builder (NetworkX-style DAG)
   protocol.py            Binary protocol encoder
-  server.py              FastAPI WebSocket server
+  server.py              `megane serve` backend (FastAPI + WebSocket)
   widget.py              anywidget Jupyter widget
 tests/                   Tests (Python, TypeScript, E2E)
 ```

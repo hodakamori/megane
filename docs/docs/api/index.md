@@ -6,9 +6,9 @@ megane provides APIs for both Python and TypeScript/JavaScript.
 
 The Python API is used for:
 
-- **Jupyter notebooks** — Interactive widget for molecular visualization
-- **CLI server** — Serve structures via WebSocket
-- **Data loading** — Parse PDB files and read XTC trajectories
+- **Jupyter widget** — Interactive viewer in a notebook cell (`MolecularViewer`)
+- **Standalone web app** — Served by `megane serve` over WebSocket
+- **Python package** — Parse structure files and read trajectories programmatically
 
 ```python
 import megane
@@ -26,9 +26,9 @@ See the [Python Pipeline API guide](/guide/pipeline/python) for full documentati
 
 The TypeScript API is used for:
 
-- **React components** — Embed the viewer in web applications
-- **Core renderer** — Framework-agnostic Three.js rendering
-- **Protocol decoding** — Parse binary WebSocket messages
+- **React component (npm)** — Embed the viewer in web applications (`MeganeViewer`)
+- **`MoleculeRenderer` core renderer** — Framework-agnostic Three.js rendering
+- **Protocol decoding** — Parse binary messages from the `megane serve` backend
 
 ```ts
 import { MeganeViewer, MoleculeRenderer } from "megane-viewer/lib";

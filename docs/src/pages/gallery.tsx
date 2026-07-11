@@ -9,7 +9,7 @@ export default function GalleryPage() {
         <h1>Gallery</h1>
         <p>
           A collection of visualization examples. Each example shows a live 3D preview
-          and the code needed to reproduce it in Jupyter, React, or the VSCode extension.
+          and the code needed to reproduce it in the Jupyter widget, React component (npm), or the VS Code extension.
         </p>
 
         <GalleryIndex />

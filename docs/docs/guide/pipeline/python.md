@@ -73,7 +73,7 @@ from megane import (
 ```
 
 :::note
-The **Surface Mesh** node (alpha-shape envelope) is available in the visual pipeline editor but does not have a Python class. Use the standalone app, JupyterLab, or VSCode to add it interactively, or author the pipeline JSON directly.
+The **Surface Mesh** node (alpha-shape envelope) is available in the visual pipeline editor but does not have a Python class. Use the standalone app, JupyterLab, or VS Code to add it interactively, or author the pipeline JSON directly.
 :::
 
 ### LoadStructure

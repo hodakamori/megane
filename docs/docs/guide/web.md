@@ -1,8 +1,8 @@
 import LiveViewer from '@site/src/components/LiveViewer';
 
-# Web / React
+# React component (npm)
 
-megane can be embedded in React applications as a component library. It provides both high-level React components and a framework-agnostic imperative renderer.
+megane can be embedded in React applications as a component library, published to npm as `megane-viewer`. It provides both high-level React components (`MeganeViewer`, `PipelineViewer`) and the framework-agnostic `MoleculeRenderer` core renderer.
 
 <LiveViewer data="caffeine_water" caption="The megane renderer running live in this page — the same engine megane-viewer ships to your app." />
 
@@ -537,7 +537,7 @@ export default nextConfig;
 
 ## Protocol Utilities
 
-Decode binary messages from the megane WebSocket server:
+Decode binary messages from the `megane serve` backend (WebSocket):
 
 ```ts
 import {

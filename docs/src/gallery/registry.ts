@@ -759,7 +759,7 @@ viewer`,
 import { PipelineViewer, Pipeline, LoadStructure, LoadTrajectory, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 // Note: PipelineViewer auto-fetches load_structure files via fileUrl.
-// For load_trajectory, use the Jupyter / VSCode integration which handles file I/O natively.
+// For load_trajectory, use the Jupyter widget / VS Code extension which handles file I/O natively.
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));
 const traj = pipe.addNode(new LoadTrajectory({ xtc: "caffeine_water_vibration.xtc" }));
@@ -862,7 +862,7 @@ viewer`,
 import { PipelineViewer, Pipeline, LoadStructure, AddBonds, LoadVector, VectorOverlay, ViewportNode } from "megane-viewer/lib";
 
 // Note: load_vector reads per-atom vector data (JSON or .vec format).
-// File loading is handled natively in Jupyter and VSCode;
+// File loading is handled natively in the Jupyter widget and VS Code extension;
 // for React embedding, inject pre-loaded VectorFrame[] data via a custom hook.
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/caffeine_water.pdb"));

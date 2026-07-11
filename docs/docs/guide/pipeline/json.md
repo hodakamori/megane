@@ -6,7 +6,7 @@ sidebar_label: JSON
 
 Pipelines serialize to the **SerializedPipeline v3** JSON format. This format is used by:
 
-- The **VSCode extension** (`megane.json` files)
+- The **VS Code extension** (`megane.json` files)
 - The **pipeline editor** (import/export)
 - The TypeScript `pipe.toObject()` / `pipe.toJSON()` methods
 - The Python `pipe.to_dict()` method

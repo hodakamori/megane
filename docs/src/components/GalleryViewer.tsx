@@ -10,7 +10,7 @@ type TabId = "jupyter" | "react" | "vscode";
 const tabs: { id: TabId; label: string }[] = [
   { id: "jupyter", label: "Jupyter" },
   { id: "react", label: "React" },
-  { id: "vscode", label: "VSCode" },
+  { id: "vscode", label: "VS Code" },
 ];
 
 interface Props {

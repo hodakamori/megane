@@ -84,7 +84,7 @@ See [`examples/external_events.ipynb`](https://github.com/hodakamori/megane/blob
 
 Embed the megane viewer in MDX-based documentation frameworks like Next.js. Drop `<MeganeViewer />` or `<Viewport />` into your `.mdx` files — WASM parsing works out of the box with a one-line webpack config.
 
-For full code examples and Next.js configuration, see the [Web / React Guide — MDX Usage](/guide/web#mdx-usage-nextjs).
+For full code examples and Next.js configuration, see the [React component (npm) guide — MDX Usage](/guide/web#mdx-usage-nextjs).
 
 ## ipywidgets Events
 
@@ -166,4 +166,4 @@ renderer.updateFrame(frame);
 renderer.dispose();
 ```
 
-Use this to embed megane in Vue, Svelte, or any other framework — or directly in a vanilla `<div>`. See the [Web / React Guide](/guide/web#core-renderer-framework-agnostic) for detailed examples.
+Use this to embed megane in Vue, Svelte, or any other framework — or directly in a vanilla `<div>`. See the [React component (npm) guide](/guide/web#core-renderer-framework-agnostic) for detailed examples.

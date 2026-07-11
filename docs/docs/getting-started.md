@@ -21,7 +21,7 @@ npm install megane-viewer
 
 ## Quick Start
 
-### Jupyter Notebook
+### Jupyter widget
 
 ```python
 import megane
@@ -41,7 +41,7 @@ viewer.frame_index = 50  # jump to frame 50
 
 For advanced usage (filtering, multi-layer rendering, custom pipelines), see [Python Pipeline API](/guide/pipeline/python).
 
-### CLI Server (Docker)
+### Standalone web app (`megane serve`)
 
 The easiest way to run `megane serve` locally is with Docker:
 
@@ -59,11 +59,11 @@ docker run --rm -p 8080:8080 -v ./mydata:/data megane \
   megane serve /data/protein.pdb --port 8080 --no-browser
 ```
 
-For running from source, see the [CLI Guide](/guide/cli).
+For running from source, see the [Standalone web app guide](/guide/cli).
 
-### React Component
+### React component (npm)
 
-`MeganeViewer` is pipeline-store-driven — it manages its own snapshot, bonds,
+The `MeganeViewer` React component is pipeline-store-driven — it manages its own snapshot, bonds,
 trajectory, etc. internally. Host apps just supply the file-ingestion callback
 that pushes the chosen file into the global pipeline store:
 
@@ -87,7 +87,7 @@ function App() {
 ```
 
 For multiple independent viewers per page (e.g. embedding in MDX docs), use
-`PipelineViewer` instead — see the [Web / React Guide](/guide/web).
+`PipelineViewer` instead — see the [React component (npm) guide](/guide/web).
 
 ## Supported File Formats
 
@@ -114,8 +114,8 @@ Not every host opens every extension from its native file picker — see
 
 ## Next Steps
 
-- [Jupyter Widget Guide](/guide/jupyter) — Detailed widget usage, event handling, and Plotly integration
-- [CLI Guide](/guide/cli) — All CLI options and development mode
-- [Web / React Guide](/guide/web) — Embedding in React applications, imperative renderer API
+- [Jupyter widget guide](/guide/jupyter) — Detailed widget usage, event handling, and Plotly integration
+- [Standalone web app guide](/guide/cli) — All `megane serve` options and development mode
+- [React component (npm) guide](/guide/web) — Embedding in React applications, imperative renderer API
 - [Python Pipeline API](/guide/pipeline/python) — Full Python API documentation
 - [TypeScript Pipeline API](/guide/pipeline/typescript) — Full TypeScript API documentation

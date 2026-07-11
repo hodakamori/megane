@@ -11,7 +11,7 @@ export interface GalleryCode {
   jupyter: string;
   /** TSX code showing PipelineViewer usage */
   react: string;
-  /** megane.json content (SerializedPipeline JSON for VSCode extension) */
+  /** megane.json content (SerializedPipeline JSON for VS Code extension) */
   vscode: string;
 }
 

@@ -24,7 +24,10 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Visualize Your Data",
       collapsed: false,
-      items: ["guide/jupyter", "guide/cli"],
+      items: [
+        { type: "doc", id: "guide/jupyter", label: "Jupyter widget" },
+        { type: "doc", id: "guide/cli", label: "Standalone web app" },
+      ],
     },
     {
       type: "category",
@@ -39,7 +42,10 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Embed the Viewer",
       collapsed: false,
-      items: ["guide/web", "guide/integrations"],
+      items: [
+        { type: "doc", id: "guide/web", label: "React component (npm)" },
+        "guide/integrations",
+      ],
     },
     {
       type: "category",
@@ -65,7 +71,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "doc",
       id: "configuration",
-      label: "Development Setup",
+      label: "Configuration",
     },
   ],
 

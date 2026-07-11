@@ -1,6 +1,6 @@
-# CLI Server
+# Standalone web app (`megane serve`)
 
-megane includes a command-line tool to serve molecular structures in a local web viewer.
+The **standalone web app** is megane's full-featured viewer. You launch it with the `megane serve` command, which starts a local server and opens the viewer in your browser. `megane serve` is the CLI launcher; the FastAPI + WebSocket process it starts is referred to as the `megane serve` backend.
 
 ## Quick Start with Docker
 
@@ -58,7 +58,7 @@ megane serve [PDB_FILE] [OPTIONS]
 
 | Argument | Description |
 |----------|-------------|
-| `PDB_FILE` | Path to a PDB file (optional; can upload from the browser). The CLI server only loads `.pdb` from this positional argument — to start with an ASE trajectory, use `--traj` instead. Once the browser is open, drag-and-drop in the standalone UI accepts every supported structure format (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE `.traj`, …). |
+| `PDB_FILE` | Path to a PDB file (optional; can upload from the browser). `megane serve` only loads `.pdb` from this positional argument — to start with an ASE trajectory, use `--traj` instead. Once the browser is open, drag-and-drop in the standalone web app accepts every supported structure format (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE `.traj`, …). |
 
 ## Options
 
@@ -116,7 +116,7 @@ In development mode, the frontend is served by the Vite dev server (typically on
 
 ## Architecture
 
-The CLI starts a [FastAPI](https://fastapi.tiangolo.com/) server with:
+`megane serve` starts the backend — a [FastAPI](https://fastapi.tiangolo.com/) server with:
 
 - **Static file serving** — The built frontend from `megane/static/app/`
 - **WebSocket endpoint** (`/ws`) — Binary protocol streaming for molecular data

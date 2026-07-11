@@ -1,6 +1,6 @@
 # Introduction
 
-**megane** is a high-performance molecular viewer that works wherever you do — Jupyter notebooks, React web apps, the command line, and VSCode.
+**megane** is a high-performance molecular viewer that works wherever you do — as a Jupyter widget, a standalone web app, an embeddable React component, and a VS Code extension.
 
 ## What can megane do?
 
@@ -11,16 +11,20 @@
 - **Integrate with Plotly**, MDX/Next.js, ipywidgets, and any framework via the framework-agnostic renderer
 - **Light, dark, and auto themes** — cycle through Light / Dark / Auto (follows OS preference) via the Theme button in the Pipeline panel; persisted across sessions
 
-## Choose your environment
+## Choose your distribution
 
-| Environment | Install | Start here |
-|-------------|---------|------------|
-| **Jupyter / Python** | `pip install megane` | [Jupyter Guide](./guide/jupyter) |
-| **Web / React** | `npm install megane-viewer` | [Web Guide](./guide/web) |
-| **CLI (Docker)** | `docker build -t megane .` | [CLI Guide](./guide/cli) |
-| **VSCode** | Install the megane extension | [Pipeline Editor](./guide/pipeline) |
+megane ships in six distributions, grouped by what you want to do — **view** your data interactively, **embed** the viewer in your own app, or **parse** files programmatically.
 
-For a side-by-side comparison of which formats and UI features each environment supports — including known gaps — see [Platform Support](./platform-support).
+| Category | Distribution | Install | Start here |
+|----------|--------------|---------|------------|
+| **View** | Standalone web app | `pip install megane`, then `megane serve` | [Standalone web app](./guide/cli) |
+| **View** | Jupyter widget | `pip install megane` | [Jupyter widget](./guide/jupyter) |
+| **View** | JupyterLab extension | `pip install megane` | [Platform Support](./platform-support) |
+| **View** | VS Code extension | Install the megane extension | [Pipeline editor](./guide/pipeline) |
+| **Embed** | React component (npm) | `npm install megane-viewer` | [React component (npm)](./guide/web) |
+| **Parse** | Python package | `pip install megane` | [Python Pipeline API](./guide/pipeline/python) |
+
+For a side-by-side comparison of which formats and UI features each distribution supports — including known gaps — see [Platform Support](./platform-support).
 
 ## Supported file formats
 
