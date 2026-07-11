@@ -1,0 +1,79 @@
+/* Dark docs→marketing bridge band. Breaks out of the doc content column to
+ * span full width, matching the landing CTA. */
+.bridge {
+  margin: 3rem -36px -34px;
+  padding: 34px 36px;
+  background: #0a0c10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  border-radius: 0;
+}
+
+.title {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+  color: #fff;
+  margin-bottom: 5px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #b6bfca;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.primary,
+.primary:hover {
+  padding: 11px 20px;
+  border-radius: 9px;
+  background: linear-gradient(90deg, #12b1a3, #6b53d9);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: filter 0.15s ease;
+}
+
+.primary:hover {
+  filter: brightness(1.08);
+}
+
+.secondary,
+.secondary:hover {
+  padding: 11px 20px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.secondary:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 996px) {
+  .bridge {
+    margin: 3rem -16px -20px;
+    padding: 28px 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .bridge {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
