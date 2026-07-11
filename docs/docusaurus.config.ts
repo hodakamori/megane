@@ -1,8 +1,8 @@
-import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 import path from "path";
 import { fileURLToPath } from "url";
+import spectralTheme from "./src/prism/spectralTheme";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -49,10 +49,10 @@ const config: Config = {
 
   themeConfig: {
     navbar: {
-      title: "megane",
+      title: "Megane",
       logo: {
-        alt: "megane",
-        src: "logo.png",
+        alt: "Megane",
+        src: "logo.svg",
       },
       items: [
         {
@@ -113,8 +113,18 @@ const config: Config = {
       copyright: "Released under the MIT License.",
     },
     prism: {
-      theme: prismThemes.github,
-      darkTheme: prismThemes.dracula,
+      // Dark code blocks on both surfaces — one spectral theme for both modes.
+      theme: spectralTheme,
+      darkTheme: spectralTheme,
+    },
+    mermaid: {
+      theme: { light: "neutral", dark: "dark" },
+    },
+    zoom: {
+      background: {
+        light: "rgba(246, 247, 249, 0.96)",
+        dark: "rgba(10, 12, 16, 0.96)",
+      },
     },
   } satisfies Preset.ThemeConfig,
 

@@ -3,56 +3,14 @@
  *
  * Split into partials for maintainability:
  *   _fonts.css    — self-hosted @font-face declarations
- *   _theme.css    — brand tokens, typography, component polish
+ *   _theme.css    — spectral tokens, Infima mapping, typography, tables, cards
+ *   _chrome.css   — navbar, sidebar, TOC, breadcrumbs, pagination, admonitions,
+ *                   tabs, code-block chrome, buttons, footer, landing chrome
  *   _notebook.css — rendered-notebook (nbconvert / Pygments) styles
  *
- * This file keeps only the landing-page pillar layout.
+ * Landing-page layout lives in src/pages/index.module.css.
  */
 @import "./_fonts.css";
 @import "./_theme.css";
+@import "./_chrome.css";
 @import "./_notebook.css";
-
-/* ── Two-column pillar layout (landing page) ──────────────────────────────── */
-
-.pillar-section {
-  margin: 2rem 0;
-}
-
-.pillar-two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
-  margin: 16px 0;
-}
-
-.pillar-two-col .pillar-text {
-  padding-top: 8px;
-}
-
-.pillar-two-col .pillar-images {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.pillar-two-col .pillar-images.single-col {
-  grid-template-columns: 1fr;
-}
-
-.pillar-two-col .pillar-images img {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  width: 100%;
-  height: auto;
-}
-
-[data-theme="dark"] .pillar-two-col .pillar-images img {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-@media (max-width: 768px) {
-  .pillar-two-col {
-    grid-template-columns: 1fr;
-  }
-}
