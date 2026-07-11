@@ -10,7 +10,6 @@ const DEMO_URL = "https://hodakamori.github.io/megane/app/";
 const GITHUB_URL = "https://github.com/hodakamori/megane";
 
 const MODES: { id: HeroMode; label: string }[] = [
-  { id: "protein", label: "Protein" },
   { id: "trajectory", label: "Trajectory" },
   { id: "pipeline", label: "Pipeline" },
 ];
@@ -198,7 +197,7 @@ function CtaSection() {
 
 export default function Home(): React.JSX.Element {
   const { siteConfig } = useDocusaurusContext();
-  const [mode, setMode] = useState<HeroMode>("protein");
+  const [mode, setMode] = useState<HeroMode>("trajectory");
 
   // Force the dark navbar/footer chrome on the landing page regardless of the
   // docs color mode (see html.sp-landing rules in _chrome.css).

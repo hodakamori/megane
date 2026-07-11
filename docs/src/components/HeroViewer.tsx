@@ -13,10 +13,9 @@ import styles from "./HeroViewer.module.css";
  * Colors are literal (not --ifm-* tokens): the hero is always dark regardless
  * of the docs color mode.
  */
-export type HeroMode = "protein" | "trajectory" | "pipeline";
+export type HeroMode = "trajectory" | "pipeline";
 
 const MODE_DATA: Record<HeroMode, string> = {
-  protein: "1crn",
   trajectory: "caffeine_traj",
   pipeline: "caffeine_water",
 };
@@ -33,7 +32,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
-  const dataName = MODE_DATA[mode] ?? MODE_DATA.protein;
+  const dataName = MODE_DATA[mode] ?? MODE_DATA.trajectory;
   const resolvedSrc = useBaseUrl(`/data/${dataName}.json`);
 
   useEffect(() => {
