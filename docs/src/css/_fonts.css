@@ -1,34 +1,43 @@
 /* Self-hosted fonts (latin subset). No external requests — the .woff2 files
  * are committed under ./fonts and emitted by webpack with hashed URLs.
  *
- * Inter ships as a single variable file covering weights 100–900. */
+ * Spectral design system (docs redesign):
+ *   Space Grotesk  — display / headings / UI      (variable 300–700)
+ *   IBM Plex Sans  — body copy                     (covers 400–600)
+ *   JetBrains Mono — code / labels / metrics       (covers 400–700)
+ *
+ * Each family ships as a single variable file covering the weight range used
+ * across the site, so one @font-face per family is enough. The latin
+ * unicode-range matches what the Google Fonts css2 API emits for these files. */
 @font-face {
-  font-family: "Inter";
+  font-family: "Space Grotesk";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 300 700;
   font-display: swap;
-  src: url("./fonts/inter-latin.woff2") format("woff2");
+  src: url("./fonts/spacegrotesk-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
-    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "IBM Plex Mono";
+  font-family: "IBM Plex Sans";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 600;
   font-display: swap;
-  src: url("./fonts/plexmono-400-latin.woff2") format("woff2");
+  src: url("./fonts/plexsans-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-  font-family: "IBM Plex Mono";
+  font-family: "JetBrains Mono";
   font-style: normal;
-  font-weight: 600;
+  font-weight: 400 700;
   font-display: swap;
-  src: url("./fonts/plexmono-600-latin.woff2") format("woff2");
+  src: url("./fonts/jetbrainsmono-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
