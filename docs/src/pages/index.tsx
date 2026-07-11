@@ -10,9 +10,12 @@ const DEMO_URL = "https://hodakamori.github.io/megane/app/";
 const GITHUB_URL = "https://github.com/hodakamori/megane";
 
 const MODES: { id: HeroMode; label: string }[] = [
-  { id: "trajectory", label: "Trajectory" },
-  { id: "pipeline", label: "Pipeline" },
+  { id: "molecular", label: "Caffeine · water" },
+  { id: "crystal", label: "Perovskite" },
 ];
+
+/** How long each structure is shown before the hero cycles to the next. */
+const CYCLE_MS = 7000;
 
 function Hero({
   mode,
@@ -197,7 +200,7 @@ function CtaSection() {
 
 export default function Home(): React.JSX.Element {
   const { siteConfig } = useDocusaurusContext();
-  const [mode, setMode] = useState<HeroMode>("trajectory");
+  const [mode, setMode] = useState<HeroMode>("molecular");
 
   // Force the dark navbar/footer chrome on the landing page regardless of the
   // docs color mode (see html.sp-landing rules in _chrome.css).
@@ -205,6 +208,20 @@ export default function Home(): React.JSX.Element {
     document.documentElement.classList.add("sp-landing");
     return () => document.documentElement.classList.remove("sp-landing");
   }, []);
+
+  // Auto-cycle the hero structure over time (Caffeine · water ⇄ Perovskite).
+  // Keying on `mode` restarts the timer on every change, so a manual click
+  // also gives a fresh dwell before the next automatic switch. Pauses when
+  // the tab is hidden and honors prefers-reduced-motion.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      setMode((m) => (m === "molecular" ? "crystal" : "molecular"));
+    }, CYCLE_MS);
+    return () => window.clearInterval(id);
+  }, [mode]);
 
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>

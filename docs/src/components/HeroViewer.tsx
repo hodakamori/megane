@@ -8,33 +8,48 @@ import styles from "./HeroViewer.module.css";
  * It mounts the real `MoleculeRenderer` (the same viewer the docs and Gallery
  * use) as a non-interactive dark backdrop: the WebGL context is created lazily
  * once the hero scrolls into view AND the browser is idle, so it never blocks
- * first paint / LCP. The mode buttons swap the loaded structure.
+ * first paint / LCP. The renderer is mounted ONCE; changing `mode` only swaps
+ * the loaded structure (no context teardown), so the landing can cycle between
+ * structures over time without GPU churn.
  *
  * Colors are literal (not --ifm-* tokens): the hero is always dark regardless
  * of the docs color mode.
  */
-export type HeroMode = "trajectory" | "pipeline";
+export type HeroMode = "molecular" | "crystal";
 
 const MODE_DATA: Record<HeroMode, string> = {
-  trajectory: "caffeine_traj",
-  pipeline: "caffeine_water",
+  molecular: "caffeine_water",
+  crystal: "perovskite_srtio3",
 };
 
 const HERO_BG = 0x0a0c10;
 
-interface FrameData {
-  positions: Float32Array;
-  nAtoms: number;
-  frameId: number;
+async function fetchSnapshot(url: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`snapshot ${res.status}`);
+  const snap = await res.json();
+  return {
+    nAtoms: snap.nAtoms,
+    nBonds: snap.nBonds,
+    nFileBonds: snap.nFileBonds,
+    positions: new Float32Array(snap.positions),
+    elements: new Uint8Array(snap.elements),
+    bonds: new Uint32Array(snap.bonds),
+    bondOrders: snap.bondOrders ? new Uint8Array(snap.bondOrders) : null,
+    box: snap.box ? new Float32Array(snap.box) : null,
+  };
 }
 
 export default function HeroViewer({ mode }: { mode: HeroMode }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<any>(null);
+  const [mounted, setMounted] = useState(false);
   const [ready, setReady] = useState(false);
 
-  const dataName = MODE_DATA[mode] ?? MODE_DATA.trajectory;
+  const dataName = MODE_DATA[mode] ?? MODE_DATA.molecular;
   const resolvedSrc = useBaseUrl(`/data/${dataName}.json`);
 
+  // Mount the renderer once (lazy: on intersection + idle).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const container = containerRef.current;
@@ -42,18 +57,14 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
 
     let renderer: any = null;
     let observer: IntersectionObserver | null = null;
-    let playInterval: ReturnType<typeof setInterval> | null = null;
     let idleHandle: number | null = null;
     let unmounted = false;
-
-    setReady(false);
 
     const prefersReducedMotion =
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-    async function initPreview() {
+    async function init() {
       if (unmounted || !container) return;
-
       const { MoleculeRenderer } = await import(
         "../../../src/renderer/MoleculeRenderer"
       );
@@ -71,55 +82,15 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
           renderer.controls.autoRotateSpeed = 1.4;
         }
       }
-
-      try {
-        const res = await fetch(resolvedSrc);
-        if (!res.ok || unmounted) return;
-        const snap = await res.json();
-        if (unmounted) return;
-
-        const snapshot = {
-          nAtoms: snap.nAtoms,
-          nBonds: snap.nBonds,
-          nFileBonds: snap.nFileBonds,
-          positions: new Float32Array(snap.positions),
-          elements: new Uint8Array(snap.elements),
-          bonds: new Uint32Array(snap.bonds),
-          bondOrders: snap.bondOrders ? new Uint8Array(snap.bondOrders) : null,
-          box: snap.box ? new Float32Array(snap.box) : null,
-        };
-        renderer.loadSnapshot(snapshot);
-        // setBackgroundColor again — loadSnapshot may reset the clear color.
-        renderer.setBackgroundColor(HERO_BG);
-        setReady(true);
-
-        // Auto-play trajectories (no Timeline UI on the hero).
-        if (!prefersReducedMotion && snap.frames && snap.frames.length > 1) {
-          const frames: FrameData[] = snap.frames.map((f: any, i: number) => ({
-            positions: new Float32Array(f.positions),
-            nAtoms: snap.nAtoms,
-            frameId: i,
-          }));
-          let idx = 0;
-          playInterval = setInterval(() => {
-            if (unmounted || !renderer) return;
-            idx = (idx + 1) % frames.length;
-            renderer.updateFrame(frames[idx]);
-          }, 1000 / 12);
-        }
-      } catch {
-        /* leave the static hero copy — the backdrop is decorative */
-      }
+      rendererRef.current = renderer;
+      setMounted(true);
     }
 
-    function scheduleInit() {
-      const ric: typeof window.requestIdleCallback | undefined =
-        (window as any).requestIdleCallback;
-      if (ric) {
-        idleHandle = ric(() => initPreview(), { timeout: 1200 });
-      } else {
-        idleHandle = window.setTimeout(() => initPreview(), 300) as any;
-      }
+    function schedule() {
+      const ric: typeof window.requestIdleCallback | undefined = (window as any)
+        .requestIdleCallback;
+      if (ric) idleHandle = ric(() => init(), { timeout: 1200 });
+      else idleHandle = window.setTimeout(() => init(), 300) as any;
     }
 
     observer = new IntersectionObserver(
@@ -127,7 +98,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
         if (entries[0].isIntersecting) {
           observer?.disconnect();
           observer = null;
-          scheduleInit();
+          schedule();
         }
       },
       { rootMargin: "100px" },
@@ -137,16 +108,39 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
     return () => {
       unmounted = true;
       observer?.disconnect();
-      if (playInterval) clearInterval(playInterval);
       if (idleHandle != null) {
-        const cic: typeof window.cancelIdleCallback | undefined =
-          (window as any).cancelIdleCallback;
+        const cic: typeof window.cancelIdleCallback | undefined = (window as any)
+          .cancelIdleCallback;
         if (cic) cic(idleHandle);
         else clearTimeout(idleHandle);
       }
       if (renderer) renderer.dispose();
+      rendererRef.current = null;
     };
-  }, [resolvedSrc]);
+  }, []);
+
+  // Load / swap the structure whenever the mode's source changes (once mounted).
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    (async () => {
+      const renderer = rendererRef.current;
+      if (!renderer) return;
+      try {
+        const snapshot = await fetchSnapshot(resolvedSrc);
+        if (cancelled || !rendererRef.current) return;
+        renderer.loadSnapshot(snapshot);
+        // loadSnapshot may reset the clear color — keep the dark hero bg.
+        renderer.setBackgroundColor(HERO_BG);
+        setReady(true);
+      } catch {
+        /* decorative backdrop — ignore load failures */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, resolvedSrc]);
 
   return (
     <div
