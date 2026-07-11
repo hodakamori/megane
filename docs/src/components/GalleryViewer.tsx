@@ -200,8 +200,16 @@ export default function GalleryViewer({ example }: Props) {
           }
         }
 
+        // Per-atom vector data (forces / velocities) for the load_vector node.
+        // Snapshots that carry a `vectors` array (e.g. caffeine_vectors.json)
+        // feed the pipeline's fileVectors channel so the arrows actually render.
+        const fileVectors = data.vectors
+          ? [{ frame: 0, vectors: new Float32Array(data.vectors) }]
+          : null;
+
         const { viewportState } = executePipeline(nodes, edges, {
           nodeSnapshots,
+          fileVectors,
         });
         applyViewportState(renderer, viewportState, null);
       } catch (error) {
