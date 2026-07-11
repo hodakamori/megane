@@ -1,6 +1,6 @@
 import LiveViewer from '@site/src/components/LiveViewer';
 
-# React component (npm)
+# React component
 
 megane can be embedded in React applications as a component library, published to npm as `megane-viewer`. It provides both high-level React components (`MeganeViewer`, `PipelineViewer`) and the framework-agnostic `MoleculeRenderer` core renderer.
 
@@ -217,45 +217,7 @@ When the pipeline includes time-dependent data — by loading a multi-frame stru
 
 ### Usage in MDX (Next.js / Docusaurus)
 
-`PipelineViewer` works in any MDX-based framework. Import it directly in your `.mdx` file:
-
-```mdx
-import { PipelineViewer } from "megane-viewer/lib";
-
-# Caffeine in Water
-
-<PipelineViewer
-  height={480}
-  pipeline={{
-    version: 3,
-    nodes: [
-      { id: "s1", type: "load_structure", fileName: "caffeine_water.pdb",
-        fileUrl: "/structures/caffeine_water.pdb",
-        hasTrajectory: false, hasCell: false, position: { x: 0, y: 0 } },
-      { id: "b1", type: "add_bond", bondSource: "distance", position: { x: 200, y: 0 } },
-      { id: "v1", type: "viewport", perspective: false, cellAxesVisible: false,
-        pivotMarkerVisible: true, position: { x: 400, y: 0 } },
-    ],
-    edges: [
-      { source: "s1", target: "b1", sourceHandle: "particle", targetHandle: "particle" },
-      { source: "s1", target: "v1", sourceHandle: "particle", targetHandle: "particle" },
-      { source: "b1", target: "v1", sourceHandle: "bond",     targetHandle: "bond" },
-    ],
-  }}
-/>
-```
-
-For Next.js you also need WASM support in `next.config.mjs`:
-
-```js
-const nextConfig = {
-  webpack: (config) => {
-    config.experiments = { ...config.experiments, asyncWebAssembly: true };
-    return config;
-  },
-};
-export default nextConfig;
-```
+`PipelineViewer` works in any MDX-based framework — import it directly in your `.mdx` file and drop it in. For full MDX examples, the `MeganeViewer` / viewport-only variants, and the required `next.config.mjs` WASM setup, see the [MDX / Next.js guide](/guide/mdx).
 
 ### Using a saved pipeline JSON
 
@@ -358,180 +320,13 @@ function CustomLayout({ bondConfig, trajectoryConfig, handleUpload }) {
 
 ## Core Renderer (Framework-Agnostic)
 
-For non-React applications (Vue, Svelte, vanilla JS), use `MoleculeRenderer` directly. This is the same Three.js renderer powering all megane components:
-
-```ts
-import { MoleculeRenderer } from "megane-viewer/lib";
-import type { Snapshot } from "megane-viewer/lib";
-
-// Create and mount
-const renderer = new MoleculeRenderer();
-renderer.mount(document.getElementById("viewer")!);
-
-// Load data
-renderer.loadSnapshot(snapshot);
-
-// Update positions for animation
-renderer.updateFrame(frame);
-
-// Control appearance
-renderer.setAtomScale(1.2);
-renderer.setAtomOpacity(0.8);
-renderer.setBondScale(0.5);
-renderer.setPerspective(true);
-renderer.setCellVisible(true);
-
-// Cleanup
-renderer.dispose();
-```
-
-### Atom Selection & Measurement
-
-```ts
-// Select atoms programmatically
-renderer.toggleAtomSelection(0);
-renderer.toggleAtomSelection(1);
-
-// Get measurement (distance, angle, or dihedral based on # selected)
-const measurement = renderer.getMeasurement();
-// { type: 'distance', value: 3.82, label: '3.82 Å', atoms: [0, 1] }
-
-// Clear selection
-renderer.clearSelection();
-```
-
-### Picking (Hover & Click)
-
-Screen-space picking for identifying atoms and bonds:
-
-```ts
-const hit = renderer.raycastAtPixel(mouseX, mouseY);
-if (hit) {
-  if (hit.kind === "atom") {
-    console.log(`Atom ${hit.atomIndex}: ${hit.elementSymbol}`);
-  } else if (hit.kind === "bond") {
-    console.log(`Bond: ${hit.atomA}–${hit.atomB}, length=${hit.bondLength.toFixed(2)} Å`);
-  }
-}
-```
+For non-React applications (Vue, Svelte, vanilla JS), use `MoleculeRenderer` directly — the same Three.js renderer that powers all megane components. See the [Framework-Agnostic Renderer guide](/guide/framework-agnostic) for mounting, appearance control, atom selection/measurement, and screen-space picking.
 
 ---
 
 ## MDX Usage (Next.js)
 
-megane works in MDX-based documentation frameworks like Next.js. For a static
-embed of a known structure, use [`PipelineViewer`](#pipelineviewer-docs--mdx-embed)
-— it has no global-store dependency, so multiple instances on the same page
-work independently and you don't need any file-upload plumbing:
-
-```mdx
----
-title: Protein Visualization
----
-
-import { PipelineViewer } from "megane-viewer/lib";
-
-# Caffeine in Water
-
-A caffeine molecule solvated by water — 3024 atoms rendered in real time.
-
-<PipelineViewer
-  height={500}
-  pipeline={{
-    version: 3,
-    nodes: [
-      { id: "s1", type: "load_structure", fileName: "caffeine_water.pdb",
-        fileUrl: "/data/protein.pdb",
-        hasTrajectory: false, hasCell: false, position: { x: 0, y: 0 } },
-      { id: "b1", type: "add_bond", bondSource: "distance",
-        position: { x: 200, y: 0 } },
-      { id: "v1", type: "viewport", perspective: false, cellAxesVisible: false,
-        pivotMarkerVisible: true, position: { x: 400, y: 0 } },
-    ],
-    edges: [
-      { source: "s1", target: "b1", sourceHandle: "particle", targetHandle: "particle" },
-      { source: "s1", target: "v1", sourceHandle: "particle", targetHandle: "particle" },
-      { source: "b1", target: "v1", sourceHandle: "bond",     targetHandle: "bond" },
-    ],
-  }}
-/>
-
-The viewer above uses WASM-powered parsing and billboard impostor rendering
-to display all 3024 atoms with bonds inferred from van der Waals radii.
-```
-
-If you specifically need the full sidebar / appearance / pipeline-editor UI in
-an MDX page, use `MeganeViewer` and pipe uploads through `usePipelineStore`:
-
-```mdx
-import { useCallback } from "react";
-import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
-
-export function FullViewer() {
-  const handleUpload = useCallback((file) => {
-    usePipelineStore.getState().openFile(file);
-  }, []);
-  return (
-    <MeganeViewer
-      onUploadStructure={handleUpload}
-      width="100%"
-      height="500px"
-    />
-  );
-}
-
-<FullViewer />
-```
-
-Note that `MeganeViewer` is backed by a global Zustand store, so only one
-instance per page renders correctly — for multiple independent viewers, use
-`PipelineViewer` as shown above.
-
-### Viewport-Only in MDX
-
-For a simpler embed without panels:
-
-```mdx
-import { useState, useEffect } from "react";
-import { Viewport, parseStructureText } from "megane-viewer/lib";
-
-export function SimpleViewer() {
-  const [snapshot, setSnapshot] = useState(null);
-
-  useEffect(() => {
-    fetch("/data/caffeine_water.pdb")
-      .then((r) => r.text())
-      .then(async (text) => {
-        const result = await parseStructureText(text);
-        setSnapshot(result.snapshot);
-      });
-  }, []);
-
-  return (
-    <div style={{ height: "400px" }}>
-      <Viewport snapshot={snapshot} frame={null} />
-    </div>
-  );
-}
-
-<SimpleViewer />
-```
-
-### Next.js Configuration
-
-Add megane to `next.config.mjs` for WASM support:
-
-```js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  webpack: (config) => {
-    config.experiments = { ...config.experiments, asyncWebAssembly: true };
-    return config;
-  },
-};
-
-export default nextConfig;
-```
+megane works in MDX-based documentation frameworks like Next.js. For static embeds, `MeganeViewer`/`PipelineViewer` variants, viewport-only embeds, and the required `next.config.mjs` WASM setup, see the [MDX / Next.js guide](/guide/mdx).
 
 ---
 

@@ -27,34 +27,38 @@ const sidebars: SidebarsConfig = {
       items: [
         { type: "doc", id: "guide/jupyter", label: "Jupyter widget" },
         { type: "doc", id: "guide/cli", label: "Standalone web app" },
+        { type: "doc", id: "guide/vscode", label: "VS Code extension" },
+        { type: "doc", id: "guide/jupyterlab", label: "JupyterLab extension" },
       ],
     },
     {
       type: "category",
       label: "Pipelines",
       collapsed: false,
-      items: ["guide/pipeline/index"],
+      items: [
+        "guide/pipeline/index",
+        "guide/pipeline/python",
+        "guide/pipeline/typescript",
+        "guide/pipeline/json",
+      ],
     },
   ],
 
   buildSidebar: [
     {
       type: "category",
-      label: "Embed the Viewer",
+      label: "Integration",
       collapsed: false,
       items: [
-        { type: "doc", id: "guide/web", label: "React component (npm)" },
-        "guide/integrations",
-      ],
-    },
-    {
-      type: "category",
-      label: "Pipeline API",
-      collapsed: false,
-      items: [
-        "guide/pipeline/python",
-        "guide/pipeline/typescript",
-        "guide/pipeline/json",
+        { type: "doc", id: "guide/web", label: "React component" },
+        { type: "doc", id: "guide/mdx", label: "MDX" },
+        { type: "doc", id: "guide/plotly", label: "Plotly" },
+        { type: "doc", id: "guide/ipywidgets-events", label: "ipywidgets events" },
+        {
+          type: "doc",
+          id: "guide/framework-agnostic",
+          label: "Framework-agnostic renderer",
+        },
       ],
     },
     {

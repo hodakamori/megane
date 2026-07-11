@@ -3,9 +3,9 @@ import Link from "@docusaurus/Link";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import Layout from "@theme/Layout";
 import HeroCodeTabs from "../components/HeroCodeTabs";
-import FullViewerDemo from "../components/FullViewerDemo";
-import BrowserOnly from "@docusaurus/BrowserOnly";
 import styles from "./index.module.css";
+
+const DEMO_URL = "https://hodakamori.github.io/megane/app/";
 
 function Hero() {
   return (
@@ -23,7 +23,7 @@ function Hero() {
             <Link className="button button--primary button--lg" to="/getting-started">
               Get Started
             </Link>
-            <Link className="button button--secondary button--lg" to="/demo">
+            <Link className="button button--secondary button--lg" href={DEMO_URL}>
               Live Demo
             </Link>
             <Link
@@ -36,18 +36,11 @@ function Hero() {
           <HeroCodeTabs />
         </div>
         <div className={styles.heroViewer}>
-          <div className={styles.heroViewerDesktop}>
-            <BrowserOnly>{() => <FullViewerDemo height="600px" />}</BrowserOnly>
-          </div>
-          <div className={styles.heroViewerMobile}>
-            <div className={styles.mobileDemoCard}>
-              <div className={styles.mobileDemoIcon}>🧪</div>
-              <p className={styles.mobileDemoText}>Interactive 3D molecular viewer</p>
-              <Link className="button button--primary" to="/demo">
-                Try Demo
-              </Link>
-            </div>
-          </div>
+          <img
+            className={styles.heroDemoGif}
+            src="/megane/screenshots/megane-promo.gif"
+            alt="megane molecular viewer demo"
+          />
         </div>
       </div>
     </header>
@@ -66,12 +59,12 @@ const paths = [
   },
   {
     icon: "⚛️",
-    title: "React component (npm)",
+    title: "React component",
     install: "npm install megane-viewer",
     isCommand: true,
     description: "Drop <PipelineViewer /> into any React app. Build pipelines with the TypeScript builder API.",
     href: "/guide/web",
-    label: "React component (npm)",
+    label: "React component",
   },
   {
     icon: "🐳",
@@ -88,7 +81,7 @@ const paths = [
     install: "Install from Marketplace",
     isCommand: false,
     description: "Open .pdb, .gro, .xyz, .mol, .cif files directly in VS Code with the megane extension.",
-    href: "https://marketplace.visualstudio.com/items?itemName=hodakamori.vscode-megane",
+    href: "/guide/vscode",
     label: "VS Code extension",
   },
 ];
@@ -131,7 +124,7 @@ function Features() {
     {
       title: "🌍 Runs Everywhere",
       description:
-        "Jupyter widget, standalone web app, React component (npm), VS Code extension, JupyterLab extension. Rust parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj, LAMMPS dump) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
+        "Jupyter widget, standalone web app, React component, VS Code extension, JupyterLab extension. Rust parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj, LAMMPS dump) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
     },
     {
       title: "🧩 Visual Pipeline Editor",
@@ -204,7 +197,7 @@ function PillarSection() {
                   <td><code>pip install megane</code></td>
                 </tr>
                 <tr>
-                  <td><strong>React component (npm)</strong></td>
+                  <td><strong>React component</strong></td>
                   <td><code>{"<MeganeViewer />"}</code> component</td>
                   <td><code>npm install megane-viewer</code></td>
                 </tr>

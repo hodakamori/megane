@@ -73,7 +73,11 @@ const config: Config = {
           label: "Reference",
         },
         { to: "/gallery", label: "Gallery", position: "left" },
-        { to: "/demo", label: "Demo", position: "left" },
+        {
+          href: "https://hodakamori.github.io/megane/app/",
+          label: "Demo",
+          position: "left",
+        },
         {
           type: "docSidebar",
           sidebarId: "apiSidebar",
