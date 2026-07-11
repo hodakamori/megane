@@ -31,7 +31,7 @@ maturin develop --release
 Run the frontend dev server and Python backend simultaneously:
 
 ```bash
-# Terminal 1: Start the Python WebSocket server
+# Terminal 1: Start the `megane serve` backend (FastAPI + WebSocket)
 megane serve protein.pdb --dev --port 8765
 
 # Terminal 2: Start the Vite dev server

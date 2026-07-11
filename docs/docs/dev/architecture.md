@@ -279,7 +279,7 @@ the same PR. The full per-host registration checklist lives in the
    `LoadTrajectoryNode.tsx`
 5. Register the type on every host: `jupyterlab-megane/src/filetypes.ts`
    (JupyterLab `IFileType`) and `vscode-megane/package.json`
-   (VSCode `customEditors`)
+   (VS Code `customEditors`)
 6. Wire the Python `LoadStructure` / `LoadTrajectory` dispatch in
    `python/megane/pipeline.py` (`_load_structure_file` / `_load_trajectory_data`)
 7. Update `docs/docs/platform-support.md`, `docs/docs/introduction.md`,

@@ -17,7 +17,7 @@ function Hero() {
             Spectacles for atomistic data.
           </p>
           <p className={styles.heroSubtitle}>
-            1M+ atoms at 60fps. Visual pipelines. Jupyter, browser, React, VSCode.
+            1M+ atoms at 60fps. Visual pipelines. Jupyter widget, standalone web app, React component, VS Code extension.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/getting-started">
@@ -57,39 +57,39 @@ function Hero() {
 const paths = [
   {
     icon: "🔬",
-    title: "Python / Jupyter",
+    title: "Jupyter widget",
     install: "pip install megane",
     isCommand: true,
     description: "Interactive widget inside Jupyter notebooks. Build pipelines in Python, display structures inline.",
     href: "/guide/jupyter",
-    label: "Jupyter Guide",
+    label: "Jupyter widget",
   },
   {
     icon: "⚛️",
-    title: "TypeScript / React",
+    title: "React component (npm)",
     install: "npm install megane-viewer",
     isCommand: true,
     description: "Drop <PipelineViewer /> into any React app. Build pipelines with the TypeScript builder API.",
     href: "/guide/web",
-    label: "React Guide",
+    label: "React component (npm)",
   },
   {
     icon: "🐳",
-    title: "Docker",
+    title: "Standalone web app",
     install: "docker build -t megane .",
     isCommand: true,
-    description: "Serve local structure files and view them instantly in the browser. No code needed.",
+    description: "Serve local structure files with `megane serve` and view them instantly in the browser. No code needed.",
     href: "/guide/cli",
-    label: "CLI Guide",
+    label: "Standalone web app",
   },
   {
     icon: "🖥️",
-    title: "VSCode",
+    title: "VS Code extension",
     install: "Install from Marketplace",
     isCommand: false,
     description: "Open .pdb, .gro, .xyz, .mol, .cif files directly in VS Code with the megane extension.",
     href: "https://marketplace.visualstudio.com/items?itemName=hodakamori.vscode-megane",
-    label: "VSCode Extension",
+    label: "VS Code extension",
   },
 ];
 
@@ -131,7 +131,7 @@ function Features() {
     {
       title: "🌍 Runs Everywhere",
       description:
-        "Jupyter widget, CLI server, React component, VSCode extension, JupyterLab labextension. Rust parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj, LAMMPS dump) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
+        "Jupyter widget, standalone web app, React component (npm), VS Code extension, JupyterLab extension. Rust parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj, LAMMPS dump) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
     },
     {
       title: "🧩 Visual Pipeline Editor",
@@ -187,29 +187,29 @@ function PillarSection() {
             <table>
               <thead>
                 <tr>
-                  <th>Environment</th>
+                  <th>Distribution</th>
                   <th>How</th>
                   <th>Install</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><strong>Jupyter</strong></td>
+                  <td><strong>Jupyter widget</strong></td>
                   <td>anywidget inline viewer</td>
                   <td><code>pip install megane</code></td>
                 </tr>
                 <tr>
-                  <td><strong>Browser</strong></td>
-                  <td><code>megane serve</code> local server</td>
+                  <td><strong>Standalone web app</strong></td>
+                  <td><code>megane serve</code> in the browser</td>
                   <td><code>pip install megane</code></td>
                 </tr>
                 <tr>
-                  <td><strong>React</strong></td>
+                  <td><strong>React component (npm)</strong></td>
                   <td><code>{"<MeganeViewer />"}</code> component</td>
                   <td><code>npm install megane-viewer</code></td>
                 </tr>
                 <tr>
-                  <td><strong>VSCode</strong></td>
+                  <td><strong>VS Code extension</strong></td>
                   <td>Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .cif</td>
                   <td>Extension</td>
                 </tr>
