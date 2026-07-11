@@ -47,6 +47,12 @@
  *   MEGANE_BENCH_SECONDS   measurement window seconds (default 5)
  *   MEGANE_BENCH_WARMUP    warmup seconds before measuring (default 1.5)
  *   MEGANE_BENCH_HEADLESS  1 → run GPU-on in new-headless too (default: GPU-on is headed)
+ *   MEGANE_BENCH_ANGLE     ANGLE backend for GPU-on (default | gl | vulkan | d3d11 | metal)
+ *   MEGANE_BENCH_CHROMIUM_ARGS  extra space-separated Chromium launch flags
+ *   MEGANE_BENCH_MAX_SECONDS / MEGANE_BENCH_MIN_FRAMES  adaptive window bounds
+ *   MEGANE_BENCH_CDP       ws/http CDP endpoint of a running browser to attach to
+ *                          instead of launching (WSL escape hatch: run Chrome/Edge
+ *                          on Windows with --remote-debugging-port=9222 for real GPU)
  */
 
 import { existsSync, mkdirSync, writeFileSync } from "fs";
@@ -75,9 +81,23 @@ const ATOM_COUNTS = (process.env.MEGANE_BENCH_ATOMS ?? "1000,10000,100000,500000
   .map((s) => parseInt(s.trim(), 10))
   .filter((n) => Number.isFinite(n) && n > 0);
 
+// CDP: connect to an already-running browser instead of launching one. This is
+// the escape hatch for WSL — launch Chrome/Edge on native Windows with
+// --remote-debugging-port=9222 so it uses the real GPU, and point the WSL-side
+// script at it. The WSL dev server is reachable from that browser over
+// localhost (WSL2 localhost forwarding / mirrored networking).
+const CDP_URL = process.env.MEGANE_BENCH_CDP || null;
+
 const GPU_ARG = parseGpuArg().toLowerCase();
-const GPU_MODES =
-  GPU_ARG === "on" ? ["on"] : GPU_ARG === "off" ? ["off"] : ["on", "off"];
+// With CDP the browser (and its GPU) is whatever you connected to, so on/off
+// launch flags don't apply — run a single "cdp" pass.
+const GPU_MODES = CDP_URL
+  ? ["cdp"]
+  : GPU_ARG === "on"
+    ? ["on"]
+    : GPU_ARG === "off"
+      ? ["off"]
+      : ["on", "off"];
 
 const MEASURE_SECONDS = Number(process.env.MEGANE_BENCH_SECONDS ?? 5);
 // Keep rotating past MEASURE_SECONDS (up to MAX_SECONDS) until at least
@@ -229,6 +249,8 @@ async function measureOnce(context, server, n) {
   const page = await context.newPage();
   page.on("pageerror", (e) => console.log(`  [pageerror] ${e.message}`));
   try {
+    // CDP contexts have no fixed viewport — set it best-effort for parity.
+    if (CDP_URL) await page.setViewportSize(VIEWPORT).catch(() => {});
     await page.goto(server.url, { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForSelector("canvas", { timeout: 20000 });
     // Warm WASM: wait for the startup demo's first frame.
@@ -294,10 +316,11 @@ try {
   console.log(
     `[render-fps] modes=${GPU_MODES.join(",")} atoms=${ATOM_COUNTS.join(",")} ` +
       `measure=${MEASURE_SECONDS}-${MAX_SECONDS}s(min${MIN_FRAMES}f) warmup=${WARMUP_SECONDS}s ` +
-      `angle=${ANGLE_BACKEND} headless(gpu-on)=${FORCE_HEADLESS}`,
+      (CDP_URL ? `cdp=${CDP_URL}` : `angle=${ANGLE_BACKEND} headless(gpu-on)=${FORCE_HEADLESS}`),
   );
   console.log("[render-fps] starting Vite dev server...");
   server = await startViteServer();
+  console.log(`[render-fps] dev server: ${server.url}`);
   const chromium = getChromium();
 
   const rows = [];
@@ -305,9 +328,17 @@ try {
 
   for (const mode of GPU_MODES) {
     console.log(`\n[render-fps] === GPU ${mode} ===`);
-    const browser = await chromium.launch(launchOptions(mode));
+    // CDP: attach to a running browser (real GPU on the host); otherwise launch.
+    const browser = CDP_URL
+      ? await chromium.connectOverCDP(CDP_URL)
+      : await chromium.launch(launchOptions(mode));
     try {
-      const context = await browser.newContext({ viewport: VIEWPORT });
+      // With CDP we reuse the connected browser's default context (a new
+      // context isn't guaranteed to inherit the GPU-backed window); otherwise
+      // create an isolated context with a fixed viewport.
+      const context = CDP_URL
+        ? browser.contexts()[0] || (await browser.newContext())
+        : await browser.newContext({ viewport: VIEWPORT });
       // __MEGANE_TEST__ exposes __megane_test / __megane_test_ready; must run
       // before setupPerfHooks so both init scripts land before any page script.
       await context.addInitScript(() => {
@@ -315,21 +346,22 @@ try {
       });
       await setupPerfHooks(context);
 
-      // GL renderer string (sanity: hardware vs SwiftShader).
+      // GL renderer string (sanity: hardware vs software).
       const probe = await context.newPage();
       await probe.goto(server.url, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
       const gl = await readGlRenderer(probe);
       glRenderers[mode] = gl;
       await probe.close().catch(() => {});
-      const swiftshader = /swiftshader|llvmpipe|software/i.test(gl);
+      const software = /swiftshader|llvmpipe|software/i.test(gl);
       console.log(`[render-fps] GL renderer: ${gl}`);
-      if (mode === "on" && swiftshader) {
+      if (mode !== "off" && software) {
         console.log(
-          "[render-fps] WARNING: GPU-on did NOT get a hardware context — the GL renderer is a " +
+          "[render-fps] WARNING: did NOT get a hardware context — the GL renderer is a " +
             "software rasterizer (SwiftShader / Mesa llvmpipe), so the GPU is NOT being used and " +
             "these numbers are CPU-bound. To use real hardware: run headed (do NOT set " +
-            "MEGANE_BENCH_HEADLESS), on native Windows/macOS/Linux (not a GPU-less VM / plain WSL), " +
-            "and optionally try MEGANE_BENCH_ANGLE=gl or =vulkan (Linux) / leave default (Windows d3d11).",
+            "MEGANE_BENCH_HEADLESS) on native Windows/macOS/Linux (not a GPU-less VM / plain WSL); " +
+            "on WSL, launch Chrome/Edge on Windows with --remote-debugging-port=9222 and set " +
+            "MEGANE_BENCH_CDP=http://localhost:9222 so the browser (and its GPU) runs on Windows.",
         );
       }
 
@@ -346,6 +378,7 @@ try {
         );
       }
     } finally {
+      // For CDP, close only disconnects (leaves the user's browser running).
       await browser.close().catch(() => {});
     }
   }
