@@ -80,8 +80,20 @@ const GPU_MODES =
   GPU_ARG === "on" ? ["on"] : GPU_ARG === "off" ? ["off"] : ["on", "off"];
 
 const MEASURE_SECONDS = Number(process.env.MEGANE_BENCH_SECONDS ?? 5);
+// Keep rotating past MEASURE_SECONDS (up to MAX_SECONDS) until at least
+// MIN_FRAMES frames are captured — otherwise heavy N at low fps yields too few
+// samples for a stable FPS estimate.
+const MAX_SECONDS = Number(process.env.MEGANE_BENCH_MAX_SECONDS ?? 20);
+const MIN_FRAMES = Number(process.env.MEGANE_BENCH_MIN_FRAMES ?? 30);
 const WARMUP_SECONDS = Number(process.env.MEGANE_BENCH_WARMUP ?? 1.5);
 const FORCE_HEADLESS = process.env.MEGANE_BENCH_HEADLESS === "1";
+// ANGLE backend for GPU-on. On Windows the default (d3d11) uses the GPU; on
+// Linux try "gl" (native driver) or "vulkan" to escape the llvmpipe fallback.
+const ANGLE_BACKEND = process.env.MEGANE_BENCH_ANGLE ?? "default";
+// Extra Chromium flags appended to every launch (space-separated).
+const EXTRA_ARGS = (process.env.MEGANE_BENCH_CHROMIUM_ARGS ?? "")
+  .split(/\s+/)
+  .filter(Boolean);
 
 const VIEWPORT = { width: 1280, height: 720 };
 const FIXTURE_DIR = join(tmpdir(), "megane-render-fixtures");
@@ -119,11 +131,18 @@ function genXyz(n) {
 function launchOptions(mode) {
   if (mode === "off") {
     // Software rasterizer — no hardware GPU.
-    return { headless: true, args: ["--use-gl=swiftshader", "--disable-gpu"] };
+    return { headless: true, args: ["--use-gl=swiftshader", "--disable-gpu", ...EXTRA_ARGS] };
   }
   // GPU on — real hardware. Headed is the most reliable way to get a hardware
-  // context; new-headless can be forced with MEGANE_BENCH_HEADLESS=1.
-  const gpuArgs = ["--ignore-gpu-blocklist", "--enable-gpu", "--use-angle=default"];
+  // context; new-headless can be forced with MEGANE_BENCH_HEADLESS=1 but on
+  // Linux headless commonly falls back to Mesa llvmpipe (software).
+  const gpuArgs = [
+    "--ignore-gpu-blocklist",
+    "--enable-gpu",
+    "--enable-webgl",
+    `--use-angle=${ANGLE_BACKEND}`,
+    ...EXTRA_ARGS,
+  ];
   if (FORCE_HEADLESS) {
     return { headless: true, args: ["--headless=new", ...gpuArgs] };
   }
@@ -146,28 +165,63 @@ async function readGlRenderer(page) {
     .catch(() => "unknown");
 }
 
-// ── Drive a continuous drag-rotate over the canvas for `seconds` ─────────────
-async function rotateCamera(page, seconds) {
-  const box = await page.locator("canvas").first().boundingBox();
+// ── Drive a continuous drag-rotate over the canvas ───────────────────────────
+// Rotates for at least `minSeconds`, then keeps going until `minFrames` frames
+// are captured, capped at `maxSeconds` (so slow/heavy cases still yield enough
+// samples for a stable estimate instead of returning null).
+async function rotateCamera(page, minSeconds, maxSeconds, minFrames) {
+  // Read the canvas rect directly (getBoundingClientRect) rather than
+  // Playwright's boundingBox(), whose actionability waits can time out when the
+  // main thread is saturated by a heavy render.
+  const box = await page
+    .evaluate(() => {
+      const c = document.querySelector("canvas");
+      if (!c) return null;
+      const r = c.getBoundingClientRect();
+      return { x: r.x, y: r.y, width: r.width, height: r.height };
+    })
+    .catch(() => null);
   const cx = box ? box.x + box.width / 2 : VIEWPORT.width / 2;
   const cy = box ? box.y + box.height / 2 : VIEWPORT.height / 2;
   const radius = box ? Math.min(box.width, box.height) * 0.3 : 200;
 
+  const frameCount = () =>
+    page.evaluate(() => (window.__meganeFrameTimes || []).length).catch(() => 0);
+
   await page.mouse.move(cx, cy);
   await page.mouse.down();
-  const deadline = Date.now() + seconds * 1000;
+  const t0 = Date.now();
+  const minDeadline = t0 + minSeconds * 1000;
+  const maxDeadline = t0 + maxSeconds * 1000;
   let angle = 0;
+  let iter = 0;
   try {
-    while (Date.now() < deadline) {
+    for (;;) {
       angle += 0.15; // radians per step → smooth orbit
       const px = cx + Math.cos(angle) * radius;
       const py = cy + Math.sin(angle) * radius;
       await page.mouse.move(px, py, { steps: 2 });
       await sleep(12); // ~ one step per frame at high fps
+      const now = Date.now();
+      if (now >= maxDeadline) break;
+      // Check the frame count every ~10 iterations once past the min window.
+      if (now >= minDeadline && ++iter % 10 === 0) {
+        if ((await frameCount()) >= minFrames) break;
+      }
     }
   } finally {
     await page.mouse.up().catch(() => {});
   }
+}
+
+// FPS from raw frame timestamps — a coarse fallback for when analyzeFrames()
+// returns null (fewer than 10 samples, e.g. very heavy N at low fps).
+function coarseFps(frameTimes) {
+  const ft = (frameTimes || []).filter((t) => Number.isFinite(t));
+  if (ft.length < 2) return null;
+  const span = ft[ft.length - 1] - ft[0];
+  if (span <= 0) return null;
+  return ((ft.length - 1) / span) * 1000;
 }
 
 // ── One (mode, N) measurement ────────────────────────────────────────────────
@@ -204,7 +258,7 @@ async function measureOnce(context, server, n) {
     await page.evaluate(() => {
       window.__meganeFrameTimes = [];
     });
-    await rotateCamera(page, MEASURE_SECONDS);
+    await rotateCamera(page, MEASURE_SECONDS, MAX_SECONDS, MIN_FRAMES);
 
     const perf = await collectPerf(page);
     const stats = analyzeFrames(perf.frameTimes);
@@ -212,10 +266,17 @@ async function measureOnce(context, server, n) {
       .evaluate(() => (window.__megane_test ? window.__megane_test.getRendererMemory() : null))
       .catch(() => null);
 
+    // Prefer the analyzeFrames estimate; fall back to a coarse fps (and mark it)
+    // when there were too few samples for it (heavy N at low fps).
+    const fallback = coarseFps(perf.frameTimes);
+    const fps = stats ? stats.fps : fallback;
+    const approx = !stats && fallback != null;
+
     return {
       atoms: n,
-      fps: stats ? Number(stats.fps.toFixed(1)) : null,
-      meanMs: stats ? Number(stats.mean.toFixed(2)) : null,
+      fps: fps != null ? Number(fps.toFixed(1)) : null,
+      approx,
+      meanMs: stats ? Number(stats.mean.toFixed(2)) : fps ? Number((1000 / fps).toFixed(2)) : null,
       stutterPct: stats ? Number((stats.stutterRatio * 100).toFixed(1)) : null,
       samples: stats ? stats.sampleCount : (perf.frameTimes || []).length,
       loadMs,
@@ -232,7 +293,8 @@ let server = null;
 try {
   console.log(
     `[render-fps] modes=${GPU_MODES.join(",")} atoms=${ATOM_COUNTS.join(",")} ` +
-      `measure=${MEASURE_SECONDS}s warmup=${WARMUP_SECONDS}s headless(gpu-on)=${FORCE_HEADLESS}`,
+      `measure=${MEASURE_SECONDS}-${MAX_SECONDS}s(min${MIN_FRAMES}f) warmup=${WARMUP_SECONDS}s ` +
+      `angle=${ANGLE_BACKEND} headless(gpu-on)=${FORCE_HEADLESS}`,
   );
   console.log("[render-fps] starting Vite dev server...");
   server = await startViteServer();
@@ -263,8 +325,11 @@ try {
       console.log(`[render-fps] GL renderer: ${gl}`);
       if (mode === "on" && swiftshader) {
         console.log(
-          "[render-fps] WARNING: GPU-on did NOT get a hardware context (SwiftShader/software). " +
-            "Numbers reflect software rendering — check GPU drivers / try without MEGANE_BENCH_HEADLESS.",
+          "[render-fps] WARNING: GPU-on did NOT get a hardware context — the GL renderer is a " +
+            "software rasterizer (SwiftShader / Mesa llvmpipe), so the GPU is NOT being used and " +
+            "these numbers are CPU-bound. To use real hardware: run headed (do NOT set " +
+            "MEGANE_BENCH_HEADLESS), on native Windows/macOS/Linux (not a GPU-less VM / plain WSL), " +
+            "and optionally try MEGANE_BENCH_ANGLE=gl or =vulkan (Linux) / leave default (Windows d3d11).",
         );
       }
 
@@ -275,7 +340,7 @@ try {
         rows.push(r);
         console.log(
           `[render-fps] gpu=${mode} atoms=${String(n).padStart(8)} ` +
-            `fps=${String(r.fps).padStart(6)} mean=${String(r.meanMs).padStart(7)}ms ` +
+            `fps=${String(r.fps).padStart(6)}${r.approx ? "~" : " "} mean=${String(r.meanMs).padStart(7)}ms ` +
             `stutter=${String(r.stutterPct).padStart(5)}% samples=${r.samples} ` +
             `load=${r.loadMs}ms heap=${r.heapMB}MB`,
         );
