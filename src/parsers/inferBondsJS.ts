@@ -114,6 +114,18 @@ export function inferBondsVdwJS(
   const atomCell = new Uint32Array(nAtoms);
   const cellStart = new Uint32Array(nCells + 1);
 
+  // In PBC mode, work off positions wrapped into the home cell `[0,1)`. The
+  // cell-list distance path derives its neighbor shift from the cell-index
+  // wrap (±1 box vector), which is only consistent with the atom coordinates
+  // when those coordinates already lie in the home cell. Crystal inputs do NOT
+  // satisfy this: `crystal::expand_symmetry` only centroid-wraps each symmetry
+  // image, so its atoms sit at fractional coords outside `[0,1)`. Using the raw
+  // (unwrapped) coordinates there makes a cross-face bond compute ~1 box too
+  // long and get dropped (Issue #558). Bond inference returns only index pairs,
+  // so wrapping internally changes connectivity to be correct without affecting
+  // any downstream positions.
+  const pbcPositions = usePbc ? new Float32Array(nAtoms * 3) : positions;
+
   if (usePbc) {
     const bi0 = boxInv![0],
       bi1 = boxInv![1],
@@ -124,6 +136,15 @@ export function inferBondsVdwJS(
     const bi6 = boxInv![6],
       bi7 = boxInv![7],
       bi8 = boxInv![8];
+    const b0 = box![0],
+      b1 = box![1],
+      b2 = box![2];
+    const b3 = box![3],
+      b4 = box![4],
+      b5 = box![5];
+    const b6 = box![6],
+      b7 = box![7],
+      b8 = box![8];
     const nxF = nx,
       nyF = ny,
       nzF = nz;
@@ -137,6 +158,10 @@ export function inferBondsVdwJS(
       fx = fx - Math.floor(fx);
       fy = fy - Math.floor(fy);
       fz = fz - Math.floor(fz);
+      // Store the home-cell Cartesian position for the distance loops below.
+      pbcPositions[i * 3] = b0 * fx + b3 * fy + b6 * fz;
+      pbcPositions[i * 3 + 1] = b1 * fx + b4 * fy + b7 * fz;
+      pbcPositions[i * 3 + 2] = b2 * fx + b5 * fy + b8 * fz;
       let cx = (fx * nxF) | 0;
       let cy = (fy * nyF) | 0;
       let cz = (fz * nzF) | 0;
@@ -215,12 +240,15 @@ export function inferBondsVdwJS(
     // transform (9 mults + 3 Math.round + 9 mults) for *every* candidate
     // pair — instead it's amortized over all atoms in the neighbor cell.
     //
-    // This optimization is only correct when each axis has ≥ 2 cells: with
-    // a single cell along an axis, atoms within the same cell can span the
-    // full box width, so cell-wrap-derived shifts no longer match the true
-    // minimum image. For such tiny boxes we fall back to the per-pair
-    // minimum-image transform (still correct, just less branch-friendly).
-    if (nx < 2 || ny < 2 || nz < 2) {
+    // This half-shell scheme is only correct when each axis has ≥ 3 cells.
+    // With exactly 2 cells, a cell's +1 and −1 neighbours along an axis
+    // collapse to the *same* cell but need opposite box shifts, while the
+    // half-shell visits it once (with only the +1 shift) and same-cell pairs
+    // get no shift at all — so both the wrap-around image and the direct
+    // image cannot be represented and the min-image distance is wrong (e.g.
+    // NaCl's 5.64 Å cube → 2 cells/axis produced spurious bonds). For such
+    // small boxes we fall back to the exact per-pair minimum-image transform.
+    if (nx < 3 || ny < 3 || nz < 3) {
       const bi0 = boxInv![0],
         bi1 = boxInv![1],
         bi2 = boxInv![2];
@@ -233,15 +261,15 @@ export function inferBondsVdwJS(
       // Brute-force min-image: at most a few dozen atoms per cell × few cells.
       for (let i = 0; i < nAtoms; i++) {
         const ix3 = i * 3;
-        const pix = positions[ix3];
-        const piy = positions[ix3 + 1];
-        const piz = positions[ix3 + 2];
+        const pix = pbcPositions[ix3];
+        const piy = pbcPositions[ix3 + 1];
+        const piz = pbcPositions[ix3 + 2];
         const ri = radii[i];
         for (let j = i + 1; j < nAtoms; j++) {
           const jx3 = j * 3;
-          let dx = positions[jx3] - pix;
-          let dy = positions[jx3 + 1] - piy;
-          let dz = positions[jx3 + 2] - piz;
+          let dx = pbcPositions[jx3] - pix;
+          let dy = pbcPositions[jx3 + 1] - piy;
+          let dz = pbcPositions[jx3 + 2] - piz;
           let sx = bi0 * dx + bi3 * dy + bi6 * dz;
           let sy = bi1 * dx + bi4 * dy + bi7 * dz;
           let sz = bi2 * dx + bi5 * dy + bi8 * dz;
@@ -273,16 +301,16 @@ export function inferBondsVdwJS(
           for (let a = aStart; a < aEnd; a++) {
             const i = cellAtoms[a];
             const ix3 = i * 3;
-            const pix = positions[ix3];
-            const piy = positions[ix3 + 1];
-            const piz = positions[ix3 + 2];
+            const pix = pbcPositions[ix3];
+            const piy = pbcPositions[ix3 + 1];
+            const piz = pbcPositions[ix3 + 2];
             const ri = radii[i];
             for (let b2i = a + 1; b2i < aEnd; b2i++) {
               const j = cellAtoms[b2i];
               const jx3 = j * 3;
-              const dx = positions[jx3] - pix;
-              const dy = positions[jx3 + 1] - piy;
-              const dz = positions[jx3 + 2] - piz;
+              const dx = pbcPositions[jx3] - pix;
+              const dy = pbcPositions[jx3 + 1] - piy;
+              const dz = pbcPositions[jx3 + 2] - piz;
               const distSq = dx * dx + dy * dy + dz * dz;
               const th = (ri + radii[j]) * vdwScale;
               if (distSq > minDistSq && distSq <= th * th) {
@@ -343,16 +371,16 @@ export function inferBondsVdwJS(
             for (let a = aStart; a < aEnd; a++) {
               const i = cellAtoms[a];
               const ix3 = i * 3;
-              const pix = positions[ix3];
-              const piy = positions[ix3 + 1];
-              const piz = positions[ix3 + 2];
+              const pix = pbcPositions[ix3];
+              const piy = pbcPositions[ix3 + 1];
+              const piz = pbcPositions[ix3 + 2];
               const ri = radii[i];
               for (let bb = bStart; bb < bEnd; bb++) {
                 const j = cellAtoms[bb];
                 const jx3 = j * 3;
-                const dx = positions[jx3] + shiftX - pix;
-                const dy = positions[jx3 + 1] + shiftY - piy;
-                const dz = positions[jx3 + 2] + shiftZ - piz;
+                const dx = pbcPositions[jx3] + shiftX - pix;
+                const dy = pbcPositions[jx3 + 1] + shiftY - piy;
+                const dz = pbcPositions[jx3 + 2] + shiftZ - piz;
                 const distSq = dx * dx + dy * dy + dz * dz;
                 const th = (ri + radii[j]) * vdwScale;
                 if (distSq > minDistSq && distSq <= th * th) {
@@ -431,5 +459,19 @@ export function inferBondsVdwJS(
     }
   }
 
+  console.log(
+    "IBJ-CALLED nAtoms=" +
+      nAtoms +
+      " usePbc=" +
+      usePbc +
+      " nx=" +
+      nx +
+      " ny=" +
+      ny +
+      " nz=" +
+      nz +
+      " bonds=" +
+      outLen / 2,
+  );
   return outBuf.slice(0, outLen);
 }
