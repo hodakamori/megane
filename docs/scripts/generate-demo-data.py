@@ -196,23 +196,169 @@ def parse_pdb(text: str) -> dict:
     }
 
 
+import re
+
+
+def parse_extended_xyz(text: str) -> dict:
+    """Parse an extended-XYZ file (ASE style, with a Lattice= header) into a
+    Snapshot-compatible dict. The 3x3 lattice is stored as the snapshot `box`
+    (row-major vectors: a, b, c) so periodic coordination polyhedra work."""
+    lines = text.splitlines()
+    n_atoms = int(lines[0].strip())
+    comment = lines[1]
+
+    box = None
+    m = re.search(r'Lattice="([^"]+)"', comment)
+    if m:
+        vals = [float(v) for v in m.group(1).split()]
+        if len(vals) == 9:
+            box = vals
+
+    positions: list[float] = []
+    elements: list[int] = []
+    for line in lines[2 : 2 + n_atoms]:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        sym = parts[0].strip()
+        atomic_num = ELEMENT_TO_ATOMIC_NUM.get(sym.upper(), 6)
+        positions.extend([float(parts[1]), float(parts[2]), float(parts[3])])
+        elements.append(atomic_num)
+
+    inferred = infer_bonds(positions, elements)
+    bonds_flat: list[int] = []
+    for a, b in inferred:
+        bonds_flat.extend([a, b])
+
+    return {
+        "nAtoms": len(elements),
+        "nBonds": len(inferred),
+        "nFileBonds": 0,
+        "positions": [round(v, 3) for v in positions],
+        "elements": elements,
+        "bonds": bonds_flat,
+        "bondOrders": [1] * len(inferred),
+        "box": box,
+    }
+
+
+def parse_protein_pdb(text: str) -> dict:
+    """Parse a protein PDB into a Snapshot with Cα backbone + secondary-structure
+    data (caIndices / caChainIds / caResNums / caSsType) so the viewer can render
+    a cartoon ribbon. Secondary structure is taken from the PDB HELIX/SHEET
+    records (SS: 0=coil, 1=helix, 2=sheet). Only ATOM records are kept (HETATM
+    waters/ligands dropped) for a clean ribbon + molecular surface."""
+    # Secondary-structure ranges from HELIX/SHEET records: (chain, resSeq) -> ss.
+    ss_map: dict[tuple[str, int], int] = {}
+
+    def mark(chain: str, start: int, end: int, ss: int) -> None:
+        for r in range(start, end + 1):
+            ss_map[(chain, r)] = ss
+
+    for line in text.splitlines():
+        rec = line[:6].strip()
+        if rec == "HELIX":
+            try:
+                mark(line[19], int(line[21:25]), int(line[33:37]), 1)
+            except ValueError:
+                pass
+        elif rec == "SHEET":
+            try:
+                mark(line[21], int(line[22:26]), int(line[33:37]), 2)
+            except ValueError:
+                pass
+
+    positions: list[float] = []
+    elements: list[int] = []
+    ca_indices: list[int] = []
+    ca_chain_ids: list[int] = []
+    ca_res_nums: list[int] = []
+    ca_ss_type: list[int] = []
+
+    for line in text.splitlines():
+        if line[:6].strip() != "ATOM":
+            continue
+        atom_name = line[12:16].strip()
+        chain = line[21]
+        try:
+            res_seq = int(line[22:26])
+            x = float(line[30:38])
+            y = float(line[38:46])
+            z = float(line[46:54])
+        except ValueError:
+            continue
+
+        elem_str = line[76:78].strip() if len(line) >= 78 else ""
+        if not elem_str:
+            elem_str = guess_element(atom_name)
+        atomic_num = ELEMENT_TO_ATOMIC_NUM.get(elem_str.upper(), 6)
+
+        idx = len(elements)
+        positions.extend([x, y, z])
+        elements.append(atomic_num)
+
+        if atom_name == "CA":
+            ca_indices.append(idx)
+            # Chain ID as an ASCII byte (65 = 'A'), per the Snapshot format.
+            ca_chain_ids.append(ord(chain) if chain.strip() else 32)
+            ca_res_nums.append(res_seq)
+            ca_ss_type.append(ss_map.get((chain, res_seq), 0))
+
+    inferred = infer_bonds(positions, elements)
+    bonds_flat: list[int] = []
+    for a, b in inferred:
+        bonds_flat.extend([a, b])
+
+    return {
+        "nAtoms": len(elements),
+        "nBonds": len(inferred),
+        "nFileBonds": 0,
+        "positions": [round(v, 3) for v in positions],
+        "elements": elements,
+        "bonds": bonds_flat,
+        "bondOrders": [1] * len(inferred),
+        "box": None,
+        "caIndices": ca_indices,
+        "caChainIds": ca_chain_ids,
+        "caResNums": ca_res_nums,
+        "caSsType": ca_ss_type,
+    }
+
+
 def main():
     repo_root = Path(__file__).resolve().parent.parent.parent
-    pdb_path = repo_root / "tests" / "fixtures" / "caffeine_water.pdb"
+    fixtures = repo_root / "tests" / "fixtures"
     out_dir = repo_root / "docs" / "public" / "data"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    text = pdb_path.read_text()
-    snapshot = parse_pdb(text)
+    def emit(name: str, snapshot: dict) -> None:
+        out_path = out_dir / name
+        with open(out_path, "w") as f:
+            json.dump(snapshot, f, separators=(",", ":"))
+        size_kb = out_path.stat().st_size / 1024
+        print(
+            f"Generated {out_path} "
+            f"({snapshot['nAtoms']} atoms, {snapshot['nBonds']} bonds, {size_kb:.1f} KB)"
+        )
 
-    out_path = out_dir / "caffeine_water.json"
-    with open(out_path, "w") as f:
-        json.dump(snapshot, f, separators=(",", ":"))
+    # Molecular demo (caffeine solvated in water).
+    emit(
+        "caffeine_water.json",
+        parse_pdb((fixtures / "caffeine_water.pdb").read_text()),
+    )
 
-    size_kb = out_path.stat().st_size / 1024
-    print(
-        f"Generated {out_path} "
-        f"({snapshot['nAtoms']} atoms, {snapshot['nBonds']} bonds, {size_kb:.1f} KB)"
+    # Crystal demo (alpha-quartz SiO2 2x2x2 supercell) — corner-sharing SiO4
+    # tetrahedra when rendered with coordination polyhedra on the landing hero.
+    emit(
+        "quartz_sio2.json",
+        parse_extended_xyz((fixtures / "quartz_sio2_2x2x2.xyz").read_text()),
+    )
+
+    # Protein demo (ubiquitin) — cartoon ribbon (Cα + secondary structure) with
+    # a translucent molecular-surface overlay on the landing hero.
+    emit(
+        "ubiquitin.json",
+        parse_protein_pdb((fixtures / "1ubq.pdb").read_text()),
     )
 
 

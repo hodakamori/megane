@@ -1,67 +1,165 @@
-/* ── Brand + design tokens ────────────────────────────────────────────────── */
+/* ── Spectral design tokens ───────────────────────────────────────────────────
+ *
+ * One "spectral" language (cyan → violet) shared by the dark landing page and
+ * the light docs. The --sp-* custom properties are the source of truth; they
+ * are mapped onto Infima's --ifm-* variables below so the stock theme picks
+ * them up. A handful of --sp-* tokens are re-pointed inside
+ * [data-theme="dark"] so the component chrome in _chrome.css works in both
+ * modes with no duplicated rules.
+ */
 
 :root {
-  /* Teal brand scale (light) */
-  --ifm-color-primary: #0d9488;
-  --ifm-color-primary-dark: #0b857a;
-  --ifm-color-primary-darker: #0a7d73;
-  --ifm-color-primary-darkest: #08675f;
-  --ifm-color-primary-light: #0fa396;
-  --ifm-color-primary-lighter: #10aba0;
-  --ifm-color-primary-lightest: #14c2b6;
+  /* Spectral palette */
+  --sp-dark-bg: #0a0c10;
+  --sp-code-bg: #0d1017;
+  --sp-paper: #f6f7f9;
+  --sp-surface: #ffffff;
+  --sp-ink: #131820;
+  --sp-body: #3a424e;
+  --sp-muted: #5b6470;
+  --sp-muted-2: #6b7480;
+  --sp-faint: #9aa1ab;
+  --sp-border: #e6e9ee;
+
+  --sp-cyan: #12b1a3; /* accent — borders, focus, active underline */
+  --sp-cyan-text: #0e8578; /* links / active nav text (contrast-safe on light) */
+  --sp-cyan-dark: #3ad6c8; /* accent text/glow on dark surfaces */
+  --sp-violet: #6b53d9; /* secondary accent */
+  --sp-violet-dark: #8a6bff;
+
+  --sp-gradient: linear-gradient(90deg, #12b1a3, #6b53d9);
+  --sp-gradient-v: linear-gradient(180deg, #12b1a3, #6b53d9);
+  --sp-gradient-tint: linear-gradient(
+    90deg,
+    rgba(18, 177, 163, 0.12),
+    rgba(107, 83, 217, 0.12)
+  );
+
+  /* Code syntax (dark blocks, both surfaces) — mirrored in prism/spectralTheme */
+  --sp-syn-keyword: #8a6bff;
+  --sp-syn-function: #3ad6c8;
+  --sp-syn-string: #e2a55a;
+  --sp-syn-comment: #5c6572;
+  --sp-syn-default: #c8cfd8;
+
+  /* ── Infima mapping (light) ── */
+  --ifm-color-primary: #0e8578; /* link/active text color, contrast-safe */
+  --ifm-color-primary-dark: #0c7367;
+  --ifm-color-primary-darker: #0b6c61;
+  --ifm-color-primary-darkest: #095950;
+  --ifm-color-primary-light: #109789;
+  --ifm-color-primary-lighter: #12b1a3; /* = accent cyan */
+  --ifm-color-primary-lightest: #3ad6c8;
+  --ifm-link-color: var(--sp-cyan-text);
+
+  --ifm-background-color: var(--sp-paper);
+  --ifm-background-surface-color: var(--sp-surface);
+  --ifm-navbar-background-color: var(--sp-surface);
+  --ifm-footer-background-color: var(--sp-dark-bg);
+  --ifm-font-color-base: var(--sp-body);
+  --ifm-heading-color: var(--sp-ink);
+  --ifm-color-content-secondary: var(--sp-muted);
+
+  --ifm-color-emphasis-100: #f0f2f5;
+  --ifm-color-emphasis-200: var(--sp-border); /* all border rules inherit this */
+  --ifm-color-emphasis-300: #d7dce3;
+  --ifm-toc-border-color: var(--sp-border);
+  --ifm-hr-background-color: var(--sp-border);
 
   /* Typography */
   --ifm-font-family-base:
-    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
+    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --ifm-heading-font-family: "Space Grotesk", var(--ifm-font-family-base);
   --ifm-font-family-monospace:
-    "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
-    monospace;
-  --ifm-font-size-base: 16px;
+    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ifm-font-size-base: 15px;
   --ifm-line-height-base: 1.7;
-  --ifm-heading-font-weight: 650;
-  --ifm-heading-line-height: 1.25;
-  --ifm-h1-font-size: 2.4rem;
-  --ifm-h2-font-size: 1.65rem;
-  --ifm-h3-font-size: 1.25rem;
-  --ifm-code-font-size: 88%;
+  --ifm-heading-font-weight: 600;
+  --ifm-heading-line-height: 1.2;
+  --ifm-h1-font-size: 2.15rem; /* ~34px @ 15px base */
+  --ifm-h2-font-size: 1.35rem; /* ~20px */
+  --ifm-h3-font-size: 1.15rem; /* ~17px */
+  --ifm-code-font-size: 87%;
 
   /* Surfaces + radii */
   --ifm-navbar-shadow: none;
   --ifm-global-radius: 10px;
   --ifm-code-border-radius: 6px;
-  --megane-surface-border: var(--ifm-color-emphasis-200);
+  --ifm-button-border-radius: 8px;
+  --ifm-pagination-nav-border-radius: 10px;
+
+  /* Active-state colors used by menu / tabs / breadcrumbs */
+  --ifm-menu-color-active: var(--sp-cyan-text);
+  --ifm-menu-color-background-active: var(--sp-gradient-tint);
+  --ifm-breadcrumb-color-active: var(--sp-cyan-text);
+  --ifm-breadcrumb-item-background-active: transparent;
+  --ifm-tabs-color-active: var(--sp-cyan-text);
+  --ifm-tabs-color-active-border: var(--sp-cyan);
+
+  --docusaurus-highlighted-code-line-bg: rgba(58, 214, 200, 0.1);
+  --megane-surface-border: var(--sp-border);
 }
 
 [data-theme="dark"] {
-  --ifm-color-primary: #2dd4bf;
-  --ifm-color-primary-dark: #1fcfb9;
-  --ifm-color-primary-darker: #16c9b2;
-  --ifm-color-primary-darkest: #0fa391;
-  --ifm-color-primary-light: #3bd9c5;
-  --ifm-color-primary-lighter: #44dbca;
-  --ifm-color-primary-lightest: #62e2d3;
-  --ifm-background-color: #0e1512;
-  --ifm-background-surface-color: #151d1a;
-  --megane-surface-border: var(--ifm-color-emphasis-200);
+  /* Spectral-dark: re-point the tokens that chrome rules read, so those rules
+   * need no dark-mode duplicates. */
+  --sp-paper: #0a0c10;
+  --sp-surface: #0d1017;
+  --sp-ink: #e6ebf0;
+  --sp-body: #b6bfca;
+  --sp-muted: #8b93a0;
+  --sp-muted-2: #8b93a0;
+  --sp-faint: #6b7482;
+  --sp-border: #1d2430;
+  --sp-cyan-text: #3ad6c8;
+  --sp-violet: #8a6bff;
+  --sp-gradient-tint: linear-gradient(
+    90deg,
+    rgba(58, 214, 200, 0.14),
+    rgba(138, 107, 255, 0.14)
+  );
+
+  --ifm-color-primary: #3ad6c8;
+  --ifm-color-primary-dark: #2fbfb2;
+  --ifm-color-primary-darker: #29b4a7;
+  --ifm-color-primary-darkest: #1f8f85;
+  --ifm-color-primary-light: #52ddd0;
+  --ifm-color-primary-lighter: #62e2d3;
+  --ifm-color-primary-lightest: #7ce7dc;
+  --ifm-link-color: var(--sp-cyan-text);
+
+  --ifm-background-color: #0a0c10;
+  --ifm-background-surface-color: #0d1017;
+  --ifm-navbar-background-color: #0d1017;
+  --ifm-font-color-base: #b6bfca;
+  --ifm-heading-color: #e6ebf0;
+  --ifm-color-content-secondary: #8b93a0;
+
+  --ifm-color-emphasis-100: #141924;
+  --ifm-color-emphasis-200: #1d2430;
+  --ifm-color-emphasis-300: #2a3340;
+  --ifm-toc-border-color: #1d2430;
+
+  --ifm-code-background: rgba(255, 255, 255, 0.07);
+  --ifm-menu-color-active: #3ad6c8;
+  --ifm-tabs-color-active: #3ad6c8;
+  --megane-surface-border: #1d2430;
 }
 
 /* ── Typography refinements ───────────────────────────────────────────────── */
 
 html {
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
 h1,
+h2,
+h3,
 .markdown h1:first-child {
   letter-spacing: -0.02em;
-}
-
-h2,
-h3 {
-  letter-spacing: -0.01em;
 }
 
 .markdown > h2 {
@@ -78,23 +176,6 @@ h3 {
 article a {
   font-weight: 500;
   text-underline-offset: 2px;
-}
-
-/* ── Navbar ───────────────────────────────────────────────────────────────── */
-
-.navbar {
-  border-bottom: 1px solid var(--ifm-color-emphasis-200);
-  backdrop-filter: saturate(150%) blur(8px);
-  background: color-mix(in srgb, var(--ifm-navbar-background-color) 86%, transparent);
-}
-
-.navbar__title {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.navbar__link--active {
-  font-weight: 600;
 }
 
 /* ── Tables ───────────────────────────────────────────────────────────────── */
@@ -123,13 +204,7 @@ article a {
   border-bottom: none;
 }
 
-/* ── Admonitions + cards ──────────────────────────────────────────────────── */
-
-.theme-admonition {
-  border-radius: var(--ifm-global-radius);
-  border-width: 1px;
-  border-left-width: 4px;
-}
+/* ── Cards ────────────────────────────────────────────────────────────────── */
 
 .card {
   border: 1px solid var(--ifm-color-emphasis-200);
@@ -141,23 +216,10 @@ article a {
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: var(--ifm-color-primary);
+  border-color: var(--sp-cyan);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme="dark"] .card:hover {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-}
-
-/* ── Code blocks ──────────────────────────────────────────────────────────── */
-
-.theme-code-block,
-div[class*="codeBlockContainer"] {
-  border-radius: var(--ifm-global-radius);
-}
-
-/* ── Table of contents ────────────────────────────────────────────────────── */
-
-.table-of-contents__link--active {
-  font-weight: 600;
 }

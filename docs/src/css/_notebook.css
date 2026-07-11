@@ -66,12 +66,14 @@
   margin: 8px 0;
 }
 
+/* Input cells use the spectral dark code surface (#0D1017) in BOTH modes, to
+ * match the "code blocks are dark on both surfaces" bridge rule. */
 .nb-container .code_cell .input {
   display: flex;
-  border: 1px solid var(--ifm-color-emphasis-300);
-  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
   overflow: hidden;
-  background: var(--ifm-color-emphasis-100);
+  background: #0d1017;
 }
 
 .nb-container .input_prompt,
@@ -82,13 +84,13 @@
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.75rem;
   text-align: right;
-  color: #0d9488;
+  color: #3ad6c8;
   user-select: none;
   line-height: 1.6;
 }
 
 .nb-container .output_area > .prompt {
-  color: #dc2626;
+  color: #e0553f;
 }
 
 .nb-container .input_area {
@@ -97,13 +99,18 @@
   overflow-x: auto;
 }
 
+.nb-container .input_area .highlight,
 .nb-container .input_area .highlight pre {
   margin: 0;
-  padding: 8px 12px;
   background: transparent;
+  color: #c8cfd8;
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.85rem;
   line-height: 1.6;
+}
+
+.nb-container .input_area .highlight pre {
+  padding: 8px 12px;
 }
 
 .nb-container .text_cell .input_prompt {
@@ -133,38 +140,31 @@
   color: var(--ifm-color-emphasis-700);
 }
 
-/* ── Pygments syntax highlighting (light) ─────────────────────────────────── */
-.nb-container .highlight .hll { background-color: #ffffcc }
-.nb-container .highlight .c { color: #3D7B7B; font-style: italic }
-.nb-container .highlight .k { color: #008000; font-weight: bold }
-.nb-container .highlight .o { color: #666 }
-.nb-container .highlight .s { color: #BA2121 }
-.nb-container .highlight .na { color: #687822 }
-.nb-container .highlight .nb { color: #008000 }
-.nb-container .highlight .nc { color: #00F; font-weight: bold }
-.nb-container .highlight .nf { color: #00F }
-.nb-container .highlight .nn { color: #00F; font-weight: bold }
-.nb-container .highlight .m { color: #666 }
-.nb-container .highlight .kn { color: #008000; font-weight: bold }
-.nb-container .highlight .kd { color: #008000; font-weight: bold }
-
-/* ── Pygments dark mode ───────────────────────────────────────────────────── */
-[data-theme="dark"] .nb-container .highlight { background: transparent; }
-[data-theme="dark"] .nb-container .highlight .c { color: #6a9955 }
-[data-theme="dark"] .nb-container .highlight .k { color: #569cd6; font-weight: normal }
-[data-theme="dark"] .nb-container .highlight .o { color: #d4d4d4 }
-[data-theme="dark"] .nb-container .highlight .s { color: #ce9178 }
-[data-theme="dark"] .nb-container .highlight .na { color: #9cdcfe }
-[data-theme="dark"] .nb-container .highlight .nb { color: #4ec9b0 }
-[data-theme="dark"] .nb-container .highlight .nc { color: #4ec9b0; font-weight: normal }
-[data-theme="dark"] .nb-container .highlight .nf { color: #dcdcaa }
-[data-theme="dark"] .nb-container .highlight .nn { color: #4ec9b0 }
-[data-theme="dark"] .nb-container .highlight .m { color: #b5cea8 }
-[data-theme="dark"] .nb-container .highlight .kn { color: #c586c0 }
-[data-theme="dark"] .nb-container .highlight .kd { color: #569cd6 }
-[data-theme="dark"] .nb-container .input_prompt { color: #2dd4bf; }
-[data-theme="dark"] .nb-container .output_area > .prompt { color: #f87171; }
-[data-theme="dark"] .nb-container .code_cell .input {
-  background: var(--ifm-color-emphasis-100);
-  border-color: var(--ifm-color-emphasis-300);
-}
+/* ── Pygments syntax highlighting (spectral — same palette in both modes) ──── */
+/* Mirrors src/prism/spectralTheme.ts so notebook input cells match code blocks:
+ *   keyword #8A6BFF · function/name #3AD6C8 · string #E2A55A
+ *   comment #5C6572 · number #E2A55A · default #C8CFD8 */
+.nb-container .highlight .hll { background-color: rgba(58, 214, 200, 0.1) }
+.nb-container .highlight .c,
+.nb-container .highlight .c1,
+.nb-container .highlight .cm { color: #5c6572; font-style: italic }
+.nb-container .highlight .k,
+.nb-container .highlight .kn,
+.nb-container .highlight .kd,
+.nb-container .highlight .kc,
+.nb-container .highlight .ow { color: #8a6bff; font-weight: normal }
+.nb-container .highlight .o { color: #c8cfd8 }
+.nb-container .highlight .s,
+.nb-container .highlight .s1,
+.nb-container .highlight .s2,
+.nb-container .highlight .sb,
+.nb-container .highlight .se { color: #e2a55a }
+.nb-container .highlight .na { color: #3ad6c8 }
+.nb-container .highlight .nb,
+.nb-container .highlight .nf,
+.nb-container .highlight .nc,
+.nb-container .highlight .nn { color: #3ad6c8; font-weight: normal }
+.nb-container .highlight .m,
+.nb-container .highlight .mi,
+.nb-container .highlight .mf { color: #e2a55a }
+.nb-container .highlight .p { color: #c8cfd8 }

@@ -119,3 +119,5 @@ Not every host opens every extension from its native file picker — see
 - [React component (npm) guide](/guide/web) — Embedding in React applications, imperative renderer API
 - [Python Pipeline API](/guide/pipeline/python) — Full Python API documentation
 - [TypeScript Pipeline API](/guide/pipeline/typescript) — Full TypeScript API documentation
+
+<CtaBridge />
