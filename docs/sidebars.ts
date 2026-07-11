@@ -65,12 +65,8 @@ const sidebars: SidebarsConfig = {
   ],
 
   developSidebar: [
-    {
-      type: "category",
-      label: "Internals",
-      collapsed: false,
-      items: ["dev/architecture", "dev/custom-nodes"],
-    },
+    { type: "doc", id: "dev/architecture", label: "Architecture" },
+    { type: "doc", id: "dev/custom-nodes", label: "Custom Nodes" },
   ],
 
   referenceSidebar: [
