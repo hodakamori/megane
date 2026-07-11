@@ -404,7 +404,16 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         return Err("CIF file contains no atom sites".to_string());
     }
 
-    // Infer bonds on the asymmetric unit.
+    // Make molecules whole before inferring bonds. CIFs frequently list every
+    // atom wrapped into the [0,1) cell, which splits a molecule that straddles
+    // a face; since bond inference is not periodic, the cross-boundary bonds
+    // would otherwise be dropped (Issue #558). Unwrapping is a no-op when the
+    // asymmetric unit is already contiguous.
+    if let Some(bm) = box_matrix.as_ref() {
+        bonds::unwrap_molecules(&mut positions, &elements, bm);
+    }
+
+    // Infer bonds on the (now whole) asymmetric unit.
     let empty_bonds = HashSet::new();
     let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
 
@@ -458,6 +467,30 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regression test for Issue #558. `pbc_bond_split.cif` lists a single
+    /// molecule wrapped into the cell so the carbonyl oxygen sits on the far
+    /// side of the a-face from the carbon. The parser must unwrap the molecule
+    /// and recover the C–O bond that non-periodic inference would otherwise drop.
+    #[test]
+    fn test_parse_recovers_bond_across_periodic_boundary() {
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/pbc_bond_split.cif"
+        ))
+        .expect("read fixture");
+        let s = parse(&text).unwrap();
+        assert_eq!(s.n_atoms, 4);
+        // C–O (the boundary-crossing bond) plus the two C–H bonds.
+        assert_eq!(s.bonds.len(), 3);
+        let has = |a: u32, b: u32| s.bonds.contains(&(a, b)) || s.bonds.contains(&(b, a));
+        assert!(
+            has(0, 1),
+            "C–O bond across the periodic boundary must exist"
+        );
+        assert!(has(0, 2));
+        assert!(has(0, 3));
+    }
 
     #[test]
     fn test_extract_symmetry_ops_single_column_loop() {

@@ -146,6 +146,129 @@ where
     bonds
 }
 
+/// Invert a row-major 3×3 matrix. Returns None if singular.
+fn invert3x3(m: &[f32; 9]) -> Option<[f32; 9]> {
+    let (a, b, c, d, e, f, g, h, i) = (m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]);
+    let det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+    if det.abs() < 1e-12 {
+        return None;
+    }
+    let inv = 1.0 / det;
+    Some([
+        (e * i - f * h) * inv,
+        (c * h - b * i) * inv,
+        (b * f - c * e) * inv,
+        (f * g - d * i) * inv,
+        (a * i - c * g) * inv,
+        (c * d - a * f) * inv,
+        (d * h - e * g) * inv,
+        (b * g - a * h) * inv,
+        (a * e - b * d) * inv,
+    ])
+}
+
+/// Shift each bonded molecule by whole lattice vectors so that no covalent bond
+/// spans the periodic boundary — i.e. every connected component becomes
+/// spatially contiguous.
+///
+/// Many CIFs list every atom wrapped into the `[0,1)` fractional cell, which
+/// physically splits a molecule that straddles a face: two bonded atoms then
+/// sit ~one lattice vector apart in Cartesian space. Distance-based bond
+/// inference (`infer_bonds`) is not periodic, so it drops those cross-boundary
+/// bonds — the molecule renders broken (Issue #558). Running this first makes
+/// the molecule whole, so ordinary (non-periodic) inference finds every bond
+/// and the bond cylinders render at their true short length rather than across
+/// the cell.
+///
+/// Connectivity for the unwrap is determined with the minimum-image convention
+/// using the same covalent-radius criterion as `infer_bonds`, so exactly the
+/// bonds that inference would otherwise find (were the molecule contiguous) are
+/// used to knit each component together. Atoms with no bonds, and molecules
+/// that are already whole, are left untouched (all lattice shifts are zero), so
+/// this is a no-op for the common contiguous case. Positions are modified in
+/// place. The unit cell is unchanged, so whole molecules may poke slightly
+/// outside the `[0,1)` box (the standard VESTA/Mercury depiction).
+pub fn unwrap_molecules(positions: &mut [f32], elements: &[u8], box_matrix: &[f32; 9]) {
+    let n = elements.len();
+    if n < 2 {
+        return;
+    }
+    let minv = match invert3x3(box_matrix) {
+        Some(m) => m,
+        None => return,
+    };
+
+    let frac = |i: usize, p: &[f32]| -> (f32, f32, f32) {
+        let (x, y, z) = (p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
+        (
+            x * minv[0] + y * minv[3] + z * minv[6],
+            x * minv[1] + y * minv[4] + z * minv[7],
+            x * minv[2] + y * minv[5] + z * minv[8],
+        )
+    };
+
+    // Adjacency with the integer lattice shift that brings the neighbour's
+    // minimum image next to the current atom. Asymmetric units are small, so a
+    // brute-force O(n²) scan is cheap and avoids periodic cell-list bookkeeping.
+    let mut adj: Vec<Vec<(usize, [i32; 3])>> = vec![Vec::new(); n];
+    for i in 0..n {
+        let (fi0, fi1, fi2) = frac(i, positions);
+        for j in (i + 1)..n {
+            let (fj0, fj1, fj2) = frac(j, positions);
+            let (mut d0, mut d1, mut d2) = (fj0 - fi0, fj1 - fi1, fj2 - fi2);
+            let (n0, n1, n2) = (d0.round(), d1.round(), d2.round());
+            d0 -= n0;
+            d1 -= n1;
+            d2 -= n2;
+            let cx = d0 * box_matrix[0] + d1 * box_matrix[3] + d2 * box_matrix[6];
+            let cy = d0 * box_matrix[1] + d1 * box_matrix[4] + d2 * box_matrix[7];
+            let cz = d0 * box_matrix[2] + d1 * box_matrix[5] + d2 * box_matrix[8];
+            let dist_sq = cx * cx + cy * cy + cz * cz;
+            let threshold =
+                (covalent_radius(elements[i]) + covalent_radius(elements[j])) * BOND_TOLERANCE;
+            if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST && dist_sq <= threshold * threshold {
+                // To place j's minimum image next to i, shift j by -n lattice
+                // vectors; the reverse edge shifts i by +n relative to j.
+                adj[i].push((j, [-(n0 as i32), -(n1 as i32), -(n2 as i32)]));
+                adj[j].push((i, [n0 as i32, n1 as i32, n2 as i32]));
+            }
+        }
+    }
+
+    // Flood-fill each connected component, accumulating lattice shifts so the
+    // whole molecule is expressed in one image. The seed atom stays put.
+    let mut shift = vec![[0i32; 3]; n];
+    let mut visited = vec![false; n];
+    let mut stack: Vec<usize> = Vec::new();
+    for start in 0..n {
+        if visited[start] {
+            continue;
+        }
+        visited[start] = true;
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            for &(j, s) in &adj[i] {
+                if !visited[j] {
+                    visited[j] = true;
+                    shift[j] = [shift[i][0] + s[0], shift[i][1] + s[1], shift[i][2] + s[2]];
+                    stack.push(j);
+                }
+            }
+        }
+    }
+
+    for i in 0..n {
+        let s = shift[i];
+        if s == [0, 0, 0] {
+            continue;
+        }
+        let (sf0, sf1, sf2) = (s[0] as f32, s[1] as f32, s[2] as f32);
+        positions[i * 3] += sf0 * box_matrix[0] + sf1 * box_matrix[3] + sf2 * box_matrix[6];
+        positions[i * 3 + 1] += sf0 * box_matrix[1] + sf1 * box_matrix[4] + sf2 * box_matrix[7];
+        positions[i * 3 + 2] += sf0 * box_matrix[2] + sf1 * box_matrix[5] + sf2 * box_matrix[8];
+    }
+}
+
 /// Infer bonds using a cell-list (spatial hashing) approach.
 pub fn infer_bonds(
     positions: &[f32],
@@ -235,6 +358,87 @@ mod tests {
     fn test_infer_bonds_empty() {
         let bonds = infer_bonds(&[], &[], 0, &HashSet::new());
         assert!(bonds.is_empty());
+    }
+
+    /// A carbonyl split across the a-face (C near fract 0.05, O near fract 0.90)
+    /// loses its C–O bond under non-periodic inference; unwrapping must knit the
+    /// molecule back together so the bond is recovered (Issue #558).
+    #[test]
+    fn test_unwrap_molecules_recovers_split_bond() {
+        let a = 8.0f32;
+        let box_m = [a, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, a];
+        // C at 0.4 Å (fract 0.05), O at 7.16 Å (fract 0.895): 6.76 Å apart
+        // directly, 1.24 Å across the periodic boundary.
+        let mut positions = vec![0.4, 4.0, 4.0, 7.16, 4.0, 4.0];
+        let elements = vec![6u8, 8u8];
+
+        // Without unwrapping, non-periodic inference misses the bond.
+        assert!(infer_bonds(&positions, &elements, 2, &HashSet::new()).is_empty());
+
+        unwrap_molecules(&mut positions, &elements, &box_m);
+        // O is shifted by one -a lattice vector to sit next to C.
+        assert!((positions[3] - (7.16 - a)).abs() < 1e-3);
+        let bonds = infer_bonds(&positions, &elements, 2, &HashSet::new());
+        assert_eq!(bonds, vec![(0, 1)]);
+    }
+
+    /// A molecule already whole must be left exactly as-is (all shifts zero).
+    #[test]
+    fn test_unwrap_molecules_noop_for_contiguous() {
+        let box_m = [20.0, 0.0, 0.0, 0.0, 20.0, 0.0, 0.0, 0.0, 20.0];
+        let (mut positions, elements) = water_positions();
+        // Center the whole molecule inside the box.
+        for i in 0..3 {
+            positions[i * 3] += 10.0;
+            positions[i * 3 + 1] += 10.0;
+            positions[i * 3 + 2] += 10.0;
+        }
+        let before = positions.clone();
+        unwrap_molecules(&mut positions, &elements, &box_m);
+        for (a, b) in positions.iter().zip(before.iter()) {
+            assert!((a - b).abs() < 1e-6);
+        }
+    }
+
+    /// Two independent split molecules are each made whole without being merged.
+    #[test]
+    fn test_unwrap_molecules_multiple_components() {
+        let a = 8.0f32;
+        let box_m = [a, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, a];
+        // Molecule A (C–O) split across the a-face; molecule B (C–O) whole and
+        // far away along y.
+        let mut positions = vec![
+            0.4, 1.0, 1.0, // C  (fract 0.05)
+            7.16, 1.0, 1.0, // O  (fract 0.895) — split partner of the C above
+            3.0, 6.0, 6.0, // C  (whole molecule B)
+            4.2, 6.0, 6.0, // O
+        ];
+        let elements = vec![6u8, 8u8, 6u8, 8u8];
+        unwrap_molecules(&mut positions, &elements, &box_m);
+        let bonds = infer_bonds(&positions, &elements, 4, &HashSet::new());
+        let set: HashSet<(u32, u32)> = bonds.into_iter().collect();
+        assert!(set.contains(&(0, 1)));
+        assert!(set.contains(&(2, 3)));
+        // Molecule B was already whole — untouched.
+        assert!((positions[6] - 3.0).abs() < 1e-6 && (positions[9] - 4.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_unwrap_molecules_too_few_atoms_is_noop() {
+        let box_m = [10.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
+        let mut positions = vec![9.9, 0.0, 0.0];
+        let before = positions.clone();
+        unwrap_molecules(&mut positions, &[6], &box_m);
+        assert_eq!(positions, before);
+    }
+
+    #[test]
+    fn test_unwrap_molecules_singular_box_is_noop() {
+        let box_m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]; // singular
+        let mut positions = vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let before = positions.clone();
+        unwrap_molecules(&mut positions, &[6, 6], &box_m);
+        assert_eq!(positions, before);
     }
 
     #[test]
