@@ -1,111 +1,132 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import BrowserOnly from "@docusaurus/BrowserOnly";
 import Link from "@docusaurus/Link";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import Layout from "@theme/Layout";
-import HeroCodeTabs from "../components/HeroCodeTabs";
+import type { HeroMode } from "../components/HeroViewer";
 import styles from "./index.module.css";
 
 const DEMO_URL = "https://hodakamori.github.io/megane/app/";
+const GITHUB_URL = "https://github.com/hodakamori/megane";
 
-function Hero() {
+const MODES: { id: HeroMode; label: string }[] = [
+  { id: "protein", label: "Protein" },
+  { id: "trajectory", label: "Trajectory" },
+  { id: "pipeline", label: "Pipeline" },
+];
+
+function Hero({
+  mode,
+  setMode,
+}: {
+  mode: HeroMode;
+  setMode: (m: HeroMode) => void;
+}) {
   return (
     <header className={styles.hero}>
-      <div className={styles.heroInner}>
-        <div className={styles.heroText}>
-          <h1 className={styles.heroTitle}>megane</h1>
-          <p className={styles.heroTagline}>
-            Spectacles for atomistic data.
-          </p>
-          <p className={styles.heroSubtitle}>
-            1M+ atoms at 60fps. Visual pipelines. Jupyter widget, standalone web app, React component, VS Code extension.
-          </p>
-          <div className={styles.heroActions}>
-            <Link className="button button--primary button--lg" to="/getting-started">
-              Get Started
-            </Link>
-            <Link className="button button--secondary button--lg" href={DEMO_URL}>
-              Live Demo
-            </Link>
-            <Link
-              className="button button--secondary button--lg"
-              href="https://github.com/hodakamori/megane"
-            >
-              GitHub
-            </Link>
-          </div>
-          <HeroCodeTabs />
+      <BrowserOnly>
+        {() => {
+          const HeroViewer = require("../components/HeroViewer").default;
+          return <HeroViewer mode={mode} />;
+        }}
+      </BrowserOnly>
+      <div className={styles.heroVignette} aria-hidden="true" />
+
+      <div className={styles.heroContent}>
+        <span className={styles.heroBadge}>◉ live in your browser · WASM</span>
+        <h1 className={styles.heroTitle}>
+          Spectacles for
+          <br />
+          atomistic data.
+        </h1>
+        <p className={styles.heroLead}>
+          A million atoms at 60fps, right here on the page. No install to look —
+          install when you&rsquo;re ready to build.
+        </p>
+        <div className={styles.heroActions}>
+          <Link className={styles.btnPrimary} to="/getting-started">
+            Get Started
+          </Link>
+          <Link className={styles.btnSecondary} href={DEMO_URL}>
+            Open full demo →
+          </Link>
         </div>
-        <div className={styles.heroViewer}>
-          <img
-            className={styles.heroDemoGif}
-            src="/megane/screenshots/megane-promo.gif"
-            alt="megane molecular viewer demo"
-          />
-        </div>
+      </div>
+
+      <div className={styles.heroModes}>
+        <span className={styles.heroModesLabel}>NOW VIEWING</span>
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className={`${styles.modePill} ${
+              mode === m.id ? styles.modePillActive : ""
+            }`}
+            onClick={() => setMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
+        <span className={styles.heroMetric}>● 1,048,576 atoms · 60fps</span>
       </div>
     </header>
   );
 }
 
-const paths = [
+const ENVIRONMENTS = [
   {
-    icon: "🔬",
     title: "Jupyter widget",
     install: "pip install megane",
     isCommand: true,
-    description: "Interactive widget inside Jupyter notebooks. Build pipelines in Python, display structures inline.",
+    description:
+      "Interactive widget inside Jupyter notebooks. Build pipelines in Python, display structures inline.",
     href: "/guide/jupyter",
-    label: "Jupyter widget",
   },
   {
-    icon: "⚛️",
     title: "React component",
     install: "npm install megane-viewer",
     isCommand: true,
-    description: "Drop <PipelineViewer /> into any React app. Build pipelines with the TypeScript builder API.",
+    description:
+      "Drop <PipelineViewer /> into any React app. Build pipelines with the TypeScript builder API.",
     href: "/guide/web",
-    label: "React component",
   },
   {
-    icon: "🐳",
     title: "Standalone web app",
-    install: "docker build -t megane .",
+    install: "megane serve ./structures",
     isCommand: true,
-    description: "Serve local structure files with `megane serve` and view them instantly in the browser. No code needed.",
+    description:
+      "Serve local structure files and view them instantly in the browser. No code needed.",
     href: "/guide/cli",
-    label: "Standalone web app",
   },
   {
-    icon: "🖥️",
     title: "VS Code extension",
     install: "Install from Marketplace",
     isCommand: false,
-    description: "Open .pdb, .gro, .xyz, .mol, .cif files directly in VS Code with the megane extension.",
+    description:
+      "Open .pdb, .gro, .xyz, .mol, .cif files directly in VS Code with the megane extension.",
     href: "/guide/vscode",
-    label: "VS Code extension",
   },
 ];
 
-function QuickStartPaths() {
+function EnvironmentPicker() {
   return (
-    <section className={styles.quickStart}>
-      <div className={styles.quickStartInner}>
-        <h2 className={styles.quickStartTitle}>Start in your environment</h2>
-        <p className={styles.quickStartSubtitle}>
-          megane works everywhere — pick your entry point.
-        </p>
-        <div className={styles.pathGrid}>
-          {paths.map((p) => (
-            <Link key={p.href} className={styles.pathCard} to={p.href}>
-              <div className={styles.pathIcon}>{p.icon}</div>
-              <h3 className={styles.pathTitle}>{p.title}</h3>
-              {p.isCommand ? (
-                <code className={styles.pathInstall}>{p.install}</code>
-              ) : (
-                <span className={styles.pathInstall}>{p.install}</span>
-              )}
-              <p className={styles.pathDesc}>{p.description}</p>
-              <span className={styles.pathLink}>{p.label} →</span>
+    <section className={styles.section}>
+      <div className={styles.sectionInner}>
+        <span className={styles.eyebrow}>START IN YOUR ENVIRONMENT</span>
+        <h2 className={styles.sectionTitle}>Runs everywhere you work</h2>
+        <div className={styles.envGrid}>
+          {ENVIRONMENTS.map((e) => (
+            <Link key={e.href} className={styles.envCard} to={e.href}>
+              <h3 className={styles.envTitle}>{e.title}</h3>
+              <code
+                className={`${styles.envInstall} ${
+                  e.isCommand ? "" : styles.envInstallPlain
+                }`}
+              >
+                {e.install}
+              </code>
+              <p className={styles.envDesc}>{e.description}</p>
+              <span className={styles.envLink}>{e.title} →</span>
             </Link>
           ))}
         </div>
@@ -114,178 +135,88 @@ function QuickStartPaths() {
   );
 }
 
-function Features() {
-  const features = [
-    {
-      title: "🚀 1M+ Atoms at 60fps",
-      description:
-        "Billboard impostor rendering scales from small molecules to massive protein complexes in real time. Run `megane serve` to stream XTC trajectories from disk over WebSocket — scrub thousands of frames without loading everything into memory.",
-    },
-    {
-      title: "🌍 Runs Everywhere",
-      description:
-        "Jupyter widget, standalone web app, React component, VS Code extension, JupyterLab extension. Rust parsers (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj, LAMMPS dump) shared between Python (PyO3) and browser (WASM): parse once, run anywhere.",
-    },
-    {
-      title: "🧩 Visual Pipeline Editor",
-      description:
-        "Build visualization workflows by wiring 11 node types — load data, filter atoms, adjust styles, generate labels, render coordination polyhedra, overlay vectors. No code required. 7 typed data channels flow through color-coded edges. An AI generator can build pipelines from natural language.",
-    },
-    {
-      title: "🔗 Embed & Integrate",
-      description:
-        "Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to frame_change, selection_change, and measurement events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.",
-    },
-  ];
+const CAPABILITIES = [
+  {
+    title: "1M+ atoms at 60fps",
+    body: "Billboard impostor rendering draws every atom as a shaded quad in a single instanced draw call — from small molecules to massive complexes. megane serve streams multi-GB XTC trajectories over WebSocket without loading them into memory.",
+  },
+  {
+    title: "One Rust core, every host",
+    body: "PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj and more are parsed in Rust, compiled to both PyO3 and WASM. Parse once, run anywhere — Jupyter, browser, React, VS Code, JupyterLab.",
+  },
+  {
+    title: "Visual pipeline editor",
+    body: "Wire 11 node types across 5 categories to load, filter, style and overlay — no code required. 7 typed data channels flow through color-coded edges; only matching types connect. Pipelines serialize to JSON to save and share.",
+  },
+  {
+    title: "Embed & integrate",
+    body: "Control the viewer from Plotly via ipywidgets events, embed in MDX / Next.js docs, and react to frame_change, selection_change and measurement events. MoleculeRenderer is a plain Three.js class — mount it in Vue, Svelte, or vanilla JS.",
+  },
+];
 
+function Capabilities() {
   return (
-    <section className={styles.features}>
-      <div className={styles.featuresGrid}>
-        {features.map((f, i) => (
-          <div key={i} className={styles.featureCard}>
-            <h3>{f.title}</h3>
-            <p>{f.description}</p>
-          </div>
-        ))}
+    <section className={styles.section}>
+      <div className={styles.sectionInner}>
+        <span className={styles.eyebrow}>WHAT YOU GET</span>
+        <h2 className={styles.sectionTitle}>Built for real atomistic data</h2>
+        <div className={styles.capGrid}>
+          {CAPABILITIES.map((c) => (
+            <div key={c.title} className={styles.capCard}>
+              <h3 className={styles.capTitle}>{c.title}</h3>
+              <p className={styles.capBody}>{c.body}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
-function PillarSection() {
+function CtaSection() {
   return (
-    <div className={styles.pillars}>
-      <section className="pillar-section">
-        <h2>Scale</h2>
-        <p>
-          megane renders over <strong>1 million atoms at 60fps</strong> in the browser
-          using GPU-accelerated billboard impostor rendering — atoms are drawn as
-          screen-aligned quads with a ray-sphere shader, so a single instanced draw
-          call covers the whole structure. No desktop app, no plugin — just a browser
-          tab.
-        </p>
-        <p>
-          With the <code>megane serve</code> CLI, multi-GB XTC trajectories stream over a
-          local WebSocket via a binary protocol — scrub through thousands of frames
-          without reading the whole file into memory. (Other hosts load trajectories
-          fully into memory; see <a href="/platform-support#ui-features">Platform Support</a>.)
-        </p>
-      </section>
-
-      <section className="pillar-section">
-        <h2>Anywhere</h2>
-        <div className="pillar-two-col">
-          <div className="pillar-text">
-            <p>One codebase, every environment.</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Distribution</th>
-                  <th>How</th>
-                  <th>Install</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>Jupyter widget</strong></td>
-                  <td>anywidget inline viewer</td>
-                  <td><code>pip install megane</code></td>
-                </tr>
-                <tr>
-                  <td><strong>Standalone web app</strong></td>
-                  <td><code>megane serve</code> in the browser</td>
-                  <td><code>pip install megane</code></td>
-                </tr>
-                <tr>
-                  <td><strong>React component</strong></td>
-                  <td><code>{"<MeganeViewer />"}</code> component</td>
-                  <td><code>npm install megane-viewer</code></td>
-                </tr>
-                <tr>
-                  <td><strong>VS Code extension</strong></td>
-                  <td>Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .cif</td>
-                  <td>Extension</td>
-                </tr>
-              </tbody>
-            </table>
-            <p>
-              The secret: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC,
-              ASE .traj, and LAMMPS dump parsers are written in <strong>Rust</strong> and
-              compiled to both <strong>PyO3</strong> (Python) and <strong>WASM</strong>{" "}
-              (browser). Parse once, run anywhere.
-            </p>
-          </div>
-          <div className="pillar-images single-col">
-            <img src="/megane/screenshots/jupyter.png" alt="megane in Jupyter Notebook" />
+    <section className={styles.cta}>
+      <div className={styles.ctaInner}>
+        <div>
+          <div className={styles.ctaTitle}>Ready to see it move?</div>
+          <div className={styles.ctaSubtitle}>
+            Open the live demo — a million atoms, right in your browser.
           </div>
         </div>
-      </section>
-
-      <section className="pillar-section">
-        <h2>Visual Pipelines</h2>
-        <div className="pillar-two-col">
-          <div className="pillar-text">
-            <p>Wire nodes to build visualization workflows — no code required.</p>
-            <p>
-              <strong>11 node types</strong> across 5 categories: load data (structure,
-              trajectory, streaming, vector), process (filter, modify), overlay (bonds,
-              labels, polyhedra, vectors), and display in a 3D viewport.
-            </p>
-            <p>
-              <strong>7 typed data channels</strong> — particle, bond, cell, label, mesh,
-              trajectory, vector — flow through color-coded edges. Only matching types
-              can connect.
-            </p>
-            <p>
-              Pipelines serialize to JSON, so you can save, share, and version-control
-              your visualization recipes.
-            </p>
-          </div>
-          <div className="pillar-images single-col">
-            <img src="/megane/screenshots/pipeline-editor.png" alt="Visual Pipeline Editor" />
-          </div>
+        <div className={styles.ctaActions}>
+          <Link className={styles.ctaPrimary} href={DEMO_URL}>
+            Launch demo →
+          </Link>
+          <Link className={styles.ctaSecondary} href={GITHUB_URL}>
+            GitHub
+          </Link>
         </div>
-      </section>
-
-      <section className="pillar-section">
-        <h2>Integrate</h2>
-        <p>megane is not a walled garden. It fits into your existing workflow.</p>
-        <p>
-          <strong>Plotly</strong> — Click a point on a Plotly FigureWidget to jump to a
-          trajectory frame. Use megane's <code>on_event("frame_change")</code> callback to
-          update Plotly markers in sync.
-        </p>
-        <p>
-          <strong>MDX / Next.js</strong> — Drop <code>{"<MeganeViewer />"}</code> or{" "}
-          <code>{"<Viewport />"}</code> into your <code>.mdx</code> documentation. WASM
-          parsing works out of the box with a one-line webpack config.
-        </p>
-        <p>
-          <strong>ipywidgets</strong> — React to <code>frame_change</code>,{" "}
-          <code>selection_change</code>, and <code>measurement</code> events. Compose
-          megane with any widget in the Jupyter ecosystem.
-        </p>
-        <p>
-          <strong>Vue / Svelte / vanilla JS</strong> — <code>MoleculeRenderer</code> is a plain
-          Three.js class. Mount it in Vue, Svelte, or a vanilla <code>{"<div>"}</code>.
-        </p>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }
 
 export default function Home(): React.JSX.Element {
   const { siteConfig } = useDocusaurusContext();
+  const [mode, setMode] = useState<HeroMode>("protein");
+
+  // Force the dark navbar/footer chrome on the landing page regardless of the
+  // docs color mode (see html.sp-landing rules in _chrome.css).
+  useEffect(() => {
+    document.documentElement.classList.add("sp-landing");
+    return () => document.documentElement.classList.remove("sp-landing");
+  }, []);
+
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
-      <Hero />
-      <main>
-        <Features />
-        <QuickStartPaths />
-        <div className="container">
-          <PillarSection />
-        </div>
-      </main>
+      <div className={`${styles.landing} sp-landing-root`}>
+        <Hero mode={mode} setMode={setMode} />
+        <main>
+          <EnvironmentPicker />
+          <Capabilities />
+        </main>
+        <CtaSection />
+      </div>
     </Layout>
   );
 }
