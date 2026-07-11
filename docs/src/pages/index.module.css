@@ -38,7 +38,7 @@
 .heroContent {
   position: relative;
   z-index: 2;
-  max-width: 560px;
+  max-width: 660px;
   padding: 40px 0 24px;
 }
 
@@ -60,10 +60,10 @@
 .heroTitle {
   font-family: "Space Grotesk", sans-serif;
   font-weight: 600;
-  font-size: clamp(34px, 6vw, 54px);
-  line-height: 1.02;
+  font-size: clamp(44px, 8vw, 84px);
+  line-height: 1;
   letter-spacing: -0.03em;
-  margin: 0 0 20px;
+  margin: 0 0 22px;
   color: #fff;
 }
 

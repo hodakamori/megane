@@ -196,23 +196,79 @@ def parse_pdb(text: str) -> dict:
     }
 
 
+import re
+
+
+def parse_extended_xyz(text: str) -> dict:
+    """Parse an extended-XYZ file (ASE style, with a Lattice= header) into a
+    Snapshot-compatible dict. The 3x3 lattice is stored as the snapshot `box`
+    (row-major vectors: a, b, c) so periodic coordination polyhedra work."""
+    lines = text.splitlines()
+    n_atoms = int(lines[0].strip())
+    comment = lines[1]
+
+    box = None
+    m = re.search(r'Lattice="([^"]+)"', comment)
+    if m:
+        vals = [float(v) for v in m.group(1).split()]
+        if len(vals) == 9:
+            box = vals
+
+    positions: list[float] = []
+    elements: list[int] = []
+    for line in lines[2 : 2 + n_atoms]:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        sym = parts[0].strip()
+        atomic_num = ELEMENT_TO_ATOMIC_NUM.get(sym.upper(), 6)
+        positions.extend([float(parts[1]), float(parts[2]), float(parts[3])])
+        elements.append(atomic_num)
+
+    inferred = infer_bonds(positions, elements)
+    bonds_flat: list[int] = []
+    for a, b in inferred:
+        bonds_flat.extend([a, b])
+
+    return {
+        "nAtoms": len(elements),
+        "nBonds": len(inferred),
+        "nFileBonds": 0,
+        "positions": [round(v, 3) for v in positions],
+        "elements": elements,
+        "bonds": bonds_flat,
+        "bondOrders": [1] * len(inferred),
+        "box": box,
+    }
+
+
 def main():
     repo_root = Path(__file__).resolve().parent.parent.parent
-    pdb_path = repo_root / "tests" / "fixtures" / "caffeine_water.pdb"
+    fixtures = repo_root / "tests" / "fixtures"
     out_dir = repo_root / "docs" / "public" / "data"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    text = pdb_path.read_text()
-    snapshot = parse_pdb(text)
+    def emit(name: str, snapshot: dict) -> None:
+        out_path = out_dir / name
+        with open(out_path, "w") as f:
+            json.dump(snapshot, f, separators=(",", ":"))
+        size_kb = out_path.stat().st_size / 1024
+        print(
+            f"Generated {out_path} "
+            f"({snapshot['nAtoms']} atoms, {snapshot['nBonds']} bonds, {size_kb:.1f} KB)"
+        )
 
-    out_path = out_dir / "caffeine_water.json"
-    with open(out_path, "w") as f:
-        json.dump(snapshot, f, separators=(",", ":"))
+    # Molecular demo (caffeine solvated in water).
+    emit(
+        "caffeine_water.json",
+        parse_pdb((fixtures / "caffeine_water.pdb").read_text()),
+    )
 
-    size_kb = out_path.stat().st_size / 1024
-    print(
-        f"Generated {out_path} "
-        f"({snapshot['nAtoms']} atoms, {snapshot['nBonds']} bonds, {size_kb:.1f} KB)"
+    # Crystal demo (alpha-quartz SiO2 2x2x2 supercell) — corner-sharing SiO4
+    # tetrahedra when rendered with coordination polyhedra on the landing hero.
+    emit(
+        "quartz_sio2.json",
+        parse_extended_xyz((fixtures / "quartz_sio2_2x2x2.xyz").read_text()),
     )
 
 

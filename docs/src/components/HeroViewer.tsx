@@ -15,11 +15,13 @@ import styles from "./HeroViewer.module.css";
  * Colors are literal (not --ifm-* tokens): the hero is always dark regardless
  * of the docs color mode.
  */
-export type HeroMode = "molecular" | "crystal";
+export type HeroMode = "molecular" | "perovskite" | "quartz";
 
-const MODE_DATA: Record<HeroMode, string> = {
-  molecular: "caffeine_water",
-  crystal: "perovskite_srtio3",
+/** Structure per mode, plus whether to overlay coordination polyhedra. */
+const MODE_DATA: Record<HeroMode, { data: string; polyhedra: boolean }> = {
+  molecular: { data: "caffeine_water", polyhedra: false },
+  perovskite: { data: "perovskite_srtio3", polyhedra: true },
+  quartz: { data: "quartz_sio2", polyhedra: true },
 };
 
 const HERO_BG = 0x0a0c10;
@@ -46,8 +48,8 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
   const [mounted, setMounted] = useState(false);
   const [ready, setReady] = useState(false);
 
-  const dataName = MODE_DATA[mode] ?? MODE_DATA.molecular;
-  const resolvedSrc = useBaseUrl(`/data/${dataName}.json`);
+  const modeInfo = MODE_DATA[mode] ?? MODE_DATA.molecular;
+  const resolvedSrc = useBaseUrl(`/data/${modeInfo.data}.json`);
 
   // Mount the renderer once (lazy: on intersection + idle).
   useEffect(() => {
@@ -135,7 +137,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
         // loadSnapshot may reset the clear color — keep the dark hero bg.
         renderer.setBackgroundColor(HERO_BG);
 
-        if (mode === "crystal") {
+        if (modeInfo.polyhedra) {
           const { executePolyhedronGenerator } = await import(
             "../../../src/pipeline/executors/polyhedronGenerator"
           );
@@ -152,8 +154,9 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
           const inputs: any = new Map([["particle", [particle]]]);
           const params: any = {
             type: "polyhedron_generator",
-            // Exclude Sr (Z=38) so only the classic corner-sharing TiO6
-            // octahedra render, not the SrO12 cuboctahedra.
+            // Exclude Sr (Z=38) so perovskite shows the classic corner-sharing
+            // TiO6 octahedra, not SrO12 cuboctahedra. Harmless for quartz
+            // (no Sr present) where Si centers give SiO4 tetrahedra.
             excludedCenters: [38],
             excludedLigands: [],
             cutoffTolerance: 1.15,

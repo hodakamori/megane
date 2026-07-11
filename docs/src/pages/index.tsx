@@ -11,7 +11,8 @@ const GITHUB_URL = "https://github.com/hodakamori/megane";
 
 const MODES: { id: HeroMode; label: string }[] = [
   { id: "molecular", label: "Caffeine · water" },
-  { id: "crystal", label: "Perovskite" },
+  { id: "perovskite", label: "Perovskite" },
+  { id: "quartz", label: "Quartz" },
 ];
 
 /** How long each structure is shown before the hero cycles to the next. */
@@ -217,7 +218,10 @@ export default function Home(): React.JSX.Element {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const id = window.setInterval(() => {
       if (document.hidden) return;
-      setMode((m) => (m === "molecular" ? "crystal" : "molecular"));
+      setMode((m) => {
+        const i = MODES.findIndex((x) => x.id === m);
+        return MODES[(i + 1) % MODES.length].id;
+      });
     }, CYCLE_MS);
     return () => window.clearInterval(id);
   }, [mode]);
