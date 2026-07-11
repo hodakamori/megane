@@ -318,9 +318,9 @@ function CustomLayout({ bondConfig, trajectoryConfig, handleUpload }) {
 
 ---
 
-## Core Renderer (Framework-Agnostic)
+## Core Renderer (Vue / Svelte / vanilla JS)
 
-For non-React applications (Vue, Svelte, vanilla JS), use `MoleculeRenderer` directly — the same Three.js renderer that powers all megane components. See the [Framework-Agnostic Renderer guide](/guide/framework-agnostic) for mounting, appearance control, atom selection/measurement, and screen-space picking.
+For non-React applications (Vue, Svelte, vanilla JS), use `MoleculeRenderer` directly — the same Three.js renderer that powers all megane components. See the [guide to using megane with Vue, Svelte & vanilla JS](/guide/framework-agnostic) for mounting, appearance control, atom selection/measurement, and screen-space picking.
 
 ---
 

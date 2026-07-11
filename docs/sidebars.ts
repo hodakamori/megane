@@ -57,7 +57,7 @@ const sidebars: SidebarsConfig = {
         {
           type: "doc",
           id: "guide/framework-agnostic",
-          label: "Framework-agnostic renderer",
+          label: "Vue / Svelte / Vanilla JS",
         },
       ],
     },
