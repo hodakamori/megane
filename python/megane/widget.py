@@ -11,8 +11,9 @@ from typing import TYPE_CHECKING, Callable
 import anywidget
 import traitlets
 
+from megane.parsers.common import encode_trajectory_frame
 from megane.parsers.pdb import load_pdb
-from megane.protocol import encode_frame, encode_snapshot
+from megane.protocol import encode_snapshot
 
 if TYPE_CHECKING:
     from megane.pipeline import Pipeline
@@ -194,15 +195,13 @@ class MolecularViewer(anywidget.AnyWidget):
         # Legacy trajectory (from viewer.load())
         if self._trajectory is not None:
             if 0 <= idx < self._trajectory.n_frames:
-                positions = self._trajectory.get_frame(idx)
-                self._frame_data = encode_frame(idx, positions)
+                self._frame_data = encode_trajectory_frame(self._trajectory, idx)
 
         # Pipeline trajectory (from set_pipeline())
         if self._pipeline_ref is not None:
             for traj in self._pipeline_ref._trajectories.values():
                 if 0 <= idx < traj.n_frames:
-                    positions = traj.get_frame(idx)
-                    self._frame_data = encode_frame(idx, positions)
+                    self._frame_data = encode_trajectory_frame(traj, idx)
                     break
 
         self._fire_event(

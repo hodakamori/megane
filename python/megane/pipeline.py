@@ -34,6 +34,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
+    from megane.parsers.common import InMemoryTrajectory
     from megane.widget import MolecularViewer
 
 # ─── Port Objects ────────────────────────────────────────────────────
@@ -621,7 +622,7 @@ class Pipeline:
         self._nodes: dict[str, tuple[PipelineNode, dict]] = {}
         self._edges: list[dict] = []
         self._node_data: dict[str, bytes] = {}
-        self._trajectories: dict[str, object] = {}
+        self._trajectories: dict[str, InMemoryTrajectory] = {}
         self._structures: dict[str, object] = {}
         self._counter = 0
 

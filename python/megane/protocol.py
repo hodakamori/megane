@@ -20,6 +20,12 @@ Protocol format:
     frame_id:   u32
     n_atoms:    u32
     positions:  Float32[n_atoms * 3]
+    elements:   Uint8[n_atoms]  + pad to 4 bytes  (if HAS_FRAME_ELEMENTS)
+    box:        Float32[9]       (3x3 row-major)   (if HAS_BOX)
+
+  The optional frame elements/box carry per-frame topology/cell for
+  heterogeneous trajectories; a frame that omits them (flags 0) is byte-identical
+  to the original positions-only layout, so uniform playback is unchanged.
 """
 
 from __future__ import annotations
@@ -46,6 +52,7 @@ MSG_METADATA = 2
 
 HAS_BOND_ORDERS = 0x01
 HAS_BOX = 0x02
+HAS_FRAME_ELEMENTS = 0x04
 
 
 @runtime_checkable
@@ -101,15 +108,45 @@ def encode_snapshot(structure: StructureLike) -> bytes:
     return header + snapshot_header + pos_bytes + elem_bytes + bond_bytes + bond_order_bytes + box_bytes
 
 
-def encode_frame(frame_id: int, positions: np.ndarray) -> bytes:
-    """Encode a trajectory frame as a binary message."""
+def encode_frame(
+    frame_id: int,
+    positions: np.ndarray,
+    elements: np.ndarray | None = None,
+    box: np.ndarray | None = None,
+) -> bytes:
+    """Encode a trajectory frame as a binary message.
+
+    Args:
+        frame_id: 0-based frame index.
+        positions: (N, 3) float32 atom positions.
+        elements: optional (N,) uint8 per-frame atomic numbers (heterogeneous
+            topology). Omit for uniform trajectories (host reuses the snapshot).
+        box: optional (3, 3) float32 per-frame unit cell. Omit for a constant cell.
+
+    A call with neither ``elements`` nor ``box`` produces the original
+    positions-only layout, so uniform playback is byte-identical.
+    """
     n_atoms = len(positions)
 
-    header = MAGIC + struct.pack("<BBH", MSG_FRAME, 0, 0)
-    frame_header = struct.pack("<II", frame_id, n_atoms)
+    flags = 0
     pos_bytes = positions.astype(np.float32).tobytes()
 
-    return header + frame_header + pos_bytes
+    elem_bytes = b""
+    if elements is not None:
+        flags |= HAS_FRAME_ELEMENTS
+        raw = np.asarray(elements, dtype=np.uint8).tobytes()
+        pad = (4 - (len(raw) % 4)) % 4
+        elem_bytes = raw + b"\x00" * pad
+
+    box_bytes = b""
+    if box is not None:
+        flags |= HAS_BOX
+        box_bytes = np.asarray(box, dtype=np.float32).flatten().tobytes()
+
+    header = MAGIC + struct.pack("<BBH", MSG_FRAME, flags, 0)
+    frame_header = struct.pack("<II", frame_id, n_atoms)
+
+    return header + frame_header + pos_bytes + elem_bytes + box_bytes
 
 
 def encode_metadata(

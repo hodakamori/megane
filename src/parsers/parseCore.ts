@@ -89,6 +89,15 @@ interface WasmXtcResult {
   box_matrix(): Float32Array;
   frame_data(): Float32Array;
   vector_channel_data(): Float32Array;
+  // Heterogeneous side table (all empty/false on the uniform fast path).
+  heterogeneous: boolean;
+  varies_atoms: boolean;
+  varies_cell: boolean;
+  varies_topology: boolean;
+  max_atoms: number;
+  frame_atom_offsets(): Uint32Array;
+  frame_elements(): Uint8Array;
+  frame_cells(): Float32Array;
   free(): void;
 }
 
@@ -121,6 +130,8 @@ export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
   readonly vector_channel_count: number;
   /** Newline-joined channel names (velocity/force), in decode order. */
   readonly vector_channel_names: string;
+  /** True when the dump's atom count varies — host reparses eagerly. */
+  readonly heterogeneous: boolean;
   decode_frame_vectors(frame: number): Float32Array;
 }
 
@@ -128,6 +139,8 @@ export interface WasmLammpstrjDecoder extends WasmTrajectoryDecoder {
 export interface WasmStructureFrameDecoder extends WasmFrameDecoder {
   /** Number of EXTRA frames (excludes the eager snapshot frame 0). */
   readonly n_frames: number;
+  /** True when frames vary in atom count / cell — host reparses eagerly. */
+  readonly heterogeneous: boolean;
   /** Parse frame 0 (the eager snapshot) from the held bytes — no re-read. */
   frame0(): WasmParseResult;
 }
@@ -143,6 +156,12 @@ export interface StructureIndexResult {
   nAtoms: number;
   /** Number of decodable EXTRA frames (excludes the eager snapshot frame 0). */
   nFrames: number;
+  /**
+   * True when the file is heterogeneous (frames vary in atom count / cell). The
+   * lazy positions-only decoder cannot represent such frames, so the caller
+   * discards the decoder and reparses the whole file eagerly.
+   */
+  heterogeneous: boolean;
 }
 
 /** Lightweight trajectory index (from `indexTrajectoryCore`) — no bulk coordinates. */
@@ -155,6 +174,12 @@ export interface TrajectoryIndexResult {
   times: Float32Array;
   /** Embedded per-atom vector channel names (LAMMPS velocity/force); empty otherwise. */
   vectorChannelNames: string[];
+  /**
+   * True when the trajectory's atom count varies between frames (LAMMPS dump).
+   * The positions-only lazy decoder cannot stream such frames, so the caller
+   * discards the decoder and reparses the whole file eagerly.
+   */
+  heterogeneous: boolean;
 }
 
 type ParseFn = (text: string) => WasmParseResult;
@@ -411,6 +436,8 @@ export function extractFrames(
   expectedNAtoms: number,
   formatLabel: string,
 ): XTCParseResult {
+  // Frame 0 defines the base topology; its atom count must match the loaded
+  // structure even for heterogeneous (variable-atom) trajectories.
   if (result.n_atoms !== expectedNAtoms) {
     const msg = `${formatLabel} atom count (${result.n_atoms}) does not match structure (${expectedNAtoms})`;
     result.free();
@@ -421,21 +448,62 @@ export function extractFrames(
   // (subarray) into that single backing buffer. Frames are read-only downstream,
   // so sharing one buffer is safe. Keep `allData` alive via these views.
   const allData = result.frame_data();
-  const stride = result.n_atoms * 3;
+  const nFrames = result.n_frames;
   const frames: Frame[] = [];
+  const heterogeneous = result.heterogeneous === true;
 
-  for (let i = 0; i < result.n_frames; i++) {
-    frames.push({
-      frameId: i,
-      nAtoms: result.n_atoms,
-      positions: allData.subarray(i * stride, (i + 1) * stride),
-    });
+  if (heterogeneous) {
+    // Slice jagged positions by per-frame atom offsets (empty ⇒ fixed atom
+    // count, e.g. per-frame-cell XTC/DCD/NetCDF); attach the per-frame cell
+    // (empty ⇒ constant cell) and per-frame element/type ids (empty ⇒ constant
+    // topology). The renderer swaps cell / re-topologises only when a frame
+    // carries those optional fields.
+    const offsets = result.frame_atom_offsets(); // atoms, length nFrames+1 or empty
+    const cellsFlat = result.frame_cells(); // 9 floats/frame or empty
+    const elemsFlat = result.frame_elements(); // per-frame ids or empty
+    const hasOffsets = offsets.length > 0;
+    const hasCells = cellsFlat.length > 0;
+    const hasElems = elemsFlat.length > 0;
+    for (let i = 0; i < nFrames; i++) {
+      const aAtoms = hasOffsets ? offsets[i] : i * result.n_atoms;
+      const bAtoms = hasOffsets ? offsets[i + 1] : (i + 1) * result.n_atoms;
+      const frame: Frame = {
+        frameId: i,
+        nAtoms: bAtoms - aAtoms,
+        positions: allData.subarray(aAtoms * 3, bAtoms * 3),
+      };
+      if (hasElems) {
+        frame.elements = elemsFlat.subarray(aAtoms, bAtoms);
+      }
+      if (hasCells) {
+        frame.box = cellsFlat.subarray(i * 9, i * 9 + 9);
+      }
+      frames.push(frame);
+    }
+  } else {
+    const stride = result.n_atoms * 3;
+    for (let i = 0; i < nFrames; i++) {
+      frames.push({
+        frameId: i,
+        nAtoms: result.n_atoms,
+        positions: allData.subarray(i * stride, (i + 1) * stride),
+      });
+    }
   }
 
   const meta: TrajectoryMeta = {
-    nFrames: result.n_frames,
+    nFrames,
     timestepPs: result.timestep_ps,
     nAtoms: result.n_atoms,
+    ...(heterogeneous
+      ? {
+          heterogeneous: true,
+          maxAtoms: result.max_atoms,
+          variesAtoms: result.varies_atoms,
+          variesCell: result.varies_cell,
+          variesTopology: result.varies_topology,
+        }
+      : {}),
   };
 
   const vectorChannels = deserializeVectorChannels(result.n_atoms, result.vector_channel_meta, () =>
@@ -444,6 +512,41 @@ export function extractFrames(
 
   result.free();
   return { frames, meta, vectorChannels };
+}
+
+/**
+ * Remap a heterogeneous LAMMPS-dump trajectory's per-frame element ids in place.
+ *
+ * A LAMMPS dump carries integer atom *types*, not elements. When the atom count
+ * varies (GCMC / deposition) the trajectory lane emits those raw type ids as
+ * each frame's `elements`; this rewrites them to real atomic numbers using the
+ * `type → element` correspondence established by frame 0 against the separately
+ * loaded structure (whose `structureElements` line up 1:1 with frame-0 atoms).
+ * Types absent from frame 0 fall back to element 0 (unknown / gray).
+ *
+ * Mutates each frame's `elements` in place (they are disjoint JS-owned views).
+ * A no-op unless the frames actually carry per-frame elements.
+ */
+export function remapTrajectoryTypesToElements(
+  frames: Frame[],
+  structureElements: Uint8Array,
+): void {
+  if (frames.length === 0 || !frames[0].elements) return;
+  const typeToElement = new Map<number, number>();
+  const frame0Types = frames[0].elements;
+  const n = Math.min(frame0Types.length, structureElements.length);
+  for (let i = 0; i < n; i++) {
+    if (!typeToElement.has(frame0Types[i])) {
+      typeToElement.set(frame0Types[i], structureElements[i]);
+    }
+  }
+  for (const frame of frames) {
+    const elems = frame.elements;
+    if (!elems) continue;
+    for (let i = 0; i < elems.length; i++) {
+      elems[i] = typeToElement.get(elems[i]) ?? 0;
+    }
+  }
 }
 
 /** Input for the structure parse core (already read from the File). */
@@ -534,6 +637,7 @@ export function indexTrajectoryCore(
     box: decoder.has_box ? decoder.box_matrix() : null,
     times: kind === "xtc" ? (decoder as WasmXtcDecoder).times() : new Float32Array(0),
     vectorChannelNames,
+    heterogeneous: kind === "lammpstrj" && (decoder as WasmLammpstrjDecoder).heterogeneous === true,
   };
   return { decoder, index };
 }
@@ -558,6 +662,7 @@ export function indexStructureCore(
   const index: StructureIndexResult = {
     nAtoms: decoder.n_atoms,
     nFrames: decoder.n_frames,
+    heterogeneous: decoder.heterogeneous === true,
   };
   const frame0 = parseWithFn(() => decoder.frame0(), "");
   return { decoder, index, frame0 };

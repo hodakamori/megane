@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import logging
 
-import numpy as np
-
 from megane import megane_parser
-from megane.parsers.common import InMemoryTrajectory
+from megane.parsers.common import InMemoryTrajectory, trajectory_from_traj_result
 
 __all__ = ["load_dcd"]
 
@@ -33,18 +31,12 @@ def load_dcd(path: str) -> InMemoryTrajectory:
         data = f.read()
 
     result = megane_parser.parse_dcd(data)
+    trajectory = trajectory_from_traj_result(result)
 
-    n_atoms = result.n_atoms
-    n_frames = result.n_frames
-    frames = np.asarray(result.frame_positions, dtype=np.float32).reshape(n_frames, n_atoms, 3)
-    box_matrix = np.asarray(result.box_matrix, dtype=np.float32)
-
-    logger.info("Loaded DCD trajectory: %d frames, %d atoms", n_frames, n_atoms)
-
-    return InMemoryTrajectory(
-        _frames=frames,
-        n_frames=n_frames,
-        n_atoms=n_atoms,
-        timestep_ps=result.timestep_ps,
-        box=box_matrix,
+    logger.info(
+        "Loaded DCD trajectory: %d frames, %d atoms%s",
+        trajectory.n_frames,
+        trajectory.n_atoms,
+        " (variable cell)" if trajectory.heterogeneous else "",
     )
+    return trajectory

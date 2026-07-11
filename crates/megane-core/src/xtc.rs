@@ -563,7 +563,11 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
     let mut n_atoms: usize = 0;
     let mut first_time: f32 = 0.0;
     let mut second_time: f32 = 0.0;
-    let mut last_box: Option<[f32; 9]> = None;
+    let mut first_box: Option<[f32; 9]> = None;
+    // Per-frame cell recording, started lazily only once a frame's box diverges
+    // from frame 0 (constant-cell runs allocate nothing and keep parity).
+    let mut per_frame_cells: Vec<[f32; 9]> = Vec::new();
+    let mut varies_cell = false;
 
     while let Some(header) = read_frame_header(&mut xdr)? {
         if n_atoms == 0 {
@@ -577,10 +581,19 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
 
         if n_frames == 0 {
             first_time = header.time;
+            first_box = Some(header.box_matrix);
         } else if n_frames == 1 {
             second_time = header.time;
         }
-        last_box = Some(header.box_matrix);
+        // Detect a per-frame cell change; backfill earlier frames with frame 0's
+        // box the first time we diverge.
+        if !varies_cell && first_box != Some(header.box_matrix) {
+            varies_cell = true;
+            per_frame_cells.extend(std::iter::repeat_n(first_box.unwrap(), n_frames));
+        }
+        if varies_cell {
+            per_frame_cells.push(header.box_matrix);
+        }
 
         // Decompress coordinate data straight into the flat buffer.
         let positions = decompress_coords(&mut xdr, n_atoms)?;
@@ -598,13 +611,16 @@ pub fn parse_xtc(data: &[u8]) -> Result<XtcData, String> {
         1.0
     };
 
+    let hetero = crate::trajectory::build_cell_hetero(varies_cell, per_frame_cells, n_atoms);
+
     Ok(XtcData {
         n_atoms,
         n_frames,
         timestep_ps,
-        box_matrix: last_box,
+        box_matrix: first_box,
         frame_positions_flat,
         vector_channels: vec![],
+        hetero,
     })
 }
 
@@ -643,6 +659,8 @@ mod tests {
         check(169, 7.09, 15.22, 0.81);
         check(200, 1.44, 13.00, 6.36);
         check(326, 12.61, 4.89, 10.66);
+        // This demo trajectory holds a constant box → uniform fast path.
+        assert!(result.hetero.is_none());
     }
 
     #[test]

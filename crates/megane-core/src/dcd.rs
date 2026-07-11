@@ -236,7 +236,11 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         Vec::new()
     };
     let mut n_frames: usize = 0;
-    let mut last_box: Option<[f32; 9]> = None;
+    let mut first_box: Option<[f32; 9]> = None;
+    // Per-frame cell recording, started lazily only once a frame's box diverges
+    // from frame 0 (constant-cell runs allocate nothing and keep parity).
+    let mut per_frame_cells: Vec<[f32; 9]> = Vec::new();
+    let mut varies_cell = false;
 
     loop {
         if reader.remaining() == 0 {
@@ -244,6 +248,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         }
 
         // Optional unit-cell record for CHARMM (6 × float64 = 48 bytes).
+        let mut cur_box: Option<[f32; 9]> = None;
         if has_cell {
             if reader.remaining() < 8 {
                 break;
@@ -268,7 +273,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
                     m[0] = a;
                     m[4] = b;
                     m[8] = c;
-                    last_box = Some(m);
+                    cur_box = Some(m);
                 }
                 Ok(_) => {}
                 Err(_) => break,
@@ -327,6 +332,21 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
                 frame_positions_flat.push(read_f32_be(z_rec, off));
             }
         }
+        // Record the per-frame cell now that the frame is confirmed complete.
+        if n_frames == 0 {
+            first_box = cur_box;
+        }
+        if has_cell {
+            let this_box = cur_box.or(first_box).unwrap_or([0.0; 9]);
+            if !varies_cell && cur_box.is_some() && cur_box != first_box {
+                varies_cell = true;
+                per_frame_cells
+                    .extend(std::iter::repeat_n(first_box.unwrap_or([0.0; 9]), n_frames));
+            }
+            if varies_cell {
+                per_frame_cells.push(this_box);
+            }
+        }
         n_frames += 1;
 
         if nset > 0 && n_frames >= nset {
@@ -344,13 +364,16 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         1.0
     };
 
+    let hetero = crate::trajectory::build_cell_hetero(varies_cell, per_frame_cells, n_atoms);
+
     Ok(DcdData {
         n_atoms,
         n_frames,
         timestep_ps,
-        box_matrix: last_box,
+        box_matrix: first_box,
         frame_positions_flat,
         vector_channels: vec![],
+        hetero,
     })
 }
 
@@ -537,6 +560,56 @@ mod tests {
         assert_eq!(r.n_atoms, 2);
         assert_eq!(r.n_frames, 1);
         assert!(r.box_matrix.is_none());
+    }
+
+    /// Build a CHARMM DCD with `cells` frames, each carrying its own diagonal box.
+    fn build_multi_frame_cells(le: bool, cells: &[(f64, f64, f64)]) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_record(
+            &mut out,
+            &build_header(le, 24, true, cells.len() as i32),
+            le,
+        );
+        let mut title = vec![0u8; 84];
+        title[0..4].copy_from_slice(&if le {
+            1i32.to_le_bytes()
+        } else {
+            1i32.to_be_bytes()
+        });
+        write_record(&mut out, &title, le);
+        write_natom(&mut out, 2, le);
+        for (i, (a, b, c)) in cells.iter().enumerate() {
+            write_cell(&mut out, *a, *b, *c, le);
+            let f = i as f32;
+            write_coord(&mut out, &[f, f + 1.0], le); // X
+            write_coord(&mut out, &[f + 2.0, f + 3.0], le); // Y
+            write_coord(&mut out, &[f + 4.0, f + 5.0], le); // Z
+        }
+        out
+    }
+
+    #[test]
+    fn test_uniform_cell_dcd_keeps_fast_path() {
+        // Every frame carries the same cell → no side table, box is that cell.
+        let blob = build_multi_frame_cells(true, &[(10.0, 10.0, 10.0), (10.0, 10.0, 10.0)]);
+        let r = parse_dcd(&blob).expect("uniform cell DCD");
+        assert_eq!(r.n_frames, 2);
+        assert!(r.hetero.is_none());
+        assert!((r.box_matrix.unwrap()[0] - 10.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_variable_cell_dcd_builds_side_table() {
+        let blob = build_multi_frame_cells(true, &[(10.0, 10.0, 10.0), (12.0, 12.0, 12.0)]);
+        let r = parse_dcd(&blob).expect("variable cell DCD");
+        assert_eq!(r.n_frames, 2);
+        let h = r.hetero.as_ref().expect("cell side table");
+        assert!(h.varies_cell);
+        assert!(!h.varies_atoms);
+        // box_matrix is frame 0; per-frame cells cover both frames.
+        assert!((r.box_matrix.unwrap()[0] - 10.0).abs() < 1e-3);
+        assert!((r.frame_cell(0).unwrap()[0] - 10.0).abs() < 1e-3);
+        assert!((r.frame_cell(1).unwrap()[0] - 12.0).abs() < 1e-3);
     }
 
     #[test]

@@ -563,18 +563,84 @@ fn parse_impl(text: &str, frame0_only: bool) -> Result<ParsedStructure, String> 
     unique_bonds.extend(inferred);
 
     // Build flat frame positions from additional models (frame 0 is `positions`).
+    // Models used to be dropped when their atom count differed from model 0; now
+    // every model is kept and, when counts diverge, a `HeteroFrames` side table
+    // carries per-model positions/elements (e.g. a multi-MODEL ensemble with a
+    // changing ligand). Uniform ensembles (constant atom count — the NMR norm)
+    // allocate no side table and keep the fixed-stride fast path.
     let extra_models = all_models.len().saturating_sub(1);
     let mut frame_positions_flat: Vec<f32> = Vec::with_capacity(extra_models * n_atoms * 3);
-    for model in all_models.iter().skip(1) {
-        if model.len() != n_atoms {
-            continue; // Skip models with different atom counts
-        }
-        for atom in model {
-            frame_positions_flat.push(atom.x);
-            frame_positions_flat.push(atom.y);
-            frame_positions_flat.push(atom.z);
+    let mut atom_offsets: Vec<u32> = vec![0];
+    let mut per_frame_elements: Vec<Vec<u8>> = Vec::new();
+    let mut varies_atoms = false;
+    let mut recording_topo = false;
+    let mut max_atoms = n_atoms;
+    // In `frame0_only` mode the extra models were intentionally not retained
+    // (empty vecs), so skip the flat-frame / side-table build entirely.
+    if !frame0_only {
+        for (ei, model) in all_models.iter().skip(1).enumerate() {
+            let m_atoms = model.len();
+            for atom in model {
+                frame_positions_flat.push(atom.x);
+                frame_positions_flat.push(atom.y);
+                frame_positions_flat.push(atom.z);
+            }
+            let last = *atom_offsets.last().unwrap();
+            atom_offsets.push(last + m_atoms as u32);
+            max_atoms = max_atoms.max(m_atoms);
+            if m_atoms != n_atoms {
+                varies_atoms = true;
+            }
+            // Lazily record per-model elements, backfilling earlier (uniform)
+            // models with model-0 elements the first time a count diverges.
+            if varies_atoms && !recording_topo {
+                for _ in 0..ei {
+                    per_frame_elements.push(elements.clone());
+                }
+                recording_topo = true;
+            }
+            if recording_topo {
+                per_frame_elements.push(model.iter().map(|a| a.element).collect());
+            }
         }
     }
+
+    // Assemble the side table only when atom counts diverge across models. PDB
+    // multi-MODEL shares a single global CRYST1, so the cell never varies per
+    // model (varies_cell stays false).
+    let hetero = if varies_atoms {
+        let empty_bonds: HashSet<(u32, u32)> = HashSet::new();
+        let mut elements_flat: Vec<u8> = Vec::new();
+        let mut bonds_flat: Vec<u32> = Vec::new();
+        let mut bond_offsets: Vec<u32> = Vec::with_capacity(per_frame_elements.len() + 1);
+        bond_offsets.push(0);
+        for (k, elems) in per_frame_elements.iter().enumerate() {
+            let a = atom_offsets[k] as usize * 3;
+            let b = atom_offsets[k + 1] as usize * 3;
+            let fpos = &frame_positions_flat[a..b];
+            let fbonds = crate::bonds::infer_bonds(fpos, elems, elems.len(), &empty_bonds);
+            for (u, v) in &fbonds {
+                bonds_flat.push(*u);
+                bonds_flat.push(*v);
+            }
+            let last = *bond_offsets.last().unwrap();
+            bond_offsets.push(last + fbonds.len() as u32);
+            elements_flat.extend_from_slice(elems);
+        }
+        Some(HeteroFrames {
+            atom_offsets,
+            elements_flat,
+            cells_flat: Vec::new(),
+            bond_offsets,
+            bonds_flat,
+            varies_atoms: true,
+            varies_cell: false,
+            varies_topology: true,
+            max_atoms: max_atoms as u32,
+        })
+    } else {
+        None
+    };
 
     // Check if any labels are non-empty
     let atom_labels = if first_model_labels.iter().any(|l| !l.is_empty()) {
@@ -632,7 +698,7 @@ fn parse_impl(text: &str, frame0_only: bool) -> Result<ParsedStructure, String> 
         ca_res_nums,
         ca_ss_type,
         symmetry_ops: Vec::new(),
-        hetero: None,
+        hetero,
     })
 }
 
@@ -660,6 +726,11 @@ pub struct PdbIndex {
     pub n_extra_frames: usize,
     /// Byte offset of each extra model's `MODEL` record line.
     pub offsets: Vec<usize>,
+    /// True when some model's atom count differs from model 0. The lazy
+    /// positions-only decode path cannot represent a jagged ensemble, so the
+    /// host falls back to an eager parse (which builds the `HeteroFrames` side
+    /// table). Detected cheaply from ATOM/HETATM counts, no coordinate decode.
+    pub heterogeneous: bool,
 }
 
 /// Cheap per-model atom-count test used only by {@link build_index}: an
@@ -681,6 +752,7 @@ pub fn build_index(text: &str) -> Result<PdbIndex, String> {
     let mut has_model_record = false;
     let mut current_offset = 0usize; // MODEL line offset of the current model
     let mut current_count = 0usize;
+    let mut heterogeneous = false;
 
     for (i, line) in text.lines().enumerate() {
         let record = if line.len() >= 6 {
@@ -698,10 +770,10 @@ pub fn build_index(text: &str) -> Result<PdbIndex, String> {
                 match first_n_atoms {
                     None => first_n_atoms = Some(current_count), // model 0 = eager snapshot
                     Some(n0) => {
-                        if current_count == n0 {
-                            offsets.push(current_offset);
+                        if current_count != n0 {
+                            heterogeneous = true;
                         }
-                        // else: mismatched model is dropped (matches eager)
+                        offsets.push(current_offset);
                     }
                 }
                 current_count = 0;
@@ -722,6 +794,7 @@ pub fn build_index(text: &str) -> Result<PdbIndex, String> {
             n_atoms: current_count,
             n_extra_frames: 0,
             offsets: Vec::new(),
+            heterogeneous: false,
         });
     }
 
@@ -733,6 +806,7 @@ pub fn build_index(text: &str) -> Result<PdbIndex, String> {
         n_atoms,
         n_extra_frames: offsets.len(),
         offsets,
+        heterogeneous,
     })
 }
 
@@ -827,9 +901,9 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // A 3-model, 2-atom PDB for the lazy decode tests. The middle model has a
-    // mismatched atom count so it must be dropped exactly as the eager parser
-    // drops it (keeping extra-frame indices aligned).
+    // A 3-model PDB whose middle model has a mismatched atom count. It used to be
+    // dropped by both paths; now the eager parser captures it as a heterogeneous
+    // extra frame and the lazy index flags the file so the host falls back to eager.
     const MULTI_MODEL_PDB: &str = "\
 CRYST1   10.000   10.000   10.000  90.00  90.00  90.00 P 1           1
 MODEL        1
@@ -845,28 +919,72 @@ ATOM      2  H1  HOH A   1       4.000   0.000   0.000  1.00  0.00           H
 ENDMDL
 ";
 
-    #[test]
-    fn lazy_frame0_and_decode_model_match_eager() {
-        let eager = parse(MULTI_MODEL_PDB).unwrap();
-        let f0 = parse_frame0(MULTI_MODEL_PDB).unwrap();
-        let idx = build_index(MULTI_MODEL_PDB).unwrap();
+    // A 3-model, 2-atom PDB with constant topology across all models — the NMR
+    // ensemble norm, which must keep the uniform fast path (hetero == None).
+    const UNIFORM_MODEL_PDB: &str = "\
+CRYST1   10.000   10.000   10.000  90.00  90.00  90.00 P 1           1
+MODEL        1
+ATOM      1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       1.000   0.000   0.000  1.00  0.00           H
+ENDMDL
+MODEL        2
+ATOM      1  O   HOH A   1       2.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       2.500   0.000   0.000  1.00  0.00           H
+ENDMDL
+MODEL        3
+ATOM      1  O   HOH A   1       3.000   0.000   0.000  1.00  0.00           O
+ATOM      2  H1  HOH A   1       3.500   0.000   0.000  1.00  0.00           H
+ENDMDL
+";
 
+    #[test]
+    fn uniform_multi_model_keeps_fast_path() {
+        let eager = parse(UNIFORM_MODEL_PDB).unwrap();
+        assert!(
+            eager.hetero.is_none(),
+            "uniform ensemble must not allocate a side table"
+        );
+        assert_eq!(eager.extra_frame_count(), 2);
+        let idx = build_index(UNIFORM_MODEL_PDB).unwrap();
+        assert!(!idx.heterogeneous);
+        assert_eq!(idx.n_extra_frames, 2);
+        // Lazy positions-only decode matches the eager frames for the uniform case.
+        for k in 0..idx.n_extra_frames {
+            let p = decode_model_at(UNIFORM_MODEL_PDB, idx.offsets[k], idx.n_atoms).unwrap();
+            assert_eq!(p, eager.frame(k).to_vec(), "extra model {k}");
+        }
+    }
+
+    #[test]
+    fn heterogeneous_multi_model_builds_side_table() {
+        let eager = parse(MULTI_MODEL_PDB).unwrap();
+        // Both mismatched and matched extra models are now retained.
+        assert_eq!(eager.extra_frame_count(), 2);
+        let h = eager.hetero.as_ref().expect("heterogeneous side table");
+        assert!(h.varies_atoms);
+        assert!(h.varies_topology);
+        assert_eq!(h.max_atoms, 2);
+        // Extra frame 0 (model 2) has 1 atom; extra frame 1 (model 3) has 2.
+        assert_eq!(eager.frame_atom_count(0), 1);
+        assert_eq!(eager.frame_atom_count(1), 2);
+        assert!((eager.frame(0)[0] - 2.0).abs() < 1e-5);
+        // The lazy index flags heterogeneity so the host reparses eagerly.
+        let idx = build_index(MULTI_MODEL_PDB).unwrap();
+        assert!(idx.heterogeneous);
+        assert_eq!(idx.n_extra_frames, 2);
+    }
+
+    #[test]
+    fn lazy_frame0_matches_eager() {
+        let eager = parse(UNIFORM_MODEL_PDB).unwrap();
+        let f0 = parse_frame0(UNIFORM_MODEL_PDB).unwrap();
         // Frame-0 snapshot is byte-identical to the eager model 0 (topology + coords).
         assert_eq!(f0.positions, eager.positions);
         assert_eq!(f0.elements, eager.elements);
         assert_eq!(f0.n_atoms, eager.n_atoms);
         assert_eq!(f0.box_matrix, eager.box_matrix);
         assert!(f0.frame_positions_flat.is_empty());
-
-        // The mismatched middle model is dropped by BOTH paths, leaving one extra.
-        assert_eq!(idx.n_atoms, eager.n_atoms);
-        assert_eq!(idx.n_extra_frames, eager.extra_frame_count());
-        assert_eq!(idx.n_extra_frames, 1);
-
-        for k in 0..idx.n_extra_frames {
-            let p = decode_model_at(MULTI_MODEL_PDB, idx.offsets[k], idx.n_atoms).unwrap();
-            assert_eq!(p, eager.frame(k).to_vec(), "extra model {k}");
-        }
+        assert!(f0.hetero.is_none());
     }
 
     #[test]

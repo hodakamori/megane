@@ -34,6 +34,10 @@ struct VectorColumnGroup {
 /// Column indices for atom data.
 struct ColumnLayout {
     id_col: usize,
+    /// `type` column index, if present. Used only for heterogeneous dumps to
+    /// carry a per-frame element proxy (LAMMPS integer type id) so the host can
+    /// map it to a real element for frames that gain/lose atoms.
+    type_col: Option<usize>,
     x_col: usize,
     y_col: usize,
     z_col: usize,
@@ -55,6 +59,7 @@ fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
     let find = |name: &str| -> Option<usize> { col_names.iter().position(|&c| c == name) };
 
     let id_col = find("id").ok_or("Missing 'id' column in ATOMS header")?;
+    let type_col = find("type");
 
     // Try unscaled first, then scaled, then unwrapped
     let (x_col, y_col, z_col, coord_type) = if let (Some(x), Some(y), Some(z)) =
@@ -90,6 +95,7 @@ fn parse_column_layout(header: &str) -> Result<ColumnLayout, String> {
 
     Ok(ColumnLayout {
         id_col,
+        type_col,
         x_col,
         y_col,
         z_col,
@@ -241,34 +247,44 @@ fn read_frame_header(lines: &[&str], i: usize) -> Result<FrameHeader, String> {
     })
 }
 
-/// One decoded atom block: flat positions, per-group vectors (in
-/// `header.layout.vector_groups` order), and the index of the line after it.
-type AtomBlock = (Vec<f32>, Vec<Vec<f32>>, usize);
+/// One decoded atom block: flat positions, per-atom type ids (empty when the
+/// dump has no `type` column or the caller does not need them), per-group
+/// vectors (in `header.layout.vector_groups` order), and the index of the line
+/// after it.
+type AtomBlock = (Vec<f32>, Vec<u8>, Vec<Vec<f32>>, usize);
 
 /// Read one frame's atom block into flat positions and per-group vectors (in
-/// `header.layout.vector_groups` order). Returns `(positions, group_vectors,
-/// next_line_index)`. Shared by the eager parser and the single-frame decoder.
+/// `header.layout.vector_groups` order). Returns `(positions, types,
+/// group_vectors, next_line_index)`. Shared by the eager parser and the
+/// single-frame decoder.
+///
+/// `expected_n_atoms` is a hint for capacity only; the frame's own
+/// `header.n_atoms` governs how many lines are read, so a dump whose atom count
+/// changes between frames (GCMC / deposition) is parsed instead of rejected.
+/// `want_types` captures the `type` column into the returned type vector (used
+/// only for heterogeneous dumps).
 fn read_atom_block(
     lines: &[&str],
     header: &FrameHeader,
     expected_n_atoms: usize,
+    want_types: bool,
 ) -> Result<AtomBlock, String> {
     let layout = &header.layout;
     let n_atoms = header.n_atoms;
-    if n_atoms != expected_n_atoms {
-        return Err(format!(
-            "Inconsistent atom count: expected {}, got {}",
-            expected_n_atoms, n_atoms
-        ));
-    }
+    let _ = expected_n_atoms; // capacity hint only; frames may differ in count.
     let n_lines = lines.len();
-    let max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
+    let capture_types = want_types && layout.type_col.is_some();
+    let mut max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
         .iter()
         .copied()
         .max()
         .unwrap();
+    if capture_types {
+        max_col = max_col.max(layout.type_col.unwrap());
+    }
 
-    let mut atoms: Vec<(usize, f32, f32, f32)> = Vec::with_capacity(n_atoms);
+    // (id, x, y, z, type) — type is 0 when not captured.
+    let mut atoms: Vec<(usize, f32, f32, f32, u8)> = Vec::with_capacity(n_atoms);
     let mut atoms_sorted = true;
     let mut prev_id: usize = 0;
     let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> = layout
@@ -313,11 +329,22 @@ fn read_atom_block(
             z = z * header.lz + header.zlo;
         }
 
+        // LAMMPS type ids are small positive integers; clamp to the u8 element
+        // proxy (systems with >255 types are unheard of for visualization).
+        let type_id: u8 = if capture_types {
+            parts[layout.type_col.unwrap()]
+                .parse::<u32>()
+                .map(|t| t.min(255) as u8)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
         if id < prev_id {
             atoms_sorted = false;
         }
         prev_id = id;
-        atoms.push((id, x, y, z));
+        atoms.push((id, x, y, z, type_id));
 
         for (gi, group) in layout.vector_groups.iter().enumerate() {
             let max_vcol = group.x_col.max(group.y_col).max(group.z_col);
@@ -345,10 +372,18 @@ fn read_atom_block(
     }
 
     let mut positions = Vec::with_capacity(n_atoms * 3);
-    for (_, x, y, z) in &atoms {
+    let mut types = if capture_types {
+        Vec::with_capacity(n_atoms)
+    } else {
+        Vec::new()
+    };
+    for (_, x, y, z, t) in &atoms {
         positions.push(*x);
         positions.push(*y);
         positions.push(*z);
+        if capture_types {
+            types.push(*t);
+        }
     }
 
     let mut group_vectors: Vec<Vec<f32>> = Vec::with_capacity(layout.vector_groups.len());
@@ -369,7 +404,7 @@ fn read_atom_block(
         }
     }
 
-    Ok((positions, group_vectors, i))
+    Ok((positions, types, group_vectors, i))
 }
 
 /// Byte offset of each line, so the index scan can record where each frame
@@ -395,6 +430,11 @@ pub struct LammpstrjIndex {
     pub offsets: Vec<usize>,
     /// Vector channel names (velocity/force) from the first frame's layout.
     pub vector_channel_names: Vec<String>,
+    /// True when some frame's atom count differs from frame 0. The lazy
+    /// positions-only decoder can't represent a jagged trajectory, so the host
+    /// reparses the whole dump eagerly (building the `TrajHetero` side table).
+    /// Detected cheaply from the `NUMBER OF ATOMS` header, no coordinate decode.
+    pub heterogeneous: bool,
 }
 
 /// One decoded LAMMPS frame: positions plus each vector channel's flat data
@@ -416,6 +456,7 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
     let mut n_atoms = 0usize;
     let mut box_matrix: Option<[f32; 9]> = None;
     let mut vector_channel_names: Vec<String> = Vec::new();
+    let mut heterogeneous = false;
     let mut i = 0usize;
 
     while i < n_lines {
@@ -435,12 +476,10 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
                 .map(|g| g.name.to_string())
                 .collect();
         } else if header.n_atoms != n_atoms {
-            return Err(format!(
-                "Inconsistent atom count: expected {}, got {} at frame {}",
-                n_atoms,
-                header.n_atoms,
-                offsets.len() + 1
-            ));
+            // A jagged dump is admitted here (not rejected); the host falls back
+            // to an eager parse because the positions-only lazy decoder can't
+            // stream frames whose atom count differs from frame 0.
+            heterogeneous = true;
         }
         offsets.push(starts[frame_start_line]);
         timesteps.push(header.timestep);
@@ -465,6 +504,7 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
         box_matrix,
         offsets,
         vector_channel_names,
+        heterogeneous,
     })
 }
 
@@ -492,7 +532,8 @@ pub fn decode_frame_at(
         return Err("frame offset is not at an ITEM: TIMESTEP boundary".to_string());
     }
     let header = read_frame_header(&lines, 0)?;
-    let (positions, vectors, _next) = read_atom_block(&lines, &header, expected_n_atoms)?;
+    let (positions, _types, vectors, _next) =
+        read_atom_block(&lines, &header, expected_n_atoms, false)?;
     Ok(DecodedLammpstrjFrame { positions, vectors })
 }
 
@@ -508,9 +549,22 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     let mut frame_positions_flat: Vec<f32> = Vec::new();
     let mut n_frames: usize = 0;
     let mut timesteps: Vec<f64> = Vec::new();
-    let mut n_atoms: usize = 0;
-    let mut box_matrix: Option<[f32; 9]> = None;
+    let mut n_atoms: usize = 0; // frame-0 atom count (the base topology)
+    let mut box_matrix: Option<[f32; 9]> = None; // frame-0 box (representative)
     let mut i = 0;
+    // Heterogeneous-frame tracking (variable atom count / cell / type). Nothing
+    // is recorded until a channel is seen to vary, so a uniform dump keeps the
+    // fixed-stride fast path and allocates no side table.
+    let mut atom_offsets: Vec<u32> = vec![0];
+    let mut per_frame_boxes: Vec<[f32; 9]> = Vec::new();
+    let mut per_frame_types: Vec<Vec<u8>> = Vec::new();
+    let mut varies_atoms = false;
+    let mut varies_cell = false;
+    let mut varies_topology = false;
+    let mut recording_types = false;
+    let mut recording_cell = false;
+    let mut max_atoms = 0usize;
+    let mut frame0_types: Vec<u8> = Vec::new();
     // Reused across every atom line so each line's split does not allocate a Vec.
     let mut parts: Vec<&str> = Vec::new();
     // Accumulated vector frames keyed by channel name from the first frame's layout.
@@ -553,13 +607,12 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
 
         if n_frames == 0 {
             n_atoms = frame_n_atoms;
-        } else if frame_n_atoms != n_atoms {
-            return Err(format!(
-                "Inconsistent atom count: expected {}, got {} at frame {}",
-                n_atoms,
-                frame_n_atoms,
-                n_frames + 1
-            ));
+            max_atoms = frame_n_atoms;
+        } else {
+            max_atoms = max_atoms.max(frame_n_atoms);
+            if frame_n_atoms != n_atoms {
+                varies_atoms = true;
+            }
         }
 
         // ITEM: BOX BOUNDS
@@ -608,33 +661,47 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             }
         }
 
-        // Build box matrix (store from first frame only)
+        // Build this frame's box matrix. Frame 0 becomes the representative
+        // `box_matrix`; a per-frame side table is recorded only when it varies.
+        let frame_box: [f32; 9] = if is_triclinic {
+            let xy = tilt[0] as f32;
+            let xz = tilt[1] as f32;
+            let yz = tilt[2] as f32;
+            // For triclinic, lo/hi include tilt adjustments
+            let xlo_bound = lo[0] as f32;
+            let xhi_bound = hi[0] as f32;
+            let ylo_bound = lo[1] as f32;
+            let yhi_bound = hi[1] as f32;
+            let zlo = lo[2] as f32;
+            let zhi = hi[2] as f32;
+            let xlo = xlo_bound - xy.min(0.0) - xz.min(0.0) - (xy + xz).min(0.0).min(0.0);
+            let xhi = xhi_bound - xy.max(0.0) - xz.max(0.0) - (xy + xz).max(0.0).max(0.0);
+            let ylo = ylo_bound - yz.min(0.0);
+            let yhi = yhi_bound - yz.max(0.0);
+            let lx = xhi - xlo;
+            let ly = yhi - ylo;
+            let lz = zhi - zlo;
+            [lx, 0.0, 0.0, xy, ly, 0.0, xz, yz, lz]
+        } else {
+            let lx = (hi[0] - lo[0]) as f32;
+            let ly = (hi[1] - lo[1]) as f32;
+            let lz = (hi[2] - lo[2]) as f32;
+            [lx, 0.0, 0.0, 0.0, ly, 0.0, 0.0, 0.0, lz]
+        };
         if box_matrix.is_none() {
-            if is_triclinic {
-                let xy = tilt[0] as f32;
-                let xz = tilt[1] as f32;
-                let yz = tilt[2] as f32;
-                // For triclinic, lo/hi include tilt adjustments
-                let xlo_bound = lo[0] as f32;
-                let xhi_bound = hi[0] as f32;
-                let ylo_bound = lo[1] as f32;
-                let yhi_bound = hi[1] as f32;
-                let zlo = lo[2] as f32;
-                let zhi = hi[2] as f32;
-                let xlo = xlo_bound - xy.min(0.0) - xz.min(0.0) - (xy + xz).min(0.0).min(0.0);
-                let xhi = xhi_bound - xy.max(0.0) - xz.max(0.0) - (xy + xz).max(0.0).max(0.0);
-                let ylo = ylo_bound - yz.min(0.0);
-                let yhi = yhi_bound - yz.max(0.0);
-                let lx = xhi - xlo;
-                let ly = yhi - ylo;
-                let lz = zhi - zlo;
-                box_matrix = Some([lx, 0.0, 0.0, xy, ly, 0.0, xz, yz, lz]);
-            } else {
-                let lx = (hi[0] - lo[0]) as f32;
-                let ly = (hi[1] - lo[1]) as f32;
-                let lz = (hi[2] - lo[2]) as f32;
-                box_matrix = Some([lx, 0.0, 0.0, 0.0, ly, 0.0, 0.0, 0.0, lz]);
-            }
+            box_matrix = Some(frame_box);
+        }
+        // Detect a per-frame cell change; backfill earlier frames with frame 0's
+        // box the first time it diverges.
+        if !varies_cell && Some(frame_box) != box_matrix {
+            varies_cell = true;
+        }
+        if varies_cell && !recording_cell {
+            per_frame_boxes.extend(std::iter::repeat_n(box_matrix.unwrap(), n_frames));
+            recording_cell = true;
+        }
+        if recording_cell {
+            per_frame_boxes.push(frame_box);
         }
 
         // Box dimensions for scaled coordinate conversion
@@ -658,13 +725,22 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             vec_group_frames = layout.vector_groups.iter().map(|_| Vec::new()).collect();
         }
 
+        // Whether to capture the per-atom `type` column this frame: frame 0
+        // (always, to seed the backfill) or any frame once the atom count has
+        // diverged (GCMC/deposition) — its new atoms need per-frame elements.
+        let capture_types =
+            layout.type_col.is_some() && (n_frames == 0 || varies_atoms || varies_topology);
+
         // Minimum column count for the mandatory id/x/y/z fields — constant for the
         // whole frame, so compute it once instead of per atom line.
-        let max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
+        let mut max_col = [layout.id_col, layout.x_col, layout.y_col, layout.z_col]
             .iter()
             .copied()
             .max()
             .unwrap();
+        if capture_types {
+            max_col = max_col.max(layout.type_col.unwrap());
+        }
 
         // Resolve each layout vector group to its accumulation slot once per frame
         // (was a linear name scan per atom per group).
@@ -675,7 +751,8 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
             .collect();
 
         // Read atom lines — accumulate both positions and per-group vector data.
-        let mut atoms: Vec<(usize, f32, f32, f32)> = Vec::with_capacity(n_atoms);
+        // (id, x, y, z, type) — type is 0 when not captured this frame.
+        let mut atoms: Vec<(usize, f32, f32, f32, u8)> = Vec::with_capacity(frame_n_atoms);
         // Track whether atom ids arrive already ascending so we can skip the sort.
         let mut atoms_sorted = true;
         let mut prev_id: usize = 0;
@@ -683,10 +760,10 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         let mut frame_vec_atoms: Vec<Vec<(usize, f32, f32, f32)>> = layout
             .vector_groups
             .iter()
-            .map(|_| Vec::with_capacity(n_atoms))
+            .map(|_| Vec::with_capacity(frame_n_atoms))
             .collect();
 
-        for _ in 0..n_atoms {
+        for _ in 0..frame_n_atoms {
             i += 1;
             if i >= n_lines {
                 return Err("Unexpected end of file in atom data".to_string());
@@ -722,11 +799,20 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
                 z = z * lz + zlo_f;
             }
 
+            let type_id: u8 = if capture_types {
+                parts[layout.type_col.unwrap()]
+                    .parse::<u32>()
+                    .map(|t| t.min(255) as u8)
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+
             if id < prev_id {
                 atoms_sorted = false;
             }
             prev_id = id;
-            atoms.push((id, x, y, z));
+            atoms.push((id, x, y, z, type_id));
 
             // Collect per-group vector values for this atom.
             // Groups are indexed by their slot in frame_vec_atoms, which mirrors
@@ -762,11 +848,34 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         }
 
         // Flatten to [x0, y0, z0, x1, y1, z1, ...] straight into the flat buffer.
-        for (_, x, y, z) in &atoms {
+        for (_, x, y, z, _) in &atoms {
             frame_positions_flat.push(*x);
             frame_positions_flat.push(*y);
             frame_positions_flat.push(*z);
         }
+        let last_off = *atom_offsets.last().unwrap();
+        atom_offsets.push(last_off + frame_n_atoms as u32);
+
+        // Frame 0's types seed the backfill; capture them once.
+        if n_frames == 0 && capture_types {
+            frame0_types = atoms.iter().map(|a| a.4).collect();
+        }
+        // Record per-frame types once the topology (atom count) varies, backfilling
+        // earlier frames with frame 0's types (same composition up to that point).
+        if varies_atoms && !recording_types {
+            per_frame_types.extend(std::iter::repeat_with(|| frame0_types.clone()).take(n_frames));
+            recording_types = true;
+            varies_topology = true;
+        }
+        if recording_types {
+            if capture_types {
+                per_frame_types.push(atoms.iter().map(|a| a.4).collect());
+            } else {
+                // Defensive: a later frame with no type column reuses frame 0's.
+                per_frame_types.push(frame0_types.clone());
+            }
+        }
+
         let frame_idx = n_frames;
         n_frames += 1;
 
@@ -774,11 +883,11 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         // Only emit a frame entry when all n_atoms parsed successfully. Vector atoms
         // are collected in the same id order as `atoms`, so they share its sortedness.
         for (slot, mut vatoms) in frame_vec_atoms.into_iter().enumerate() {
-            if vatoms.len() == n_atoms {
+            if vatoms.len() == frame_n_atoms {
                 if !atoms_sorted {
                     vatoms.sort_by_key(|a| a.0);
                 }
-                let mut flat = Vec::with_capacity(n_atoms * 3);
+                let mut flat = Vec::with_capacity(frame_n_atoms * 3);
                 for (_, vx, vy, vz) in &vatoms {
                     flat.push(*vx);
                     flat.push(*vy);
@@ -808,16 +917,55 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         0.0
     };
 
-    // Assemble VectorChannel entries for groups that have data in every frame.
-    let vector_channels: Vec<VectorChannel> = vec_group_names
-        .into_iter()
-        .zip(vec_group_frames)
-        .filter(|(_, frames)| frames.len() == n_frames)
-        .map(|(name, frames)| VectorChannel {
-            name: name.to_string(),
-            frames,
+    // Vector channels assume a fixed per-atom stride, so they are incompatible
+    // with a variable atom count — drop them for heterogeneous-atom dumps.
+    let vector_channels: Vec<VectorChannel> = if varies_atoms {
+        Vec::new()
+    } else {
+        vec_group_names
+            .into_iter()
+            .zip(vec_group_frames)
+            .filter(|(_, frames)| frames.len() == n_frames)
+            .map(|(name, frames)| VectorChannel {
+                name: name.to_string(),
+                frames,
+            })
+            .collect()
+    };
+
+    // Assemble the side table only when a channel varies. Positions stay in a
+    // single flat buffer; `atom_offsets` (all frames) makes them sliceable when
+    // jagged. Element/type ids ride `elements_flat`; the cell rides `cells_flat`.
+    let hetero = if varies_atoms || varies_cell || varies_topology {
+        let elements_flat: Vec<u8> = if varies_atoms || varies_topology {
+            per_frame_types.into_iter().flatten().collect()
+        } else {
+            Vec::new()
+        };
+        let cells_flat: Vec<f32> = if varies_cell {
+            per_frame_boxes.iter().flatten().copied().collect()
+        } else {
+            Vec::new()
+        };
+        // When only the cell varies, positions are fixed-stride; drop the
+        // all-frames atom_offsets so the host takes the cheaper stride path.
+        let atom_offsets = if varies_atoms {
+            atom_offsets
+        } else {
+            Vec::new()
+        };
+        Some(crate::trajectory::TrajHetero {
+            atom_offsets,
+            elements_flat,
+            cells_flat,
+            varies_atoms,
+            varies_cell,
+            varies_topology,
+            max_atoms: max_atoms as u32,
         })
-        .collect();
+    } else {
+        None
+    };
 
     Ok(LammpstrjData {
         n_atoms,
@@ -826,6 +974,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         box_matrix,
         frame_positions_flat,
         vector_channels,
+        hetero,
     })
 }
 
@@ -912,6 +1061,70 @@ mod tests {
         assert_eq!(bm[0], 10.0); // lx
         assert_eq!(bm[4], 10.0); // ly
         assert_eq!(bm[8], 10.0); // lz
+    }
+
+    #[test]
+    fn test_uniform_dump_keeps_fast_path() {
+        // Constant atoms/box/type → uniform fast path, no side table.
+        let data = parse_lammpstrj(sample_dump()).unwrap();
+        assert!(data.hetero.is_none());
+    }
+
+    #[test]
+    fn test_variable_atom_count_dump() {
+        // Frame 0 has 2 atoms; frame 1 grows a third (GCMC insertion).
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.0 0.0 0.0\n\
+                    2 1 2.0 0.0 0.0\n\
+                    ITEM: TIMESTEP\n100\n\
+                    ITEM: NUMBER OF ATOMS\n3\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.1 0.0 0.0\n\
+                    2 1 2.1 0.0 0.0\n\
+                    3 2 3.0 0.0 0.0\n";
+        let data = parse_lammpstrj(text).unwrap();
+        assert_eq!(data.n_atoms, 2); // frame-0 base
+        assert_eq!(data.n_frames, 2);
+        let h = data.hetero.as_ref().expect("side table");
+        assert!(h.varies_atoms);
+        assert!(h.varies_topology);
+        assert_eq!(h.max_atoms, 3);
+        assert_eq!(data.frame_atom_count(0), 2);
+        assert_eq!(data.frame_atom_count(1), 3);
+        // Frame 1 positions are jagged (9 floats for 3 atoms).
+        let f1 = data.frame(1);
+        assert_eq!(f1.len(), 9);
+        assert!((f1[6] - 3.0).abs() < 1e-5); // the inserted atom
+                                             // Per-frame element/type ids: frame 1 carries type 2 for the new atom.
+        let e1 = data.frame_elements(1).expect("per-frame types");
+        assert_eq!(e1, &[1u8, 1u8, 2u8]);
+    }
+
+    #[test]
+    fn test_variable_cell_dump() {
+        // Constant atom count, per-frame box grows (NPT-style) → varies_cell only.
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n1\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.0 0.0 0.0\n\
+                    ITEM: TIMESTEP\n100\n\
+                    ITEM: NUMBER OF ATOMS\n1\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 12.0\n0.0 12.0\n0.0 12.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.1 0.0 0.0\n";
+        let data = parse_lammpstrj(text).unwrap();
+        let h = data.hetero.as_ref().expect("side table");
+        assert!(h.varies_cell);
+        assert!(!h.varies_atoms);
+        assert!(data.frame_elements(0).is_none()); // atom count constant
+        assert!((data.box_matrix.unwrap()[0] - 10.0).abs() < 1e-5);
+        assert!((data.frame_cell(0).unwrap()[0] - 10.0).abs() < 1e-5);
+        assert!((data.frame_cell(1).unwrap()[0] - 12.0).abs() < 1e-5);
     }
 
     #[test]
@@ -1088,5 +1301,32 @@ mod tests {
         let text = sample_dump();
         // Offset 5 lands mid-header, not on an ITEM: TIMESTEP boundary.
         assert!(decode_frame_at(text, 5, 3).is_err());
+    }
+
+    #[test]
+    fn build_index_flags_variable_atom_count() {
+        // A GCMC-style dump: build_index admits every frame (no error) and flags
+        // heterogeneity so the host falls back to an eager parse.
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.0 0.0 0.0\n\
+                    2 1 2.0 0.0 0.0\n\
+                    ITEM: TIMESTEP\n100\n\
+                    ITEM: NUMBER OF ATOMS\n3\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.1 0.0 0.0\n\
+                    2 1 2.1 0.0 0.0\n\
+                    3 2 3.0 0.0 0.0\n";
+        let idx = build_index(text).unwrap();
+        assert!(idx.heterogeneous);
+        assert_eq!(idx.n_frames, 2);
+        assert_eq!(idx.n_atoms, 2); // frame-0 base
+
+        // A uniform dump stays non-heterogeneous.
+        let uni = build_index(sample_dump()).unwrap();
+        assert!(!uni.heterogeneous);
     }
 }

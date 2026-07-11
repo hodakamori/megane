@@ -30,6 +30,7 @@ import {
   shouldUseLazyTrajectory,
 } from "../parsers/xtc";
 import type { TrajectoryLazyHandle, LazyTrajectoryKind } from "../parsers/xtc";
+import { remapTrajectoryTypesToElements } from "../parsers/parseCore";
 import { LazyFrameProvider } from "../stream/LazyFrameProvider";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { useBondSource } from "./useBondSource";
@@ -406,8 +407,19 @@ export function useMeganeLocal(): MeganeLocalState {
         await applyTop();
         // ── Phase 2 (background): full index → upgrade to streaming ──
         void indexStructureLazy(file, kind)
-          .then((indexed) => {
+          .then(async (indexed) => {
             if (!indexed) return; // frame 0 already shown; no streaming available
+            // Heterogeneous files can't ride the positions-only lazy path — the
+            // per-frame atom count / cell would be lost. Discard the lazy handle
+            // and reparse eagerly so the full HeteroFrames side table is built.
+            if (indexed.handle.index.heterogeneous) {
+              disposeTrajectoryLazy(indexed.handle.trajectoryId);
+              if (myToken !== loadTokenRef.current) return;
+              const result = await parseStructureFile(file);
+              if (myToken !== loadTokenRef.current) return;
+              await applyStructureResult(result, file.name, topFile);
+              return;
+            }
             if (indexed.handle.index.nFrames <= 0) {
               disposeTrajectoryLazy(indexed.handle.trajectoryId); // single frame — nothing to stream
               return;
@@ -422,6 +434,11 @@ export function useMeganeLocal(): MeganeLocalState {
       const indexed = await indexStructureLazy(file, kind);
       if (!indexed) return false;
       const { handle, frame0 } = indexed;
+      // Heterogeneous → reparse eagerly (see Phase 2 note above).
+      if (handle.index.heterogeneous) {
+        disposeTrajectoryLazy(handle.trajectoryId);
+        return false; // caller's eager parse path handles it
+      }
       if (handle.index.nFrames <= 0) {
         disposeTrajectoryLazy(handle.trajectoryId);
         applyResult(
@@ -441,7 +458,7 @@ export function useMeganeLocal(): MeganeLocalState {
       await applyTop();
       return true;
     },
-    [applyResult, attachStreamingProvider],
+    [applyResult, attachStreamingProvider, applyStructureResult],
   );
 
   const loadFile = useCallback(
@@ -556,6 +573,58 @@ export function useMeganeLocal(): MeganeLocalState {
       const nAtoms = baseSnapshotRef.current.nAtoms;
       const store = usePipelineStore.getState();
 
+      // Eager whole-file parse + apply. Used for small files, when the worker is
+      // unavailable, and as the fallback for a heterogeneous (variable-atom)
+      // LAMMPS dump — whose jagged frames the positions-only lazy decoder can't
+      // stream, so the full TrajHetero side table must be built eagerly.
+      const eagerLoad = async () => {
+        const parseFn = isLammpstrj
+          ? parseLammpstrjFile
+          : isDcd
+            ? parseDCDFile
+            : isNetcdf
+              ? parseNetCDFFile
+              : parseXTCFile;
+        const { frames, meta: xtcMeta, vectorChannels } = await parseFn(xtc, nAtoms);
+        // A variable-atom LAMMPS dump emits raw integer type ids as each frame's
+        // elements; map them to real atomic numbers via the loaded structure.
+        if (xtcMeta?.variesTopology && baseSnapshotRef.current) {
+          remapTrajectoryTypesToElements(frames, baseSnapshotRef.current.elements);
+        }
+        fileFramesRef.current = frames;
+        fileTrajMetaRef.current = xtcMeta;
+        xtcFileNameRef.current = xtc.name;
+        setHasFileFrames(true);
+
+        currentTrajSourceRef.current = "file";
+        setTrajectorySourceState("file");
+        setMeta(xtcMeta);
+        resetPlayback();
+        setXtcFileName(xtc.name);
+
+        // Feed parsed frames into the pipeline store so executeLoadTrajectory produces output.
+        store.setFileFrames(frames, xtcMeta ?? null);
+
+        // Sync the load_trajectory node's displayed fileName so the pipeline
+        // editor reflects the actually-loaded XTC/dump.
+        const trajNode = store.nodes.find((n) => n.type === "load_trajectory");
+        if (trajNode) {
+          store.updateNodeParams(trajNode.id, { fileName: xtc.name });
+        }
+
+        // Auto-load first embedded vector channel (e.g. LAMMPS dump vx/vy/vz) into pipeline.
+        if (vectorChannels.length > 0) {
+          const ch = vectorChannels[0];
+          store.setFileVectors(ch.frames);
+          // Update all load_vector nodes so the UI shows the channel name.
+          for (const n of store.nodes) {
+            if (n.type === "load_vector") {
+              store.updateNodeParams(n.id, { fileName: `[embedded] ${ch.name}` });
+            }
+          }
+        }
+      };
+
       // Lazy/streaming path (large XTC or LAMMPS dump, worker-gated). Two phases,
       // like the structure path, so first paint is O(one frame) not O(file size):
       //   Phase 1 (critical): decode ONLY frame 0 from a bounded prefix and show
@@ -589,10 +658,17 @@ export function useMeganeLocal(): MeganeLocalState {
 
           // ── Phase 2 (background): full index → swap to streaming provider ──
           void indexTrajectoryLazy(xtc, lazyKind, nAtoms)
-            .then((handle) => {
+            .then(async (handle) => {
               if (!handle) return; // frame 0 already shown; no streaming available
               if (xtcLoadTokenRef.current !== myToken) {
                 disposeTrajectoryLazy(handle.trajectoryId); // a newer load superseded this
+                return;
+              }
+              // Variable-atom dump: the lazy decoder can't stream jagged frames,
+              // so drop it and reparse eagerly (builds the full side table).
+              if (handle.index.heterogeneous) {
+                disposeTrajectoryLazy(handle.trajectoryId);
+                if (xtcLoadTokenRef.current === myToken) await eagerLoad();
                 return;
               }
               attachFileProvider(handle, xtc.name, nAtoms, frame0Positions);
@@ -603,52 +679,14 @@ export function useMeganeLocal(): MeganeLocalState {
 
         // ── Fallback: single full read (frame 0 still renders via the provider) ──
         const handle = await indexTrajectoryLazy(xtc, lazyKind, nAtoms);
-        if (handle) {
+        if (handle && !handle.index.heterogeneous) {
           attachFileProvider(handle, xtc.name, nAtoms);
           return;
         }
+        if (handle) disposeTrajectoryLazy(handle.trajectoryId); // heterogeneous → eager below
       }
 
-      const parseFn = isLammpstrj
-        ? parseLammpstrjFile
-        : isDcd
-          ? parseDCDFile
-          : isNetcdf
-            ? parseNetCDFFile
-            : parseXTCFile;
-      const { frames, meta: xtcMeta, vectorChannels } = await parseFn(xtc, nAtoms);
-      fileFramesRef.current = frames;
-      fileTrajMetaRef.current = xtcMeta;
-      xtcFileNameRef.current = xtc.name;
-      setHasFileFrames(true);
-
-      currentTrajSourceRef.current = "file";
-      setTrajectorySourceState("file");
-      setMeta(xtcMeta);
-      resetPlayback();
-      setXtcFileName(xtc.name);
-
-      // Feed parsed frames into the pipeline store so executeLoadTrajectory produces output.
-      store.setFileFrames(frames, xtcMeta ?? null);
-
-      // Sync the load_trajectory node's displayed fileName so the pipeline
-      // editor reflects the actually-loaded XTC/dump.
-      const trajNode = store.nodes.find((n) => n.type === "load_trajectory");
-      if (trajNode) {
-        store.updateNodeParams(trajNode.id, { fileName: xtc.name });
-      }
-
-      // Auto-load first embedded vector channel (e.g. LAMMPS dump vx/vy/vz) into pipeline.
-      if (vectorChannels.length > 0) {
-        const ch = vectorChannels[0];
-        store.setFileVectors(ch.frames);
-        // Update all load_vector nodes so the UI shows the channel name.
-        for (const n of store.nodes) {
-          if (n.type === "load_vector") {
-            store.updateNodeParams(n.id, { fileName: `[embedded] ${ch.name}` });
-          }
-        }
-      }
+      await eagerLoad();
     },
     [resetPlayback, attachFileProvider],
   );
