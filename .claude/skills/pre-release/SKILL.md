@@ -122,6 +122,43 @@ uv run make test-all
 All of Python, TypeScript, Rust, E2E, notebook, and integration tests must
 pass.
 
+### 3.1 Full 5-platform E2E matrix is MANDATORY for a release
+
+`make test-all` only runs the E2E *subset* `webapp`, `contract`,
+`widget-jupyterlab`, `jupyterlab-doc`. **A release is different from a normal
+PR: it MUST verify the viewer renders on ALL 5 host platforms** — webapp,
+JupyterLab DocWidget, VSCode custom editor, Jupyter widget in JupyterLab, and
+Jupyter widget in a VSCode notebook. A version bump changes the shipped
+artifacts on every host, so every host has to be exercised, not just the four
+in the subset. Run the **full** Playwright matrix per the `e2e-coverage`
+skill, including:
+
+- every host project (`webapp`, `contract`, `widget-jupyterlab`,
+  `widget-vscode`, `jupyterlab-doc`, `vscode`),
+- the single-feature projects (`format-loading`, `playback`, `sidebar`,
+  `licorice`, `water-line`, `pipeline-editor`, `pipeline-file`,
+  `render-modal`, `resname-filter-opacity`, `widget-api`, `widget-examples`,
+  `heterogeneous-traj`, `trajectory-bonds-vdw-leak`), and
+- the Phase-2 cross-host matrix (`modify-node`, `camera`, `measurement`,
+  `subsystem-rendering`, `trajectory-bonds`) across all 5 hosts.
+
+The VSCode hosts (`vscode`, `widget-vscode`, and the `*__vscode` /
+`*__widget-vscode` Phase-2 variants) require the code-server setup from the
+`e2e-coverage` skill (`sudo apt-get install -y libkrb5-dev`,
+`MEGANE_CODE_SERVER_USE_NPM=1 bash scripts/install-code-server.sh`,
+`MEGANE_E2E_MODE=1`). Because E2E is local-only (not in CI), release is the
+one checkpoint that catches drift/regressions that accumulated across merged
+PRs — do **not** skip a host because it needs extra setup.
+
+**Triage rule for each failure** (see also the drift note below):
+- *Pixel diff only* (`full-page`/`viewer-region diff X% > 2%`) from intended
+  merged changes → visually inspect the `.new.png`, then re-baseline.
+- *Timeout / runtime error / non-deterministic (flaky) diff* → a **real
+  regression**; fix the root cause. Never re-baseline a flaky or functional
+  failure. The `vscode` project's ~9 format tests intentionally diff heavily
+  off the baseline host — do **not** re-baseline those (the DOM-contract layer
+  still validates them).
+
 The release commit will run through CI on the way to `main`, and CI uploads
 to Codecov with `fail_ci_on_error: true` (`codecov.yml` patch target 70 %).
 The release diff is mostly version bumps + CHANGELOG, which Codecov ignores

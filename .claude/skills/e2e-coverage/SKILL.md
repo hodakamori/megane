@@ -156,6 +156,16 @@ npm run test:e2e          # all Playwright projects
 make test-all             # + Python + Rust + TS unit + perf
 ```
 
+**Releases run the whole matrix, not the `make test-all` subset.** `make
+test-all` only exercises `webapp` / `contract` / `widget-jupyterlab` /
+`jupyterlab-doc`. A version bump changes the shipped bundle on every host, so
+the `pre-release` skill (Phase 3) requires the **full** matrix across all 5
+platforms — every host project, every feature project, and the Phase-2 5×5
+cross-host matrix — with the VSCode/code-server setup above included. This is
+the checkpoint that catches baseline drift and regressions that piled up
+across merged PRs while E2E was local-only. See CRITICAL RULE #9 in
+`CLAUDE.md` and the `pre-release` skill.
+
 ## Adding a New Spec
 
 Boilerplate that satisfies the 3-layer pattern:
