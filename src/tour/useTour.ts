@@ -4,6 +4,7 @@
  * Pipeline header Guide button.
  */
 import { useCallback, useEffect } from "react";
+import { isE2ETestMode } from "../testMode";
 import { startTour, stopTour } from "./MeganeTour";
 import { shouldAutoStart, useTourStore, type TourHost } from "./tourStore";
 
@@ -25,8 +26,10 @@ export function useTour({ host, autoStartDelayMs = 600 }: UseTourOptions) {
   useEffect(() => {
     if (autoStartHandled) return;
     // Suppress auto-start under E2E so the welcome modal doesn't capture
-    // the page while tests interact with JupyterLab tabs / the viewer.
-    const isTestMode = (globalThis as { __MEGANE_TEST__?: boolean }).__MEGANE_TEST__ === true;
+    // the page while tests interact with JupyterLab tabs / the viewer. Uses
+    // the shared detector so the webapp `?test=1` path is honoured too, not
+    // just an injected `__MEGANE_TEST__` global (VSCode / JupyterLab hosts).
+    const isTestMode = isE2ETestMode();
     const { dontShowAgain } = useTourStore.getState();
     if (isTestMode || !shouldAutoStart(host, dontShowAgain)) {
       markAutoStartHandled();
