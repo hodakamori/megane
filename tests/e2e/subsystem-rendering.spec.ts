@@ -40,6 +40,13 @@ const PLATFORM = "subsystem-rendering";
 const FIXTURE = "caffeine_water.pdb";
 const FIXTURE_ATOMS = 3024;
 
+// Widget hosts build their pipeline through viewer.set_pipeline() and do not
+// mount the React-Flow editor (CRITICAL RULE #7), so the insertNode/connectEdge
+// helpers can't drive the graph there. The node-insertion cases below skip on
+// those hosts; the default-visibility case still runs everywhere.
+const WIDGET_HOSTS = new Set(["widget-jupyterlab", "widget-vscode"]);
+const isWidgetHost = () => WIDGET_HOSTS.has(getHost());
+
 test.describe.configure({ mode: "serial" });
 
 let boot: HostBoot | null = null;
@@ -78,6 +85,10 @@ test("subsystems: default visibility — atoms + bonds + cell are on", async () 
 });
 
 test("subsystems: inserting label_generator turns on labels", async () => {
+  test.skip(
+    isWidgetHost(),
+    "widget hosts build pipelines via set_pipeline, not the React-Flow editor",
+  );
   if (!boot) test.skip(true, "boot not initialised");
   const before = await getReadyState(boot!.scope);
   const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
@@ -102,6 +113,10 @@ test("subsystems: inserting label_generator turns on labels", async () => {
 });
 
 test("subsystems: inserting polyhedron_generator wires the polyhedra subsystem", async () => {
+  test.skip(
+    isWidgetHost(),
+    "widget hosts build pipelines via set_pipeline, not the React-Flow editor",
+  );
   if (!boot) test.skip(true, "boot not initialised");
   const before = await getReadyState(boot!.scope);
   const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
@@ -128,6 +143,10 @@ test("subsystems: inserting polyhedron_generator wires the polyhedra subsystem",
 });
 
 test("subsystems: representation line mode shows lines and hides atoms/bonds", async () => {
+  test.skip(
+    isWidgetHost(),
+    "widget hosts build pipelines via set_pipeline, not the React-Flow editor",
+  );
   if (!boot) test.skip(true, "boot not initialised");
   const before = await getReadyState(boot!.scope);
   const loaderId = await findNodeIdByType(boot!.scope, "load_structure");
