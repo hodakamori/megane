@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-12
+
 ### Added
 
 - **Performance HUD** next to the Reset View button showing the loaded atom count, bond count, per-frame draw calls, and live render FPS. Present on every host (webapp, JupyterLab widgets, VSCode webview).
