@@ -1,6 +1,6 @@
 {
   "name": "megane-jupyterlab",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "JupyterLab 4 extension for the megane molecular viewer",
   "license": "MIT",
   "author": "hodakamori",
