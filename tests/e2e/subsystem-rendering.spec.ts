@@ -28,6 +28,7 @@ import {
   defaultViewerContract,
   expectFullPageMatch,
   stabilizeUi,
+  pinFrame,
   waitForReady,
   getReadyState,
 } from "./lib/setup";
@@ -51,6 +52,9 @@ test.beforeAll(async ({ browser }, info) => {
     ...defaultViewerContract({ expectedAtoms: FIXTURE_ATOMS, context: boot.context }),
   ]);
   await stabilizeUi(boot.scope);
+  // Pin to frame 0 so the full-page captures below don't flake on whichever
+  // lazily-streamed trajectory frame the renderer happened to settle on.
+  await pinFrame(boot.scope, 0);
 });
 
 test.afterAll(async () => {

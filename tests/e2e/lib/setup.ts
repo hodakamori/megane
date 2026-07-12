@@ -199,10 +199,12 @@ export async function assertDomContract(
 }
 
 /** Common contract that EVERY platform must satisfy when a structure is loaded. */
-export function defaultViewerContract(opts: {
-  expectedAtoms?: number;
-  context?: string;
-} = {}): DomContractItem[] {
+export function defaultViewerContract(
+  opts: {
+    expectedAtoms?: number;
+    context?: string;
+  } = {},
+): DomContractItem[] {
   const items: DomContractItem[] = [
     { testid: "megane-viewer", visible: true },
     { testid: "viewer-root", visible: true },
@@ -236,9 +238,7 @@ export async function captureFullPage(
   // host window (IDE chrome + the embedded viewer), not just the
   // iframe contents.
   const ownerPage =
-    "screenshot" in scope && "mouse" in scope
-      ? (scope as Page)
-      : (scope as Frame).page();
+    "screenshot" in scope && "mouse" in scope ? (scope as Page) : (scope as Frame).page();
   const buf = await ownerPage.screenshot({
     path: outPath,
     fullPage: true,
@@ -254,10 +254,7 @@ export async function captureFullPage(
  * cross-platform Parity baseline (the same fixed input should produce the
  * same viewer pixels regardless of host UI chrome).
  */
-export async function captureViewerRegion(
-  scope: Page | Frame,
-  outPath: string,
-): Promise<Buffer> {
+export async function captureViewerRegion(scope: Page | Frame, outPath: string): Promise<Buffer> {
   if ("evaluate" in scope && typeof (scope as Page).screenshot === "function") {
     await stabilizeUi(scope as Page);
   }
@@ -319,14 +316,7 @@ export async function compareToBaseline(
 
   const { width, height } = baseline;
   const diff = new PNG({ width, height });
-  const numDiff = pixelmatch(
-    baseline.data,
-    cur.data,
-    diff.data,
-    width,
-    height,
-    { threshold },
-  );
+  const numDiff = pixelmatch(baseline.data, cur.data, diff.data, width, height, { threshold });
   const total = width * height;
   const diffPercent = (numDiff / total) * 100;
 
@@ -422,8 +412,7 @@ function repoRoot(): string {
  * stabilising stylesheet lands in the right document.
  */
 export async function stabilizeUi(scope: Page | Frame): Promise<void> {
-  const ownerPage =
-    "mouse" in scope ? (scope as Page) : (scope as Frame).page?.() ?? null;
+  const ownerPage = "mouse" in scope ? (scope as Page) : ((scope as Frame).page?.() ?? null);
   await ownerPage?.mouse.move(0, 0).catch(() => {});
   await scope
     .evaluate(() => {
@@ -443,6 +432,44 @@ export async function stabilizeUi(scope: Page | Frame): Promise<void> {
       `;
       document.head.appendChild(style);
     })
+    .catch(() => {});
+}
+
+/**
+ * Pin the trajectory to a fixed frame so full-page / viewer captures are
+ * deterministic. The webapp default (caffeine_water) carries a multi-frame
+ * vibration trajectory whose frames are streamed lazily; depending on timing
+ * the renderer can settle on frame 0 or frame 1 by screenshot time, which
+ * across ~1000 vibrating waters is a multi-percent full-page diff (a source
+ * of batch-vs-isolated flakiness). Seeking the timeline slider to a known
+ * frame and waiting for `data-current-frame` removes that timing dependence.
+ *
+ * Host-tolerant: no-ops on hosts without a timeline slider (e.g. widget
+ * shells), and the readback wait is best-effort.
+ */
+export async function pinFrame(scope: Page | Frame, frame = 0): Promise<void> {
+  const seekbar = scope.locator('[data-testid="playback-seekbar"]');
+  if ((await seekbar.count().catch(() => 0)) === 0) return;
+  await seekbar
+    .evaluate((el: HTMLInputElement, value: string) => {
+      // Drive React's native value setter so the synthetic onChange fires
+      // (a plain `el.value = ...` is shadowed by React's prop tracking).
+      const proto = Object.getPrototypeOf(el);
+      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      setter?.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, String(frame))
+    .catch(() => {});
+  await scope
+    .waitForFunction(
+      (target: string) =>
+        document
+          .querySelector('[data-testid="megane-viewer"]')
+          ?.getAttribute("data-current-frame") === target,
+      String(frame),
+      { timeout: 5_000 },
+    )
     .catch(() => {});
 }
 
