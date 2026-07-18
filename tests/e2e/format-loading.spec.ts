@@ -52,6 +52,14 @@ const STRUCTURE_CASES: StructureCase[] = [
     expectedAtoms: 10,
   },
   { name: "lammps-water", file: "water.lammps", mime: "text/plain" },
+  // Offset simulation box (xlo/ylo/zlo far from 0): the cell must render
+  // wrapped around the atoms (box_origin fix), not anchored at world zero.
+  {
+    name: "lammps-offset-box",
+    file: "confined_offset.data",
+    mime: "text/plain",
+    expectedAtoms: 64,
+  },
   // LAMMPS dump opens standalone as a multi-frame structure (frame-0 topology,
   // integer atom `type` ids used as element proxies), like a multi-frame XYZ.
   // The `.trj` alias is exercised alongside the canonical `.lammpstrj`.
@@ -104,9 +112,9 @@ test.describe("format loading: webapp drag-drop", () => {
       // The pipeline editor's LoadStructure node header must display the
       // file the user actually opened — guards against the
       // `caffeine_water.pdb` ghost-name regression that PR-A2 fixed.
-      await expect(
-        page.locator('[data-testid="load-structure-filename"]').first(),
-      ).toHaveText(c.file);
+      await expect(page.locator('[data-testid="load-structure-filename"]').first()).toHaveText(
+        c.file,
+      );
 
       await expectViewerRegionMatch(page, PLATFORM, `${c.name}-viewer`);
     });
@@ -146,11 +154,11 @@ test.describe("format loading: trajectory companion", () => {
     // graph's literal defaults. After demo init both should display the
     // bundled file basenames, but updating via openFile / applyResult is
     // what guarantees the names track real loads going forward.
-    await expect(
-      page.locator('[data-testid="load-structure-filename"]').first(),
-    ).toHaveText("caffeine_water.pdb");
-    await expect(
-      page.locator('[data-testid="load-trajectory-filename"]').first(),
-    ).toHaveText("caffeine_water_vibration.xtc");
+    await expect(page.locator('[data-testid="load-structure-filename"]').first()).toHaveText(
+      "caffeine_water.pdb",
+    );
+    await expect(page.locator('[data-testid="load-trajectory-filename"]').first()).toHaveText(
+      "caffeine_water_vibration.xtc",
+    );
   });
 });

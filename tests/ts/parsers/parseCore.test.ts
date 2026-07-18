@@ -54,6 +54,7 @@ function makeStructureResult(opts: MockStructureOpts) {
       bonds: () => Uint32Array.from([0, 1]),
       bond_orders: () => Uint8Array.from([1]),
       box_matrix: () => Float32Array.from({ length: 9 }, (_, i) => i),
+      box_origin: () => Float32Array.from([100, 200, 300]),
       frame_data: () => frameData,
       chain_ids: () => Uint8Array.from({ length: nAtoms }, () => 65),
       bfactors: () => Float32Array.from({ length: nAtoms }, () => 1.5),
@@ -92,6 +93,7 @@ describe("parseWithFn", () => {
     });
     const out = parseWithFn(() => result as never, "");
     expect(out.snapshot.box).toEqual(Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7, 8]));
+    expect(out.snapshot.boxOrigin).toEqual(Float32Array.from([100, 200, 300]));
     expect(out.snapshot.atomBFactors).toEqual(Float32Array.from([1.5, 1.5]));
     expect(out.snapshot.atomChainIds).toEqual(Uint8Array.from([65, 65]));
     expect(out.snapshot.caIndices).toEqual(Uint32Array.from([0]));
@@ -154,6 +156,7 @@ function makeHeteroResult() {
       bonds: () => Uint32Array.from([0, 1]),
       bond_orders: () => Uint8Array.from([1]),
       box_matrix: () => Float32Array.from({ length: 9 }, (_, i) => i),
+      box_origin: () => new Float32Array(),
       frame_data: () => framePos,
       chain_ids: () => new Uint8Array(),
       bfactors: () => new Float32Array(),

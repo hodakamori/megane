@@ -204,6 +204,9 @@ export function executeReplicate(
     bonds,
     bondOrders,
     box: newBox,
+    // Replication extends the cell from the same lower corner, so the origin
+    // (where the wireframe is anchored) is unchanged.
+    boxOrigin: src.boxOrigin,
     atomChainIds,
     atomBFactors,
     caIndices,

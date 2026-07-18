@@ -14,6 +14,7 @@ function makeSnapshot(opts: {
   positions: number[];
   elements?: number[];
   box?: number[] | null;
+  boxOrigin?: number[] | null;
 }): Snapshot {
   const positions = new Float32Array(opts.positions);
   const nAtoms = positions.length / 3;
@@ -27,6 +28,10 @@ function makeSnapshot(opts: {
     bonds: new Uint32Array(0),
     bondOrders: null,
     box: opts.box === null || opts.box === undefined ? null : new Float32Array(opts.box),
+    boxOrigin:
+      opts.boxOrigin === null || opts.boxOrigin === undefined
+        ? null
+        : new Float32Array(opts.boxOrigin),
   };
 }
 
@@ -76,6 +81,34 @@ describe("computeViewBounds", () => {
     const { center, extent } = computeViewBounds(snap);
     expect(center).toEqual([0, 0, 0]);
     expect(Number.isFinite(extent.maxExtent)).toBe(false); // -Infinity from empty extents
+  });
+
+  it("offsets the box center and corners by boxOrigin", () => {
+    // Cubic box of side 10 anchored at an offset origin (like a confined slab
+    // whose atoms sit at z≈600). The camera must center on the box's true
+    // location, not at world zero.
+    const snap = makeSnapshot({
+      positions: [105, 205, 605],
+      box: [10, 0, 0, 0, 10, 0, 0, 0, 10],
+      boxOrigin: [100, 200, 600],
+    });
+    const { center, extent } = computeViewBounds(snap);
+    expect(center[0]).toBeCloseTo(105, 5);
+    expect(center[1]).toBeCloseTo(205, 5);
+    expect(center[2]).toBeCloseTo(605, 5);
+    // Extent is unchanged by the offset (still the box side).
+    expect(extent.maxExtent).toBeCloseTo(10, 5);
+    expect(extent.extentX).toBeCloseTo(10, 5);
+  });
+
+  it("null boxOrigin reproduces the origin-anchored result", () => {
+    const snap = makeSnapshot({
+      positions: [0, 0, 0],
+      box: [10, 0, 0, 0, 10, 0, 0, 0, 10],
+      boxOrigin: null,
+    });
+    const { center } = computeViewBounds(snap);
+    expect(center).toEqual([5, 5, 5]);
   });
 
   it("handles a triclinic cell (non-orthogonal vectors)", () => {

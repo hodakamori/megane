@@ -20,6 +20,11 @@ struct PyStructure {
     bond_orders: Py<PyArray1<u8>>,
     #[pyo3(get)]
     box_matrix: Py<PyArray2<f32>>,
+    /// World-space lower corner (xlo,ylo,zlo) the box is anchored at, shape
+    /// `(3,)`. `(0,0,0)` when the format carries no explicit origin. Atom
+    /// coordinates stay absolute; this only positions the rendered cell.
+    #[pyo3(get)]
+    box_origin: Py<PyArray1<f32>>,
     /// Extra-frame positions reshaped to `(n_frames, n_atoms*3)`. Populated only
     /// for *uniform* trajectories; empty when `heterogeneous` (use the flat
     /// arrays below, which can represent jagged frames).
@@ -94,6 +99,12 @@ impl PyStructure {
             PyValueError::new_err(format!("failed to reshape box_matrix into (3, 3): {e}"))
         })?;
 
+        let origin_vec = data
+            .box_origin
+            .map(|o| o.to_vec())
+            .unwrap_or_else(|| vec![0.0f32; 3]);
+        let box_origin_array = Array1::from_vec(origin_vec);
+
         // Frame positions for multi-frame formats (e.g. .traj). Core already stores
         // the extra frames as one contiguous buffer. For *uniform* trajectories it
         // reshapes directly to (n_frames, n_atoms*3) — the existing fast path. For
@@ -149,6 +160,7 @@ impl PyStructure {
             bonds: bond_array.into_pyarray(py).into(),
             bond_orders: bo_array.into_pyarray(py).into(),
             box_matrix: box_array.into_pyarray(py).into(),
+            box_origin: box_origin_array.into_pyarray(py).into(),
             frame_positions: frame_array.into_pyarray(py).into(),
             symmetry_ops: data.symmetry_ops,
             heterogeneous,

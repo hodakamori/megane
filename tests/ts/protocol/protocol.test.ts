@@ -54,12 +54,14 @@ describe("decodeSnapshot", () => {
     bonds: number[];
     bondOrders?: number[];
     box?: number[];
+    boxOrigin?: number[];
   }): ArrayBuffer {
-    const { nAtoms, nBonds, positions, elements, bonds, bondOrders, box } = opts;
+    const { nAtoms, nBonds, positions, elements, bonds, bondOrders, box, boxOrigin } = opts;
 
     let flags = 0;
     if (bondOrders) flags |= 0x01; // HAS_BOND_ORDERS
     if (box) flags |= 0x02; // HAS_BOX
+    if (boxOrigin) flags |= 0x08; // HAS_BOX_ORIGIN
 
     // Calculate total size
     const elemPadding = (4 - ((8 + 4 + 4 + nAtoms * 12 + nAtoms) % 4)) % 4;
@@ -69,6 +71,7 @@ describe("decodeSnapshot", () => {
       size += nBonds + boPadding;
     }
     if (box) size += 36;
+    if (boxOrigin) size += 12;
 
     const buf = new ArrayBuffer(size);
     const view = new DataView(buf);
@@ -122,6 +125,14 @@ describe("decodeSnapshot", () => {
     if (box) {
       for (let i = 0; i < 9; i++) {
         view.setFloat32(offset, box[i], true);
+        offset += 4;
+      }
+    }
+
+    // Box origin (follows the box)
+    if (boxOrigin) {
+      for (let i = 0; i < 3; i++) {
+        view.setFloat32(offset, boxOrigin[i], true);
         offset += 4;
       }
     }
@@ -216,6 +227,40 @@ describe("decodeSnapshot", () => {
     for (let i = 0; i < 9; i++) {
       expect(snap.box![i]).toBeCloseTo(boxValues[i], 5);
     }
+  });
+
+  it("decodes box origin when flag is set", () => {
+    const boxValues = [10, 0, 0, 0, 10, 0, 0, 0, 10];
+    const originValues = [160, 0, 600];
+    const buf = makeSnapshotBuffer({
+      nAtoms: 1,
+      nBonds: 0,
+      positions: [0, 0, 0],
+      elements: [6],
+      bonds: [],
+      box: boxValues,
+      boxOrigin: originValues,
+    });
+    const snap = decodeSnapshot(buf);
+    expect(snap.boxOrigin).not.toBeNull();
+    for (let i = 0; i < 3; i++) {
+      expect(snap.boxOrigin![i]).toBeCloseTo(originValues[i], 5);
+    }
+    // Box still decodes correctly alongside the origin.
+    expect(snap.box![0]).toBeCloseTo(10, 5);
+  });
+
+  it("returns null boxOrigin when flag is not set", () => {
+    const buf = makeSnapshotBuffer({
+      nAtoms: 1,
+      nBonds: 0,
+      positions: [0, 0, 0],
+      elements: [6],
+      bonds: [],
+      box: [10, 0, 0, 0, 10, 0, 0, 0, 10],
+    });
+    const snap = decodeSnapshot(buf);
+    expect(snap.boxOrigin).toBeNull();
   });
 
   it("returns null bondOrders when flag is not set", () => {

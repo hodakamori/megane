@@ -66,7 +66,7 @@ export class StructureLayer {
           this.cellRenderer = new CellRenderer();
           this.scene.add(this.cellRenderer.mesh);
         }
-        this.cellRenderer.loadBox(snapshot.box);
+        this.cellRenderer.loadBox(snapshot.box, snapshot.boxOrigin);
       }
     }
   }

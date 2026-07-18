@@ -66,6 +66,12 @@ pub struct ParsedStructure {
     pub n_file_bonds: usize,
     pub bond_orders: Option<Vec<u8>>,
     pub box_matrix: Option<[f32; 9]>,
+    /// World-space lower corner (xlo, ylo, zlo) of the simulation box, i.e. the
+    /// origin at which `box_matrix`'s edge vectors are anchored. `None` ⇒ the
+    /// box sits at world origin `(0,0,0)`. Atom coordinates in `positions` are
+    /// always absolute; this only tells the renderer where to draw the cell.
+    /// Only formats that store an explicit box origin (LAMMPS data/dump) set it.
+    pub box_origin: Option<[f32; 3]>,
     /// EXTRA frames only (frame 0 lives in `positions`), frame-major flat:
     /// `[extra0: x0,y0,z0,…][extra1: …]…`. Length == `extra_frame_count() * n_atoms * 3`.
     /// A single contiguous allocation so the WASM/PyO3 boundary avoids a flatten copy.
@@ -688,6 +694,7 @@ fn parse_impl(text: &str, frame0_only: bool) -> Result<ParsedStructure, String> 
         n_file_bonds,
         bond_orders: None,
         box_matrix,
+        box_origin: None,
         frame_positions_flat,
         atom_labels,
         chain_ids,

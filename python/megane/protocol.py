@@ -4,7 +4,7 @@ Protocol format:
   Header (8 bytes):
     magic:    4 bytes "MEGN"
     msg_type: u8 (0=snapshot, 1=frame, 2=metadata)
-    flags:    u8 (bit 0: HAS_BOND_ORDERS, bit 1: HAS_BOX)
+    flags:    u8 (bit 0: HAS_BOND_ORDERS, bit 1: HAS_BOX, bit 3: HAS_BOX_ORIGIN)
     reserved: 2 bytes
 
   Snapshot payload:
@@ -15,6 +15,7 @@ Protocol format:
     bonds:        Uint32[n_bonds * 2]
     bond_orders:  Uint8[n_bonds]     + pad to 4 bytes  (if HAS_BOND_ORDERS)
     box:          Float32[9]         (3x3 row-major)   (if HAS_BOX)
+    box_origin:   Float32[3]         (xlo,ylo,zlo)     (if HAS_BOX_ORIGIN)
 
   Frame payload:
     frame_id:   u32
@@ -53,6 +54,7 @@ MSG_METADATA = 2
 HAS_BOND_ORDERS = 0x01
 HAS_BOX = 0x02
 HAS_FRAME_ELEMENTS = 0x04
+HAS_BOX_ORIGIN = 0x08
 
 
 @runtime_checkable
@@ -65,6 +67,7 @@ class StructureLike(Protocol):
     bonds: np.ndarray  # (M, 2) uint32
     bond_orders: np.ndarray  # (M,) uint8
     box: np.ndarray  # (3, 3) float32
+    box_origin: np.ndarray  # (3,) float32 — box lower corner; zero if unset
 
 
 def encode_snapshot(structure: StructureLike) -> bytes:
@@ -99,13 +102,22 @@ def encode_snapshot(structure: StructureLike) -> bytes:
         flags |= HAS_BOX
         box_bytes = structure.box.astype(np.float32).flatten().tobytes()
 
+    # Box origin (optional; only meaningful alongside a box). Emitted when the
+    # lower corner is offset from the world origin — e.g. a LAMMPS box far from
+    # (0,0,0) — so the frontend draws the cell around its (absolute) atoms.
+    origin_bytes = b""
+    box_origin = getattr(structure, "box_origin", None)
+    if (flags & HAS_BOX) and box_origin is not None and np.any(np.asarray(box_origin) != 0):
+        flags |= HAS_BOX_ORIGIN
+        origin_bytes = np.asarray(box_origin, dtype=np.float32).flatten().tobytes()
+
     # Header: magic(4) + msg_type(1) + flags(1) + reserved(2) = 8 bytes
     header = MAGIC + struct.pack("<BBH", MSG_SNAPSHOT, flags, 0)
 
     # Snapshot header: n_atoms(4) + n_bonds(4) = 8 bytes
     snapshot_header = struct.pack("<II", n_atoms, n_bonds)
 
-    return header + snapshot_header + pos_bytes + elem_bytes + bond_bytes + bond_order_bytes + box_bytes
+    return header + snapshot_header + pos_bytes + elem_bytes + bond_bytes + bond_order_bytes + box_bytes + origin_bytes
 
 
 def encode_frame(

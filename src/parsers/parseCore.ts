@@ -57,6 +57,7 @@ interface WasmParseResult {
   bonds(): Uint32Array;
   bond_orders(): Uint8Array;
   box_matrix(): Float32Array;
+  box_origin(): Float32Array;
   frame_data(): Float32Array;
   chain_ids(): Uint8Array;
   bfactors(): Float32Array;
@@ -87,6 +88,7 @@ interface WasmXtcResult {
   vector_channel_count: number;
   vector_channel_meta: string;
   box_matrix(): Float32Array;
+  box_origin(): Float32Array;
   frame_data(): Float32Array;
   vector_channel_data(): Float32Array;
   // Heterogeneous side table (all empty/false on the uniform fast path).
@@ -118,6 +120,7 @@ export interface WasmTrajectoryDecoder extends WasmFrameDecoder {
   readonly timestep_ps: number;
   readonly has_box: boolean;
   box_matrix(): Float32Array;
+  box_origin(): Float32Array;
 }
 
 /** Persistent XTC decoder (owns the file bytes; decodes one frame on demand). */
@@ -171,6 +174,8 @@ export interface TrajectoryIndexResult {
   timestepPs: number;
   hasBox: boolean;
   box: Float32Array | null;
+  /** Box origin (length 3); null ⇒ (0,0,0). Set only for LAMMPS dumps. */
+  boxOrigin: Float32Array | null;
   times: Float32Array;
   /** Embedded per-atom vector channel names (LAMMPS velocity/force); empty otherwise. */
   vectorChannelNames: string[];
@@ -322,6 +327,7 @@ export function parseWithFn(parseFn: ParseFn, text: string): StructureParseResul
     bonds: result.bonds(),
     bondOrders: result.bond_orders(),
     box: result.has_box ? result.box_matrix() : null,
+    boxOrigin: result.has_box && result.box_origin().length === 3 ? result.box_origin() : null,
     atomChainIds: result.has_chain_ids ? result.chain_ids() : null,
     atomBFactors: result.has_bfactors ? result.bfactors() : null,
     ...(caCount > 0 && {
@@ -644,6 +650,7 @@ export function indexTrajectoryCore(
     timestepPs: decoder.timestep_ps,
     hasBox: decoder.has_box,
     box: decoder.has_box ? decoder.box_matrix() : null,
+    boxOrigin: decoder.has_box && decoder.box_origin().length === 3 ? decoder.box_origin() : null,
     times: kind === "xtc" ? (decoder as WasmXtcDecoder).times() : new Float32Array(0),
     vectorChannelNames,
     heterogeneous: kind === "lammpstrj" && (decoder as WasmLammpstrjDecoder).heterogeneous === true,
@@ -740,6 +747,7 @@ export function collectResultBuffers(result: StructureParseResult | XTCParseResu
     add(s.bonds);
     add(s.bondOrders);
     add(s.box);
+    add(s.boxOrigin);
     add(s.atomChainIds);
     add(s.atomBFactors);
     add(s.caIndices);

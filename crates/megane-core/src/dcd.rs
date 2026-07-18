@@ -371,6 +371,7 @@ pub fn parse_dcd(data: &[u8]) -> Result<DcdData, String> {
         n_frames,
         timestep_ps,
         box_matrix: first_box,
+        box_origin: None,
         frame_positions_flat,
         vector_channels: vec![],
         hetero,
