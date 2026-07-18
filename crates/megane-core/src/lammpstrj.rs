@@ -1,12 +1,24 @@
 /// LAMMPS dump trajectory (.lammpstrj) parser.
 ///
-/// Text-based multi-frame format. Returns trajectory data (positions + box)
-/// without topology — element/bond info comes from a separate structure file.
+/// Text-based multi-frame format. [`parse_lammpstrj`] returns trajectory data
+/// (positions + box) without topology — element/bond info comes from a separate
+/// structure file — for the "attach onto a loaded topology" workflow.
+///
+/// [`parse_lammpstrj_structure`] instead returns a full [`ParsedStructure`]
+/// (structure lane, like `traj.rs`/`xyz.rs`) so a dump can be opened standalone
+/// as a multi-frame structure: frame-0 topology is derived from the file, the
+/// remaining frames stream into playback. A dump carries no element symbols or
+/// masses, so the integer per-atom `type` id is used as the atomic-number proxy
+/// (the same convention as the trajectory lane's `TrajHetero::elements_flat`);
+/// bonds are inferred by distance from frame 0.
 ///
 /// Supports coordinate columns: x/y/z (unscaled), xs/ys/zs (scaled),
 /// xu/yu/zu (unwrapped). Atoms are sorted by id within each frame.
 /// Also detects and extracts named vector column groups (vx/vy/vz, fx/fy/fz).
+use crate::bonds;
+use crate::parser::{HeteroFrames, ParsedStructure};
 use crate::trajectory::{TrajectoryData, VectorChannel, VectorFrame};
+use std::collections::HashSet;
 
 /// Type alias kept for backwards compatibility.
 pub type LammpstrjData = TrajectoryData;
@@ -978,6 +990,196 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     })
 }
 
+/// Parse a LAMMPS dump as a standalone multi-frame **structure** (structure
+/// lane), mirroring `traj.rs`/`xyz.rs`: frame 0 becomes the topology
+/// (`positions`/`elements`/`box_matrix`/`bonds`) and the remaining frames stream
+/// into `frame_positions_flat`. Element identities are the integer LAMMPS `type`
+/// ids used as an atomic-number proxy (a dump carries no symbols/masses); when a
+/// dump has no `type` column, atoms fall back to element 0. Bonds are inferred
+/// by distance from frame 0. Variable atom count / cell / type dumps populate a
+/// [`HeteroFrames`] side table exactly as the other multi-frame structure
+/// parsers do; a uniform dump keeps `hetero: None`.
+pub fn parse_lammpstrj_structure(text: &str) -> Result<ParsedStructure, String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let n_lines = lines.len();
+    if n_lines == 0 {
+        return Err("Empty file".to_string());
+    }
+
+    // Frame-0 topology.
+    let mut n_atoms = 0usize;
+    let mut positions: Vec<f32> = Vec::new();
+    let mut elements: Vec<u8> = Vec::new();
+    let mut box_matrix: Option<[f32; 9]> = None;
+
+    // Extra frames (frame 0 lives in the fields above).
+    let mut frame_positions_flat: Vec<f32> = Vec::new();
+    let mut atom_offsets: Vec<u32> = vec![0];
+    // Per-extra-frame side tables, recorded lazily once a channel is seen to
+    // vary (backfilling the earlier extra frames), so a uniform dump allocates
+    // nothing — identical to the `traj.rs`/`xyz.rs` fast path.
+    let mut per_frame_elements: Vec<Vec<u8>> = Vec::new();
+    let mut per_frame_cells: Vec<[f32; 9]> = Vec::new();
+    let mut varies_atoms = false;
+    let mut varies_cell = false;
+    let mut varies_topology = false;
+    let mut recording_topo = false;
+    let mut recording_cell = false;
+    let mut max_atoms = 0usize;
+    let mut frame_idx = 0usize;
+
+    let mut i = 0usize;
+    while i < n_lines {
+        if lines[i].trim() != "ITEM: TIMESTEP" {
+            i += 1;
+            continue;
+        }
+        let header = read_frame_header(&lines, i)?;
+        let frame_atoms = header.n_atoms;
+        let frame_box = header.box_matrix;
+        // want_types=true so the `type` column (when present) becomes the
+        // per-atom element proxy; read_atom_block already applies scaled-coord
+        // conversion and id-sorting.
+        let (frame_positions, frame_types, _vectors, next) =
+            read_atom_block(&lines, &header, frame_atoms, true)?;
+        // A dump without a `type` column yields empty types → all element 0.
+        let frame_elements: Vec<u8> = if frame_types.len() == frame_atoms {
+            frame_types
+        } else {
+            vec![0u8; frame_atoms]
+        };
+
+        if frame_idx == 0 {
+            n_atoms = frame_atoms;
+            max_atoms = frame_atoms;
+            positions = frame_positions;
+            elements = frame_elements;
+            box_matrix = Some(frame_box);
+        } else {
+            let ei = frame_idx - 1; // extra-frame index
+            if frame_atoms > max_atoms {
+                max_atoms = frame_atoms;
+            }
+            if frame_atoms != n_atoms {
+                varies_atoms = true;
+            }
+            if !varies_topology && frame_elements != elements {
+                varies_topology = true;
+            }
+            if !varies_cell && Some(frame_box) != box_matrix {
+                varies_cell = true;
+            }
+
+            frame_positions_flat.extend_from_slice(&frame_positions);
+            let last = *atom_offsets.last().unwrap();
+            atom_offsets.push(last + frame_atoms as u32);
+
+            // Lazily record per-frame topology once the atom count or elements
+            // vary; backfill the earlier extra frames with frame-0 topology.
+            if (varies_atoms || varies_topology) && !recording_topo {
+                for _ in 0..ei {
+                    per_frame_elements.push(elements.clone());
+                }
+                recording_topo = true;
+            }
+            if recording_topo {
+                per_frame_elements.push(frame_elements.clone());
+            }
+
+            // Lazily record per-frame cell once it varies.
+            if varies_cell && !recording_cell {
+                let base = box_matrix.unwrap();
+                for _ in 0..ei {
+                    per_frame_cells.push(base);
+                }
+                recording_cell = true;
+            }
+            if recording_cell {
+                per_frame_cells.push(frame_box);
+            }
+        }
+
+        frame_idx += 1;
+        i = next;
+    }
+
+    if frame_idx == 0 {
+        return Err("No frames found in file".to_string());
+    }
+    // Atom count varying implies the element list (and inferred bonds) vary too.
+    if varies_atoms {
+        varies_topology = true;
+    }
+
+    // Infer frame-0 bonds by distance (a dump embeds no connectivity).
+    let empty_bonds: HashSet<(u32, u32)> = HashSet::new();
+    let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
+
+    // Assemble the side table only when a channel varies (uniform → None).
+    let hetero = if varies_atoms || varies_cell || varies_topology {
+        let (elements_flat, bonds_flat, bond_offsets) = if varies_topology {
+            let mut elements_flat: Vec<u8> = Vec::new();
+            let mut bonds_flat: Vec<u32> = Vec::new();
+            let mut bond_offsets: Vec<u32> = vec![0];
+            for (k, elems) in per_frame_elements.iter().enumerate() {
+                let a = atom_offsets[k] as usize * 3;
+                let b = atom_offsets[k + 1] as usize * 3;
+                let fpos = &frame_positions_flat[a..b];
+                let fbonds = bonds::infer_bonds(fpos, elems, elems.len(), &empty_bonds);
+                for (u, v) in &fbonds {
+                    bonds_flat.push(*u);
+                    bonds_flat.push(*v);
+                }
+                let last = *bond_offsets.last().unwrap();
+                bond_offsets.push(last + fbonds.len() as u32);
+                elements_flat.extend_from_slice(elems);
+            }
+            (elements_flat, bonds_flat, bond_offsets)
+        } else {
+            (Vec::new(), Vec::new(), Vec::new())
+        };
+        let cells_flat: Vec<f32> = if varies_cell {
+            per_frame_cells.iter().flatten().copied().collect()
+        } else {
+            Vec::new()
+        };
+        Some(HeteroFrames {
+            atom_offsets,
+            elements_flat,
+            cells_flat,
+            bond_offsets,
+            bonds_flat,
+            varies_atoms,
+            varies_cell,
+            varies_topology,
+            max_atoms: max_atoms as u32,
+        })
+    } else {
+        None
+    };
+
+    Ok(ParsedStructure {
+        n_atoms,
+        positions,
+        elements,
+        bonds,
+        n_file_bonds: 0,
+        bond_orders: None,
+        box_matrix,
+        frame_positions_flat,
+        atom_labels: None,
+        chain_ids: None,
+        bfactors: None,
+        vector_channels: vec![],
+        ca_indices: vec![],
+        ca_chain_ids: vec![],
+        ca_res_nums: vec![],
+        ca_ss_type: vec![],
+        symmetry_ops: Vec::new(),
+        hetero,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1328,5 +1530,97 @@ mod tests {
         // A uniform dump stays non-heterogeneous.
         let uni = build_index(sample_dump()).unwrap();
         assert!(!uni.heterogeneous);
+    }
+
+    #[test]
+    fn structure_uniform_splits_frame0_topology() {
+        let s = parse_lammpstrj_structure(sample_dump()).unwrap();
+        assert_eq!(s.n_atoms, 3);
+        // Frame 0 topology: id-sorted positions and type-id element proxies.
+        assert_eq!(s.positions, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
+        assert_eq!(s.elements, vec![1u8, 2u8, 2u8]); // types of atoms 1,2,3
+        assert!(s.box_matrix.is_some());
+        // One extra frame beyond frame 0; uniform → no side table.
+        assert_eq!(s.extra_frame_count(), 1);
+        assert!(s.hetero.is_none());
+        // Extra frame (frame 1) rides frame_positions_flat, id-sorted.
+        assert_eq!(
+            s.frame_positions_flat,
+            vec![1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, 9.1]
+        );
+    }
+
+    #[test]
+    fn structure_no_type_column_falls_back_to_element_zero() {
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id x y z\n\
+                    1 1.0 0.0 0.0\n\
+                    2 2.0 0.0 0.0\n";
+        let s = parse_lammpstrj_structure(text).unwrap();
+        assert_eq!(s.n_atoms, 2);
+        assert_eq!(s.elements, vec![0u8, 0u8]);
+        assert!(s.hetero.is_none());
+    }
+
+    #[test]
+    fn structure_variable_atoms_builds_hetero_side_table() {
+        // GCMC-style dump: frame 0 has 2 atoms, frame 1 grows a third.
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.0 0.0 0.0\n\
+                    2 1 2.0 0.0 0.0\n\
+                    ITEM: TIMESTEP\n100\n\
+                    ITEM: NUMBER OF ATOMS\n3\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.1 0.0 0.0\n\
+                    2 1 2.1 0.0 0.0\n\
+                    3 2 3.0 0.0 0.0\n";
+        let s = parse_lammpstrj_structure(text).unwrap();
+        assert_eq!(s.n_atoms, 2); // frame-0 base topology
+        assert_eq!(s.elements, vec![1u8, 1u8]);
+        assert_eq!(s.extra_frame_count(), 1);
+        let h = s.hetero.as_ref().expect("side table");
+        assert!(h.varies_atoms);
+        assert!(h.varies_topology);
+        assert_eq!(h.max_atoms, 3);
+        // Extra frame's element proxies (the 3-atom frame), incl. the new type 2.
+        assert_eq!(h.elements_flat, vec![1u8, 1u8, 2u8]);
+        // Its jagged positions (9 floats) are sliceable via atom_offsets.
+        assert_eq!(h.atom_offsets, vec![0, 3]);
+    }
+
+    #[test]
+    fn structure_variable_cell_records_cells_only() {
+        // NPT-style dump: constant atom count, growing box → varies_cell only.
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n1\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 10.0\n0.0 10.0\n0.0 10.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.0 0.0 0.0\n\
+                    ITEM: TIMESTEP\n100\n\
+                    ITEM: NUMBER OF ATOMS\n1\n\
+                    ITEM: BOX BOUNDS pp pp pp\n0.0 12.0\n0.0 12.0\n0.0 12.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 1.1 0.0 0.0\n";
+        let s = parse_lammpstrj_structure(text).unwrap();
+        let h = s.hetero.as_ref().expect("side table");
+        assert!(h.varies_cell);
+        assert!(!h.varies_atoms);
+        assert!(!h.varies_topology);
+        assert!(h.elements_flat.is_empty()); // topology constant
+        // Frame-0 box on the struct; extra frame's grown box in cells_flat.
+        assert!((s.box_matrix.unwrap()[0] - 10.0).abs() < 1e-5);
+        assert_eq!(h.cells_flat.len(), 9); // one extra frame
+        assert!((h.cells_flat[0] - 12.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn structure_empty_file_errors() {
+        assert!(parse_lammpstrj_structure("").is_err());
     }
 }

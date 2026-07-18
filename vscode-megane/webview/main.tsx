@@ -98,15 +98,14 @@ function App() {
             : undefined;
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
-          lower.endsWith(".xtc") ||
-          lower.endsWith(".dcd") ||
-          lower.endsWith(".lammpstrj") ||
-          lower.endsWith(".dump") ||
-          lower.endsWith(".nc");
-        // Trajectory-only formats (XTC, LAMMPS dump) need a topology loaded
+          lower.endsWith(".xtc") || lower.endsWith(".dcd") || lower.endsWith(".nc");
+        // Trajectory-only formats (XTC, DCD, NetCDF) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by
         // adding a Load Structure node and re-pointing the trajectory file.
+        // LAMMPS dump (.lammpstrj/.dump/.trj) is NOT trajectory-only: it loads
+        // standalone as a multi-frame structure via loadFile (topology from
+        // frame 0), like a multi-frame XYZ / ASE .traj.
         const loadPromise = isTrajectoryOnly ? local.loadXtc(file) : local.loadFile(file, topFile);
         loadPromise
           .then(() => setLoaded(true))

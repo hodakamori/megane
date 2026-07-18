@@ -566,7 +566,8 @@ export function useMeganeLocal(): MeganeLocalState {
         throw new Error("Load a structure before loading a trajectory");
       }
       const ext = xtc.name.toLowerCase();
-      const isLammpstrj = ext.endsWith(".lammpstrj") || ext.endsWith(".dump");
+      const isLammpstrj =
+        ext.endsWith(".lammpstrj") || ext.endsWith(".dump") || ext.endsWith(".trj");
       const isDcd = ext.endsWith(".dcd");
       const isNetcdf = ext.endsWith(".nc");
       const isXtc = !isLammpstrj && !isDcd && !isNetcdf;

@@ -198,6 +198,7 @@ interface WasmModule {
   parse_lammps_data: ParseFn;
   parse_prmtop: ParseFn;
   parse_traj: BinaryParseFn;
+  parse_lammpstrj_structure: ParseFn;
   parse_xtc_file: TrajBinaryParseFn;
   parse_dcd_file: TrajBinaryParseFn;
   parse_netcdf_file: TrajBinaryParseFn;
@@ -248,6 +249,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_lammps_data: wasm.parse_lammps_data,
         parse_prmtop: wasm.parse_prmtop,
         parse_traj: wasm.parse_traj,
+        parse_lammpstrj_structure: wasm.parse_lammpstrj_structure,
         parse_xtc_file: wasm.parse_xtc_file,
         parse_dcd_file: wasm.parse_dcd_file,
         parse_netcdf_file: wasm.parse_netcdf_file,
@@ -288,6 +290,13 @@ function getParserForExtension(ext: string): ParseFn {
     case ".data":
     case ".lammps":
       return wasmModule!.parse_lammps_data;
+    // LAMMPS dump opened standalone as a multi-frame structure (topology from
+    // frame 0, remaining frames stream into playback). Element identities are
+    // the integer LAMMPS `type` ids used as an atomic-number proxy.
+    case ".lammpstrj":
+    case ".dump":
+    case ".trj":
+      return wasmModule!.parse_lammpstrj_structure;
     case ".prmtop":
       return wasmModule!.parse_prmtop;
     default:

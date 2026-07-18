@@ -37,6 +37,7 @@ describe("vscode-megane package.json", () => {
         "*.prmtop",
         "*.sdf",
         "*.traj",
+        "*.trj",
         "*.xtc",
         "*.xyz",
       ].sort(),

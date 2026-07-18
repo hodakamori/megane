@@ -1080,6 +1080,15 @@ pub fn parse_lammpstrj_file(text: &str) -> Result<XtcParseResult, JsError> {
     Ok(XtcParseResult::from_trajectory(data))
 }
 
+/// Parse a LAMMPS dump as a standalone multi-frame **structure** (frame-0
+/// topology + extra frames). Element identities are the integer LAMMPS `type`
+/// ids used as an atomic-number proxy; bonds are inferred from frame 0.
+#[wasm_bindgen]
+pub fn parse_lammpstrj_structure(text: &str) -> Result<ParseResult, JsError> {
+    let parsed = lammpstrj::parse_lammpstrj_structure(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(parsed))
+}
+
 /// Parse a DCD trajectory binary (CHARMM/NAMD/X-PLOR) and return frame data.
 #[wasm_bindgen]
 pub fn parse_dcd_file(data: &[u8]) -> Result<XtcParseResult, JsError> {

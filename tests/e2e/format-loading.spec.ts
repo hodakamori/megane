@@ -52,10 +52,11 @@ const STRUCTURE_CASES: StructureCase[] = [
     expectedAtoms: 10,
   },
   { name: "lammps-water", file: "water.lammps", mime: "text/plain" },
-  // .lammpstrj is a *trajectory* format, not a structure — the LoadStructure
-  // node's file input rejects it by extension, so dropping it here was
-  // silently a no-op. Trajectory loading is exercised by the
-  // "trajectory companion" suite below.
+  // LAMMPS dump opens standalone as a multi-frame structure (frame-0 topology,
+  // integer atom `type` ids used as element proxies), like a multi-frame XYZ.
+  // The `.trj` alias is exercised alongside the canonical `.lammpstrj`.
+  { name: "lammpstrj-water", file: "water.lammpstrj", mime: "text/plain", expectedAtoms: 3 },
+  { name: "trj-water", file: "water.trj", mime: "text/plain", expectedAtoms: 3 },
 ];
 
 async function dropStructure(

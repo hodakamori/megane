@@ -135,6 +135,34 @@ describe("usePipelineStore.openFile — single structure file", () => {
     expect(state.fileFrames).toBeNull();
   });
 
+  it.each([["dump.lammpstrj"], ["run.dump"], ["md.trj"]])(
+    "opens a LAMMPS dump (%s) standalone as a multi-frame structure",
+    async (filename) => {
+      // A LAMMPS dump classifies as a structure (structure-first), so opening it
+      // alone derives the topology from frame 0 and streams the rest — like a
+      // multi-frame .traj — instead of requiring a pre-loaded topology.
+      mockParseStructureFile.mockResolvedValueOnce({
+        snapshot: makeSnapshot(3),
+        frames: [makeFrame(1), makeFrame(2)],
+        meta: makeMeta(3),
+        labels: null,
+        vectorChannels: [],
+      });
+
+      const file = new File(["<dump>"], filename);
+      await usePipelineStore.getState().openFile(file, { mode: "replace" });
+
+      const state = usePipelineStore.getState();
+      const loader = state.nodes.find((n) => n.type === "load_structure")!;
+      expect((loader.data.params as { fileName: string }).fileName).toBe(filename);
+      expect((loader.data.params as { hasTrajectory: boolean }).hasTrajectory).toBe(true);
+      expect(state.nodeSnapshots[loader.id]?.frames?.length).toBe(2);
+      // Routed through the structure parser, NOT the trajectory-attach parser.
+      expect(mockParseStructureFile).toHaveBeenCalled();
+      expect(mockParseLammpstrjFile).not.toHaveBeenCalled();
+    },
+  );
+
   it("uses an existing load_structure node in merge mode without replacing the graph", async () => {
     mockParseStructureFile.mockResolvedValueOnce({
       snapshot: makeSnapshot(3),
@@ -285,31 +313,6 @@ describe("usePipelineStore.openFile — trajectory files", () => {
     expect((traj.data.params as { fileName: string }).fileName).toBe("vibration.xtc");
     expect(state.fileFrames?.length).toBe(2);
     expect(mockParseXTCFile).toHaveBeenCalled();
-  });
-
-  it("uses the LAMMPS trajectory parser for .lammpstrj", async () => {
-    mockParseStructureFile.mockResolvedValueOnce({
-      snapshot: makeSnapshot(3),
-      frames: [],
-      meta: null,
-      labels: null,
-      vectorChannels: [],
-    });
-    await usePipelineStore.getState().openFile(new File(["<lammps>"], "water.lammps"), {
-      mode: "replace",
-    });
-
-    mockParseLammpstrjFile.mockResolvedValueOnce({
-      frames: [makeFrame(1, 3)],
-      meta: makeMeta(1, 3),
-      vectorChannels: null,
-    });
-
-    const dump = new File(["<dump>"], "trajectory.lammpstrj");
-    await usePipelineStore.getState().openFile(dump);
-
-    expect(mockParseLammpstrjFile).toHaveBeenCalled();
-    expect(mockParseXTCFile).not.toHaveBeenCalled();
   });
 
   it("uses the DCD parser for .dcd", async () => {

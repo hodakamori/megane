@@ -46,10 +46,13 @@ Legend:
 | LAMMPS data | `.data`, `.lammps` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | ✓ | API |
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
 
 Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
+
+Note: **LAMMPS dump** (`.lammpstrj` / `.dump` / `.trj`) is also loaded via the **Load Structure** node as a self-contained multi-frame structure — frame 0 defines the topology and the remaining frames stream into playback, exactly like a multi-frame XYZ. Because a dump carries no element symbols or masses, the integer per-atom `type` id is used as the atomic-number **proxy** for colouring/sizing (placeholder chemistry, not real elements), and bonds are inferred by distance. A dump can still be **attached onto a separately-loaded topology** (which supplies true elements) via the Load Trajectory node — see the Trajectory formats table below.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
@@ -59,13 +62,17 @@ Note: **Heterogeneous frames** — trajectories whose frames differ in atom coun
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | XTC | `.xtc` | ✓ | API | ✓¹ | ✓¹ | ✓¹ | ✓ |
 | DCD | `.dcd` | ✓ | API | ✓¹ | ✓¹ | ✓¹ | ✓ |
-| LAMMPS dump | `.lammpstrj`, `.dump` | ✓ | API | ✓¹ | ✓¹ | ✓¹ | ✓ |
+| LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | AMBER NetCDF | `.nc` | ✓ | API | ✓¹ | ✓¹ | ✓¹ | ✓ |
 
 ¹ Trajectory-only formats need a topology already loaded. Opening a `.xtc` /
-`.dcd` / `.lammpstrj` / `.dump` / `.nc` directly surfaces an actionable error; recover by
+`.dcd` / `.nc` directly surfaces an actionable error; recover by
 opening a structure file (PDB, GRO, …) first or by wiring a Load Structure
-node in the always-mounted pipeline editor.
+node in the always-mounted pipeline editor. **LAMMPS dump is _not_
+trajectory-only** — it opens standalone as a multi-frame structure (see the
+Structure formats table); it is also listed here because it can additionally be
+_attached_ onto a separately-loaded topology (which supplies true elements)
+via the Load Trajectory node.
 
 Note: **Heterogeneous frames** apply to the trajectory formats too. XTC, DCD, and
 AMBER NetCDF carry a fixed atom count but a **per-frame unit cell** (variable-cell
@@ -140,13 +147,13 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 
 These are formats or features that the parser layer supports but a given platform does not yet wire into its UI. They are documented here so users do not file bugs against expected-but-absent behaviour.
 
-- **Trajectory-only opens require a topology first.** On VS Code and JupyterLab, opening a `.xtc` / `.dcd` / `.lammpstrj` / `.dump` / `.nc` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node.
+- **Trajectory-only opens require a topology first.** On VS Code and JupyterLab, opening a `.xtc` / `.dcd` / `.nc` file before any structure is loaded surfaces a friendly error. The recommended flow is to open the structure first, or to use the pipeline editor (always mounted on these hosts) to wire a Load Structure node. (LAMMPS dump `.lammpstrj` / `.dump` / `.trj` is exempt — it opens standalone as a multi-frame structure.)
 - **Export downloads do not work for the Jupyter widget inside a VS Code notebook.** Browsers download exports via a synthetic `<a download>` click, and the VS Code custom editor relays them to the extension host (`saveFile` webview message → native save dialog). The anywidget running inside VS Code's notebook renderer webview can do neither — the sandbox ignores anchor downloads and provides no bridge to the extension host. Use JupyterLab (or the VS Code custom editor on a structure file) to export.
 - **Jupyter widget has no in-cell file picker or drag-and-drop.** This is intentional — the widget is Python-driven. Use `set_pipeline()` with a `Pipeline` to load any supported format.
 - **The Replicate node does not replicate trajectory frames.** The `replicate` pipeline node builds a static supercell from the structure's particles, bonds, and cell, but trajectory frames keep the original atom count. With a trajectory connected and any replication count > 1, the static structure and playback frames differ in atom count. The default pipelines wire Replicate with `nx = ny = nz = 1` (identity), so this only surfaces once a user increases the counts on a structure that also has a trajectory. Replicate also requires a unit cell on the input — structures without a cell pass through unchanged.

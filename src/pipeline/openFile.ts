@@ -63,9 +63,15 @@ const STRUCTURE_EXTS = [
   ".data",
   ".lammps",
   ".traj",
+  // LAMMPS dump opened standalone as a multi-frame structure (topology derived
+  // from frame 0). Also listed under TRAJECTORY_EXTS so it can still be attached
+  // onto a separately-loaded topology via the Load Trajectory node.
+  ".lammpstrj",
+  ".dump",
+  ".trj",
 ];
 
-const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump", ".dcd", ".nc"];
+const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump", ".trj", ".dcd", ".nc"];
 
 const PIPELINE_SUFFIX = ".megane.json";
 
@@ -131,8 +137,12 @@ export function syncAddBondSourceForLoader(
 function classify(filename: string): FileKind {
   const lower = filename.toLowerCase();
   if (lower.endsWith(PIPELINE_SUFFIX)) return "pipeline";
-  for (const ext of TRAJECTORY_EXTS) if (lower.endsWith(ext)) return "trajectory";
+  // Structure is checked first so a format listed in both lists (a LAMMPS dump,
+  // which can be opened standalone as a structure OR attached as a trajectory)
+  // defaults to a standalone structure load on a generic/drag-drop open. The two
+  // lists are otherwise disjoint, so pure trajectory formats are unaffected.
   for (const ext of STRUCTURE_EXTS) if (lower.endsWith(ext)) return "structure";
+  for (const ext of TRAJECTORY_EXTS) if (lower.endsWith(ext)) return "trajectory";
   return "unknown";
 }
 
@@ -247,7 +257,8 @@ async function openTrajectory(
   }
 
   const lower = file.name.toLowerCase();
-  const isLammps = lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
+  const isLammps =
+    lower.endsWith(".lammpstrj") || lower.endsWith(".dump") || lower.endsWith(".trj");
   const isDcd = lower.endsWith(".dcd");
   const isNetcdf = lower.endsWith(".nc");
   const parseFn = isLammps
@@ -323,7 +334,8 @@ async function openPipeline(
     const f = fileMap.get(name);
     if (!f) continue;
     const lower = name.toLowerCase();
-    const isLammps = lower.endsWith(".lammpstrj") || lower.endsWith(".dump");
+    const isLammps =
+      lower.endsWith(".lammpstrj") || lower.endsWith(".dump") || lower.endsWith(".trj");
     const isDcd = lower.endsWith(".dcd");
     const isNetcdf = lower.endsWith(".nc");
     const parseFn = isLammps

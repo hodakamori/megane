@@ -96,7 +96,9 @@ class LoadStructure(PipelineNode):
     """Load a molecular structure from a file.
 
     Supported formats: PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, LAMMPS data
-    (.data / .lammps), and ASE .traj.
+    (.data / .lammps), ASE .traj, and LAMMPS dump (.lammpstrj / .dump / .trj)
+    opened standalone as a multi-frame structure (frame-0 topology, integer
+    atom `type` ids used as element proxies).
 
     Ports:
         out.particle — atom data
@@ -129,7 +131,7 @@ class LoadTrajectory(PipelineNode):
         nc: Path to AMBER NetCDF trajectory file.
         traj: Path to ASE .traj file.
         xyz: Path to multi-frame XYZ file.
-        lammpstrj: Path to LAMMPS dump trajectory (.lammpstrj / .dump).
+        lammpstrj: Path to LAMMPS dump trajectory (.lammpstrj / .dump / .trj).
 
     Ports:
         inp.particle — atom topology source
@@ -574,6 +576,11 @@ def _load_structure_file(path: str):
         ".cif": megane_parser.parse_cif,
         ".data": megane_parser.parse_lammps_data,
         ".lammps": megane_parser.parse_lammps_data,
+        # LAMMPS dump opened standalone as a structure (frame-0 topology; integer
+        # atom `type` ids used as element proxies).
+        ".lammpstrj": megane_parser.parse_lammpstrj_structure,
+        ".dump": megane_parser.parse_lammpstrj_structure,
+        ".trj": megane_parser.parse_lammpstrj_structure,
     }
     binary_parsers = {
         ".traj": megane_parser.parse_traj,
@@ -731,7 +738,7 @@ class Pipeline:
                 nc=fname if ext == ".nc" else None,
                 traj=fname if ext == ".traj" else None,
                 xyz=fname if ext == ".xyz" else None,
-                lammpstrj=fname if ext in (".lammpstrj", ".dump") else None,
+                lammpstrj=fname if ext in (".lammpstrj", ".dump", ".trj") else None,
             )
         elif ntype == "filter":
             return Filter(query=nd.get("query", "all"), bond_query=nd.get("bond_query", ""))
@@ -1098,6 +1105,7 @@ def view_traj(
     xtc: str | None = None,
     traj: str | None = None,
     xyz: str | None = None,
+    lammpstrj: str | None = None,
     bonds: Literal["distance", "structure", "file"] | None = "distance",
     perspective: bool = False,
     cell_axes_visible: bool = True,
@@ -1143,19 +1151,25 @@ def view_traj(
     """
     import pathlib
 
-    if sum(x is not None for x in (xtc, traj, xyz)) > 1:
-        raise ValueError("Only one of 'xtc', 'traj', or 'xyz' can be provided, not multiple.")
+    if sum(x is not None for x in (xtc, traj, xyz, lammpstrj)) > 1:
+        raise ValueError(
+            "Only one of 'xtc', 'traj', 'xyz', or 'lammpstrj' can be provided, not multiple."
+        )
 
-    if xtc is None and traj is None and xyz is None:
+    if xtc is None and traj is None and xyz is None and lammpstrj is None:
         ext = pathlib.Path(path).suffix.lower()
         if ext == ".traj":
             traj = path
         elif ext == ".xyz":
             xyz = path
+        elif ext in (".lammpstrj", ".dump", ".trj"):
+            # Self-contained LAMMPS dump: topology from LoadStructure(path),
+            # frames from LoadTrajectory(lammpstrj=path) — same file both ways.
+            lammpstrj = path
         else:
             raise ValueError(
-                "Either 'xtc', 'traj', or 'xyz' must be provided, "
-                "or 'path' must point to a .traj or .xyz file. "
+                "Either 'xtc', 'traj', 'xyz', or 'lammpstrj' must be provided, "
+                "or 'path' must point to a .traj, .xyz, or .lammpstrj/.dump/.trj file. "
                 "Use view() for structure-only display."
             )
 
@@ -1163,7 +1177,7 @@ def view_traj(
 
     pipe = Pipeline()
     s = pipe.add_node(LoadStructure(path))
-    t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj, xyz=xyz))
+    t = pipe.add_node(LoadTrajectory(xtc=xtc, traj=traj, xyz=xyz, lammpstrj=lammpstrj))
     v = pipe.add_node(Viewport(perspective=perspective, cell_axes_visible=cell_axes_visible))
 
     pipe.add_edge(s.out.particle, t.inp.particle)

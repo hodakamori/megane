@@ -13,7 +13,8 @@ import { NodeShell } from "./NodeShell";
 import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
-const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj";
+const STRUCTURE_ACCEPT =
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj";
 export const STRUCTURE_EXTS = [
   ".pdb",
   ".gro",
@@ -27,6 +28,11 @@ export const STRUCTURE_EXTS = [
   ".lammps",
   ".prmtop",
   ".traj",
+  // LAMMPS dump opened standalone as a multi-frame structure (topology from
+  // frame 0; integer atom `type` ids used as element proxies).
+  ".lammpstrj",
+  ".dump",
+  ".trj",
 ];
 
 /**

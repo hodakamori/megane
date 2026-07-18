@@ -89,6 +89,10 @@ const { calls, wasmMock } = vi.hoisted(() => {
       calls.push("parse_traj");
       return mockStructResult(3, 1);
     },
+    parse_lammpstrj_structure: () => {
+      calls.push("parse_lammpstrj_structure");
+      return mockStructResult(3, 1);
+    },
     parse_xtc_file: xtcFn("parse_xtc_file"),
     parse_dcd_file: xtcFn("parse_dcd_file"),
     parse_netcdf_file: xtcFn("parse_netcdf_file"),
@@ -179,6 +183,15 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     expect(calls).toContain("parse_traj");
     expect(out.frames.length).toBe(1); // one extra frame
   });
+
+  it.each([["dump.lammpstrj"], ["run.dump"], ["md.trj"]])(
+    "routes a LAMMPS dump (%s) through the standalone structure parser",
+    async (filename) => {
+      const out = await sync.parseStructureFile(fakeFile(filename, "ITEM: TIMESTEP"));
+      expect(calls).toContain("parse_lammpstrj_structure");
+      expect(out.frames.length).toBe(1); // frame 0 is the snapshot; one extra frame
+    },
+  );
 
   it("parseStructureText defaults to PDB and honors fileName", async () => {
     await sync.parseStructureText("ATOM", "y.cif");

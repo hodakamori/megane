@@ -4,7 +4,11 @@ from pathlib import Path
 
 import numpy as np
 
-from megane.parsers.lammpstrj import InMemoryTrajectory, load_lammpstrj
+from megane.parsers.lammpstrj import (
+    InMemoryTrajectory,
+    load_lammpstrj,
+    load_lammpstrj_structure,
+)
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 
@@ -79,3 +83,40 @@ def test_variable_atom_count_lammpstrj():
     frame1 = trajectory.get_frame(1)
     assert frame1.shape == (3, 3)
     np.testing.assert_allclose(frame1[2], [3.0, 0.0, 0.0], atol=1e-5)
+
+
+def test_load_lammpstrj_structure():
+    """A dump loads standalone as (Structure, trajectory): frame-0 topology with
+    type-id element proxies, remaining frames streamed."""
+    structure, trajectory = load_lammpstrj_structure(str(FIXTURES / "water.lammpstrj"))
+
+    # Frame-0 topology.
+    assert structure.n_atoms == 3
+    # Element proxies are the integer LAMMPS type ids (atom 1 type 1, 2/3 type 2).
+    assert structure.elements.tolist() == [1, 2, 2]
+    np.testing.assert_allclose(structure.positions.reshape(3, 3)[0], [5.0, 5.0, 5.0], atol=1e-5)
+    expected_box = np.diag([10.0, 10.0, 10.0]).astype(np.float32)
+    np.testing.assert_allclose(structure.box.reshape(3, 3), expected_box, atol=1e-5)
+
+    # All three frames are available for playback; frame 0 == structure topology.
+    assert trajectory.n_frames == 3
+    assert trajectory.heterogeneous is False
+    np.testing.assert_allclose(trajectory.get_frame(0)[0], [5.0, 5.0, 5.0], atol=1e-5)
+    np.testing.assert_allclose(trajectory.get_frame(2)[0], [5.2, 5.2, 5.2], atol=1e-5)
+
+
+def test_load_lammpstrj_structure_from_trj_extension():
+    """The `.trj` extension loads identically to `.lammpstrj`."""
+    structure, trajectory = load_lammpstrj_structure(str(FIXTURES / "water.trj"))
+    assert structure.n_atoms == 3
+    assert trajectory.n_frames == 3
+
+
+def test_load_lammpstrj_structure_variable_atoms():
+    """A variable-atom dump loads standalone as a heterogeneous structure."""
+    structure, trajectory = load_lammpstrj_structure(str(FIXTURES / "hetero_atoms.lammpstrj"))
+    assert structure.n_atoms == 2  # frame-0 base topology
+    assert structure.elements.tolist() == [1, 1]
+    assert trajectory.heterogeneous is True
+    assert trajectory.n_frames == 2
+    assert trajectory.n_atoms_at(1) == 3
