@@ -371,10 +371,18 @@ export function parseResname(label: string): string {
  * Extract a residue sequence number from an atom label by reading the last run
  * of digits (e.g. "ALA42" → 42, "HOH" → NaN). Returns NaN when the label has no
  * trailing number, so a numeric `resid` comparison never matches those atoms.
+ *
+ * Implemented as a linear back-to-front scan rather than a regex: atom labels
+ * come from parsed files (untrusted input), and a lookahead like
+ * `/(\d+)(?!.*\d)/` has polynomial worst-case matching time (ReDoS).
  */
 export function parseResid(label: string): number {
-  const match = label.match(/(\d+)(?!.*\d)/);
-  return match ? parseInt(match[1], 10) : NaN;
+  const isDigit = (c: string) => c >= "0" && c <= "9";
+  let end = label.length;
+  while (end > 0 && !isDigit(label[end - 1])) end--;
+  let start = end;
+  while (start > 0 && isDigit(label[start - 1])) start--;
+  return start === end ? NaN : parseInt(label.slice(start, end), 10);
 }
 
 /**

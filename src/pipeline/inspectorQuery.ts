@@ -5,9 +5,17 @@
  * reused by both the chip builder and the 3D click "quick expand" actions.
  */
 
-/** Wrap a value in the double quotes the DSL requires for string comparisons. */
+/**
+ * Wrap a value in the double quotes the DSL requires for string comparisons.
+ *
+ * The selection DSL has no string-escape mechanism (its tokenizer reads raw
+ * characters up to the next quote), so a value can't contain a quote or a
+ * backslash. Element/residue/chain values never do, but we strip both defensively
+ * — removing the characters entirely rather than emitting escapes the tokenizer
+ * cannot decode (and avoids an incomplete-escaping footgun on untrusted labels).
+ */
 export function quoteValue(v: string): string {
-  return `"${v.replace(/"/g, '\\"')}"`;
+  return `"${v.replace(/["\\]/g, "")}"`;
 }
 
 /**
