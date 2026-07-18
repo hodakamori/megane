@@ -40,7 +40,7 @@ Filters atoms (and optionally bonds) by a selection query. See the
 "Atom & Bond Selection Query Language" section below for the full, authoritative
 grammar — only the syntax documented there is supported.
 - Parameters: `{ type: "filter", query: string, bond_query?: string }`
-  - `query`: atom selection (e.g. `element == "C"`, `index < 10`, `resname == "ALA"`, `element == "O" or element == "N"`)
+  - `query`: atom selection (e.g. `element == "C"`, `index < 10`, `resname == "ALA"`, `chain == "A"`, `resid == 42`, `within 5 of (resname == "HEM")`)
   - `bond_query`: optional bond selection (e.g. `both element != "H"`)
 - Inputs: `in` (accepts particle or bond data type)
 - Outputs: `out` (same type as input)

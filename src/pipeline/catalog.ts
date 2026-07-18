@@ -179,7 +179,7 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
       },
     ],
     promptNotes: [
-      '`query`: atom selection (e.g. `element == "C"`, `index < 10`, `resname == "ALA"`, `element == "O" or element == "N"`)',
+      '`query`: atom selection (e.g. `element == "C"`, `index < 10`, `resname == "ALA"`, `chain == "A"`, `resid == 42`, `within 5 of (resname == "HEM")`)',
       '`bond_query`: optional bond selection (e.g. `both element != "H"`)',
     ],
     promptInputs: "`in` (accepts particle or bond data type)",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { summarizeStructure } from "@/ai/structureSummary";
+import { summarizeStructure, getStructureFacts } from "@/ai/structureSummary";
 import type { Snapshot } from "@/types";
 
 /** Build a minimal Snapshot for testing. Carbon=6, Hydrogen=1, Oxygen=8. */
@@ -83,5 +83,49 @@ describe("summarizeStructure", () => {
 
     const withoutCell = summarizeStructure(makeSnapshot([6]), null);
     expect(withoutCell).toContain("Unit cell: no");
+  });
+});
+
+describe("getStructureFacts", () => {
+  it("returns null for no / empty structure", () => {
+    expect(getStructureFacts(null, null)).toBeNull();
+    expect(getStructureFacts(makeSnapshot([]), null)).toBeNull();
+  });
+
+  it("returns elements with counts, sorted descending", () => {
+    const facts = getStructureFacts(makeSnapshot([6, 6, 6, 1, 1, 8]), null)!;
+    expect(facts.nAtoms).toBe(6);
+    expect(facts.elements).toEqual([
+      { symbol: "C", count: 3 },
+      { symbol: "H", count: 2 },
+      { symbol: "O", count: 1 },
+    ]);
+  });
+
+  it("returns unique sorted resnames from labels", () => {
+    const facts = getStructureFacts(makeSnapshot([6, 6, 8, 8]), ["HOH2", "ALA1", "ALA1", "HOH3"])!;
+    expect(facts.resnames).toEqual(["ALA", "HOH"]);
+  });
+
+  it("returns empty resnames when labels are absent", () => {
+    const facts = getStructureFacts(makeSnapshot([6, 1]), null)!;
+    expect(facts.resnames).toEqual([]);
+  });
+
+  it("returns unique sorted chains, ignoring code 0", () => {
+    const snap = makeSnapshot([6, 6, 6, 6], {
+      atomChainIds: new Uint8Array([66, 65, 65, 0]), // 'B','A','A', none
+    });
+    const facts = getStructureFacts(snap, null)!;
+    expect(facts.chains).toEqual(["A", "B"]);
+  });
+
+  it("reports cell and bond presence", () => {
+    const facts = getStructureFacts(
+      makeSnapshot([6], { box: new Float32Array(9), nBonds: 3 }),
+      null,
+    )!;
+    expect(facts.hasCell).toBe(true);
+    expect(facts.nBonds).toBe(3);
   });
 });

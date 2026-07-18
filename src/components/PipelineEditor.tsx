@@ -52,6 +52,7 @@ import { StreamingNode } from "./nodes/StreamingNode";
 import { LoadVolumetricNode } from "./nodes/LoadVolumetricNode";
 import { IsosurfaceNode } from "./nodes/IsosurfaceNode";
 import { PipelineChatBox } from "./PipelineChatBox";
+import { PipelineInspector } from "./PipelineInspector";
 import { RenderModal } from "./RenderModal";
 import { ShareDialog } from "./ShareDialog";
 import { startTour, startPipelineTutorial } from "../tour/MeganeTour";
@@ -853,6 +854,7 @@ function PipelineEditorInner({
 
   const TAB_OPTIONS: { value: PipelinePanelMode; label: string }[] = [
     { value: "editor", label: "Editor" },
+    { value: "inspector", label: "Inspector" },
     { value: "chat", label: "Chat" },
   ];
 
@@ -1061,6 +1063,22 @@ function PipelineEditorInner({
               />
             </ReactFlow>
           </div>
+        </div>
+        <div
+          role="tabpanel"
+          id="pipeline-tabpanel-inspector"
+          aria-labelledby="pipeline-tab-inspector"
+          aria-hidden={mode !== "inspector"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "var(--megane-surface-solid)",
+            visibility: mode === "inspector" ? "visible" : "hidden",
+          }}
+        >
+          <PipelineInspector />
         </div>
         <div
           role="tabpanel"

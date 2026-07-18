@@ -156,3 +156,49 @@ export function pickAtPixel(
 
   return null;
 }
+
+/** A rubber-band rectangle in client coordinates (any corner order). */
+export interface ClientRect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Return the indices of every atom whose projected center falls inside `rect`
+ * (a screen-space rubber-band box in client coordinates). Atoms behind the
+ * camera are ignored. Uses the same CPU projection as `pickAtPixel`, so it is
+ * consistent with click picking.
+ */
+export function atomsInRect(
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
+  container: HTMLElement,
+  snapshot: Snapshot,
+  currentPositions: Float32Array,
+  rect: ClientRect,
+): number[] {
+  const bounds = container.getBoundingClientRect();
+  const w = bounds.width;
+  const h = bounds.height;
+  const minX = Math.min(rect.x0, rect.x1) - bounds.left;
+  const maxX = Math.max(rect.x0, rect.x1) - bounds.left;
+  const minY = Math.min(rect.y0, rect.y1) - bounds.top;
+  const maxY = Math.max(rect.y0, rect.y1) - bounds.top;
+
+  const pos = currentPositions;
+  const result: number[] = [];
+  for (let i = 0; i < snapshot.nAtoms; i++) {
+    const { sx, sy, depth } = projectToScreen(
+      camera,
+      pos[i * 3],
+      pos[i * 3 + 1],
+      pos[i * 3 + 2],
+      w,
+      h,
+    );
+    if (depth <= 0) continue; // behind camera
+    if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) result.push(i);
+  }
+  return result;
+}
