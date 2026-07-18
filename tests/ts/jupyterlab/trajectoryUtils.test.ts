@@ -5,16 +5,20 @@ import {
 } from "../../../jupyterlab-megane/src/trajectoryUtils";
 
 describe("TRAJECTORY_ONLY_EXTENSIONS", () => {
-  it("includes all five trajectory-only extensions", () => {
+  it("includes the trajectory-only extensions", () => {
     expect(TRAJECTORY_ONLY_EXTENSIONS.has(".xtc")).toBe(true);
     expect(TRAJECTORY_ONLY_EXTENSIONS.has(".dcd")).toBe(true);
-    expect(TRAJECTORY_ONLY_EXTENSIONS.has(".lammpstrj")).toBe(true);
-    expect(TRAJECTORY_ONLY_EXTENSIONS.has(".dump")).toBe(true);
     expect(TRAJECTORY_ONLY_EXTENSIONS.has(".nc")).toBe(true);
   });
 
   it("does not include structure-file extensions", () => {
     for (const ext of [".pdb", ".gro", ".xyz", ".mol", ".sdf", ".cif", ".traj", ".data"]) {
+      expect(TRAJECTORY_ONLY_EXTENSIONS.has(ext)).toBe(false);
+    }
+  });
+
+  it("does not include LAMMPS dump extensions (they load standalone as structures)", () => {
+    for (const ext of [".lammpstrj", ".dump", ".trj"]) {
       expect(TRAJECTORY_ONLY_EXTENSIONS.has(ext)).toBe(false);
     }
   });
@@ -29,12 +33,10 @@ describe("isTrajectoryOnly", () => {
     expect(isTrajectoryOnly("run.dcd")).toBe(true);
   });
 
-  it("returns true for .lammpstrj files", () => {
-    expect(isTrajectoryOnly("dump.lammpstrj")).toBe(true);
-  });
-
-  it("returns true for .dump files", () => {
-    expect(isTrajectoryOnly("lammps.dump")).toBe(true);
+  it("returns false for LAMMPS dump files (they load standalone as structures)", () => {
+    expect(isTrajectoryOnly("dump.lammpstrj")).toBe(false);
+    expect(isTrajectoryOnly("lammps.dump")).toBe(false);
+    expect(isTrajectoryOnly("run.trj")).toBe(false);
   });
 
   it("returns true for .nc files (AMBER NetCDF)", () => {
@@ -54,7 +56,7 @@ describe("isTrajectoryOnly", () => {
   it("is case-insensitive", () => {
     expect(isTrajectoryOnly("TRAJ.XTC")).toBe(true);
     expect(isTrajectoryOnly("RUN.DCD")).toBe(true);
-    expect(isTrajectoryOnly("DUMP.LAMMPSTRJ")).toBe(true);
+    expect(isTrajectoryOnly("RUN.NC")).toBe(true);
   });
 
   it("returns false for filenames with no extension", () => {

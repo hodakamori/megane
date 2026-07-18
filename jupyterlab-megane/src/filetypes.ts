@@ -99,7 +99,7 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
   {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
-    extensions: [".lammpstrj", ".dump"],
+    extensions: [".lammpstrj", ".dump", ".trj"],
     mimeTypes: ["chemical/x-lammps-dump"],
     fileFormat: "text",
     contentType: "file",

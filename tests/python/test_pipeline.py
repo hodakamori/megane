@@ -279,6 +279,15 @@ class TestPipelineAddNode:
         n2 = pipe.add_node(Filter(query="b"))
         assert n1._id != n2._id
 
+    def test_load_structure_accepts_lammps_dump(self):
+        # A LAMMPS dump opens standalone via LoadStructure: frame-0 topology with
+        # integer atom `type` ids as element proxies.
+        pipe = Pipeline()
+        n = pipe.add_node(LoadStructure(str(FIXTURES / "water.trj")))
+        structure = pipe._structures[n._id]
+        assert structure.n_atoms == 3
+        assert structure.elements.tolist() == [1, 2, 2]
+
     def test_add_node_returns_same_instance(self):
         pipe = Pipeline()
         original = Filter(query="test")
@@ -1058,8 +1067,21 @@ class TestViewTrajWrapper:
         assert viewer.total_frames > 0
 
     def test_raises_without_trajectory(self):
-        with pytest.raises(ValueError, match=r"Either 'xtc', 'traj', or 'xyz'"):
+        with pytest.raises(ValueError, match=r"Either 'xtc', 'traj', 'xyz', or 'lammpstrj'"):
             view_traj(str(FIXTURES / "1crn.pdb"))
+
+    def test_auto_detects_lammps_dump(self):
+        # A self-contained .trj/.lammpstrj loads standalone: LoadStructure(path)
+        # supplies the topology, LoadTrajectory(lammpstrj=path) the frames.
+        from megane.widget import MolecularViewer
+
+        viewer = view_traj(str(FIXTURES / "water.trj"))
+        assert isinstance(viewer, MolecularViewer)
+        pipe = viewer._pipeline_ref
+        node_types = [cfg["type"] for _, cfg in pipe._nodes.values()]
+        assert "load_structure" in node_types
+        assert "load_trajectory" in node_types
+        assert viewer.total_frames > 0
 
     def test_returns_molecular_viewer_traj(self):
         from megane.widget import MolecularViewer

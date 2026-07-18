@@ -4,8 +4,13 @@
  *
  * Used by both MeganeDocWidget (JupyterLab) and the VSCode webview to decide
  * whether to route an opened file through the trajectory loader path.
+ *
+ * Note: LAMMPS dump (`.lammpstrj` / `.dump` / `.trj`) is intentionally NOT here.
+ * A dump carries per-atom `type` ids and coordinates, so it is opened standalone
+ * as a multi-frame structure (topology derived from frame 0) via the structure
+ * loader path, exactly like a multi-frame XYZ or ASE `.traj`.
  */
-export const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".dcd", ".lammpstrj", ".dump", ".nc"]);
+export const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".dcd", ".nc"]);
 
 /**
  * Returns true when `filename` maps to a trajectory-only format that needs a

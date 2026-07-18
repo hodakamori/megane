@@ -48,8 +48,18 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.traj";
-const STRUCTURE_EXTS = [".pdb", ".gro", ".xyz", ".mol", ".sdf", ".traj"];
+const STRUCTURE_ACCEPT = ".pdb,.gro,.xyz,.mol,.sdf,.traj,.lammpstrj,.dump,.trj";
+const STRUCTURE_EXTS = [
+  ".pdb",
+  ".gro",
+  ".xyz",
+  ".mol",
+  ".sdf",
+  ".traj",
+  ".lammpstrj",
+  ".dump",
+  ".trj",
+];
 const BOND_FILE_ACCEPT = ".pdb,.top";
 const BOND_FILE_EXTS = [".pdb", ".top"];
 
@@ -296,8 +306,8 @@ export function Sidebar({
           />
           {trajectory.source === "file" && (
             <DropZone
-              accept=".xtc,.lammpstrj,.dump,.dcd,.nc"
-              exts={[".xtc", ".lammpstrj", ".dump", ".dcd", ".nc"]}
+              accept=".xtc,.lammpstrj,.dump,.trj,.dcd,.nc"
+              exts={[".xtc", ".lammpstrj", ".dump", ".trj", ".dcd", ".nc"]}
               onFile={trajectory.onUploadXtc}
               label="Load trajectory..."
               testId="trajectory-upload"

@@ -402,6 +402,16 @@ fn parse_lammpstrj(py: Python<'_>, text: &str) -> PyResult<PyTrajectoryData> {
     py_trajectory_from_data(py, data)
 }
 
+/// Parse a LAMMPS dump as a standalone multi-frame structure (frame-0 topology
+/// + extra frames). Element identities are the integer LAMMPS `type` ids used
+/// as an atomic-number proxy; bonds are inferred from frame 0.
+#[pyfunction]
+fn parse_lammpstrj_structure(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let parsed =
+        megane_core::lammpstrj::parse_lammpstrj_structure(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, parsed)
+}
+
 /// Parse an AMBER NetCDF trajectory binary and return frame data.
 #[pyfunction]
 fn parse_netcdf(py: Python<'_>, data: &[u8]) -> PyResult<PyTrajectoryData> {
@@ -485,6 +495,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_dcd, m)?)?;
     m.add_function(wrap_pyfunction!(parse_traj, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammpstrj, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_lammpstrj_structure, m)?)?;
     m.add_function(wrap_pyfunction!(parse_netcdf, m)?)?;
     m.add_function(wrap_pyfunction!(parse_psf_bonds, m)?)?;
     m.add_function(wrap_pyfunction!(infer_bonds_vdw, m)?)?;

@@ -63,10 +63,10 @@ describe("jupyterlab filetypes", () => {
     expect(lammps?.extensions).toEqual([".data", ".lammps"]);
   });
 
-  it("registers both .lammpstrj and .dump for the LAMMPS-dump filetype", () => {
+  it("registers .lammpstrj, .dump, and .trj for the LAMMPS-dump filetype", () => {
     const dump = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-lammps-dump");
     expect(dump).toBeDefined();
-    expect(dump?.extensions).toEqual([".lammpstrj", ".dump"]);
+    expect(dump?.extensions).toEqual([".lammpstrj", ".dump", ".trj"]);
     expect(dump?.fileFormat).toBe("text");
   });
 
