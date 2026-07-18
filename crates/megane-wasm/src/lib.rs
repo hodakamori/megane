@@ -55,6 +55,7 @@ pub struct ParseResult {
     bonds: Vec<u32>,
     bond_orders: Vec<u8>,
     box_matrix: Vec<f32>,
+    box_origin: Vec<f32>,
     frame_data: Vec<f32>,
     atom_labels: String,
     chain_ids: Vec<u8>,
@@ -175,6 +176,12 @@ impl ParseResult {
     /// Cell matrix as Float32Array (9 floats, row-major 3x3)
     pub fn box_matrix(&self) -> Float32Array {
         Float32Array::from(&self.box_matrix[..])
+    }
+
+    /// Box origin (lower corner) as Float32Array (3 floats), or empty when the
+    /// format carries no explicit origin (⇒ treat as (0,0,0)).
+    pub fn box_origin(&self) -> Float32Array {
+        Float32Array::from(&self.box_origin[..])
     }
 
     /// All additional frame positions concatenated as Float32Array
@@ -309,6 +316,7 @@ impl ParseResult {
             .unwrap_or_else(|| vec![1u8; data.bonds.len()]);
         let has_box = data.box_matrix.is_some();
         let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        let box_origin = data.box_origin.map(|o| o.to_vec()).unwrap_or_default();
         // Core already stores extra frames as one contiguous buffer — move it out,
         // no flatten copy and no 2× peak. Derive the frame count from the moved
         // buffer to avoid borrowing `data` after earlier partial moves.
@@ -385,6 +393,7 @@ impl ParseResult {
             bonds: bonds_flat,
             bond_orders,
             box_matrix,
+            box_origin,
             frame_data,
             atom_labels,
             chain_ids,
@@ -419,6 +428,7 @@ pub struct XtcParseResult {
     timestep_ps: f32,
     has_box: bool,
     box_matrix: Vec<f32>,
+    box_origin: Vec<f32>,
     frame_data: Vec<f32>,
     vector_channel_count: u32,
     vector_channel_meta: String,
@@ -458,6 +468,11 @@ impl XtcParseResult {
 
     pub fn box_matrix(&self) -> Float32Array {
         Float32Array::from(&self.box_matrix[..])
+    }
+
+    /// Box origin (lower corner, 3 floats), or empty ⇒ (0,0,0).
+    pub fn box_origin(&self) -> Float32Array {
+        Float32Array::from(&self.box_origin[..])
     }
 
     /// All frame positions concatenated (n_frames * n_atoms * 3 floats).
@@ -534,6 +549,7 @@ impl XtcParseResult {
     fn from_trajectory(data: megane_core::trajectory::TrajectoryData) -> Self {
         let has_box = data.box_matrix.is_some();
         let box_matrix = data.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        let box_origin = data.box_origin.map(|o| o.to_vec()).unwrap_or_default();
         let n_atoms = data.n_atoms as u32;
         let n_frames = data.n_frames as u32;
         let timestep_ps = data.timestep_ps;
@@ -578,6 +594,7 @@ impl XtcParseResult {
             timestep_ps,
             has_box,
             box_matrix,
+            box_origin,
             frame_data,
             vector_channel_count,
             vector_channel_meta,
@@ -664,6 +681,12 @@ impl XtcDecoder {
         Float32Array::from(&self.box_matrix[..])
     }
 
+    /// Box origin — always empty for XTC (coordinates are absolute, box at
+    /// origin). Present for interface parity with the LAMMPS-dump decoder.
+    pub fn box_origin(&self) -> Float32Array {
+        Float32Array::new_with_length(0)
+    }
+
     /// Per-frame time stamps (ps).
     pub fn times(&self) -> Float32Array {
         Float32Array::from(&self.times[..])
@@ -694,6 +717,7 @@ pub struct LammpstrjDecoder {
     timestep_ps: f32,
     has_box: bool,
     box_matrix: Vec<f32>,
+    box_origin: Vec<f32>,
     /// Newline-joined vector channel names (velocity/force), in decode order.
     vector_channel_names: Vec<String>,
     heterogeneous: bool,
@@ -707,6 +731,7 @@ impl LammpstrjDecoder {
         let idx = lammpstrj::build_index(&text).map_err(|e| JsError::new(&e))?;
         let has_box = idx.box_matrix.is_some();
         let box_matrix = idx.box_matrix.map(|m| m.to_vec()).unwrap_or_default();
+        let box_origin = idx.box_origin.map(|o| o.to_vec()).unwrap_or_default();
         Ok(LammpstrjDecoder {
             text,
             offsets: idx.offsets,
@@ -715,6 +740,7 @@ impl LammpstrjDecoder {
             timestep_ps: idx.timestep_ps,
             has_box,
             box_matrix,
+            box_origin,
             vector_channel_names: idx.vector_channel_names,
             heterogeneous: idx.heterogeneous,
         })
@@ -744,6 +770,10 @@ impl LammpstrjDecoder {
     }
     pub fn box_matrix(&self) -> Float32Array {
         Float32Array::from(&self.box_matrix[..])
+    }
+    /// Box origin (lower corner, 3 floats), or empty ⇒ (0,0,0).
+    pub fn box_origin(&self) -> Float32Array {
+        Float32Array::from(&self.box_origin[..])
     }
     /// Number of per-atom vector channels (velocity/force).
     #[wasm_bindgen(getter)]

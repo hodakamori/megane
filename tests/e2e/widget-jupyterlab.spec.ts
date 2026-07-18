@@ -54,6 +54,9 @@ const FORMATS: WidgetFormatFixture[] = [
   { id: "pdb-water-wrapped", file: "water_wrapped.pdb" },
   { id: "pdb-caffeine-water", file: "caffeine_water.pdb" },
   { id: "xyz-si-diamond", file: "si_diamond.xyz" },
+  // Offset simulation box (LAMMPS): exercises the box-origin path through the
+  // Python→JS binary protocol so the widget draws the cell around its atoms.
+  { id: "lammps-offset-box", file: "confined_offset.data", expectedAtoms: 64 },
 ];
 
 let lab: JupyterLabHandle | null = null;

@@ -598,6 +598,7 @@ pub fn parse_traj(data: &[u8]) -> Result<ParsedStructure, String> {
         n_file_bonds: 0,
         bond_orders: None,
         box_matrix,
+        box_origin: None,
         frame_positions_flat,
         atom_labels: None,
         chain_ids: None,

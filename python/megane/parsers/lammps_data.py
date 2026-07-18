@@ -32,4 +32,5 @@ def load_lammps_data(path: str) -> Structure:
         bonds=np.asarray(result.bonds, dtype=np.uint32),
         bond_orders=np.asarray(result.bond_orders, dtype=np.uint8),
         box=np.asarray(result.box_matrix, dtype=np.float32),
+        box_origin=np.asarray(result.box_origin, dtype=np.float32),
     )

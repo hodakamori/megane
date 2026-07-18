@@ -41,9 +41,17 @@ export function computeViewBounds(snapshot: Snapshot): {
 
   if (hasBox) {
     const box = snapshot.box!;
-    cx = (box[0] + box[3] + box[6]) / 2;
-    cy = (box[1] + box[4] + box[7]) / 2;
-    cz = (box[2] + box[5] + box[8]) / 2;
+    // The cell is anchored at its world-space origin (lower corner). Include it
+    // so the camera frames the cell where the (absolute) atoms actually are,
+    // not at world zero. Null/short origin ⇒ (0,0,0), unchanged behavior.
+    const origin =
+      snapshot.boxOrigin && snapshot.boxOrigin.length === 3 ? snapshot.boxOrigin : null;
+    const ox = origin ? origin[0] : 0;
+    const oy = origin ? origin[1] : 0;
+    const oz = origin ? origin[2] : 0;
+    cx = ox + (box[0] + box[3] + box[6]) / 2;
+    cy = oy + (box[1] + box[4] + box[7]) / 2;
+    cz = oz + (box[2] + box[5] + box[8]) / 2;
 
     const va = [box[0], box[1], box[2]];
     const vb = [box[3], box[4], box[5]];
@@ -51,9 +59,9 @@ export function computeViewBounds(snapshot: Snapshot): {
     for (let ia = 0; ia <= 1; ia++) {
       for (let ib = 0; ib <= 1; ib++) {
         for (let ic = 0; ic <= 1; ic++) {
-          const vx = ia * va[0] + ib * vb[0] + ic * vc[0];
-          const vy = ia * va[1] + ib * vb[1] + ic * vc[1];
-          const vz = ia * va[2] + ib * vb[2] + ic * vc[2];
+          const vx = ox + ia * va[0] + ib * vb[0] + ic * vc[0];
+          const vy = oy + ia * va[1] + ib * vb[1] + ic * vc[1];
+          const vz = oz + ia * va[2] + ib * vb[2] + ic * vc[2];
           minX = Math.min(minX, vx);
           minY = Math.min(minY, vy);
           minZ = Math.min(minZ, vz);

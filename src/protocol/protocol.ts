@@ -16,6 +16,7 @@ export const MSG_METADATA = 2;
 const HAS_BOND_ORDERS = 0x01;
 const HAS_BOX = 0x02;
 const HAS_FRAME_ELEMENTS = 0x04;
+const HAS_BOX_ORIGIN = 0x08;
 
 export function decodeHeader(buffer: ArrayBuffer): {
   msgType: number;
@@ -70,6 +71,13 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
     offset += 9 * 4;
   }
 
+  // Box origin (optional, if HAS_BOX_ORIGIN flag) — follows the box.
+  let boxOrigin: Float32Array | null = null;
+  if (flags & HAS_BOX_ORIGIN) {
+    boxOrigin = new Float32Array(buffer, offset, 3);
+    offset += 3 * 4;
+  }
+
   return {
     nAtoms,
     nBonds,
@@ -79,6 +87,7 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
     bonds,
     bondOrders,
     box,
+    boxOrigin,
     atomChainIds: null,
     atomBFactors: null,
   };

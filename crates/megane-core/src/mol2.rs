@@ -213,6 +213,7 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
         n_file_bonds,
         bond_orders: Some(bond_orders),
         box_matrix: None,
+        box_origin: None,
         frame_positions_flat: Vec::new(),
         atom_labels: Some(atom_labels),
         chain_ids: None,

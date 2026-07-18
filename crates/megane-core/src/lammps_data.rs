@@ -464,6 +464,15 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         None
     };
 
+    // Preserve the box origin (lower corner) so the cell is drawn at its true
+    // world-space location. LAMMPS atom coords are absolute, so without this the
+    // wireframe cell (anchored at 0,0,0) would sit far from an offset structure.
+    let box_origin = if hd.has_box {
+        Some([hd.xlo, hd.ylo, hd.zlo])
+    } else {
+        None
+    };
+
     let atom_labels = if atoms.labels.iter().any(|l| !l.is_empty()) {
         Some(atoms.labels)
     } else {
@@ -478,6 +487,7 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         n_file_bonds,
         bond_orders: None,
         box_matrix,
+        box_origin,
         frame_positions_flat: Vec::new(),
         atom_labels,
         chain_ids: None,
@@ -546,6 +556,66 @@ Atoms # atomic
         assert!((bm[0] - 10.0).abs() < 1e-5);
         assert!((bm[4] - 10.0).abs() < 1e-5);
         assert!((bm[8] - 10.0).abs() < 1e-5);
+        // Origin at the world origin for a 0-based box.
+        assert_eq!(result.box_origin, Some([0.0, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn test_parse_offset_box_origin() {
+        // A box offset far from the origin (as in a confined/slab simulation):
+        // the origin (lo corner) must be preserved so the cell is drawn around
+        // the atoms, while box_matrix keeps only the edge lengths.
+        let data = "\
+LAMMPS data file
+
+2 atoms
+1 atom types
+
+160.0 240.0 xlo xhi
+0.0 150.0 ylo yhi
+600.0 900.0 zlo zhi
+
+Masses
+
+1 12.011
+
+Atoms # atomic
+
+1 1 165.0 10.0 605.0
+2 1 200.0 75.0 750.0
+";
+        let result = parse(data).expect("parse failed");
+        // Origin is the lower corner (xlo, ylo, zlo).
+        assert_eq!(result.box_origin, Some([160.0, 0.0, 600.0]));
+        // box_matrix carries edge lengths only (xhi-xlo, yhi-ylo, zhi-zlo).
+        let bm = result.box_matrix.unwrap();
+        assert!((bm[0] - 80.0).abs() < 1e-5);
+        assert!((bm[4] - 150.0).abs() < 1e-5);
+        assert!((bm[8] - 300.0).abs() < 1e-5);
+        // Atom coordinates stay absolute (unshifted).
+        assert!((result.positions[0] - 165.0).abs() < 1e-5);
+        assert!((result.positions[5] - 750.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_no_box_has_no_origin() {
+        let data = "\
+LAMMPS data file
+
+1 atoms
+1 atom types
+
+Masses
+
+1 12.011
+
+Atoms # atomic
+
+1 1 1.0 2.0 3.0
+";
+        let result = parse(data).expect("parse failed");
+        assert_eq!(result.box_matrix, None);
+        assert_eq!(result.box_origin, None);
     }
 
     #[test]

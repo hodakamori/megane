@@ -359,6 +359,7 @@ pub fn parse_netcdf(data: &[u8]) -> Result<TrajectoryData, String> {
         n_frames,
         timestep_ps,
         box_matrix,
+        box_origin: None,
         frame_positions_flat,
         vector_channels: vec![],
         hetero,
