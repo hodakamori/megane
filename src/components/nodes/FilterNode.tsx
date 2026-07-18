@@ -100,7 +100,9 @@ export function FilterNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
       />
       {error && <div style={errorStyle}>{error}</div>}
       {!error && !localQuery && (
-        <div style={hintStyle}>element, index, x, y, z, resname, mass, molecule_id</div>
+        <div style={hintStyle}>
+          element, index, x, y, z, resname, resid, chain, mass, molecule_id · within R of (…)
+        </div>
       )}
       <input
         value={localBondQuery}

@@ -26,6 +26,7 @@ import { createDefaultPipeline, createDemoPipeline, createEmptyPipeline } from "
 import { PIPELINE_TEMPLATES } from "./templates";
 import { getLayoutedElements } from "./layout";
 import { performOpenFile, type OpenFileOptions } from "./openFile";
+import { reconcileInspectorLayers, isInspectorId, type InspectorLayer } from "./inspectorSync";
 
 let nextNodeId = 1;
 
@@ -112,6 +113,12 @@ export interface PipelineStore {
   // updates inside a single store transaction so the post-deserialize
   // execute() sees the matching per-node snapshots.
   loadPipeline: (json: SerializedPipeline, nodeSnapshots: Record<string, NodeSnapshotData>) => void;
+
+  // Selection Inspector: replace the Inspector-owned subgraph with the nodes
+  // realizing `layers` (filter → color/representation/modify → viewport),
+  // branching from whatever currently feeds viewport.particle so replicate /
+  // supercell effects are preserved. Non-Inspector nodes are left untouched.
+  setInspectorLayers: (layers: InspectorLayer[]) => void;
 
   // Templates
   pendingTemplateId: string | null;
@@ -545,6 +552,33 @@ const pipelineStateCreator: StateCreator<PipelineStore> = (set, get, api) => ({
       nodeSnapshots: { ...nodeSnapshots },
       snapshot: primarySnapshot,
     });
+    get().execute();
+  },
+
+  setInspectorLayers: (layers) => {
+    const { nodes, edges } = get();
+    const viewport = nodes.find((n) => n.type === "viewport");
+    if (!viewport) return;
+
+    // Prefer the node currently feeding viewport.particle (e.g. replicate) as
+    // the branch source so filtered layers inherit any supercell expansion.
+    const baseEdge = edges.find(
+      (e) =>
+        e.target === viewport.id &&
+        (e.targetHandle ?? "") === "particle" &&
+        !isInspectorId(e.source),
+    );
+    let source: { nodeId: string; handle: string } | null = null;
+    if (baseEdge) {
+      source = { nodeId: baseEdge.source, handle: baseEdge.sourceHandle ?? "particle" };
+    } else {
+      const loader = nodes.find((n) => n.type === "load_structure");
+      if (loader) source = { nodeId: loader.id, handle: "particle" };
+    }
+    if (!source) return;
+
+    const next = reconcileInspectorLayers(nodes, edges, layers, source, viewport.id);
+    set({ nodes: next.nodes, edges: next.edges });
     get().execute();
   },
 

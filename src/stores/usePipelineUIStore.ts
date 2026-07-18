@@ -11,7 +11,7 @@
 
 import { create } from "zustand";
 
-export type PipelinePanelMode = "editor" | "chat";
+export type PipelinePanelMode = "editor" | "chat" | "inspector";
 
 export interface PipelineAppliedNotice {
   kind: "applied";
@@ -26,7 +26,10 @@ function loadMode(): PipelinePanelMode {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && (parsed.mode === "editor" || parsed.mode === "chat")) {
+      if (
+        parsed &&
+        (parsed.mode === "editor" || parsed.mode === "chat" || parsed.mode === "inspector")
+      ) {
         return parsed.mode;
       }
     }

@@ -21,6 +21,10 @@ import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJ
 import type { StructureParseResult } from "../parsers/structure";
 import { processPbcBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
+import { usePipelineUIStore } from "../stores/usePipelineUIStore";
+import { useInspectorInteractionStore } from "../stores/useInspectorInteractionStore";
+import { getElementSymbol } from "../constants";
+import { parseResname, computeMoleculeIds } from "../pipeline/selection";
 import { usePlaybackStore } from "../stores/usePlaybackStore";
 import { useViewStateStore } from "../stores/useViewStateStore";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
@@ -125,6 +129,30 @@ export function MeganeViewer({
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
     useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
+
+  // Selection Inspector ⇄ 3D view bridge.
+  const inspectorActive = usePipelineUIStore((s) => s.mode === "inspector");
+  const previewIndices = useInspectorInteractionStore((s) => s.previewIndices);
+  const boxSelectActive = useInspectorInteractionStore((s) => s.boxSelectActive);
+  const publishBoxResult = useInspectorInteractionStore((s) => s.publishBoxResult);
+  const publishPickedAtom = useInspectorInteractionStore((s) => s.publishPickedAtom);
+
+  const handleInspectorPick = useCallback(
+    (atomIndex: number) => {
+      const { snapshot: snap, atomLabels } = usePipelineStore.getState();
+      if (!snap) return;
+      const chainCode = snap.atomChainIds?.[atomIndex] ?? 0;
+      const molIds = snap.bonds.length > 0 ? computeMoleculeIds(snap.bonds, snap.nAtoms) : null;
+      publishPickedAtom({
+        index: atomIndex,
+        element: getElementSymbol(snap.elements[atomIndex]),
+        resname: atomLabels?.[atomIndex] ? parseResname(atomLabels[atomIndex]) : null,
+        chain: chainCode === 0 ? null : String.fromCharCode(chainCode),
+        moleculeId: molIds ? molIds[atomIndex] : null,
+      });
+    },
+    [publishPickedAtom],
+  );
 
   useEffect(() => {
     pipelineCollapsedRef.current = pipelineCollapsed;
@@ -420,6 +448,11 @@ export function MeganeViewer({
         onHover={setHoverInfo}
         onAtomRightClick={handleAtomRightClick}
         onFrameUpdated={handleFrameUpdated}
+        previewIndices={previewIndices}
+        boxSelectActive={boxSelectActive}
+        onBoxSelect={publishBoxResult}
+        onInspectorPick={handleInspectorPick}
+        inspectorActive={inspectorActive}
       />
       <div
         ref={tourAnchorRef}

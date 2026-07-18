@@ -114,19 +114,28 @@ Query      := OrExpr
 OrExpr     := AndExpr ("or" AndExpr)*
 AndExpr    := NotExpr ("and" NotExpr)*
 NotExpr    := "not" NotExpr | Atom
-Atom       := Comparison | "(" OrExpr ")" | "all" | "none"
+Atom       := Comparison | Within | "(" OrExpr ")" | "all" | "none"
+Within     := "within" Number "of" Atom
 Comparison := Field Op Value
-Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass" | "molecule_id"
+Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "resid"
+            | "chain" | "mass" | "molecule_id"
 Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
 Value      := QuotedString | Number
 \`\`\`
-- Fields are ONLY: \`element\`, \`index\`, \`x\`, \`y\`, \`z\`, \`resname\`, \`mass\`, \`molecule_id\`. No other field exists.
+- Fields are ONLY: \`element\`, \`index\`, \`x\`, \`y\`, \`z\`, \`resname\`, \`resid\`, \`chain\`, \`mass\`, \`molecule_id\`. No other field exists.
 - String values MUST be double-quoted: \`element == "C"\` (NOT \`element == C\`).
-  This applies to \`element\` and \`resname\`.
+  This applies to \`element\`, \`resname\`, and \`chain\`.
 - \`element\` compares the element symbol ("C", "Fe", …). \`index\` is the 0-based
   atom index. \`x\`/\`y\`/\`z\` are Cartesian coordinates (Å). \`mass\` is atomic mass.
   \`molecule_id\` is the 0-based connected-component (molecule) ID derived from
   bond connectivity — the molecule containing atom 0 is \`molecule_id == 0\`.
+- \`resname\` is the residue name (e.g. "ALA", "HOH"). \`resid\` is the residue
+  sequence number (e.g. \`resid == 42\`). \`chain\` is the single-character chain ID
+  (e.g. \`chain == "A"\`). \`resid\`/\`chain\` need the structure to carry that info
+  (proteins/PDB); atoms without it never match.
+- \`within R of (SEL)\` selects atoms within R ångström of ANY atom matched by the
+  inner expression SEL (the matched atoms are included). Use it for distance /
+  "around" selections, e.g. everything near a ligand or an active site.
 - An empty query or \`all\` selects every atom; \`none\` selects nothing.
 - Combine with \`and\`, \`or\`, \`not\`, and parentheses.
 
@@ -135,10 +144,14 @@ Valid examples:
 - \`element != "H"\` — all non-hydrogen (heavy) atoms
 - \`index >= 10 and index <= 19\` — atoms 10–19
 - \`resname == "HOH"\` — residues named HOH
+- \`resid == 42\` — every atom of residue 42
+- \`chain == "A"\` — every atom on chain A
 - \`element == "O" or element == "N"\` — oxygens or nitrogens
 - \`(x > 0 and x < 10) and element == "C"\` — carbons in an x-slab
 - \`mass > 32\` — atoms heavier than sulfur
 - \`not molecule_id == 0\` — every molecule except the first one
+- \`within 5 of (resname == "HEM")\` — everything within 5 Å of a HEM residue
+- \`element != "H" and within 4 of (chain == "B")\` — heavy atoms near chain B
 
 ### Bond query grammar
 \`\`\`
@@ -158,15 +171,17 @@ Field := "bond_index" | "atom_index" | "element" | "molecule_id"
 | --- | --- |
 | \`name CA\`, \`protein\`, \`backbone\`, \`sidechain\` | not supported (no per-atom-name / structural selection) |
 | \`water\`, \`resname HOH WAT\` | \`resname == "HOH"\` (use an actual resname from the loaded structure) |
-| \`chain A\` | not supported (chain selection is unavailable) |
-| \`within 5 of ...\`, distance-based | not supported |
-| \`resid 1-20\`, \`index 1 to 10\` | \`index >= 1 and index <= 10\` |
+| \`chain A\` | \`chain == "A"\` |
+| \`within 5 of resname LIG\` | \`within 5 of (resname == "LIG")\` (parenthesize the inner selection) |
+| \`resid 1-20\` | \`resid >= 1 and resid <= 20\` |
+| \`index 1 to 10\` | \`index >= 1 and index <= 10\` |
 | \`element C\` (unquoted) | \`element == "C"\` |
 | \`noh\`, \`heavy\`, "non-hydrogen" | \`element != "H"\` |
 
-If a request needs an unsupported selection (atom names, chains, distance,
-secondary structure), express the closest supported approximation with
-\`element\`/\`resname\`/\`index\`, or omit the filter rather than inventing syntax.
+If a request needs an unsupported selection (atom names, secondary structure),
+express the closest supported approximation with
+\`element\`/\`resname\`/\`resid\`/\`chain\`/\`index\`, or omit the filter rather than
+inventing syntax.
 
 ## Common Atomic Numbers
 H=1, C=6, N=7, O=8, F=9, Na=11, Mg=12, Al=13, Si=14, P=15, S=16, Cl=17, K=19, Ca=20, Ti=22, Fe=26, Zn=30, Sr=38

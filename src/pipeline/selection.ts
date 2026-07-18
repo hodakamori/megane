@@ -7,9 +7,11 @@
  *   OrExpr     := AndExpr ("or" AndExpr)*
  *   AndExpr    := NotExpr ("and" NotExpr)*
  *   NotExpr    := "not" NotExpr | Atom
- *   Atom       := Comparison | "(" OrExpr ")" | "all" | "none"
+ *   Atom       := Comparison | Within | "(" OrExpr ")" | "all" | "none"
+ *   Within     := "within" Number "of" Atom
  *   Comparison := Field Op Value
- *   Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "mass" | "molecule_id"
+ *   Field      := "element" | "index" | "x" | "y" | "z" | "resname" | "resid"
+ *               | "chain" | "mass" | "molecule_id"
  *   Op         := "==" | "!=" | ">" | "<" | ">=" | "<="
  *   Value      := QuotedString | Number
  *
@@ -18,6 +20,14 @@
  *   connectivity) that the atom belongs to. Atoms with no bonds form their
  *   own single-atom molecule. IDs are assigned in order of the smallest atom
  *   index in each component (the component containing atom 0 gets 0, etc.).
+ *   "chain": per-atom chain ID as a single character (e.g. "A"), derived from
+ *   `snapshot.atomChainIds`. Atoms without chain info compare as "".
+ *   "resid": residue sequence number parsed from the trailing digits of the
+ *   atom label (e.g. "ALA42" → 42). Atoms whose label has no trailing number
+ *   compare as NaN (never match a numeric comparison).
+ *   "within R of (SEL)": atoms lying within distance R (Å) of ANY atom
+ *   selected by the inner expression SEL (the selected atoms themselves are
+ *   included, being at distance 0).
  */
 
 import type { Snapshot } from "../types";
@@ -97,6 +107,8 @@ type TokenType =
   | "and"
   | "or"
   | "not"
+  | "within"
+  | "of"
   | "lparen"
   | "rparen"
   | "all"
@@ -108,7 +120,18 @@ interface Token {
   value: string;
 }
 
-const FIELDS = new Set(["element", "index", "x", "y", "z", "resname", "mass", "molecule_id"]);
+const FIELDS = new Set([
+  "element",
+  "index",
+  "x",
+  "y",
+  "z",
+  "resname",
+  "resid",
+  "chain",
+  "mass",
+  "molecule_id",
+]);
 
 function tokenize(query: string): Token[] {
   const tokens: Token[] = [];
@@ -196,6 +219,8 @@ function tokenize(query: string): Token[] {
       if (word === "and") tokens.push({ type: "and", value: word });
       else if (word === "or") tokens.push({ type: "or", value: word });
       else if (word === "not") tokens.push({ type: "not", value: word });
+      else if (word === "within") tokens.push({ type: "within", value: word });
+      else if (word === "of") tokens.push({ type: "of", value: word });
       else if (word === "all") tokens.push({ type: "all", value: word });
       else if (word === "none") tokens.push({ type: "none", value: word });
       else if (FIELDS.has(word)) tokens.push({ type: "field", value: word });
@@ -214,6 +239,7 @@ function tokenize(query: string): Token[] {
 
 type ASTNode =
   | { kind: "comparison"; field: string; op: string; value: string | number }
+  | { kind: "within"; radius: number; operand: ASTNode }
   | { kind: "and"; left: ASTNode; right: ASTNode }
   | { kind: "or"; left: ASTNode; right: ASTNode }
   | { kind: "not"; operand: ASTNode }
@@ -303,6 +329,16 @@ class Parser {
       return node;
     }
 
+    if (t.type === "within") {
+      this.advance();
+      const radiusToken = this.expect("number");
+      const radius = parseFloat(radiusToken.value);
+      if (isNaN(radius)) throw new Error("Invalid radius after 'within'");
+      this.expect("of");
+      const operand = this.parseAtom();
+      return { kind: "within", radius, operand };
+    }
+
     if (t.type === "field") {
       const field = this.advance().value;
       const op = this.expect("op").value;
@@ -331,6 +367,90 @@ export function parseResname(label: string): string {
   return match ? match[1] : label;
 }
 
+/**
+ * Extract a residue sequence number from an atom label by reading the last run
+ * of digits (e.g. "ALA42" → 42, "HOH" → NaN). Returns NaN when the label has no
+ * trailing number, so a numeric `resid` comparison never matches those atoms.
+ */
+export function parseResid(label: string): number {
+  const match = label.match(/(\d+)(?!.*\d)/);
+  return match ? parseInt(match[1], 10) : NaN;
+}
+
+/**
+ * Build a predicate selecting atoms within `radius` (Å) of any atom matched by
+ * `inner`. Uses a uniform spatial grid (cell size = radius) so the cost scales
+ * with local density rather than O(nAtoms · nSelected). The selected atoms
+ * themselves satisfy the predicate (distance 0). An empty inner selection
+ * yields a predicate that matches nothing.
+ */
+function buildWithinPredicate(
+  inner: (index: number) => boolean,
+  snapshot: Snapshot,
+  radius: number,
+): (index: number) => boolean {
+  const { positions, nAtoms } = snapshot;
+  const seeds: number[] = [];
+  for (let i = 0; i < nAtoms; i++) if (inner(i)) seeds.push(i);
+  if (seeds.length === 0) return () => false;
+
+  const r = radius;
+  const r2 = r * r;
+
+  // Radii <= 0 (or non-finite) can't drive a spatial grid; fall back to a
+  // direct scan over the (usually small) seed set.
+  if (!(r > 0)) {
+    return (i) => {
+      const x = positions[i * 3];
+      const y = positions[i * 3 + 1];
+      const z = positions[i * 3 + 2];
+      for (const j of seeds) {
+        const dx = x - positions[j * 3];
+        const dy = y - positions[j * 3 + 1];
+        const dz = z - positions[j * 3 + 2];
+        if (dx * dx + dy * dy + dz * dz <= r2) return true;
+      }
+      return false;
+    };
+  }
+
+  const grid = new Map<string, number[]>();
+  const cellKey = (cx: number, cy: number, cz: number) => `${cx},${cy},${cz}`;
+  for (const j of seeds) {
+    const cx = Math.floor(positions[j * 3] / r);
+    const cy = Math.floor(positions[j * 3 + 1] / r);
+    const cz = Math.floor(positions[j * 3 + 2] / r);
+    const key = cellKey(cx, cy, cz);
+    const cell = grid.get(key);
+    if (cell) cell.push(j);
+    else grid.set(key, [j]);
+  }
+
+  return (i) => {
+    const x = positions[i * 3];
+    const y = positions[i * 3 + 1];
+    const z = positions[i * 3 + 2];
+    const bx = Math.floor(x / r);
+    const by = Math.floor(y / r);
+    const bz = Math.floor(z / r);
+    for (let cx = bx - 1; cx <= bx + 1; cx++) {
+      for (let cy = by - 1; cy <= by + 1; cy++) {
+        for (let cz = bz - 1; cz <= bz + 1; cz++) {
+          const cell = grid.get(cellKey(cx, cy, cz));
+          if (!cell) continue;
+          for (const j of cell) {
+            const dx = x - positions[j * 3];
+            const dy = y - positions[j * 3 + 1];
+            const dz = z - positions[j * 3 + 2];
+            if (dx * dx + dy * dy + dz * dz <= r2) return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+}
+
 function compileAST(
   ast: ASTNode,
   snapshot: Snapshot,
@@ -354,6 +474,10 @@ function compileAST(
       const left = compileAST(ast.left, snapshot, atomLabels);
       const right = compileAST(ast.right, snapshot, atomLabels);
       return (i) => left(i) || right(i);
+    }
+    case "within": {
+      const inner = compileAST(ast.operand, snapshot, atomLabels);
+      return buildWithinPredicate(inner, snapshot, ast.radius);
     }
     case "comparison": {
       const { field, op, value } = ast;
@@ -379,6 +503,14 @@ function compileAST(
           case "resname":
             fieldValue = atomLabels?.[i] ? parseResname(atomLabels[i]) : "";
             break;
+          case "resid":
+            fieldValue = atomLabels?.[i] != null ? parseResid(atomLabels[i]) : NaN;
+            break;
+          case "chain": {
+            const code = snapshot.atomChainIds?.[i] ?? 0;
+            fieldValue = code === 0 ? "" : String.fromCharCode(code);
+            break;
+          }
           case "mass":
             fieldValue = getAtomicMass(snapshot.elements[i]);
             break;

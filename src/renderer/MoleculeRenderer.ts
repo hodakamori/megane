@@ -33,7 +33,7 @@ import { SurfaceRenderer } from "./SurfaceRenderer";
 import { LineRenderer } from "./LineRenderer";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE, LICORICE_RADIUS } from "../constants";
-import { pickAtPixel, projectToScreen } from "./Picking";
+import { pickAtPixel, projectToScreen, atomsInRect, type ClientRect } from "./Picking";
 import { computeMeasurement } from "./Selection";
 import { FpsCounter } from "./FpsCounter";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
@@ -77,6 +77,47 @@ const _testMode = (() => {
  */
 export function isMeganeTestMode(): boolean {
   return _testMode;
+}
+
+/** Remove and dispose every child of a THREE.Group (meshes and lines). */
+function clearGroup(group: THREE.Group): void {
+  while (group.children.length > 0) {
+    const child = group.children[0];
+    group.remove(child);
+    if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+      else child.material.dispose();
+    }
+  }
+}
+
+/** Draw translucent highlight spheres (1.6× atom radius) over the given atoms. */
+function drawHighlightSpheres(
+  group: THREE.Group,
+  atomIndices: number[],
+  positions: Float32Array,
+  elements: Uint8Array,
+  color: number,
+  opacity: number,
+): void {
+  for (const atomIdx of atomIndices) {
+    const r = getRadius(elements[atomIdx]) * BALL_STICK_ATOM_SCALE * 1.6;
+    const geo = new THREE.SphereGeometry(r, 16, 16);
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+    });
+    const sphere = new THREE.Mesh(geo, mat);
+    sphere.position.set(
+      positions[atomIdx * 3],
+      positions[atomIdx * 3 + 1],
+      positions[atomIdx * 3 + 2],
+    );
+    group.add(sphere);
+  }
 }
 
 interface MeganeTestReady {
@@ -312,6 +353,9 @@ export class MoleculeRenderer {
   // Atom selection & measurement
   private selectedAtoms: number[] = [];
   private selectionGroup = new THREE.Group();
+  // Inspector preview highlight — an arbitrary-size, uncapped set drawn in a
+  // distinct color, independent of the 4-atom measurement selection above.
+  private previewSelectionGroup = new THREE.Group();
 
   /** Mount the viewer into a DOM element. */
   mount(container: HTMLElement): void {
@@ -414,6 +458,7 @@ export class MoleculeRenderer {
 
     // Selection overlay group
     this.scene.add(this.selectionGroup);
+    this.scene.add(this.previewSelectionGroup);
 
     // Pivot marker (3D crosshair at rotation center)
     this.pivotMarker = new PivotMarker();
@@ -1569,6 +1614,41 @@ export class MoleculeRenderer {
     return { atoms: [...this.selectedAtoms] };
   }
 
+  /**
+   * Highlight an arbitrary set of atoms as a live "preview" of the Selection
+   * Inspector's current selection (green, translucent). Independent of the
+   * measurement selection. Pass `null` or `[]` to clear.
+   */
+  setPreviewSelection(atomIndices: number[] | null): void {
+    clearGroup(this.previewSelectionGroup);
+    if (!this.snapshot || !atomIndices || atomIndices.length === 0) return;
+    drawHighlightSpheres(
+      this.previewSelectionGroup,
+      atomIndices,
+      this.getCurrentPositions(),
+      this.snapshot.elements,
+      0x22c55e,
+      0.3,
+    );
+  }
+
+  /** Return the indices of atoms whose centers fall inside a screen rectangle. */
+  selectAtomsInRect(rect: ClientRect): number[] {
+    if (!this.container || !this.snapshot) return [];
+    return atomsInRect(
+      this.camera,
+      this.container,
+      this.snapshot,
+      this.getCurrentPositions(),
+      rect,
+    );
+  }
+
+  /** Enable/disable orbit controls (used to suspend camera rotation during a box drag). */
+  setControlsEnabled(enabled: boolean): void {
+    if (this.controls) this.controls.enabled = enabled;
+  }
+
   /** Clear all selected atoms. */
   clearSelection(): void {
     this.selectedAtoms = [];
@@ -1582,19 +1662,7 @@ export class MoleculeRenderer {
   }
 
   private updateSelectionVisuals(): void {
-    // Clear old visuals
-    while (this.selectionGroup.children.length > 0) {
-      const child = this.selectionGroup.children[0];
-      this.selectionGroup.remove(child);
-      if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
-        child.geometry.dispose();
-        if (Array.isArray(child.material)) {
-          child.material.forEach((m) => m.dispose());
-        } else {
-          child.material.dispose();
-        }
-      }
-    }
+    clearGroup(this.selectionGroup);
 
     if (!this.snapshot || this.selectedAtoms.length === 0) return;
 
@@ -1602,19 +1670,7 @@ export class MoleculeRenderer {
     const elements = this.snapshot.elements;
 
     // Highlight spheres
-    for (const atomIdx of this.selectedAtoms) {
-      const r = getRadius(elements[atomIdx]) * BALL_STICK_ATOM_SCALE * 1.6;
-      const geo = new THREE.SphereGeometry(r, 16, 16);
-      const mat = new THREE.MeshBasicMaterial({
-        color: 0x4285f4,
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
-      });
-      const sphere = new THREE.Mesh(geo, mat);
-      sphere.position.set(pos[atomIdx * 3], pos[atomIdx * 3 + 1], pos[atomIdx * 3 + 2]);
-      this.selectionGroup.add(sphere);
-    }
+    drawHighlightSpheres(this.selectionGroup, this.selectedAtoms, pos, elements, 0x4285f4, 0.35);
 
     // Connecting lines
     if (this.selectedAtoms.length >= 2) {

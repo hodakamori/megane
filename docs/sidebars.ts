@@ -38,6 +38,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         "guide/pipeline/index",
+        "guide/pipeline/inspector",
         "guide/pipeline/python",
         "guide/pipeline/typescript",
         "guide/pipeline/json",
