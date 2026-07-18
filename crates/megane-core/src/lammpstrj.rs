@@ -1537,7 +1537,10 @@ mod tests {
         let s = parse_lammpstrj_structure(sample_dump()).unwrap();
         assert_eq!(s.n_atoms, 3);
         // Frame 0 topology: id-sorted positions and type-id element proxies.
-        assert_eq!(s.positions, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
+        assert_eq!(
+            s.positions,
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
+        );
         assert_eq!(s.elements, vec![1u8, 2u8, 2u8]); // types of atoms 1,2,3
         assert!(s.box_matrix.is_some());
         // One extra frame beyond frame 0; uniform → no side table.
@@ -1613,7 +1616,7 @@ mod tests {
         assert!(!h.varies_atoms);
         assert!(!h.varies_topology);
         assert!(h.elements_flat.is_empty()); // topology constant
-        // Frame-0 box on the struct; extra frame's grown box in cells_flat.
+                                             // Frame-0 box on the struct; extra frame's grown box in cells_flat.
         assert!((s.box_matrix.unwrap()[0] - 10.0).abs() < 1e-5);
         assert_eq!(h.cells_flat.len(), 9); // one extra frame
         assert!((h.cells_flat[0] - 12.0).abs() < 1e-5);

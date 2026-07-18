@@ -1152,9 +1152,7 @@ def view_traj(
     import pathlib
 
     if sum(x is not None for x in (xtc, traj, xyz, lammpstrj)) > 1:
-        raise ValueError(
-            "Only one of 'xtc', 'traj', 'xyz', or 'lammpstrj' can be provided, not multiple."
-        )
+        raise ValueError("Only one of 'xtc', 'traj', 'xyz', or 'lammpstrj' can be provided, not multiple.")
 
     if xtc is None and traj is None and xyz is None and lammpstrj is None:
         ext = pathlib.Path(path).suffix.lower()
