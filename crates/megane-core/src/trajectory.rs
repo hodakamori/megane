@@ -83,6 +83,11 @@ pub struct TrajectoryData {
     pub n_frames: usize,
     pub timestep_ps: f32,
     pub box_matrix: Option<[f32; 9]>,
+    /// World-space lower corner of the simulation box (see
+    /// [`crate::parser::ParsedStructure::box_origin`]). `None` ⇒ origin at
+    /// `(0,0,0)`. Set only by formats that store an explicit box origin
+    /// (LAMMPS dump); constant across frames (frame-0 origin).
+    pub box_origin: Option<[f32; 3]>,
     /// Frame-major flat coordinates for ALL frames:
     /// `[frame0: x0,y0,z0,x1,…][frame1: …]…`. Length == `n_frames * n_atoms * 3`
     /// (or, when `hetero` carries `atom_offsets`, jagged and sliced by them).
@@ -161,6 +166,7 @@ mod tests {
             n_frames: 2,
             timestep_ps: 1.0,
             box_matrix: None,
+            box_origin: None,
             frame_positions_flat: vec![
                 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, // frame 0
                 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, // frame 1
@@ -201,6 +207,7 @@ mod tests {
             n_frames: 2,
             timestep_ps: 1.0,
             box_matrix: None,
+            box_origin: None,
             frame_positions_flat: vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
             vector_channels: vec![],
             hetero: Some(TrajHetero {

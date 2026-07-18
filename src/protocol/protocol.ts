@@ -79,6 +79,10 @@ export function decodeSnapshot(buffer: ArrayBuffer): Snapshot {
     bonds,
     bondOrders,
     box,
+    // The Python→JS binary protocol does not yet carry a box origin, so the
+    // widget path keeps the historical behavior (cell anchored at 0,0,0).
+    // Extending the protocol + Python encoder is a follow-up.
+    boxOrigin: null,
     atomChainIds: null,
     atomBFactors: null,
   };

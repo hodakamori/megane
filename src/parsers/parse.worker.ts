@@ -116,6 +116,7 @@ ctx.onmessage = async (e: MessageEvent<ParseRequest>) => {
       // Transfer the small index arrays (box, times) zero-copy.
       const transfer: Transferable[] = [index.times.buffer];
       if (index.box) transfer.push(index.box.buffer);
+      if (index.boxOrigin) transfer.push(index.boxOrigin.buffer);
       ctx.postMessage(
         { id: req.id, ok: true, op: "indexTrajectory", result: index } satisfies ParseResponse,
         transfer,

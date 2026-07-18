@@ -10,6 +10,11 @@ export interface Snapshot {
   bonds: Uint32Array; // length = nBonds * 2
   bondOrders: Uint8Array | null; // length = nBonds (1=single,2=double,3=triple,4=aromatic)
   box: Float32Array | null; // length = 9 (3x3 row-major cell vectors)
+  /** World-space lower corner (xlo,ylo,zlo) at which `box` is anchored, so the
+   *  cell is drawn where the (absolute) atom coordinates actually are. Length 3.
+   *  Null ⇒ origin at (0,0,0). Only formats with an explicit box origin
+   *  (LAMMPS data/dump) set it; others keep atoms near the origin. */
+  boxOrigin: Float32Array | null;
   /** Per-atom chain IDs as raw ASCII bytes (e.g. 65='A'). Null for formats without chain info. */
   atomChainIds: Uint8Array | null;
   /** Per-atom B-factors (temperature factors) in Å². Null for formats without B-factor info. */
@@ -80,6 +85,9 @@ export interface Frame {
   nBonds?: number;
   /** Per-frame 3×3 cell (length 9). Set only when the cell varies. */
   box?: Float32Array | null;
+  /** Per-frame box origin (length 3). Set only when the cell varies; otherwise
+   *  the renderer reuses the base snapshot's `boxOrigin`. */
+  boxOrigin?: Float32Array | null;
 }
 
 /** Trajectory metadata. */

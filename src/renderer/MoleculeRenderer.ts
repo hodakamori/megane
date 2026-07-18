@@ -521,7 +521,7 @@ export class MoleculeRenderer {
           this.cellRenderer = new CellRenderer();
           this.scene.add(this.cellRenderer.mesh);
         }
-        this.cellRenderer.loadBox(snapshot.box);
+        this.cellRenderer.loadBox(snapshot.box, snapshot.boxOrigin);
       }
       if (hasNonZero) {
         try {
@@ -576,7 +576,8 @@ export class MoleculeRenderer {
 
     // Per-frame unit cell (heterogeneous cell), independent of topology.
     if (frame.box) {
-      this.updateFrameCell(frame.box);
+      // Per-frame origin when the frame carries one, else reuse the snapshot's.
+      this.updateFrameCell(frame.box, frame.boxOrigin ?? this.snapshot?.boxOrigin ?? null);
     }
 
     this.cartoonRenderer?.updatePositions(frame.positions);
@@ -635,13 +636,13 @@ export class MoleculeRenderer {
   }
 
   /** Redraw the simulation cell for a heterogeneous per-frame cell. */
-  private updateFrameCell(box: Float32Array): void {
+  private updateFrameCell(box: Float32Array, origin?: Float32Array | null): void {
     if (!box.some((v) => v !== 0)) return;
     if (!this.cellRenderer) {
       this.cellRenderer = new CellRenderer();
       this.scene.add(this.cellRenderer.mesh);
     }
-    this.cellRenderer.loadBox(box);
+    this.cellRenderer.loadBox(box, origin);
     try {
       if (!this.cellAxesRenderer) {
         this.cellAxesRenderer = new CellAxesRenderer();

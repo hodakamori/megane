@@ -426,6 +426,9 @@ pub struct LammpstrjIndex {
     pub n_frames: usize,
     pub timestep_ps: f32,
     pub box_matrix: Option<[f32; 9]>,
+    /// World-space lower corner (frame-0 xlo,ylo,zlo) of the box. `None` ⇒
+    /// origin at `(0,0,0)`. Keeps offset dumps rendering inside their cell.
+    pub box_origin: Option<[f32; 3]>,
     /// Byte offset of each frame's "ITEM: TIMESTEP" line.
     pub offsets: Vec<usize>,
     /// Vector channel names (velocity/force) from the first frame's layout.
@@ -455,6 +458,7 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
     let mut timesteps: Vec<f64> = Vec::new();
     let mut n_atoms = 0usize;
     let mut box_matrix: Option<[f32; 9]> = None;
+    let mut box_origin: Option<[f32; 3]> = None;
     let mut vector_channel_names: Vec<String> = Vec::new();
     let mut heterogeneous = false;
     let mut i = 0usize;
@@ -469,6 +473,7 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
         if offsets.is_empty() {
             n_atoms = header.n_atoms;
             box_matrix = Some(header.box_matrix);
+            box_origin = Some([header.xlo, header.ylo, header.zlo]);
             vector_channel_names = header
                 .layout
                 .vector_groups
@@ -502,6 +507,7 @@ pub fn build_index(text: &str) -> Result<LammpstrjIndex, String> {
         n_frames: offsets.len(),
         timestep_ps,
         box_matrix,
+        box_origin,
         offsets,
         vector_channel_names,
         heterogeneous,
@@ -551,6 +557,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
     let mut timesteps: Vec<f64> = Vec::new();
     let mut n_atoms: usize = 0; // frame-0 atom count (the base topology)
     let mut box_matrix: Option<[f32; 9]> = None; // frame-0 box (representative)
+    let mut box_origin: Option<[f32; 3]> = None; // frame-0 box origin (lower corner)
     let mut i = 0;
     // Heterogeneous-frame tracking (variable atom count / cell / type). Nothing
     // is recorded until a channel is seen to vary, so a uniform dump keeps the
@@ -690,6 +697,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         };
         if box_matrix.is_none() {
             box_matrix = Some(frame_box);
+            box_origin = Some([lo[0] as f32, lo[1] as f32, lo[2] as f32]);
         }
         // Detect a per-frame cell change; backfill earlier frames with frame 0's
         // box the first time it diverges.
@@ -972,6 +980,7 @@ pub fn parse_lammpstrj(text: &str) -> Result<LammpstrjData, String> {
         n_frames,
         timestep_ps,
         box_matrix,
+        box_origin,
         frame_positions_flat,
         vector_channels,
         hetero,
@@ -1015,6 +1024,37 @@ mod tests {
         assert_eq!(data.n_atoms, 3);
         assert_eq!(data.n_frames, 2);
         assert_eq!(data.timestep_ps, 100.0);
+    }
+
+    #[test]
+    fn test_box_origin_zero_for_origin_box() {
+        // sample_dump()'s box runs 0..10 in every dim → origin (0,0,0).
+        let data = parse_lammpstrj(sample_dump()).unwrap();
+        assert_eq!(data.box_origin, Some([0.0, 0.0, 0.0]));
+        // The index (streaming path) must agree with the eager parse.
+        let idx = build_index(sample_dump()).unwrap();
+        assert_eq!(idx.box_origin, Some([0.0, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn test_box_origin_offset_box() {
+        // An offset dump (box far from the world origin): the frame-0 lower
+        // corner must be preserved so the cell renders around the atoms.
+        let text = "ITEM: TIMESTEP\n0\n\
+                    ITEM: NUMBER OF ATOMS\n2\n\
+                    ITEM: BOX BOUNDS pp pp pp\n160.0 240.0\n0.0 150.0\n600.0 900.0\n\
+                    ITEM: ATOMS id type x y z\n\
+                    1 1 165.0 10.0 605.0\n\
+                    2 2 200.0 75.0 750.0\n";
+        let data = parse_lammpstrj(text).unwrap();
+        assert_eq!(data.box_origin, Some([160.0, 0.0, 600.0]));
+        // Edge lengths only in box_matrix.
+        let bm = data.box_matrix.unwrap();
+        assert!((bm[0] - 80.0).abs() < 1e-5);
+        assert!((bm[8] - 300.0).abs() < 1e-5);
+        // The streaming index carries the same origin.
+        let idx = build_index(text).unwrap();
+        assert_eq!(idx.box_origin, Some([160.0, 0.0, 600.0]));
     }
 
     #[test]
