@@ -82,6 +82,25 @@ describe("MoleculeRenderer — heterogeneous frame slow path", () => {
     expect(internals.cellRenderer).toBeTruthy();
   });
 
+  it("anchors the per-frame cell at the frame's box origin", () => {
+    const { renderer, internals } = makeRenderer();
+
+    const frame: Frame = {
+      frameId: 1,
+      nAtoms: 2,
+      positions: new Float32Array([165, 10, 605, 200, 75, 750]),
+      box: new Float32Array([80, 0, 0, 0, 150, 0, 0, 0, 300]),
+      boxOrigin: new Float32Array([160, 0, 600]),
+    };
+    renderer.updateFrame(frame);
+
+    const buf = internals.cellRenderer.mesh.geometry.getAttribute("position")
+      .array as Float32Array;
+    // The wireframe's origin corner sits at the frame's box origin.
+    expect([buf[0], buf[1], buf[2]]).toEqual([160, 0, 600]);
+    expect([buf[69], buf[70], buf[71]]).toEqual([240, 150, 900]);
+  });
+
   it("keeps a positions-only frame on the fast path (no re-topology)", () => {
     const { renderer, atom } = makeRenderer();
     const before = instanceCount(atom);
