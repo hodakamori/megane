@@ -12,6 +12,7 @@ from megane.protocol import (
     MSG_SNAPSHOT,
     HAS_BOND_ORDERS,
     HAS_BOX,
+    HAS_BOX_ORIGIN,
     HAS_FRAME_ELEMENTS,
     encode_frame,
     encode_snapshot,
@@ -164,6 +165,33 @@ def test_encode_decode_roundtrip():
     if flags & HAS_BOX:
         box = np.frombuffer(data[offset : offset + 36], dtype=np.float32).reshape(3, 3)
         np.testing.assert_array_almost_equal(box, s.box, decimal=5)
+
+
+def test_encode_snapshot_box_origin():
+    """An offset box origin is flagged and appended after the box (3 floats)."""
+    s = _make_water_structure(2)
+    s.box = np.eye(3, dtype=np.float32) * 10.0
+    s.box_origin = np.array([160.0, 0.0, 600.0], dtype=np.float32)
+    data = encode_snapshot(s)
+
+    flags = struct.unpack("<B", data[5:6])[0]
+    assert flags & HAS_BOX
+    assert flags & HAS_BOX_ORIGIN
+
+    # The origin is the last 12 bytes (3 float32), directly after the 36-byte box.
+    origin = np.frombuffer(data[-12:], dtype=np.float32)
+    np.testing.assert_array_almost_equal(origin, s.box_origin, decimal=5)
+
+
+def test_encode_snapshot_zero_origin_omits_flag():
+    """A zero (or absent) origin does not set HAS_BOX_ORIGIN — byte-compatible."""
+    s = _make_water_structure(2)
+    s.box = np.eye(3, dtype=np.float32) * 10.0
+    # box_origin defaults to zeros(3).
+    data = encode_snapshot(s)
+    flags = struct.unpack("<B", data[5:6])[0]
+    assert flags & HAS_BOX
+    assert not (flags & HAS_BOX_ORIGIN)
 
 
 def test_encode_snapshot_100k_atoms():

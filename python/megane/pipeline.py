@@ -598,6 +598,7 @@ def _load_structure_file(path: str):
         bonds=np.asarray(result.bonds, dtype=np.uint32),
         bond_orders=np.asarray(result.bond_orders, dtype=np.uint8),
         box=np.asarray(result.box_matrix, dtype=np.float32),
+        box_origin=np.asarray(result.box_origin, dtype=np.float32),
     )
 
 
