@@ -1043,7 +1043,7 @@ class Pipeline:
         # Update parent LoadStructure's hasTrajectory flag. Only mark true
         # when there is more than one frame — single-frame sources
         # shouldn't advertise a playable trajectory to the frontend.
-        if trajectory.n_frames > 1 and source._id in self._nodes:
+        if trajectory.n_frames > 1 and source._id is not None and source._id in self._nodes:
             self._nodes[source._id][1]["hasTrajectory"] = True
 
 
