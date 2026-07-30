@@ -97,6 +97,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-xsf",
+    displayName: "XCrySDen structure",
+    extensions: [".xsf", ".axsf"],
+    mimeTypes: ["chemical/x-xcrysden-structure"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
     extensions: [".lammpstrj", ".dump", ".trj"],

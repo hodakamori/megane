@@ -196,6 +196,7 @@ interface WasmModule {
   parse_pdb: ParseFn;
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
+  parse_xsf: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
@@ -247,6 +248,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
+        parse_xsf: wasm.parse_xsf,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
@@ -283,6 +285,11 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_gro;
     case ".xyz":
       return wasmModule!.parse_xyz;
+    // XCrySDen. `.axsf` is the same grammar with an `ANIMSTEPS` header, so it
+    // arrives as a multi-frame structure through the one parser.
+    case ".xsf":
+    case ".axsf":
+      return wasmModule!.parse_xsf;
     case ".mol":
     case ".sdf":
       return wasmModule!.parse_mol;

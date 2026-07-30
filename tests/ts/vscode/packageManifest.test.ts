@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 const manifest = JSON.parse(
   readFileSync(resolve(__dirname, "../../../vscode-megane/package.json"), "utf8"),
 ) as {
+  description: string;
   contributes: {
     customEditors: Array<{
       viewType: string;
@@ -40,7 +41,13 @@ describe("vscode-megane package.json", () => {
         "*.trj",
         "*.xtc",
         "*.xyz",
+        "*.xsf",
+        "*.axsf",
       ].sort(),
     );
+  });
+
+  it("mentions XCrySDen XSF in the marketplace description", () => {
+    expect(manifest.description).toContain("XCrySDen XSF");
   });
 });

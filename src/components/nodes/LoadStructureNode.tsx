@@ -14,7 +14,7 @@ import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
 const STRUCTURE_ACCEPT =
-  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj";
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.xsf,.axsf";
 export const STRUCTURE_EXTS = [
   ".pdb",
   ".gro",
@@ -33,6 +33,9 @@ export const STRUCTURE_EXTS = [
   ".lammpstrj",
   ".dump",
   ".trj",
+  // XCrySDen structure / animation (`.axsf` is the animated variant).
+  ".xsf",
+  ".axsf",
 ];
 
 /**

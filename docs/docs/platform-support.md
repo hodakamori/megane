@@ -47,12 +47,27 @@ Legend:
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | ✓ | API |
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| XCrySDen | `.xsf`, `.axsf` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
 
 Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
 
 Note: **LAMMPS dump** (`.lammpstrj` / `.dump` / `.trj`) is also loaded via the **Load Structure** node as a self-contained multi-frame structure — frame 0 defines the topology and the remaining frames stream into playback, exactly like a multi-frame XYZ. Because a dump carries no element symbols or masses, the integer per-atom `type` id is used as the atomic-number **proxy** for colouring/sizing (placeholder chemistry, not real elements), and bonds are inferred by distance. A dump can still be **attached onto a separately-loaded topology** (which supplies true elements) via the Load Trajectory node — see the Trajectory formats table below.
+
+Note: **XCrySDen** (`.xsf` / `.axsf`) is one format with two shapes. A static
+file carries a dimensionality keyword (`CRYSTAL`, `SLAB`, `POLYMER`, `MOLECULE`,
+or `ATOMS`), an optional `PRIMVEC` lattice, and a `PRIMCOORD`/`ATOMS` block;
+an animated `.axsf` opens with `ANIMSTEPS n` and repeats those blocks per step,
+which megane loads as a multi-frame structure — including **variable-cell**
+animations, where each step's `PRIMVEC` animates the box. The first column of an
+atom line may be an atomic number or an element symbol, and a negative number
+(XCrySDen's ghost-atom convention) is read as its magnitude. The optional
+per-atom **force** triple is exposed as a `force` vector channel, so the Vector
+Overlay node can draw it with no format-specific wiring. `CONVVEC` is consumed
+and discarded — `PRIMVEC` is the cell megane draws — and
+`BEGIN_BLOCK_DATAGRID_*` volumetric blocks are skipped; mapping those onto the
+isosurface pipeline is a follow-up.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
@@ -147,7 +162,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_xsf`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

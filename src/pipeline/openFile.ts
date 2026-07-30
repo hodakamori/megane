@@ -69,6 +69,9 @@ const STRUCTURE_EXTS = [
   ".lammpstrj",
   ".dump",
   ".trj",
+  // XCrySDen structure / animation.
+  ".xsf",
+  ".axsf",
 ];
 
 const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump", ".trj", ".dcd", ".nc"];

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **XCrySDen structure files** (`.xsf` / `.axsf`) on every host. Handles the `CRYSTAL` / `SLAB` / `POLYMER` / `MOLECULE` / `ATOMS` dimensionality keywords, `PRIMVEC` lattice vectors, and `PRIMCOORD` atom blocks; an `ANIMSTEPS` `.axsf` loads as a multi-frame structure with per-frame cells for variable-cell animations. The optional per-atom force triple is exposed as a `force` vector channel for the Vector Overlay node. `CONVVEC` is consumed and discarded, and `BEGIN_BLOCK_DATAGRID_*` volumetric blocks are skipped.
+
 ## [0.10.0] - 2026-07-12
 
 ### Added

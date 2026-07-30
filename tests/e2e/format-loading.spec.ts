@@ -65,6 +65,10 @@ const STRUCTURE_CASES: StructureCase[] = [
   // The `.trj` alias is exercised alongside the canonical `.lammpstrj`.
   { name: "lammpstrj-water", file: "water.lammpstrj", mime: "text/plain", expectedAtoms: 3 },
   { name: "trj-water", file: "water.trj", mime: "text/plain", expectedAtoms: 3 },
+  // XCrySDen: a static CRYSTAL cell and an ANIMSTEPS animation whose extra
+  // frames feed the playback timeline.
+  { name: "xsf-si-diamond", file: "si_diamond.xsf", mime: "text/plain", expectedAtoms: 8 },
+  { name: "axsf-water-relax", file: "water_relax.axsf", mime: "text/plain", expectedAtoms: 3 },
 ];
 
 async function dropStructure(
