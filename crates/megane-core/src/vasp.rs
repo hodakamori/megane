@@ -173,7 +173,7 @@ fn parse_header(lines: &[&str], start: usize) -> Result<Header, String> {
         Some(names) => {
             for (si, &n) in counts.iter().enumerate() {
                 let z = names.get(si).map(|s| symbol_to_atomic_num(s)).unwrap_or(0);
-                elements.extend(std::iter::repeat(z).take(n));
+                elements.extend(std::iter::repeat_n(z, n));
             }
         }
         None => {
@@ -182,7 +182,7 @@ fn parse_header(lines: &[&str], start: usize) -> Result<Header, String> {
             let mut labels = Vec::with_capacity(total);
             for (si, &n) in counts.iter().enumerate() {
                 let proxy = (si + 1).min(u8::MAX as usize) as u8;
-                elements.extend(std::iter::repeat(proxy).take(n));
+                elements.extend(std::iter::repeat_n(proxy, n));
                 for _ in 0..n {
                     labels.push(format!("Type{} (no species line)", si + 1));
                 }
