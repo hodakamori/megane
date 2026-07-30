@@ -21,9 +21,10 @@ import {
   type StructureParseResult,
   type XTCParseResult,
 } from "./parseCore";
+import { structureExtFromFileName } from "./fileNames";
 
 function extOf(name: string, fallback: string): string {
-  return name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? fallback;
+  return structureExtFromFileName(name, fallback);
 }
 
 export async function parseStructureFile(file: File): Promise<StructureParseResult> {

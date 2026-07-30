@@ -19,6 +19,7 @@ import ParseWorker from "./parse.worker?worker&inline";
 import wasmAssetUrl from "../../crates/megane-wasm/pkg/megane_wasm_bg.wasm?url";
 import { perfMark, perfMeasure } from "../perf";
 import * as sync from "./parseClientSync";
+import { structureExtFromFileName } from "./fileNames";
 import type {
   StructureParseResult,
   XTCParseResult,
@@ -142,7 +143,7 @@ function send<T>(req: ParseRequest, transfer: Transferable[]): Promise<T> {
 export async function parseStructureFile(file: File): Promise<StructureParseResult> {
   if (workerUnavailable()) return sync.parseStructureFile(file);
 
-  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb";
+  const ext = structureExtFromFileName(file.name);
   const tag = `${file.name.replace(/[^A-Za-z0-9._-]/g, "_")}-${Date.now()}`;
   perfMark(`megane:parse:start:${tag}`);
   try {
@@ -172,7 +173,7 @@ export async function parseStructureText(
   fileName?: string,
 ): Promise<StructureParseResult> {
   if (workerUnavailable()) return sync.parseStructureText(text, fileName);
-  const ext = fileName ? (fileName.toLowerCase().match(/\.[^.]+$/)?.[0] ?? ".pdb") : ".pdb";
+  const ext = fileName ? structureExtFromFileName(fileName) : ".pdb";
   try {
     const id = nextId++;
     const req: ParseRequest = { id, op: "structure", wasmUrl: resolveWasmUrl(), ext, text };

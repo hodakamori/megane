@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 const manifest = JSON.parse(
   readFileSync(resolve(__dirname, "../../../vscode-megane/package.json"), "utf8"),
 ) as {
+  description: string;
   contributes: {
     customEditors: Array<{
       viewType: string;
@@ -38,9 +39,19 @@ describe("vscode-megane package.json", () => {
         "*.sdf",
         "*.traj",
         "*.trj",
+        "*.vasp",
         "*.xtc",
         "*.xyz",
+        // VASP's standard filenames carry no extension, so the selector needs
+        // basename globs alongside the `*.vasp` extension pattern.
+        "POSCAR*",
+        "CONTCAR*",
+        "XDATCAR*",
       ].sort(),
     );
+  });
+
+  it("mentions VASP in the marketplace description", () => {
+    expect(manifest.description).toContain("VASP");
   });
 });

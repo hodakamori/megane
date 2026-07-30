@@ -16,6 +16,7 @@ pub mod psf;
 pub mod top;
 pub mod traj;
 pub mod trajectory;
+pub mod vasp;
 pub mod xtc;
 pub mod xyz;
 
