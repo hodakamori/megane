@@ -9,6 +9,12 @@ repository = "https://github.com/hodakamori/megane"
 
 [dependencies]
 serde_json = "1"
+# Pull-parser XML reader for the CML and Chem3D-XML parsers. Chosen over a
+# DOM-building crate for its small WASM footprint, and because it performs no
+# DTD processing or custom entity expansion -- an untrusted .cml cannot mount
+# an XXE or billion-laughs attack through it. "encoding" is left off: megane
+# reads XML that has already been decoded to a Rust &str.
+quick-xml = { version = "0.38", default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

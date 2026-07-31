@@ -79,6 +79,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_xyz: structFn("parse_xyz"),
     parse_molden: structFn("parse_molden"),
     parse_xsf: structFn("parse_xsf"),
+    parse_cml: structFn("parse_cml"),
     parse_phonon: structFn("parse_phonon"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
@@ -205,6 +206,10 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     },
   );
 
+  it("routes a .cml file through the CML parser", async () => {
+    await sync.parseStructureFile(fakeFile("ethanol.cml", "<molecule/>"));
+    expect(calls).toContain("parse_cml");
+  });
   it.each([["POSCAR"], ["CONTCAR"], ["XDATCAR"], ["MgO.vasp"]])(
     "routes the VASP file %s through the VASP structure parser",
     async (filename) => {

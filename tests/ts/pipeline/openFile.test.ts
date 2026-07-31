@@ -242,6 +242,8 @@ describe("usePipelineStore.openFile — AddBond default by file format", () => {
     ["library.sdf", "structure"],
     ["system.data", "structure"],
     ["system.lammps", "structure"],
+    // CML carries an explicit <bondArray>, so AddBond should read the file.
+    ["ethanol.cml", "structure"],
   ];
   const formatsWithoutBonds: Array<[string, string]> = [
     ["water.gro", "distance"],
