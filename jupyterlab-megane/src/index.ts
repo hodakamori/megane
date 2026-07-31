@@ -1,8 +1,4 @@
-import {
-  ILayoutRestorer,
-  JupyterFrontEnd,
-  JupyterFrontEndPlugin,
-} from "@jupyterlab/application";
+import { ILayoutRestorer, JupyterFrontEnd, JupyterFrontEndPlugin } from "@jupyterlab/application";
 import { WidgetTracker } from "@jupyterlab/apputils";
 import type { IDocumentWidget } from "@jupyterlab/docregistry";
 import { IStatusBar } from "@jupyterlab/statusbar";
@@ -81,9 +77,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const tracker = new WidgetTracker<IDocumentWidget<MeganeReactView>>({
       namespace: TRACKER_NAMESPACE,
     });
-    const pipelineTracker = new WidgetTracker<
-      IDocumentWidget<MeganePipelineReactView>
-    >({
+    const pipelineTracker = new WidgetTracker<IDocumentWidget<MeganePipelineReactView>>({
       namespace: PIPELINE_TRACKER_NAMESPACE,
     });
 
@@ -103,9 +97,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       void pipelineTracker.add(widget);
     });
 
-    const binaryExtensions = new Set(
-      STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
-    );
+    const binaryExtensions = new Set(STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []));
     const factoryForPath = (path: string): string => {
       if (path.toLowerCase().endsWith(".megane.json")) return FACTORY_NAME_PIPELINE;
       const dot = path.lastIndexOf(".");

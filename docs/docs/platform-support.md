@@ -51,6 +51,7 @@ Legend:
 | CML | `.cml` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | Molden | `.molden` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| Chem3D XML | `.c3xml` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | GAMESS output | `.gamess` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
@@ -119,6 +120,18 @@ modes are separate features, and the latter should share one format-agnostic
 node with CASTEP `.phonon`. Every unrecognised `[...]` section is skipped
 tolerantly — writers emit many vendor-specific blocks and the parser never fails
 on one it does not know.
+Note: **Chem3D XML** (`.c3xml`) reads `<n>` (node) elements for their
+`Element` and `Position` and `<b>` (bond) elements for explicit connectivity and
+orders, so no distance inference is needed for genuine 3D input. The schema is
+only loosely documented, so the reader is permissive: it accepts the long
+spellings (`<node>` / `<bond>` with `Begin` / `End`) some exports use, `Element`
+may be an atomic **number or a symbol**, and a node with no `Element` defaults to
+carbon — the CDXML convention. A **2D-only drawing** (`p="x y"` instead of
+`Position`) is projected onto z = 0 so the file still opens, matching the CML
+reader's decision, and bonds are deliberately **not** inferred for it because
+projected 2D distances are meaningless. The binary `.cdx` and general `.cdxml`
+variants are out of scope. It shares `quick-xml` with the CML reader, so no new
+dependency.
 Note: **GAMESS** support reads the program's printed **log output**, not a data
 format. Every `COORDINATES OF ALL ATOMS ARE` banner block becomes a frame, so a
 geometry optimisation scrubs on the timeline like a multi-frame XYZ and the
@@ -144,6 +157,35 @@ per-atom label. It is registered on the same JupyterLab `IFileType` as `.xyz`
 for the same reason.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
+
+### Volumetric formats
+
+Scalar-field grids consumed by the **Load Volumetric** node and rendered by the
+**Isosurface** node. A grid carries a field but **no atoms**, so it is always an
+overlay on a separately-loaded structure — opening one standalone on JupyterLab
+or VS Code surfaces an actionable error pointing at the Load Volumetric node,
+the same guard the trajectory-only formats get.
+
+| Format | Extensions | Standalone | Jupyter widget | JupyterLab | VS Code | React (npm) | Python |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Gaussian CUBE | `.cube`, `.cub` | ✓ | — | ✓⁶ | ✓⁶ | ✓ | — |
+| OpenDX | `.dx` | ✓ | — | ✓⁶ | ✓⁶ | ✓ | — |
+
+⁶ Registered so the file opens megane, which then explains that a grid needs a
+structure to overlay. Load it through the **Load Volumetric** node in the
+pipeline editor.
+
+Both readers live in **TypeScript** (`src/pipeline/executors/parseCube.ts` and
+`parseDx.ts`), not in `megane-core`, so there is no Python API for them. CUBE
+coordinates are Bohr and converted to Ångström on read; OpenDX is already in
+Ångström. Both use the same voxel ordering (ix outer, iz inner), so the
+Isosurface node consumes them interchangeably.
+
+**`.dx` is ambiguous.** OpenDX grids and JCAMP-DX spectra share the extension,
+so dispatch sniffs the content: OpenDX opens with `object … class
+gridpositions`, JCAMP-DX with `##TITLE=` / `##JCAMP-DX=`. A `.dx` that turns out
+to be a spectrum gets an explicit "megane has no 2D plot surface yet" message
+rather than a confusing parse failure.
 
 ### Trajectory formats
 
@@ -220,7 +262,7 @@ from the previous ordinate, with its Y-value checkpoint at each line start), and
 and `##XYPOINTS=(XY..XY)` tables. `##XFACTOR=` / `##YFACTOR=` are applied, and a
 missing `##DELTAX=` is derived from `FIRSTX` / `LASTX` / `NPOINTS`.
 
-Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `src/parsers/spectrum.ts` (spectrum accept list and JCAMP-DX/OpenDX sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
+Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `src/pipeline/executors/parseVolumetric.ts` (volumetric accept list + `.dx` content sniffing), `src/parsers/spectrum.ts` (spectrum accept list and JCAMP-DX/OpenDX sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
 
 ## UI features
 
@@ -267,7 +309,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_gamess`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_gamess`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

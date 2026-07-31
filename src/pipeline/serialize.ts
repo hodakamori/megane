@@ -24,12 +24,14 @@ export function serializePipeline(
   return {
     version: 3,
     nodes: nodes.map((n) => {
-      // Strip ephemeral (non-serializable) fields from params
-      // `spectrumData` holds Float64Arrays and `parseError` is a transient UI
-      // message; both are documented as "not serialized" on LoadSpectrumParams.
-      const { bondFileData, spectrumData, parseError, ...params } = n.data
+      // Strip ephemeral (non-serializable) fields from params.
+      // `volumetricData` holds Float32Arrays, `spectrumData` Float64Arrays, and
+      // `parseError` is a transient UI message; all are documented as "not
+      // serialized" on LoadVolumetricParams / LoadSpectrumParams.
+      const { bondFileData, volumetricData, spectrumData, parseError, ...params } = n.data
         .params as typeof n.data.params & {
         bondFileData?: unknown;
+        volumetricData?: unknown;
         spectrumData?: unknown;
         parseError?: unknown;
       };

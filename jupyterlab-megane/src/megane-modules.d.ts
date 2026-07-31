@@ -24,7 +24,10 @@ declare module "@megane/hooks/useMeganeLocal" {
 declare module "@megane/pipeline/store" {
   export const usePipelineStore: {
     getState(): {
-      openFile(file: File, opts?: { mode?: "replace" | "merge"; companions?: File[] }): Promise<void>;
+      openFile(
+        file: File,
+        opts?: { mode?: "replace" | "merge"; companions?: File[] },
+      ): Promise<void>;
       [key: string]: any;
     };
     setState(snapshot: any): void;

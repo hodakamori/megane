@@ -591,6 +591,12 @@ export interface LoadVolumetricParams {
   fileName: string | null;
   /** Ephemeral: parsed volumetric data from file. Not serialized. */
   volumetricData?: VolumetricData | null;
+  /**
+   * Ephemeral: why the last load failed, surfaced in the node body. Carries the
+   * actionable message for a `.dx` that turns out to be a JCAMP-DX spectrum
+   * rather than an OpenDX grid. Not serialized.
+   */
+  parseError?: string | null;
 }
 
 export interface LoadSpectrumParams {

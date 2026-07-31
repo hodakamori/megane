@@ -15,9 +15,7 @@ export class MeganeDocFactory extends ABCWidgetFactory<
     super(options);
   }
 
-  protected createNewWidget(
-    context: DocumentRegistry.Context,
-  ): IDocumentWidget<MeganeReactView> {
+  protected createNewWidget(context: DocumentRegistry.Context): IDocumentWidget<MeganeReactView> {
     const content = new MeganeReactView(context, this.contents);
     const widget = new DocumentWidget({ content, context });
     widget.title.iconClass = "jp-MaterialIcon jp-FileIcon";
@@ -30,9 +28,7 @@ export class MeganePipelineDocFactory extends ABCWidgetFactory<
   DocumentRegistry.IModel
 > {
   constructor(
-    options: DocumentRegistry.IWidgetFactoryOptions<
-      IDocumentWidget<MeganePipelineReactView>
-    >,
+    options: DocumentRegistry.IWidgetFactoryOptions<IDocumentWidget<MeganePipelineReactView>>,
     private readonly contents: Contents.IManager,
   ) {
     super(options);

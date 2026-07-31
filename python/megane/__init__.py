@@ -1,5 +1,6 @@
 """megane - A fast, beautiful molecular viewer."""
 
+from megane.parsers.c3xml import load_c3xml
 from megane.parsers.cif import load_cif
 from megane.parsers.cml import load_cml
 from megane.parsers.gamess import load_gamess
@@ -61,6 +62,7 @@ __all__ = [
     "Streaming",
     "VectorOverlay",
     "Viewport",
+    "load_c3xml",
     "load_cif",
     "load_gamess",
     "load_cml",

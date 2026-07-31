@@ -5,10 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { ErrorBoundary } from "@megane/components/ErrorBoundary";
 import { usePipelineStore } from "@megane/pipeline/store";
-import {
-  capturePipelineStore,
-  type PipelineStoreSnapshot,
-} from "@megane/pipeline/storeSnapshot";
+import { capturePipelineStore, type PipelineStoreSnapshot } from "@megane/pipeline/storeSnapshot";
 import { useTour } from "@megane/tour/useTour";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
@@ -61,10 +58,7 @@ function joinUnderDir(dir: string, rel: string): string | null {
   return joined;
 }
 
-async function fetchCompanion(
-  contents: Contents.IManager,
-  path: string,
-): Promise<File | null> {
+async function fetchCompanion(contents: Contents.IManager, path: string): Promise<File | null> {
   try {
     const model = await contents.get(path, { content: true, format: "base64" });
     const raw = String(model.content ?? "");
@@ -109,19 +103,14 @@ function DocBody({ context, contents, subscribeActivation }: DocBodyProps): JSX.
         // shared `usePipelineStore.openFile` entry point.
         const companionTargets: string[] = [];
         for (const node of pipeline.nodes ?? []) {
-          if (
-            node.type !== "load_structure" &&
-            node.type !== "load_trajectory"
-          ) {
+          if (node.type !== "load_structure" && node.type !== "load_trajectory") {
             continue;
           }
           if (!node.fileName) continue;
           const target = joinUnderDir(dir, String(node.fileName));
           if (target) companionTargets.push(target);
         }
-        const fetched = await Promise.all(
-          companionTargets.map((p) => fetchCompanion(contents, p)),
-        );
+        const fetched = await Promise.all(companionTargets.map((p) => fetchCompanion(contents, p)));
         if (token.cancelled) return;
         const companions: File[] = fetched.filter((f): f is File => f !== null);
 
@@ -162,12 +151,9 @@ function DocBody({ context, contents, subscribeActivation }: DocBodyProps): JSX.
     };
   }, [parseAndLoad, subscribeActivation]);
 
-  const handleUploadStructure = useCallback(
-    (file: File) => {
-      void usePipelineStore.getState().openFile(file, { mode: "merge" });
-    },
-    [],
-  );
+  const handleUploadStructure = useCallback((file: File) => {
+    void usePipelineStore.getState().openFile(file, { mode: "merge" });
+  }, []);
 
   if (typeof state === "object") {
     return (
