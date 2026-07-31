@@ -5,6 +5,7 @@ from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj, load_lammpstrj_structure
 from megane.parsers.mol import load_mol, load_sdf
 from megane.parsers.mol2 import load_mol2
+from megane.parsers.molden import load_molden
 from megane.parsers.netcdf import load_netcdf
 from megane.parsers.pdb import load_pdb
 from megane.parsers.phonon import load_phonon
@@ -22,6 +23,7 @@ __all__ = [
     "load_lammpstrj_structure",
     "load_mol",
     "load_mol2",
+    "load_molden",
     "load_netcdf",
     "load_pdb",
     "load_phonon",
