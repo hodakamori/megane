@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Molden files** (`.molden`) on every host. The `[Atoms]` block becomes the structure, honouring its `(AU)` / `(Angs)` unit argument, and a `[GEOMETRIES] XYZ` block loads as a multi-frame optimisation via the shared XYZ frame reader. `[GTO]`/`[MO]` orbitals, `[FREQ]` normal modes, and any vendor-specific section are skipped tolerantly.
 - **GAMESS output** (`.gamess`) on every host. Every `COORDINATES OF ALL ATOMS ARE` block becomes a frame, so a geometry optimisation scrubs on the timeline; the `(ANGS)`/`(BOHR)` banner is honoured and ECP fractional charges fall back to the atom label. Only `.gamess` is registered — claiming `.log`/`.out` would hijack every log file in a workspace.
 - **VASP structure files** (`POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`) on every host. `XDATCAR` opens as a multi-frame structure, including variable-cell (ISIF ≥ 3) runs that re-emit the header per configuration. Because the standard VASP filenames carry no extension, megane now also dispatches by **basename** (`src/parsers/fileNames.ts`); VS Code registers `POSCAR*` / `CONTCAR*` / `XDATCAR*` globs and JupyterLab an `IFileType.pattern`. VASP 4 files with no species line fall back to the 1-based species index as an atomic-number proxy instead of failing.
 

@@ -77,6 +77,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_molden: structFn("parse_molden"),
     parse_gamess: structFn("parse_gamess"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
@@ -202,6 +203,13 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       expect(calls).toContain("parse_vasp");
     },
   );
+
+  it("routes a Molden file through the Molden parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile("water.molden", "[Molden Format]\n[Atoms] (Angs)\n O 1 8 0.0 0.0 0.0\n"),
+    );
+    expect(calls).toContain("parse_molden");
+  });
 
   it("routes a GAMESS file through the GAMESS parser", async () => {
     await sync.parseStructureFile(
