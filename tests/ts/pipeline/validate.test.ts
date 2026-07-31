@@ -42,7 +42,11 @@ function makeEdge(
 describe("validatePipeline", () => {
   it("returns no errors for a valid simple pipeline", () => {
     const nodes = [
-      makeNode("ls", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: false }),
+      makeNode("ls", "load_structure", {
+        fileName: "test.pdb",
+        hasTrajectory: false,
+        hasCell: false,
+      }),
       makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
     ];
     const edges = [makeEdge("ls", "particle", "vp", "particle")];
@@ -64,7 +68,11 @@ describe("validatePipeline", () => {
 
   it("does not report missing input for load_structure (no required inputs)", () => {
     const nodes = [
-      makeNode("ls", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: false }),
+      makeNode("ls", "load_structure", {
+        fileName: "test.pdb",
+        hasTrajectory: false,
+        hasCell: false,
+      }),
     ];
     const errors = validatePipeline(nodes, []);
     // load_structure has no required inputs, but it's not connected to viewport
@@ -74,7 +82,11 @@ describe("validatePipeline", () => {
 
   it("warns when node is not connected to viewport", () => {
     const nodes = [
-      makeNode("ls", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: false }),
+      makeNode("ls", "load_structure", {
+        fileName: "test.pdb",
+        hasTrajectory: false,
+        hasCell: false,
+      }),
       makeNode("f", "filter", { query: "" }),
       makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
     ];
@@ -87,14 +99,8 @@ describe("validatePipeline", () => {
   });
 
   it("detects cycles", () => {
-    const nodes = [
-      makeNode("a", "filter", { query: "" }),
-      makeNode("b", "filter", { query: "" }),
-    ];
-    const edges = [
-      makeEdge("a", "out", "b", "in"),
-      makeEdge("b", "out", "a", "in"),
-    ];
+    const nodes = [makeNode("a", "filter", { query: "" }), makeNode("b", "filter", { query: "" })];
+    const edges = [makeEdge("a", "out", "b", "in"), makeEdge("b", "out", "a", "in")];
     const errors = validatePipeline(nodes, edges);
     // At least one node should have a cycle error
     const allErrors = [...errors.values()].flat();
@@ -137,14 +143,15 @@ describe("validatePipeline", () => {
 
   it("reports error for filter with invalid query syntax", () => {
     const nodes = [
-      makeNode("ls", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: false }),
+      makeNode("ls", "load_structure", {
+        fileName: "test.pdb",
+        hasTrajectory: false,
+        hasCell: false,
+      }),
       makeNode("f", "filter", { query: 'foo == "bar"' }),
       makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
     ];
-    const edges = [
-      makeEdge("ls", "particle", "f", "in"),
-      makeEdge("f", "out", "vp", "particle"),
-    ];
+    const edges = [makeEdge("ls", "particle", "f", "in"), makeEdge("f", "out", "vp", "particle")];
     const errors = validatePipeline(nodes, edges);
     expect(errors.has("f")).toBe(true);
     const filterErrors = errors.get("f")!;
@@ -156,7 +163,11 @@ describe("validatePipeline", () => {
     // surface; centers and ligands are derived from the upstream structure
     // at execute time, so empty exclude lists are always valid.
     const nodes = [
-      makeNode("ls", "load_structure", { fileName: "test.pdb", hasTrajectory: false, hasCell: false }),
+      makeNode("ls", "load_structure", {
+        fileName: "test.pdb",
+        hasTrajectory: false,
+        hasCell: false,
+      }),
       makeNode("pg", "polyhedron_generator", {
         excludedCenters: [],
         excludedLigands: [],
@@ -179,7 +190,12 @@ describe("validatePipeline", () => {
 
   it("skips config validation for disabled nodes", () => {
     const nodes = [
-      makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }, false),
+      makeNode(
+        "ls",
+        "load_structure",
+        { fileName: null, hasTrajectory: false, hasCell: false },
+        false,
+      ),
       makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
     ];
     const edges = [makeEdge("ls", "particle", "vp", "particle")];

@@ -284,6 +284,11 @@ function getParserForExtension(ext: string): ParseFn {
     case ".gro":
       return wasmModule!.parse_gro;
     case ".xyz":
+    // Jmol writes plain XYZ under a second extension. megane's XYZ reader
+    // already covers what Jmol's does -- multi-frame blocks, `Lattice=`
+    // extended headers, and extra per-atom columns after x/y/z (kept as the
+    // atom label) -- so `.jxyz` is an alias, not a second parser.
+    case ".jxyz":
       return wasmModule!.parse_xyz;
     // VASP POSCAR / CONTCAR / XDATCAR. Those filenames carry no extension, so
     // `structureExtFromFileName` (fileNames.ts) maps them onto this synthetic

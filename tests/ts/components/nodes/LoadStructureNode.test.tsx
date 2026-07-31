@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { usePipelineStore } from "@/pipeline/store";
-import {
-  LoadStructureNode,
-  setStructureLoadHandler,
-} from "@/components/nodes/LoadStructureNode";
+import { LoadStructureNode, setStructureLoadHandler } from "@/components/nodes/LoadStructureNode";
 import type { LoadStructureParams } from "@/pipeline/types";
 import { seedPipelineStore } from "./_helpers";
 
@@ -51,12 +48,8 @@ describe("LoadStructureNode", () => {
 
   it("renders the placeholder when fileName is null", () => {
     const seeded = seedPipelineStore("load_structure", { id: "ls1" });
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
-    expect(screen.getByTestId("load-structure-filename")).toHaveTextContent(
-      "No structure loaded",
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
+    expect(screen.getByTestId("load-structure-filename")).toHaveTextContent("No structure loaded");
   });
 
   it("renders the filename when params.fileName is set", () => {
@@ -64,9 +57,7 @@ describe("LoadStructureNode", () => {
       id: "ls1",
       params: { fileName: "water.pdb", hasTrajectory: false, hasCell: true },
     });
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
     expect(screen.getByTestId("load-structure-filename")).toHaveTextContent("water.pdb");
   });
 
@@ -77,9 +68,7 @@ describe("LoadStructureNode", () => {
     usePipelineStore.setState({ updateNodeParams });
     setStructureLoadHandler(handler);
 
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
 
     const file = new File(["dummy"], "system.pdb", { type: "chemical/x-pdb" });
     const input = screen.getByTestId("load-structure-input") as HTMLInputElement;
@@ -97,9 +86,7 @@ describe("LoadStructureNode", () => {
     usePipelineStore.setState({ updateNodeParams });
     setStructureLoadHandler(handler);
 
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
 
     const file = new File(["dummy"], "garbage.bad", { type: "text/plain" });
     const input = screen.getByTestId("load-structure-input") as HTMLInputElement;
@@ -118,9 +105,7 @@ describe("LoadStructureNode", () => {
     setStructureLoadHandler(handler);
     setStructureLoadHandler(null);
 
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
 
     const file = new File(["dummy"], "system.gro", { type: "text/plain" });
     const input = screen.getByTestId("load-structure-input") as HTMLInputElement;
@@ -137,9 +122,7 @@ describe("LoadStructureNode", () => {
     usePipelineStore.setState({ updateNodeParams });
     setStructureLoadHandler(handler);
 
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
 
     const file = new File(["dummy"], "trajectory.xyz", { type: "text/plain" });
     const dropZone = screen.getByTestId("load-structure-filename").parentElement!;
@@ -180,9 +163,7 @@ describe("LoadStructureNode", () => {
     usePipelineStore.setState({ updateNodeParams });
     setStructureLoadHandler(handler);
 
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
 
     const file = new File(["dummy"], "readme.txt", { type: "text/plain" });
     const dropZone = screen.getByTestId("load-structure-filename").parentElement!;
@@ -199,9 +180,7 @@ describe("LoadStructureNode", () => {
       id: "ls1",
       params: { fileName: "water.pdb", hasTrajectory: false, hasCell: false },
     });
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
 
     const trajectoryHandle = screen.getByTestId("handle-source-trajectory");
     const cellHandle = screen.getByTestId("handle-source-cell");
@@ -219,9 +198,7 @@ describe("LoadStructureNode", () => {
       id: "ls1",
       params: { fileName: "system.gro", hasTrajectory: true, hasCell: true },
     });
-    render(
-      <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
-    );
+    render(<LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />);
     const trajectoryHandle = screen.getByTestId("handle-source-trajectory");
     expect(trajectoryHandle.style.background).not.toBe("rgb(203, 213, 225)");
   });

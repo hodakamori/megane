@@ -74,6 +74,12 @@ describe("jupyterlab filetypes", () => {
     expect(re.test("notes.txt")).toBe(false);
   });
 
+  it("registers .jxyz alongside .xyz on the XYZ filetype", () => {
+    const xyz = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-xyz");
+    expect(xyz).toBeDefined();
+    expect(xyz?.extensions).toEqual([".xyz", ".jxyz"]);
+  });
+
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
     const lammps = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-lammps-data");
     expect(lammps).toBeDefined();
@@ -118,12 +124,8 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(
-      STRUCTURE_FILETYPES_TEXT.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
-      STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
-    );
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(12);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });

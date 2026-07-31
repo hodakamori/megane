@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { executeRepresentation } from "@/pipeline/executors/representation";
-import type {
-  ParticleData,
-  PipelineData,
-  RepresentationParams,
-} from "@/pipeline/types";
+import type { ParticleData, PipelineData, RepresentationParams } from "@/pipeline/types";
 import type { Snapshot } from "@/types";
 
 function makeSnapshot(): Snapshot {

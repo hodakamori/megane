@@ -497,6 +497,30 @@ pub fn decode_frame_at(
 mod tests {
     use super::*;
 
+    /// Jmol writes plain XYZ under the `.jxyz` extension, with extra per-atom
+    /// columns (an atom name and a partial charge) after x/y/z. megane
+    /// dispatches `.jxyz` straight to this parser, so the extra columns must
+    /// land in the atom label rather than break the coordinate read.
+    #[test]
+    fn parses_the_jmol_extra_column_form() {
+        let text = "\
+3
+water written by Jmol
+O   0.000000   0.000000   0.117300  O1  -0.834
+H   0.000000   0.757200  -0.469200  H1   0.417
+H   0.000000  -0.757200  -0.469200  H2   0.417
+";
+        let s = parse(text).unwrap();
+        assert_eq!(s.n_atoms, 3);
+        assert_eq!(s.elements, vec![8, 1, 1]);
+        assert!((s.positions[4] - 0.7572).abs() < 1e-5);
+        let labels = s.atom_labels.expect("extra columns become the atom label");
+        assert_eq!(labels[0], "O1 -0.834");
+        assert_eq!(labels[2], "H2 0.417");
+        // Extra columns must not disturb bond inference.
+        assert_eq!(s.bonds.len(), 2);
+    }
+
     #[test]
     fn test_parse_multiframe_flat() {
         // Two frames of 2 atoms each; frame 0 lives in `positions`, frame 1 flat.

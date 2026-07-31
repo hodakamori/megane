@@ -70,6 +70,9 @@ const STRUCTURE_CASES: StructureCase[] = [
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
   { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
   { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
+  // Jmol's `.jxyz` is plain XYZ under a second extension, with extra per-atom
+  // columns after x/y/z that must not disturb the coordinate read.
+  { name: "jxyz-benzene", file: "benzene.jxyz", mime: "chemical/x-xyz", expectedAtoms: 12 },
 ];
 
 async function dropStructure(

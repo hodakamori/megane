@@ -2,12 +2,7 @@ import { describe, it, expect } from "vitest";
 import { MoleculeRenderer } from "@/renderer/MoleculeRenderer";
 import { ImpostorAtomMesh } from "@/renderer/ImpostorAtomMesh";
 import { ImpostorBondMesh } from "@/renderer/ImpostorBondMesh";
-import {
-  LICORICE_RADIUS,
-  BOND_RADIUS,
-  getRadius,
-  BALL_STICK_ATOM_SCALE,
-} from "@/constants";
+import { LICORICE_RADIUS, BOND_RADIUS, getRadius, BALL_STICK_ATOM_SCALE } from "@/constants";
 import type { Snapshot } from "@/types";
 
 function makeSnapshot(): Snapshot {

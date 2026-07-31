@@ -57,6 +57,8 @@ const STRUCTURE_EXTS = [
   ".pdbx",
   ".gro",
   ".xyz",
+  // Jmol's second extension for plain XYZ.
+  ".jxyz",
   ".mol",
   ".sdf",
   ".cif",

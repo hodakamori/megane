@@ -18,11 +18,13 @@ import { matchesStructureName } from "../../parsers/fileNames";
 // `.vasp` here. Its extensionless spellings (POSCAR / CONTCAR / XDATCAR) are
 // still accepted on drag-drop via `matchesStructureName`.
 const STRUCTURE_ACCEPT =
-  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp";
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp,.jxyz";
 export const STRUCTURE_EXTS = [
   ".pdb",
   ".gro",
   ".xyz",
+  // Jmol's second extension for plain XYZ.
+  ".jxyz",
   ".mol",
   ".sdf",
   ".mol2",

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { applyViewportState } from "@/pipeline/apply";
-import { DEFAULT_VIEWPORT_STATE, type ViewportState, type RepresentationMode } from "@/pipeline/types";
+import {
+  DEFAULT_VIEWPORT_STATE,
+  type ViewportState,
+  type RepresentationMode,
+} from "@/pipeline/types";
 import type { MoleculeRenderer } from "@/renderer/MoleculeRenderer";
 
 function makeRendererStub() {
@@ -41,11 +45,7 @@ describe("applyViewportState — per-atom representation wiring", () => {
   it("forwards representationByAtom to the renderer on first apply", () => {
     const renderer = makeRendererStub();
     const byAtom: RepresentationMode[] = ["line", "atoms"];
-    applyViewportState(
-      renderer as unknown as MoleculeRenderer,
-      stateWith(byAtom, "atoms"),
-      null,
-    );
+    applyViewportState(renderer as unknown as MoleculeRenderer, stateWith(byAtom, "atoms"), null);
     expect(renderer.setRepresentationByAtom).toHaveBeenCalledWith(byAtom);
   });
 
@@ -76,11 +76,7 @@ describe("applyViewportState — per-atom representation wiring", () => {
 
   it("passes null through for the uniform fast path", () => {
     const renderer = makeRendererStub();
-    applyViewportState(
-      renderer as unknown as MoleculeRenderer,
-      stateWith(null, "line"),
-      null,
-    );
+    applyViewportState(renderer as unknown as MoleculeRenderer, stateWith(null, "line"), null);
     expect(renderer.setRepresentationByAtom).toHaveBeenCalledWith(null);
   });
 });

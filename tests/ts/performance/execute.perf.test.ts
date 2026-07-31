@@ -98,13 +98,10 @@ describe("performance: executePipeline", () => {
     const snapshot = makeSnapshot(100_000);
     const nodes = [
       makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
-      makeNode("f1", "filter", { query: "x > 50 and element != \"H\"" }),
+      makeNode("f1", "filter", { query: 'x > 50 and element != "H"' }),
       makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
     ];
-    const edges = [
-      makeEdge("ls", "particle", "f1", "in"),
-      makeEdge("f1", "out", "vp", "particle"),
-    ];
+    const edges = [makeEdge("ls", "particle", "f1", "in"), makeEdge("f1", "out", "vp", "particle")];
 
     const time = benchmark(() => {
       executePipeline(nodes, edges, { snapshot });

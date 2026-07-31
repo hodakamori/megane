@@ -73,7 +73,11 @@ describe("executeFilter — particle stream", () => {
   });
 
   it("sets indices to atoms matching molecule_id == 0", () => {
-    const out = executeFilter(baseParams({ query: "molecule_id == 0" }), inputs(makeParticle()), null);
+    const out = executeFilter(
+      baseParams({ query: "molecule_id == 0" }),
+      inputs(makeParticle()),
+      null,
+    );
     const result = out.get("out") as ParticleData;
     expect(Array.from(result.indices!)).toEqual([0, 1, 2]);
   });
@@ -128,11 +132,7 @@ describe("executeFilter — bond stream", () => {
 
   it("passes through unchanged when atomElements is null", () => {
     const bond = makeBond({ atomElements: null });
-    const out = executeFilter(
-      baseParams({ bond_query: "molecule_id == 0" }),
-      inputs(bond),
-      null,
-    );
+    const out = executeFilter(baseParams({ bond_query: "molecule_id == 0" }), inputs(bond), null);
     expect(out.get("out")).toBe(bond);
   });
 });

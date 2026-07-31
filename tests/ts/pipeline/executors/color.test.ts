@@ -78,10 +78,7 @@ describe("executeColor", () => {
   });
 
   it("paints every atom in uniform mode when indices is null", () => {
-    const out = executeColor(
-      baseParams({ uniformColor: "#ff0000" }),
-      inputs(makeParticle()),
-    );
+    const out = executeColor(baseParams({ uniformColor: "#ff0000" }), inputs(makeParticle()));
     const result = out.get("out") as ParticleData;
     const buf = result.colorOverrides!;
     expect(buf.length).toBe(12);
@@ -95,10 +92,7 @@ describe("executeColor", () => {
 
   it("paints only the selected indices when indices is non-null", () => {
     const particle = makeParticle({ indices: new Uint32Array([0, 2]) });
-    const out = executeColor(
-      baseParams({ uniformColor: "#00ff00" }),
-      inputs(particle),
-    );
+    const out = executeColor(baseParams({ uniformColor: "#00ff00" }), inputs(particle));
     const result = out.get("out") as ParticleData;
     const buf = result.colorOverrides!;
     expect(buf[1]).toBe(1);
@@ -117,10 +111,7 @@ describe("executeColor", () => {
       indices: new Uint32Array([0]),
       colorOverrides: upstream,
     });
-    const out = executeColor(
-      baseParams({ uniformColor: "#ff0000" }),
-      inputs(particle),
-    );
+    const out = executeColor(baseParams({ uniformColor: "#ff0000" }), inputs(particle));
     const result = out.get("out") as ParticleData;
     const buf = result.colorOverrides!;
     expect(buf[0]).toBe(1);
@@ -141,11 +132,7 @@ describe("executeColor", () => {
 
   it("byResidue uses the supplied atomLabels to choose a palette entry", () => {
     const labels = ["ALA1", "ALA1", "GLY2", "GLY2"];
-    const out = executeColor(
-      baseParams({ mode: "byResidue" }),
-      inputs(makeParticle()),
-      labels,
-    );
+    const out = executeColor(baseParams({ mode: "byResidue" }), inputs(makeParticle()), labels);
     const result = out.get("out") as ParticleData;
     const buf = result.colorOverrides!;
     expect(buf[0]).toBeCloseTo(0.78, 5);

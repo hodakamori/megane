@@ -78,7 +78,9 @@ function makeMockRenderer(scene?: THREE.Scene): MoleculeRenderer {
 /** Mock canvas 2D context to avoid "Not implemented: getContext" errors in jsdom. */
 function mockCanvas2dContext() {
   const ctx = { drawImage: vi.fn() };
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+    ctx as unknown as CanvasRenderingContext2D,
+  );
   return ctx;
 }
 
@@ -286,9 +288,9 @@ describe("captureSnapshot (svg format)", () => {
       drawImage: vi.fn(),
       getImageData: vi.fn().mockReturnValue({ data: new Uint8ClampedArray(16) }),
     };
-    restore2d = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
-      ctx as unknown as CanvasRenderingContext2D,
-    ) as ReturnType<typeof vi.fn>;
+    restore2d = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctx as unknown as CanvasRenderingContext2D) as ReturnType<typeof vi.fn>;
 
     // Mock toBlob to return a minimal PNG blob
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
@@ -385,7 +387,9 @@ describe("resolveGifWorkerScript (issue #497)", () => {
   });
 
   it("falls back to the direct URL when the fetch fails", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve("") });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve("") });
     vi.stubGlobal("fetch", fetchMock);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -406,19 +410,16 @@ describe("captureGif (issue #497)", () => {
     gifInstances.length = 0;
 
     // Composite step draws onto a 2D context — stub it out for jsdom.
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
-      { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
-    );
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
 
     // requestAnimationFrame: run the callback on the next microtask so the
     // per-frame awaits resolve quickly.
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      (cb: FrameRequestCallback) => {
-        Promise.resolve().then(() => cb(0));
-        return 0;
-      },
-    );
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      Promise.resolve().then(() => cb(0));
+      return 0;
+    });
 
     createObjectURL = vi.fn().mockReturnValue("blob:gif-worker-url");
     revokeObjectURL = vi.fn();

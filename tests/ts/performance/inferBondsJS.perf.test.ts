@@ -105,7 +105,9 @@ describe("performance: inferBondsVdwJS", () => {
     const timeLarge = benchmark(() => inferBondsVdwJS(large.positions, large.elements, 50_000), 3);
 
     const ratio = timeLarge / timeSmall;
-    console.log(`  Scaling: 5k=${timeSmall.toFixed(1)}ms, 50k=${timeLarge.toFixed(1)}ms, ratio=${ratio.toFixed(1)}x (expected ~10x)`);
+    console.log(
+      `  Scaling: 5k=${timeSmall.toFixed(1)}ms, 50k=${timeLarge.toFixed(1)}ms, ratio=${ratio.toFixed(1)}x (expected ~10x)`,
+    );
     // With O(N) cell-list, ratio should be roughly 10x, allow up to 50x for CI overhead
     expect(ratio).toBeLessThan(50);
   });

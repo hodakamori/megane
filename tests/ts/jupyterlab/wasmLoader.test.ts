@@ -20,9 +20,7 @@ describe("ensureWasmUrl — catch branch", () => {
       PageConfig: { getOption: vi.fn(() => "https://lab.example.test/extensions") },
     }));
 
-    const { ensureWasmUrl } = await import(
-      "../../../jupyterlab-megane/src/wasmLoader"
-    );
+    const { ensureWasmUrl } = await import("../../../jupyterlab-megane/src/wasmLoader");
     await ensureWasmUrl();
 
     expect((globalThis as GlobalWithWasm).__MEGANE_WASM_URL__).toBe(
@@ -35,9 +33,7 @@ describe("ensureWasmUrl — catch branch", () => {
       PageConfig: { getOption: vi.fn(() => "") },
     }));
 
-    const { ensureWasmUrl } = await import(
-      "../../../jupyterlab-megane/src/wasmLoader"
-    );
+    const { ensureWasmUrl } = await import("../../../jupyterlab-megane/src/wasmLoader");
 
     await expect(ensureWasmUrl()).rejects.toBeDefined();
     expect((globalThis as GlobalWithWasm).__MEGANE_WASM_URL__).toBeUndefined();
@@ -50,9 +46,7 @@ describe("ensureWasmUrl — promise cache", () => {
       PageConfig: { getOption: vi.fn(() => "/lab/extensions") },
     }));
 
-    const { ensureWasmUrl } = await import(
-      "../../../jupyterlab-megane/src/wasmLoader"
-    );
+    const { ensureWasmUrl } = await import("../../../jupyterlab-megane/src/wasmLoader");
 
     const first = ensureWasmUrl();
     const second = ensureWasmUrl();
@@ -65,9 +59,7 @@ describe("ensureWasmUrl — promise cache", () => {
     const getOption = vi.fn(() => "/lab/extensions");
     vi.doMock("@jupyterlab/coreutils", () => ({ PageConfig: { getOption } }));
 
-    const { ensureWasmUrl } = await import(
-      "../../../jupyterlab-megane/src/wasmLoader"
-    );
+    const { ensureWasmUrl } = await import("../../../jupyterlab-megane/src/wasmLoader");
 
     await ensureWasmUrl();
     await ensureWasmUrl();
