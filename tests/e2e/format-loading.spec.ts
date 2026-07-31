@@ -78,6 +78,9 @@ const STRUCTURE_CASES: StructureCase[] = [
   // conversion) and a `[GEOMETRIES] XYZ` optimisation that becomes frames.
   { name: "molden-water", file: "water.molden", mime: "text/plain", expectedAtoms: 3 },
   { name: "molden-water-opt", file: "water_opt.molden", mime: "text/plain", expectedAtoms: 3 },
+  // Jmol's `.jxyz` is plain XYZ under a second extension, with extra per-atom
+  // columns after x/y/z that must not disturb the coordinate read.
+  { name: "jxyz-benzene", file: "benzene.jxyz", mime: "chemical/x-xyz", expectedAtoms: 12 },
   // CASTEP .phonon: the header becomes the periodic structure; the q-point
   // frequency and eigenvector blocks must not be read as more atoms.
   { name: "phonon-si-gamma", file: "si_gamma.phonon", mime: "text/plain", expectedAtoms: 2 },
