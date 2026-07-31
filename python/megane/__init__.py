@@ -1,7 +1,11 @@
 """megane - A fast, beautiful molecular viewer."""
 
 from megane.parsers.cif import load_cif
+<<<<<<< HEAD
 from megane.parsers.gamess import load_gamess
+=======
+from megane.parsers.cml import load_cml
+>>>>>>> origin/main
 from megane.parsers.jcampdx import load_jcampdx
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj_structure
@@ -61,7 +65,11 @@ __all__ = [
     "VectorOverlay",
     "Viewport",
     "load_cif",
+<<<<<<< HEAD
     "load_gamess",
+=======
+    "load_cml",
+>>>>>>> origin/main
     "load_jcampdx",
     "load_lammps_data",
     "load_lammpstrj_structure",

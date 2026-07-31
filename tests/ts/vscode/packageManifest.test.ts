@@ -50,6 +50,7 @@ describe("vscode-megane package.json", () => {
         // OpenDX volumetric grids and only content sniffing separates them.
         "*.jdx",
         "*.jcamp",
+        "*.cml",
         "*.gamess",
         // VASP's standard filenames carry no extension, so the selector needs
         // basename globs alongside the `*.vasp` extension pattern.
@@ -62,6 +63,10 @@ describe("vscode-megane package.json", () => {
 
   it("mentions XCrySDen XSF in the marketplace description", () => {
     expect(manifest.description).toContain("XCrySDen XSF");
+  });
+
+  it("mentions CML in the marketplace description", () => {
+    expect(manifest.description).toContain("CML");
   });
 
   it("mentions VASP in the marketplace description", () => {

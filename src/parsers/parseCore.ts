@@ -198,6 +198,7 @@ interface WasmModule {
   parse_xyz: ParseFn;
   parse_molden: ParseFn;
   parse_xsf: ParseFn;
+  parse_cml: ParseFn;
   parse_gamess: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
@@ -253,6 +254,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_xyz: wasm.parse_xyz,
         parse_molden: wasm.parse_molden,
         parse_xsf: wasm.parse_xsf,
+        parse_cml: wasm.parse_cml,
         parse_gamess: wasm.parse_gamess,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
@@ -318,6 +320,9 @@ function getParserForExtension(ext: string): ParseFn {
     // block makes it multi-frame via the shared XYZ frame reader.
     case ".molden":
       return wasmModule!.parse_molden;
+    // Chemical Markup Language (Open Babel / Avogadro / ChemDraw).
+    case ".cml":
+      return wasmModule!.parse_cml;
     // GAMESS log output. Only `.gamess` is claimed -- registering `*.log`
     // or `*.out` would hijack every log file in the user's workspace.
     case ".gamess":
