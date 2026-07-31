@@ -37,7 +37,7 @@ Legend:
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
 | PDB | `.pdb` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | GRO | `.gro` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
-| XYZ | `.xyz` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| XYZ | `.xyz`, `.jxyz` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | MOL | `.mol` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | SDF | `.sdf` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | MOL2 | `.mol2` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
@@ -103,6 +103,14 @@ modes are separate features, and the latter should share one format-agnostic
 node with CASTEP `.phonon`. Every unrecognised `[...]` section is skipped
 tolerantly — writers emit many vendor-specific blocks and the parser never fails
 on one it does not know.
+
+Note: **`.jxyz`** is Jmol's second extension for plain XYZ, not a separate
+format, so it is an **alias** to the XYZ reader rather than a second parser.
+megane's XYZ parser already covers everything Jmol's writes: multi-frame
+blocks, `Lattice=` extended headers, and extra per-atom columns after x/y/z
+(an atom name and a partial charge in Jmol's output), which are kept as the
+per-atom label. It is registered on the same JupyterLab `IFileType` as `.xyz`
+for the same reason.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
