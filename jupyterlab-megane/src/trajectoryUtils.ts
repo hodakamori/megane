@@ -13,6 +13,15 @@
 export const TRAJECTORY_ONLY_EXTENSIONS = new Set([".xtc", ".dcd", ".nc"]);
 
 /**
+ * Volumetric-only file extensions: scalar grids (Gaussian CUBE, OpenDX) that
+ * carry a field but no atoms. Opening one standalone has nothing to overlay,
+ * so — exactly like the trajectory-only formats above — the host surfaces an
+ * actionable error pointing at the Load Volumetric node instead of feeding the
+ * grid to the structure parser.
+ */
+export const VOLUMETRIC_ONLY_EXTENSIONS = new Set([".cube", ".cub", ".dx"]);
+
+/**
  * Spectrum-only file extensions. A JCAMP-DX spectrum has no coordinates at all,
  * so there is nothing for the 3D viewer to render; opening one standalone
  * surfaces an actionable error pointing at the Load Spectrum node.
@@ -43,4 +52,15 @@ export function isSpectrumOnly(filename: string): boolean {
   const dot = lower.lastIndexOf(".");
   if (dot < 0) return false;
   return SPECTRUM_ONLY_EXTENSIONS.has(lower.slice(dot));
+}
+
+/**
+ * Returns true when `filename` maps to a volumetric-only format (a scalar grid
+ * with no atoms), which needs a structure loaded before it means anything.
+ */
+export function isVolumetricOnly(filename: string): boolean {
+  const lower = filename.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  if (dot < 0) return false;
+  return VOLUMETRIC_ONLY_EXTENSIONS.has(lower.slice(dot));
 }

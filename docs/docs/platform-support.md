@@ -155,6 +155,35 @@ for the same reason.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
+### Volumetric formats
+
+Scalar-field grids consumed by the **Load Volumetric** node and rendered by the
+**Isosurface** node. A grid carries a field but **no atoms**, so it is always an
+overlay on a separately-loaded structure — opening one standalone on JupyterLab
+or VS Code surfaces an actionable error pointing at the Load Volumetric node,
+the same guard the trajectory-only formats get.
+
+| Format | Extensions | Standalone | Jupyter widget | JupyterLab | VS Code | React (npm) | Python |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Gaussian CUBE | `.cube`, `.cub` | ✓ | — | ✓⁶ | ✓⁶ | ✓ | — |
+| OpenDX | `.dx` | ✓ | — | ✓⁶ | ✓⁶ | ✓ | — |
+
+⁶ Registered so the file opens megane, which then explains that a grid needs a
+structure to overlay. Load it through the **Load Volumetric** node in the
+pipeline editor.
+
+Both readers live in **TypeScript** (`src/pipeline/executors/parseCube.ts` and
+`parseDx.ts`), not in `megane-core`, so there is no Python API for them. CUBE
+coordinates are Bohr and converted to Ångström on read; OpenDX is already in
+Ångström. Both use the same voxel ordering (ix outer, iz inner), so the
+Isosurface node consumes them interchangeably.
+
+**`.dx` is ambiguous.** OpenDX grids and JCAMP-DX spectra share the extension,
+so dispatch sniffs the content: OpenDX opens with `object … class
+gridpositions`, JCAMP-DX with `##TITLE=` / `##JCAMP-DX=`. A `.dx` that turns out
+to be a spectrum gets an explicit "megane has no 2D plot surface yet" message
+rather than a confusing parse failure.
+
 ### Trajectory formats
 
 | Format | Extensions | Standalone | Jupyter widget | JupyterLab | VS Code | React (npm) | Python |
@@ -230,7 +259,7 @@ from the previous ordinate, with its Y-value checkpoint at each line start), and
 and `##XYPOINTS=(XY..XY)` tables. `##XFACTOR=` / `##YFACTOR=` are applied, and a
 missing `##DELTAX=` is derived from `FIRSTX` / `LASTX` / `NPOINTS`.
 
-Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `src/parsers/spectrum.ts` (spectrum accept list and JCAMP-DX/OpenDX sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
+Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `src/pipeline/executors/parseVolumetric.ts` (volumetric accept list + `.dx` content sniffing), `src/parsers/spectrum.ts` (spectrum accept list and JCAMP-DX/OpenDX sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
 
 ## UI features
 

@@ -20,9 +20,9 @@ export function ensureWasmUrl(): Promise<void> {
       // pointing into the labextension's static/ directory; the `unknown` cast
       // is needed because the wasm-bindgen .d.ts at build time is the JS glue
       // module's type, not the asset URL type.
-      const mod = (await import(
-        "../../crates/megane-wasm/pkg/megane_wasm_bg.wasm"
-      )) as unknown as { default: string };
+      const mod = (await import("../../crates/megane-wasm/pkg/megane_wasm_bg.wasm")) as unknown as {
+        default: string;
+      };
       (globalThis as Record<string, unknown>).__MEGANE_WASM_URL__ = mod.default;
     } catch (err) {
       const base = PageConfig.getOption("fullLabextensionsUrl");

@@ -174,6 +174,16 @@ function App() {
 | Chem3D XML | `.c3xml` | PerkinElmer Chem3D / ChemDraw XML (CDXML family) — nodes with explicit bonds and orders |
 | CASTEP magres | `.magres` | CASTEP / Quantum ESPRESSO NMR output — the `[atoms]` block (lattice + labelled atoms) with per-block units |
 
+### Volumetric formats (`LoadVolumetric` node)
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| Gaussian CUBE | `.cube`, `.cub` | Gaussian cube grid (Bohr, converted to Angstrom on read) |
+| OpenDX | `.dx` | OpenDX scalar field — the APBS electrostatics output, also read by VMD and PyMOL |
+
+A grid has no atoms of its own, so it is rendered as an isosurface over a
+separately-loaded structure. `.dx` is shared with JCAMP-DX spectra, so the
+loader sniffs the content and says so if the file is really a spectrum.
 ### Spectrum formats (`LoadSpectrum` node)
 
 A spectrum is a 2D (x, y) trace with no atoms or coordinates, so it is drawn by
