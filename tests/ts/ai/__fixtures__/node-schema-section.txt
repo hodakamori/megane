@@ -25,6 +25,21 @@ electron density or electrostatic potential).
 - Outputs: `volumetric` (volumetric data type)
 - No inputs
 
+### load_spectrum
+Loads a JCAMP-DX spectrum (.jdx / .jcamp) -- IR, NMR, MS, or UV/Vis.
+A spectrum has no 3D coordinates, so it feeds the Spectrum Plot node
+rather than the Viewport.
+- Parameters: `{ type: "load_spectrum", fileName: string | null }`
+- Outputs: `spectrum` (spectrum data type)
+- No inputs
+
+### spectrum_plot
+Draws a spectrum as a 2D line chart. Terminal node -- a spectrum has no
+geometry, so it does not reach the 3D renderer.
+- Parameters: `{ type: "spectrum_plot", reverseX: boolean, color: string }`
+- Inputs: `spectrum`
+- No outputs
+
 ### add_bond
 Detects or infers bonds between atoms.
 - Parameters: `{ type: "add_bond", bondSource: "structure" | "file" | "distance" | "none" }`

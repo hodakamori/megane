@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships fourteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, Molden, and XSF)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(14);
+  it("ships fifteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, Molden, XSF, and JCAMP-DX)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(15);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden / JCAMP-DX names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -56,6 +56,7 @@ describe("jupyterlab filetypes", () => {
         "megane-xsf",
         "megane-vasp",
         "megane-molden",
+        "megane-jcampdx",
       ].sort(),
     );
   });
@@ -65,6 +66,17 @@ describe("jupyterlab filetypes", () => {
     expect(xsf).toBeDefined();
     expect(xsf?.extensions).toEqual([".xsf", ".axsf"]);
     expect(xsf?.fileFormat).toBe("text");
+  });
+
+  it("registers .jdx and .jcamp for the JCAMP-DX spectrum filetype", () => {
+    const jcamp = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-jcampdx");
+    expect(jcamp).toBeDefined();
+    expect(jcamp?.extensions).toEqual([".jdx", ".jcamp"]);
+    expect(jcamp?.fileFormat).toBe("text");
+    expect(jcamp?.mimeTypes).toEqual(["chemical/x-jcamp-dx"]);
+    // `.dx` is intentionally absent — it collides with OpenDX volumetric grids
+    // and only content sniffing can tell the two apart.
+    expect(jcamp?.extensions).not.toContain(".dx");
   });
 
   it("registers the VASP filetype with .vasp plus a basename pattern for POSCAR/CONTCAR/XDATCAR", () => {
@@ -136,7 +148,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(14);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(15);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });
