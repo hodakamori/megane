@@ -85,6 +85,13 @@ const STRUCTURE_CASES: StructureCase[] = [
   // Jmol's `.jxyz` is plain XYZ under a second extension, with extra per-atom
   // columns after x/y/z that must not disturb the coordinate read.
   { name: "jxyz-benzene", file: "benzene.jxyz", mime: "chemical/x-xyz", expectedAtoms: 12 },
+  // Chem3D XML: <n> nodes carry explicit <b> bonds, so nothing is inferred.
+  {
+    name: "c3xml-3d-molecule",
+    file: "methoxymethylamine.c3xml",
+    mime: "text/xml",
+    expectedAtoms: 11,
+  },
   // CASTEP magres: the [atoms] block becomes the structure and the [magres]
   // tensor block must not be mistaken for more atoms.
   { name: "magres-si-nmr", file: "si_nmr.magres", mime: "text/plain", expectedAtoms: 8 },

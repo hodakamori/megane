@@ -148,6 +148,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-c3xml",
+    displayName: "Chem3D XML",
+    extensions: [".c3xml"],
+    mimeTypes: ["chemical/x-c3xml"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-magres",
     displayName: "CASTEP magres",
     extensions: [".magres"],

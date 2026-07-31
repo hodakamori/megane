@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array, Uint8Arra
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, cml, dcd, gro, jcampdx, lammps_data, lammpstrj, magres, mmcif, mol, mol2,
-    molden, netcdf, parser, psf, top, traj, vasp, xsf, xtc, xyz,
+    amber, bonds, c3xml, cif, cml, dcd, gro, jcampdx, lammps_data, lammpstrj, magres, mmcif, mol,
+    mol2, molden, netcdf, parser, psf, top, traj, vasp, xsf, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -1051,6 +1051,12 @@ pub fn parse_molden(text: &str) -> Result<ParseResult, JsError> {
     Ok(ParseResult::from_parsed(data))
 }
 
+/// Parse a Chem3D XML (`.c3xml`) document and return structured data.
+#[wasm_bindgen]
+pub fn parse_c3xml(text: &str) -> Result<ParseResult, JsError> {
+    let data = c3xml::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
 /// Parse a CASTEP / Quantum ESPRESSO NMR `.magres` file and return structured data from its `[atoms]` block.
 #[wasm_bindgen]
 pub fn parse_magres(text: &str) -> Result<ParseResult, JsError> {

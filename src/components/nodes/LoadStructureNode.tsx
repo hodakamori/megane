@@ -18,9 +18,13 @@ import { matchesStructureName } from "../../parsers/fileNames";
 // `.vasp` here. Its extensionless spellings (POSCAR / CONTCAR / XDATCAR) are
 // still accepted on drag-drop via `matchesStructureName`.
 const STRUCTURE_ACCEPT =
-  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp,.molden,.cml,.xsf,.axsf,.jxyz,.magres";
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp,.cml,.molden,.xsf,.axsf,.jxyz,.c3xml,.magres";
 export const STRUCTURE_EXTS = [
+  // Molden geometry output.
   ".molden",
+  // Chem3D XML (CDXML family).
+  ".c3xml",
+  // CASTEP / Quantum ESPRESSO NMR output.
   ".magres",
   ".pdb",
   ".gro",

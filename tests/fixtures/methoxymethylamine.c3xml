@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CDXML CreationProgram="ChemDraw / Chem3D" GraphicTypeface="Arial">
+  <fragment id="1">
+    <n id="1" Element="6" Position="0.0000 0.0000 0.0000"/>
+    <n id="2" Element="8" Position="1.4300 0.0000 0.0000"/>
+    <n id="3" Element="6" Position="2.1200 1.2200 0.0000"/>
+    <n id="4" Element="7" Position="3.5300 1.1300 0.0000"/>
+    <n id="5" Element="1" Position="-0.3600 -1.0300 0.0000"/>
+    <n id="6" Element="1" Position="-0.3600 0.5100 0.8900"/>
+    <n id="7" Element="1" Position="-0.3600 0.5100 -0.8900"/>
+    <n id="8" Element="1" Position="1.7700 1.7700 0.8800"/>
+    <n id="9" Element="1" Position="1.7700 1.7700 -0.8800"/>
+    <n id="10" Element="1" Position="3.9500 2.0500 0.0000"/>
+    <n id="11" Element="1" Position="3.9000 0.5900 0.7800"/>
+    <b B="1" E="2" Order="1"/>
+    <b B="2" E="3" Order="1"/>
+    <b B="3" E="4" Order="1"/>
+    <b B="1" E="5" Order="1"/>
+    <b B="1" E="6" Order="1"/>
+    <b B="1" E="7" Order="1"/>
+    <b B="3" E="8" Order="1"/>
+    <b B="3" E="9" Order="1"/>
+    <b B="4" E="10" Order="1"/>
+    <b B="4" E="11" Order="1"/>
+  </fragment>
+</CDXML>

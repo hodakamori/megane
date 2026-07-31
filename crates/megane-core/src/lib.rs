@@ -1,6 +1,7 @@
 pub mod amber;
 pub mod atomic;
 pub mod bonds;
+pub mod c3xml;
 pub mod cif;
 pub mod cml;
 pub mod crystal;
