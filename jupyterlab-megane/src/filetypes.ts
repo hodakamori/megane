@@ -107,6 +107,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-cml",
+    displayName: "Chemical Markup Language",
+    extensions: [".cml"],
+    mimeTypes: ["chemical/x-cml"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     // Volumetric grids. Registered so double-clicking one opens megane, which
     // then explains that a grid needs a structure to overlay — see
     // VOLUMETRIC_ONLY_EXTENSIONS in trajectoryUtils.ts.

@@ -198,6 +198,7 @@ interface WasmModule {
   parse_xyz: ParseFn;
   parse_molden: ParseFn;
   parse_xsf: ParseFn;
+  parse_cml: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
@@ -252,6 +253,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_xyz: wasm.parse_xyz,
         parse_molden: wasm.parse_molden,
         parse_xsf: wasm.parse_xsf,
+        parse_cml: wasm.parse_cml,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
@@ -316,6 +318,9 @@ function getParserForExtension(ext: string): ParseFn {
     // block makes it multi-frame via the shared XYZ frame reader.
     case ".molden":
       return wasmModule!.parse_molden;
+    // Chemical Markup Language (Open Babel / Avogadro / ChemDraw).
+    case ".cml":
+      return wasmModule!.parse_cml;
     case ".cif":
       return wasmModule!.parse_cif;
     case ".mmcif":
