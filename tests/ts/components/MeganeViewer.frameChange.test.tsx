@@ -28,23 +28,13 @@ describe("MeganeViewer.onFrameChange", () => {
 
   it("does not fire on initial mount", () => {
     const onFrameChange = vi.fn();
-    render(
-      <MeganeViewer
-        onUploadStructure={() => {}}
-        onFrameChange={onFrameChange}
-      />,
-    );
+    render(<MeganeViewer onUploadStructure={() => {}} onFrameChange={onFrameChange} />);
     expect(onFrameChange).not.toHaveBeenCalled();
   });
 
   it("fires when the playback store's currentFrame changes", () => {
     const onFrameChange = vi.fn();
-    render(
-      <MeganeViewer
-        onUploadStructure={() => {}}
-        onFrameChange={onFrameChange}
-      />,
-    );
+    render(<MeganeViewer onUploadStructure={() => {}} onFrameChange={onFrameChange} />);
 
     act(() => {
       usePlaybackStore.setState({ currentFrame: 5 });
@@ -61,12 +51,7 @@ describe("MeganeViewer.onFrameChange", () => {
 
   it("does not fire when currentFrame is set to the same value", () => {
     const onFrameChange = vi.fn();
-    render(
-      <MeganeViewer
-        onUploadStructure={() => {}}
-        onFrameChange={onFrameChange}
-      />,
-    );
+    render(<MeganeViewer onUploadStructure={() => {}} onFrameChange={onFrameChange} />);
 
     act(() => {
       usePlaybackStore.setState({ currentFrame: 3 });

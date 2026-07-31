@@ -29,9 +29,9 @@ function makeStatusBar() {
   return { registerStatusItem: vi.fn() };
 }
 
-function registeredItem(
-  statusBar: ReturnType<typeof makeStatusBar>,
-): { node: { textContent: string } } {
+function registeredItem(statusBar: ReturnType<typeof makeStatusBar>): {
+  node: { textContent: string };
+} {
   return statusBar.registerStatusItem.mock.calls[0][1].item as {
     node: { textContent: string };
   };

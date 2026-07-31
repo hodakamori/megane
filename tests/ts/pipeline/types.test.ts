@@ -198,9 +198,19 @@ describe("defaultParams", () => {
 
 describe("NODE_PORTS", () => {
   const allNodeTypes: PipelineNodeType[] = [
-    "load_structure", "load_trajectory", "load_vector", "streaming",
-    "add_bond", "viewport", "filter", "modify", "color", "representation",
-    "label_generator", "polyhedron_generator", "vector_overlay",
+    "load_structure",
+    "load_trajectory",
+    "load_vector",
+    "streaming",
+    "add_bond",
+    "viewport",
+    "filter",
+    "modify",
+    "color",
+    "representation",
+    "label_generator",
+    "polyhedron_generator",
+    "vector_overlay",
   ];
 
   it("defines ports for all node types", () => {
@@ -229,9 +239,18 @@ describe("NODE_PORTS", () => {
 describe("NODE_TYPE_LABELS", () => {
   it("has labels for all node types", () => {
     const allTypes: PipelineNodeType[] = [
-      "load_structure", "load_trajectory", "load_vector",
-      "add_bond", "viewport", "filter", "modify", "color", "representation",
-      "label_generator", "polyhedron_generator", "vector_overlay",
+      "load_structure",
+      "load_trajectory",
+      "load_vector",
+      "add_bond",
+      "viewport",
+      "filter",
+      "modify",
+      "color",
+      "representation",
+      "label_generator",
+      "polyhedron_generator",
+      "vector_overlay",
     ];
     for (const t of allTypes) {
       expect(NODE_TYPE_LABELS[t]).toBeDefined();
@@ -244,7 +263,15 @@ describe("NODE_TYPE_LABELS", () => {
 
 describe("DATA_TYPE_COLORS", () => {
   it("defines colors for all data types", () => {
-    const dataTypes = ["particle", "bond", "cell", "label", "mesh", "trajectory", "vector"] as const;
+    const dataTypes = [
+      "particle",
+      "bond",
+      "cell",
+      "label",
+      "mesh",
+      "trajectory",
+      "vector",
+    ] as const;
     for (const dt of dataTypes) {
       expect(DATA_TYPE_COLORS[dt]).toBeDefined();
       expect(DATA_TYPE_COLORS[dt]).toMatch(/^#[0-9a-fA-F]{6}$/);

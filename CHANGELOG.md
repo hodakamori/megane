@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **CASTEP NMR magres files** (`.magres`) on every host. The `[atoms]` block becomes a periodic structure, with each block's own `units` declaration honoured (Angstrom or bohr, lattice and atoms independently). The `ms`/`efg`/`isc` tensors and the old-style pre-2010 grammar are out of scope; the latter is rejected with a clear message.
 - **VASP structure files** (`POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`) on every host. `XDATCAR` opens as a multi-frame structure, including variable-cell (ISIF ≥ 3) runs that re-emit the header per configuration. Because the standard VASP filenames carry no extension, megane now also dispatches by **basename** (`src/parsers/fileNames.ts`); VS Code registers `POSCAR*` / `CONTCAR*` / `XDATCAR*` globs and JupyterLab an `IFileType.pattern`. VASP 4 files with no species line fall back to the 1-based species index as an atomic-number proxy instead of failing.
 
 ## [0.10.0] - 2026-07-12

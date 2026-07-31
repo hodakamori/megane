@@ -23,7 +23,7 @@ describe("MeasurementPanel", () => {
         measurement={null}
         elements={null}
         onClear={onClear}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -36,7 +36,7 @@ describe("MeasurementPanel", () => {
         measurement={null}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     expect(screen.getByText("Selection")).toBeInTheDocument();
     expect(screen.getByText("C")).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("MeasurementPanel", () => {
         measurement={measurement}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     expect(screen.getByText(/Distance/)).toBeInTheDocument();
     expect(screen.getByText(/1\.47/)).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe("MeasurementPanel", () => {
         measurement={measurement}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     expect(screen.getByText(/Angle/)).toBeInTheDocument();
     expect(screen.getByText(/109\.5/)).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe("MeasurementPanel", () => {
         measurement={null}
         elements={elements}
         onClear={clearFn}
-      />
+      />,
     );
     fireEvent.click(screen.getByText("Clear"));
     expect(clearFn).toHaveBeenCalledTimes(1);
@@ -105,7 +105,7 @@ describe("MeasurementPanel", () => {
         measurement={null}
         elements={null}
         onClear={onClear}
-      />
+      />,
     );
     expect(screen.getByText("?")).toBeInTheDocument();
   });
@@ -124,7 +124,7 @@ describe("MeasurementPanel", () => {
         measurement={measurement}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     expect(screen.getByTestId("measurement-pin")).toBeInTheDocument();
   });
@@ -137,7 +137,7 @@ describe("MeasurementPanel", () => {
         measurement={null}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     expect(screen.queryByTestId("measurement-pin")).toBeNull();
   });
@@ -156,7 +156,7 @@ describe("MeasurementPanel", () => {
         measurement={measurement}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     fireEvent.click(screen.getByTestId("measurement-pin"));
     expect(useMeasurementStore.getState().measurements).toHaveLength(1);
@@ -177,7 +177,7 @@ describe("MeasurementPanel", () => {
         measurement={measurement}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     fireEvent.click(screen.getByTestId("measurement-pin"));
     rerender(
@@ -186,7 +186,7 @@ describe("MeasurementPanel", () => {
         measurement={{ ...measurement, value: 2.0, label: "2.000 Å" }}
         elements={elements}
         onClear={onClear}
-      />
+      />,
     );
     fireEvent.click(screen.getByTestId("measurement-pin"));
     expect(useMeasurementStore.getState().measurements).toHaveLength(2);

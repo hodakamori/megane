@@ -204,6 +204,13 @@ fn parse_vasp(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     PyStructure::from_parsed(py, data)
 }
 
+/// Parse a CASTEP / Quantum ESPRESSO NMR `.magres` file and return structured data from its `[atoms]` block.
+#[pyfunction]
+fn parse_magres(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::magres::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
+
 /// Parse an MDL Molfile (V2000) text and return structured data.
 #[pyfunction]
 fn parse_mol(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -493,6 +500,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_gro, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_vasp, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_magres, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;

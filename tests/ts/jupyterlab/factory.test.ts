@@ -11,11 +11,12 @@ vi.mock("../../../jupyterlab-megane/src/MeganeDocWidget", () => ({
 }));
 
 vi.mock("../../../jupyterlab-megane/src/MeganePipelineDocWidget", () => ({
-  MeganePipelineReactView: vi
-    .fn()
-    .mockImplementation(function (context: unknown, contents: unknown) {
-      return { kind: "pipeline", context, contents };
-    }),
+  MeganePipelineReactView: vi.fn().mockImplementation(function (
+    context: unknown,
+    contents: unknown,
+  ) {
+    return { kind: "pipeline", context, contents };
+  }),
 }));
 
 vi.mock("@jupyterlab/docregistry", () => {
@@ -25,25 +26,23 @@ vi.mock("@jupyterlab/docregistry", () => {
       this.options = options;
     }
   }
-  const DocumentWidget = vi
-    .fn()
-    .mockImplementation(function (opts: { content: unknown; context: unknown }) {
-      return {
-        content: opts.content,
-        context: opts.context,
-        title: { iconClass: "" },
-      };
-    });
+  const DocumentWidget = vi.fn().mockImplementation(function (opts: {
+    content: unknown;
+    context: unknown;
+  }) {
+    return {
+      content: opts.content,
+      context: opts.context,
+      title: { iconClass: "" },
+    };
+  });
   return { ABCWidgetFactory, DocumentWidget };
 });
 
 import { MeganeReactView } from "../../../jupyterlab-megane/src/MeganeDocWidget";
 import { MeganePipelineReactView } from "../../../jupyterlab-megane/src/MeganePipelineDocWidget";
 import { DocumentWidget } from "@jupyterlab/docregistry";
-import {
-  MeganeDocFactory,
-  MeganePipelineDocFactory,
-} from "../../../jupyterlab-megane/src/factory";
+import { MeganeDocFactory, MeganePipelineDocFactory } from "../../../jupyterlab-megane/src/factory";
 
 type Exposed<R = unknown> = { createNewWidget: (ctx: unknown) => R };
 
@@ -72,8 +71,9 @@ describe("MeganeDocFactory", () => {
 
   it("createNewWidget returns a DocumentWidget with the megane iconClass", () => {
     const factory = new MeganeDocFactory(factoryOptions, fakeContents);
-    const widget = (factory as unknown as Exposed<{ title: { iconClass: string } }>)
-      .createNewWidget(fakeContext);
+    const widget = (
+      factory as unknown as Exposed<{ title: { iconClass: string } }>
+    ).createNewWidget(fakeContext);
 
     expect(DocumentWidget).toHaveBeenCalledTimes(1);
     expect(widget.title.iconClass).toBe("jp-MaterialIcon jp-FileIcon");
@@ -99,8 +99,9 @@ describe("MeganePipelineDocFactory", () => {
 
   it("createNewWidget returns a DocumentWidget with the megane iconClass", () => {
     const factory = new MeganePipelineDocFactory(factoryOptions, fakeContents);
-    const widget = (factory as unknown as Exposed<{ title: { iconClass: string } }>)
-      .createNewWidget(fakeContext);
+    const widget = (
+      factory as unknown as Exposed<{ title: { iconClass: string } }>
+    ).createNewWidget(fakeContext);
 
     expect(DocumentWidget).toHaveBeenCalledTimes(1);
     expect(widget.title.iconClass).toBe("jp-MaterialIcon jp-FileIcon");

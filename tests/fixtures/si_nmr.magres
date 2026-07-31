@@ -1,0 +1,27 @@
+#$magres-abinitio-v1.0
+[calculation]
+  calc_code               CASTEP
+  calc_code_version       24.1
+  calc_name               si_nmr
+  calc_xcfunctional       PBE
+[/calculation]
+[atoms]
+  units lattice Angstrom
+  lattice  5.4300000000 0.0000000000 0.0000000000  0.0000000000 5.4300000000 0.0000000000  0.0000000000 0.0000000000 5.4300000000
+  units atom Angstrom
+  atom Si Si         1     0.0000000000    0.0000000000    0.0000000000
+  atom Si Si         2     0.0000000000    2.7150000000    2.7150000000
+  atom Si Si         3     2.7150000000    0.0000000000    2.7150000000
+  atom Si Si         4     2.7150000000    2.7150000000    0.0000000000
+  atom Si Si         5     1.3575000000    1.3575000000    1.3575000000
+  atom Si Si         6     1.3575000000    4.0725000000    4.0725000000
+  atom Si Si         7     4.0725000000    1.3575000000    4.0725000000
+  atom Si Si         8     4.0725000000    4.0725000000    1.3575000000
+[/atoms]
+[magres]
+  units ms ppm
+  ms Si 1   340.12 0.00 0.00  0.00 340.12 0.00  0.00 0.00 340.12
+  ms Si 2   340.12 0.00 0.00  0.00 340.12 0.00  0.00 0.00 340.12
+  units efg au
+  efg Si 1  0.00 0.00 0.00  0.00 0.00 0.00  0.00 0.00 0.00
+[/magres]

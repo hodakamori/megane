@@ -52,6 +52,7 @@ export interface OpenFileOptions {
 type FileKind = "structure" | "trajectory" | "pipeline" | "unknown";
 
 const STRUCTURE_EXTS = [
+  ".magres",
   ".pdb",
   ".ent",
   ".pdbx",

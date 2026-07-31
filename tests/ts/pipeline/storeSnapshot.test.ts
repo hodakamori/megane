@@ -30,9 +30,7 @@ describe("capturePipelineStore + setState restore", () => {
     const minimal = createMinimalStructurePipeline();
     usePipelineStore.setState({ nodes: minimal.nodes, edges: minimal.edges });
 
-    const loader = usePipelineStore
-      .getState()
-      .nodes.find((n) => n.type === "load_structure")!;
+    const loader = usePipelineStore.getState().nodes.find((n) => n.type === "load_structure")!;
     usePipelineStore.getState().setNodeSnapshot(loader.id, {
       snapshot: makeSnapshot(7, true),
       frames: null,
