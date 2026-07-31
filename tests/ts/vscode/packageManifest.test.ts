@@ -46,6 +46,11 @@ describe("vscode-megane package.json", () => {
         "*.molden",
         "*.xsf",
         "*.axsf",
+        // Volumetric grids open the megane editor, which then explains that a
+        // grid needs a structure to overlay.
+        "*.cube",
+        "*.cub",
+        "*.dx",
         // JCAMP-DX spectra. `*.dx` is intentionally absent — it collides with
         // OpenDX volumetric grids and only content sniffing separates them.
         "*.jdx",
@@ -67,6 +72,10 @@ describe("vscode-megane package.json", () => {
 
   it("mentions CML in the marketplace description", () => {
     expect(manifest.description).toContain("CML");
+  });
+  it("mentions the volumetric grids in the marketplace description", () => {
+    expect(manifest.description).toContain("Gaussian CUBE");
+    expect(manifest.description).toContain("OpenDX");
   });
 
   it("mentions VASP in the marketplace description", () => {

@@ -33,16 +33,17 @@ const vscode = acquireVsCodeApi();
 // click is silently ignored inside the webview sandbox, so downloadBlob
 // (src/renderer/RenderCapture.ts) defers to this hook when it is installed.
 // Registered at module scope so it exists before any export can fire.
-(globalThis as { __MEGANE_SAVE_BLOB__?: (blob: Blob, filename: string) => void }).__MEGANE_SAVE_BLOB__ =
-  (blob, filename) => {
-    void blob.arrayBuffer().then((buf) => {
-      vscode.postMessage({
-        type: "saveFile",
-        filename,
-        bytes: Array.from(new Uint8Array(buf)),
-      });
+(
+  globalThis as { __MEGANE_SAVE_BLOB__?: (blob: Blob, filename: string) => void }
+).__MEGANE_SAVE_BLOB__ = (blob, filename) => {
+  void blob.arrayBuffer().then((buf) => {
+    vscode.postMessage({
+      type: "saveFile",
+      filename,
+      bytes: Array.from(new Uint8Array(buf)),
     });
-  };
+  });
+};
 
 function ThemeSync() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
@@ -110,6 +111,18 @@ function App() {
           );
           return;
         }
+        // Volumetric grids (CUBE, OpenDX) carry a scalar field but no atoms, so
+        // there is nothing to render standalone. Guard them the same way.
+        const isVolumetricOnly =
+          lower.endsWith(".cube") || lower.endsWith(".cub") || lower.endsWith(".dx");
+        if (isVolumetricOnly) {
+          setError(
+            `${filename} is a volumetric grid, which has no atoms to render on its own. ` +
+              "Open a structure file (PDB, GRO, etc.) first, then add a Load Volumetric node " +
+              "in the pipeline editor and point it at this file to draw an isosurface.",
+          );
+          return;
+        }
         // Trajectory-only formats (XTC, DCD, NetCDF) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by
@@ -154,19 +167,15 @@ function App() {
             ...structureFiles.map(
               (sf) => new File([sf.content], sf.filename, { type: "text/plain" }),
             ),
-            ...trajectoryFiles.map(
-              (tf) => new File([new Uint8Array(tf.content)], tf.filename),
-            ),
+            ...trajectoryFiles.map((tf) => new File([new Uint8Array(tf.content)], tf.filename)),
           ];
 
           // Re-stringify the pipeline payload into a File so the canonical
           // openFile entry point sees the same .megane.json contract that
           // every other host uses.
-          const meganeFile = new File(
-            [JSON.stringify(pipeline)],
-            "pipeline.megane.json",
-            { type: "application/json" },
-          );
+          const meganeFile = new File([JSON.stringify(pipeline)], "pipeline.megane.json", {
+            type: "application/json",
+          });
           await usePipelineStore.getState().openFile(meganeFile, { companions });
 
           // Populate useMeganeLocal so MeganeViewer props (atom selection,
@@ -240,7 +249,15 @@ function App() {
           }}
         >
           <div style={{ fontWeight: "bold" }}>Error</div>
-          <div style={{ color: "var(--megane-text-secondary)", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
+          <div
+            style={{
+              color: "var(--megane-text-secondary)",
+              maxWidth: "400px",
+              wordBreak: "break-word",
+            }}
+          >
+            {error}
+          </div>
         </div>
       </>
     );
@@ -271,22 +288,22 @@ function App() {
     <>
       <ThemeSync />
       <MeganeViewer
-      testContext="vscode"
-      onUploadStructure={handleUploadStructure}
-      onBondSourceChange={(s) =>
-        local.setBondSource(s as "structure" | "file" | "distance" | "none")
-      }
-      onLabelSourceChange={(s) => local.setLabelSource(s as "none" | "structure" | "file")}
-      onLoadLabelFile={(f) => local.loadLabelFile(f)}
-      onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
-      onLoadVectorFile={(f) => local.loadVectorFile(f)}
-      onLoadDemoVectors={() => local.loadDemoVectors()}
-      initialCameraState={initialCameraState}
-      onCameraStateChange={handleCameraStateChange}
-      onFrameChange={handleFrameChange}
-      onSelectionChange={handleSelectionChange}
-      onMeasurementChange={handleMeasurementChange}
-    />
+        testContext="vscode"
+        onUploadStructure={handleUploadStructure}
+        onBondSourceChange={(s) =>
+          local.setBondSource(s as "structure" | "file" | "distance" | "none")
+        }
+        onLabelSourceChange={(s) => local.setLabelSource(s as "none" | "structure" | "file")}
+        onLoadLabelFile={(f) => local.loadLabelFile(f)}
+        onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
+        onLoadVectorFile={(f) => local.loadVectorFile(f)}
+        onLoadDemoVectors={() => local.loadDemoVectors()}
+        initialCameraState={initialCameraState}
+        onCameraStateChange={handleCameraStateChange}
+        onFrameChange={handleFrameChange}
+        onSelectionChange={handleSelectionChange}
+        onMeasurementChange={handleMeasurementChange}
+      />
     </>
   );
 }
