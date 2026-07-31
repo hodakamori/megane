@@ -78,6 +78,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
     parse_molden: structFn("parse_molden"),
+    parse_xsf: structFn("parse_xsf"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),
@@ -192,6 +193,14 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       const out = await sync.parseStructureFile(fakeFile(filename, "ITEM: TIMESTEP"));
       expect(calls).toContain("parse_lammpstrj_structure");
       expect(out.frames.length).toBe(1); // frame 0 is the snapshot; one extra frame
+    },
+  );
+
+  it.each([["si.xsf"], ["relax.axsf"]])(
+    "routes the XCrySDen file %s through the XSF parser",
+    async (filename) => {
+      await sync.parseStructureFile(fakeFile(filename, "ATOMS\n 14 0 0 0\n"));
+      expect(calls).toContain("parse_xsf");
     },
   );
 
