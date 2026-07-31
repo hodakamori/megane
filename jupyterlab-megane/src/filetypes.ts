@@ -127,6 +127,17 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    // JCAMP-DX spectra. Registered so double-clicking one opens megane, which
+    // then explains that a spectrum needs the Load Spectrum node -- see
+    // SPECTRUM_ONLY_EXTENSIONS in trajectoryUtils.ts.
+    name: "megane-jcampdx",
+    displayName: "JCAMP-DX spectrum",
+    extensions: [".jdx", ".jcamp"],
+    mimeTypes: ["chemical/x-jcamp-dx"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-magres",
     displayName: "CASTEP magres",
     extensions: [".magres"],
