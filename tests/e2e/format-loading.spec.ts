@@ -65,6 +65,11 @@ const STRUCTURE_CASES: StructureCase[] = [
   // The `.trj` alias is exercised alongside the canonical `.lammpstrj`.
   { name: "lammpstrj-water", file: "water.lammpstrj", mime: "text/plain", expectedAtoms: 3 },
   { name: "trj-water", file: "water.trj", mime: "text/plain", expectedAtoms: 3 },
+  // VASP is the one format dispatched by *filename* rather than extension —
+  // POSCAR / CONTCAR / XDATCAR carry no extension at all. These two cases
+  // therefore also cover `structureExtFromFileName`'s bare-name mapping.
+  { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
+  { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
 ];
 
 async function dropStructure(

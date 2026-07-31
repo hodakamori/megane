@@ -47,12 +47,34 @@ Legend:
 | AMBER topology | `.prmtop` | ✓ | API | ✓ | ✓ | ✓ | API |
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
 
 Note: ASE `.traj` is self-contained (elements, bonds, and all frames in one file) and is loaded via the **Load Structure** node, not Load Trajectory. It is listed here because it contains multi-frame trajectory data.
 
 Note: **LAMMPS dump** (`.lammpstrj` / `.dump` / `.trj`) is also loaded via the **Load Structure** node as a self-contained multi-frame structure — frame 0 defines the topology and the remaining frames stream into playback, exactly like a multi-frame XYZ. Because a dump carries no element symbols or masses, the integer per-atom `type` id is used as the atomic-number **proxy** for colouring/sizing (placeholder chemistry, not real elements), and bonds are inferred by distance. A dump can still be **attached onto a separately-loaded topology** (which supplies true elements) via the Load Trajectory node — see the Trajectory formats table below.
+
+Note: **VASP** files are the one format megane dispatches by **filename**, not
+only by extension: `POSCAR`, `CONTCAR`, and `XDATCAR` are conventionally written
+with no extension at all. `src/parsers/fileNames.ts` maps those bare names (and
+their common suffixed forms — `POSCAR.bak`, `CONTCAR_relaxed`, `XDATCAR-run2`)
+onto the synthetic `.vasp` extension every other dispatch point already
+understands, so drag-drop on Standalone, the JupyterLab file browser (via an
+`IFileType.pattern`), and the VS Code `customEditors` selector (`POSCAR*` /
+`CONTCAR*` / `XDATCAR*`) all open them. The **file dialog** filter is the one
+place that cannot express an extensionless name — an HTML `accept` list only
+takes extensions and MIME types — so the Standalone picker offers `.vasp` and
+bare `POSCAR`/`CONTCAR`/`XDATCAR` files are opened by dragging them in (or by
+switching the picker to "All Files"). An **XDATCAR** opens as a multi-frame
+structure, exactly like a multi-frame XYZ; variable-cell runs (ISIF ≥ 3), which
+re-emit the whole header before each configuration, animate the cell too. A
+**VASP 4** file has no species-name line (species come from POTCAR); rather than
+failing, the 1-based species index becomes the atomic-number **proxy** — the same
+convention LAMMPS dump uses for its integer `type` ids — and every atom is
+labelled `Type<N> (no species line)` so the substitution is visible in the viewer.
+`Selective dynamics` flags are parsed and ignored, and a trailing velocity block
+is skipped.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
@@ -130,6 +152,7 @@ with a GROMACS `.top`).
 ² Python `AddBonds` only wires GROMACS `.top` topology via the `top=` parameter. PSF bonds are accessible programmatically via `megane.parsers.psf.parse_psf_bonds(path)` or `megane_parser.parse_psf_bonds(text)`, but cannot be passed directly to an `AddBonds` pipeline node.
 
 Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/pipeline/executors/parseVolumetric.ts` (volumetric accept list + `.dx` content sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
+Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
 
 ## UI features
 
@@ -176,7 +199,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

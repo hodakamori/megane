@@ -39,6 +39,7 @@ describe("vscode-megane package.json", () => {
         "*.sdf",
         "*.traj",
         "*.trj",
+        "*.vasp",
         "*.xtc",
         "*.xyz",
         // Volumetric grids open the megane editor, which then explains that a
@@ -46,6 +47,11 @@ describe("vscode-megane package.json", () => {
         "*.cube",
         "*.cub",
         "*.dx",
+        // VASP's standard filenames carry no extension, so the selector needs
+        // basename globs alongside the `*.vasp` extension pattern.
+        "POSCAR*",
+        "CONTCAR*",
+        "XDATCAR*",
       ].sort(),
     );
   });
@@ -53,5 +59,9 @@ describe("vscode-megane package.json", () => {
   it("mentions the volumetric grids in the marketplace description", () => {
     expect(manifest.description).toContain("Gaussian CUBE");
     expect(manifest.description).toContain("OpenDX");
+  });
+
+  it("mentions VASP in the marketplace description", () => {
+    expect(manifest.description).toContain("VASP");
   });
 });

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **VASP structure files** (`POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`) on every host. `XDATCAR` opens as a multi-frame structure, including variable-cell (ISIF ≥ 3) runs that re-emit the header per configuration. Because the standard VASP filenames carry no extension, megane now also dispatches by **basename** (`src/parsers/fileNames.ts`); VS Code registers `POSCAR*` / `CONTCAR*` / `XDATCAR*` globs and JupyterLab an `IFileType.pattern`. VASP 4 files with no species line fall back to the 1-based species index as an atomic-number proxy instead of failing.
 - **OpenDX volumetric grids** (`.dx`) in the Load Volumetric node, alongside the existing Gaussian CUBE reader — the de-facto APBS electrostatics output. The node's accept list is now multi-format and dispatches by extension.
 - **Volumetric grids are registered on JupyterLab and VS Code.** Opening a `.cube` / `.cub` / `.dx` standalone now surfaces an actionable "load a structure first, then add a Load Volumetric node" message instead of feeding the grid to the structure parser.
 - The volumetric formats now have their own table in `docs/docs/platform-support.md` — `.cube` had never been documented.
