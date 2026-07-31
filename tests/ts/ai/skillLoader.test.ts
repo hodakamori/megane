@@ -76,9 +76,7 @@ describe("buildToolDefinitions", () => {
   });
 
   it("each tool has the empty-input schema shape", () => {
-    const tools = buildToolDefinitions([
-      { name: "x", description: "d", content: "" },
-    ]);
+    const tools = buildToolDefinitions([{ name: "x", description: "d", content: "" }]);
     expect(tools[0].input_schema).toEqual({ type: "object", properties: {} });
     expect(tools[0].description).toBe("d");
   });

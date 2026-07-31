@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array, Uint8Arra
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, dcd, gro, jcampdx, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser,
-    psf, top, traj, vasp, xtc, xyz,
+    amber, bonds, cif, dcd, gro, jcampdx, lammps_data, lammpstrj, mmcif, mol, mol2, molden, netcdf,
+    parser, psf, top, traj, vasp, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -1027,6 +1027,13 @@ pub fn parse_jcampdx(text: &str) -> Result<SpectrumResult, JsError> {
         x: s.x,
         y: s.y,
     })
+}
+
+/// Parse a Molden file (`.molden`) and return structured data. A `[GEOMETRIES] XYZ` block yields a multi-frame structure.
+#[wasm_bindgen]
+pub fn parse_molden(text: &str) -> Result<ParseResult, JsError> {
+    let data = molden::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
 }
 
 /// Parse an MDL Molfile (V2000) text and return structured data.

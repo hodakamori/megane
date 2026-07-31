@@ -70,7 +70,9 @@ describe("getLayoutedElements", () => {
         const a = result.nodes[i].position;
         const b = result.nodes[j].position;
         const samePosition = a.x === b.x && a.y === b.y;
-        expect(samePosition, `nodes ${result.nodes[i].id} and ${result.nodes[j].id} overlap`).toBe(false);
+        expect(samePosition, `nodes ${result.nodes[i].id} and ${result.nodes[j].id} overlap`).toBe(
+          false,
+        );
       }
     }
   });

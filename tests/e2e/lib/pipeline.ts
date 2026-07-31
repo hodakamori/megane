@@ -34,7 +34,9 @@ export async function insertNode(
   return await scope.evaluate(
     ({ t, p }) => {
       const w = window as Window & {
-        __megane_test_pipeline_store?: { getState: () => { addNode: (t: string, p?: { x: number; y: number }) => string } };
+        __megane_test_pipeline_store?: {
+          getState: () => { addNode: (t: string, p?: { x: number; y: number }) => string };
+        };
       };
       const store = w.__megane_test_pipeline_store;
       if (!store) throw new Error("__megane_test_pipeline_store not exposed; testMode off?");

@@ -237,6 +237,13 @@ fn parse_jcampdx(py: Python<'_>, text: &str) -> PyResult<PySpectrum> {
     })
 }
 
+/// Parse a Molden file (`.molden`) and return structured data. A `[GEOMETRIES] XYZ` block yields a multi-frame structure.
+#[pyfunction]
+fn parse_molden(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::molden::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
+
 /// Parse an MDL Molfile (V2000) text and return structured data.
 #[pyfunction]
 fn parse_mol(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -526,6 +533,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_gro, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_vasp, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_molden, m)?)?;
     m.add_function(wrap_pyfunction!(parse_jcampdx, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;

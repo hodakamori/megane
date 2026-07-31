@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships thirteen text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, VASP, and JCAMP-DX)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(13);
+  it("ships fourteen text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, VASP, Molden, and JCAMP-DX)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(14);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / JCAMP-DX names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden / JCAMP-DX names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -54,6 +54,7 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-dump",
         "megane-amber-prmtop",
         "megane-vasp",
+        "megane-molden",
         "megane-jcampdx",
       ].sort(),
     );
@@ -84,6 +85,13 @@ describe("jupyterlab filetypes", () => {
     expect(re.test("xdatcar")).toBe(true);
     expect(re.test("MyPOSCAR")).toBe(false);
     expect(re.test("notes.txt")).toBe(false);
+  });
+
+  it("registers .molden for the Molden filetype", () => {
+    const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-molden");
+    expect(ft).toBeDefined();
+    expect(ft?.extensions).toEqual([".molden"]);
+    expect(ft?.fileFormat).toBe("text");
   });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
@@ -130,13 +138,9 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(
-      STRUCTURE_FILETYPES_TEXT.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
-      STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(13);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(14);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

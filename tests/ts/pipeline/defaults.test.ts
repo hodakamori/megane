@@ -8,10 +8,7 @@ import {
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Check that every edge references existing node IDs. */
-function assertEdgesValid(
-  nodes: { id: string }[],
-  edges: { source: string; target: string }[],
-) {
+function assertEdgesValid(nodes: { id: string }[], edges: { source: string; target: string }[]) {
   const ids = new Set(nodes.map((n) => n.id));
   for (const e of edges) {
     expect(ids.has(e.source), `edge source "${e.source}" not in nodes`).toBe(true);

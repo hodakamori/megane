@@ -85,9 +85,7 @@ export function startCodeServer(opts: StartCodeServerOpts): Promise<CodeServerHa
     // with no extensions, which in turn meant `.pdb` had no custom editor
     // registered.
     const userDataDir =
-      opts.userDataDir ??
-      process.env.MEGANE_CODE_SERVER_DIR ??
-      "/tmp/megane-code-server";
+      opts.userDataDir ?? process.env.MEGANE_CODE_SERVER_DIR ?? "/tmp/megane-code-server";
     mkdirSync(userDataDir, { recursive: true });
     writeUserSettings(userDataDir);
     const bin = opts.bin ?? process.env.MEGANE_CODE_SERVER_BIN ?? "code-server";
@@ -95,9 +93,12 @@ export function startCodeServer(opts: StartCodeServerOpts): Promise<CodeServerHa
     const proc = spawn(
       bin,
       [
-        "--auth", "none",
-        "--bind-addr", `127.0.0.1:${opts.port}`,
-        "--user-data-dir", userDataDir,
+        "--auth",
+        "none",
+        "--bind-addr",
+        `127.0.0.1:${opts.port}`,
+        "--user-data-dir",
+        userDataDir,
         "--disable-telemetry",
         "--disable-update-check",
         opts.workspace,
@@ -113,7 +114,8 @@ export function startCodeServer(opts: StartCodeServerOpts): Promise<CodeServerHa
 
     let resolved = false;
     const timer = setTimeout(() => {
-      if (!resolved) reject(new Error(`code-server did not start in ${opts.timeoutMs ?? 90_000}ms`));
+      if (!resolved)
+        reject(new Error(`code-server did not start in ${opts.timeoutMs ?? 90_000}ms`));
     }, opts.timeoutMs ?? 90_000);
 
     const onData = (data: Buffer) => {
@@ -164,7 +166,10 @@ export function stopCodeServer(handle: CodeServerHandle | null): void {
  * Returns a real `Frame` (not a `FrameLocator`) so the test helpers can
  * call `evaluate` / `waitForFunction` on this scope.
  */
-export async function getWebviewFrame(page: Page, opts: { timeoutMs?: number } = {}): Promise<Frame> {
+export async function getWebviewFrame(
+  page: Page,
+  opts: { timeoutMs?: number } = {},
+): Promise<Frame> {
   const timeoutMs = opts.timeoutMs ?? 60_000;
   const deadline = Date.now() + timeoutMs;
   const seenUrls = new Set<string>();
@@ -253,10 +258,7 @@ export interface OpenVscodeNotebookOpts extends OpenVscodeFileOpts {
  * and return the output cell's webview frame containing the megane
  * widget. Used by widget-vscode.spec.ts.
  */
-export async function openVscodeNotebook(
-  page: Page,
-  opts: OpenVscodeNotebookOpts,
-): Promise<Frame> {
+export async function openVscodeNotebook(page: Page, opts: OpenVscodeNotebookOpts): Promise<Frame> {
   const url = `http://127.0.0.1:${opts.port}/?folder=${encodeURIComponent("/workspace")}`;
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".monaco-workbench", { timeout: 30_000 });
@@ -346,11 +348,9 @@ async function pickPythonKernel(page: Page): Promise<void> {
   // Step 2: environment picker. Same idea — wait for placeholder text to
   // change before pressing Enter, otherwise the keypress lands on a
   // stale dialog and the kernel never resolves.
-  await waitForQuickInputPlaceholder(
-    page,
-    /select a python|interpreter|kernel/i,
-    20_000,
-  ).catch(() => {});
+  await waitForQuickInputPlaceholder(page, /select a python|interpreter|kernel/i, 20_000).catch(
+    () => {},
+  );
   await page.waitForTimeout(800);
   await page.keyboard.press("Enter");
   await page.waitForTimeout(1_500);

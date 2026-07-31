@@ -18,7 +18,9 @@ function makeVol(nx = 3, ny = 2, nz = 2): VolumetricData {
   }
   return {
     type: "volumetric",
-    nx, ny, nz,
+    nx,
+    ny,
+    nz,
     origin: ORIGIN_ZERO,
     step: UNIT_STEP,
     data,
@@ -85,7 +87,10 @@ describe("executeIsosurface", () => {
   });
 
   it("encodes positive color into vertex colors", () => {
-    const out = executeIsosurface(baseParams({ color: "#ff0000", opacity: 1.0 }), makeInputs(makeVol()));
+    const out = executeIsosurface(
+      baseParams({ color: "#ff0000", opacity: 1.0 }),
+      makeInputs(makeVol()),
+    );
     const mesh = out.get("mesh") as MeshData;
     if (mesh.colors.length >= 4) {
       expect(mesh.colors[0]).toBeCloseTo(1.0, 1); // R ≈ 1
@@ -95,8 +100,14 @@ describe("executeIsosurface", () => {
   });
 
   it("outputs more vertices when showNegative is enabled", () => {
-    const posOnly = executeIsosurface(baseParams({ isoLevel: 1.5, showNegative: false }), makeInputs(makeVol()));
-    const dual = executeIsosurface(baseParams({ isoLevel: 1.5, showNegative: true }), makeInputs(makeVol()));
+    const posOnly = executeIsosurface(
+      baseParams({ isoLevel: 1.5, showNegative: false }),
+      makeInputs(makeVol()),
+    );
+    const dual = executeIsosurface(
+      baseParams({ isoLevel: 1.5, showNegative: true }),
+      makeInputs(makeVol()),
+    );
     const posMesh = posOnly.get("mesh") as MeshData;
     const dualMesh = dual.get("mesh") as MeshData;
     // The dual contour adds a surface at -1.5; the gradient field has no values
@@ -119,7 +130,9 @@ describe("executeIsosurface", () => {
     }
     const vol: VolumetricData = {
       type: "volumetric",
-      nx: 3, ny: 2, nz: 2,
+      nx: 3,
+      ny: 2,
+      nz: 2,
       origin: ORIGIN_ZERO,
       step: UNIT_STEP,
       data,
@@ -136,7 +149,10 @@ describe("executeIsosurface", () => {
   });
 
   it("showNegative=false with isoLevel=0 does not crash", () => {
-    const out = executeIsosurface(baseParams({ isoLevel: 0, showNegative: false }), makeInputs(makeVol()));
+    const out = executeIsosurface(
+      baseParams({ isoLevel: 0, showNegative: false }),
+      makeInputs(makeVol()),
+    );
     expect(out.has("mesh")).toBe(true);
   });
 

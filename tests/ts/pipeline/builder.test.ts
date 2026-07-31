@@ -402,9 +402,7 @@ describe("Pipeline.toJSON", () => {
     // builder fixture didn't wire cell, so we expect 4 + 1 normalize edges.
     expect(edges).toHaveLength(5);
     expect(
-      edges.some(
-        (e) => e.source === s._id && e.sourceHandle === "cell" && e.target === v._id,
-      ),
+      edges.some((e) => e.source === s._id && e.sourceHandle === "cell" && e.target === v._id),
     ).toBe(true);
 
     const filterNode = nodes.find((n) => n.type === "filter")!;

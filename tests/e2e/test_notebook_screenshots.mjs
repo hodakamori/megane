@@ -126,9 +126,7 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
     .waitForSelector('.jp-Notebook-ExecutionIndicator[data-status="idle"]', {
       timeout: 30000,
     })
-    .catch(() =>
-      console.log("  Warning: kernel status indicator not found, continuing..."),
-    );
+    .catch(() => console.log("  Warning: kernel status indicator not found, continuing..."));
   await page.waitForTimeout(2000);
 
   // Execute all cells
@@ -171,8 +169,12 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
         const scrollParent = el.closest(".jp-WindowedPanel-outer") || el.closest(".jp-Notebook");
         if (scrollParent) {
           const parentRect = scrollParent.getBoundingClientRect();
-          const targetScroll = scrollParent.scrollTop + rect.top - parentRect.top
-            - parentRect.height / 2 + rect.height / 2;
+          const targetScroll =
+            scrollParent.scrollTop +
+            rect.top -
+            parentRect.top -
+            parentRect.height / 2 +
+            rect.height / 2;
           scrollParent.scrollTop = Math.max(0, targetScroll);
         } else {
           el.scrollIntoView({ block: "center", behavior: "instant" });
@@ -195,8 +197,12 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
       const scrollParent = el.closest(".jp-WindowedPanel-outer") || el.closest(".jp-Notebook");
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
-        const targetScroll = scrollParent.scrollTop + rect.top - parentRect.top
-          - parentRect.height / 2 + rect.height / 2;
+        const targetScroll =
+          scrollParent.scrollTop +
+          rect.top -
+          parentRect.top -
+          parentRect.height / 2 +
+          rect.height / 2;
         scrollParent.scrollTop = Math.max(0, targetScroll);
       } else {
         el.scrollIntoView({ block: "center", behavior: "instant" });
@@ -217,9 +223,7 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
   // 2. No critical JS errors
   const criticalErrors = jsErrors.filter(
     (e) =>
-      (e.includes("Cannot read propert") ||
-        e.includes("ipywidget") ||
-        e.includes("anywidget")) &&
+      (e.includes("Cannot read propert") || e.includes("ipywidget") || e.includes("anywidget")) &&
       !e.includes("Shader Error") &&
       !e.includes("WebGLProgram"),
   );
@@ -233,9 +237,7 @@ async function runNotebookTest(page, { name, notebookPath, screenshotName }) {
     (e) => e.includes("Shader Error") || e.includes("WebGLProgram"),
   );
   if (shaderErrors.length > 0) {
-    console.log(
-      `  INFO: ${shaderErrors.length} WebGL shader error(s) (expected in headless mode)`,
-    );
+    console.log(`  INFO: ${shaderErrors.length} WebGL shader error(s) (expected in headless mode)`);
   }
 
   console.log(`=== ${name}: PASSED ===`);
@@ -373,6 +375,10 @@ try {
     server.stderr?.destroy();
     server.unref();
     // Fire-and-forget SIGKILL fallback; unref'd so it doesn't block exit.
-    setTimeout(() => { try { server.kill('SIGKILL'); } catch {} }, 3000).unref();
+    setTimeout(() => {
+      try {
+        server.kill("SIGKILL");
+      } catch {}
+    }, 3000).unref();
   }
 }

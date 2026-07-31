@@ -111,6 +111,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-molden",
+    displayName: "Molden",
+    extensions: [".molden"],
+    mimeTypes: ["chemical/x-molden"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     // JCAMP-DX spectra. Registered so double-clicking one opens megane, which
     // then explains that a spectrum needs the Load Spectrum node -- see
     // SPECTRUM_ONLY_EXTENSIONS in trajectoryUtils.ts.

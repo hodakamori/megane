@@ -9,11 +9,7 @@
  */
 
 import { test, expect } from "playwright/test";
-import {
-  defaultViewerContract,
-  assertDomContract,
-  waitForReady,
-} from "./lib/setup";
+import { defaultViewerContract, assertDomContract, waitForReady } from "./lib/setup";
 
 const ATOM_COUNT_CAFFEINE = 3024;
 
@@ -42,9 +38,7 @@ test.describe("pipeline-editor: webapp default graph", () => {
     ]);
 
     for (const kind of SEEDED_KINDS) {
-      const count = await page
-        .locator(`[data-testid="pipeline-node-${kind}"]`)
-        .count();
+      const count = await page.locator(`[data-testid="pipeline-node-${kind}"]`).count();
       expect(count, `expected at least one ${kind} node in the seed graph`).toBeGreaterThan(0);
     }
   });

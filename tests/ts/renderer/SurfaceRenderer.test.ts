@@ -167,13 +167,7 @@ describe("buildSdf – two atoms", () => {
   });
 
   it("grid has at least some inside voxels", () => {
-    const result = buildSdf(
-      makePositions(0, 0, 0, 3, 0, 0),
-      makeElements(6, 8),
-      2,
-      1.4,
-      24,
-    );
+    const result = buildSdf(makePositions(0, 0, 0, 3, 0, 0), makeElements(6, 8), 2, 1.4, 24);
     const insideCount = Array.from(result.sdf).filter((v) => v < 0).length;
     expect(insideCount).toBeGreaterThan(0);
   });

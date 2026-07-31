@@ -91,14 +91,20 @@ function spawnLab() {
     const timer = setTimeout(() => reject(new Error("JupyterLab did not start in time")), 90000);
     const handler = (data) => {
       const line = data.toString();
-      if (line.includes(String(PORT)) && (line.includes("http://") || line.includes("is running at"))) {
+      if (
+        line.includes(String(PORT)) &&
+        (line.includes("http://") || line.includes("is running at"))
+      ) {
         clearTimeout(timer);
         resolve(proc);
       }
     };
     proc.stdout.on("data", handler);
     proc.stderr.on("data", handler);
-    proc.on("error", (err) => { clearTimeout(timer); reject(err); });
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -142,7 +148,9 @@ try {
   await sleep(5000);
 
   // Reset frame buffer and observe steady FPS for 5 seconds
-  await page.evaluate(() => { window.__meganeFrameTimes = []; });
+  await page.evaluate(() => {
+    window.__meganeFrameTimes = [];
+  });
   await sleep(5000);
 
   const perf = await collectPerf(page);
@@ -171,17 +179,27 @@ try {
   savePerfJson("widget", out);
   await saveScreenshot(page, "perf-widget.png");
 
-  console.log(`  widget-mount   = ${widgetMountMs?.toFixed(1)} ms (budget ${BUDGETS.widgetMountMs})`);
+  console.log(
+    `  widget-mount   = ${widgetMountMs?.toFixed(1)} ms (budget ${BUDGETS.widgetMountMs})`,
+  );
   console.log(`  wasm-init      = ${wasmInitMs?.toFixed(1)} ms (budget ${BUDGETS.wasmInitMs})`);
-  console.log(`  first-render   = ${firstRenderMs?.toFixed(1)} ms (budget ${BUDGETS.firstRenderMs})`);
+  console.log(
+    `  first-render   = ${firstRenderMs?.toFixed(1)} ms (budget ${BUDGETS.firstRenderMs})`,
+  );
   console.log(`  steady fps     = ${frames?.fps?.toFixed(1)} (budget ≥ ${BUDGETS.steadyFpsMin})`);
-  console.log(`  heap           = ${(perf.heap ?? 0) / (1024 * 1024)} MB (budget ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB)`);
+  console.log(
+    `  heap           = ${(perf.heap ?? 0) / (1024 * 1024)} MB (budget ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB)`,
+  );
 
-  if (widgetMountMs !== null) assert(widgetMountMs <= BUDGETS.widgetMountMs, `widget-mount ≤ ${BUDGETS.widgetMountMs} ms`);
-  if (wasmInitMs !== null) assert(wasmInitMs <= BUDGETS.wasmInitMs, `wasm-init ≤ ${BUDGETS.wasmInitMs} ms`);
-  if (firstRenderMs !== null) assert(firstRenderMs <= BUDGETS.firstRenderMs, `first-render ≤ ${BUDGETS.firstRenderMs} ms`);
+  if (widgetMountMs !== null)
+    assert(widgetMountMs <= BUDGETS.widgetMountMs, `widget-mount ≤ ${BUDGETS.widgetMountMs} ms`);
+  if (wasmInitMs !== null)
+    assert(wasmInitMs <= BUDGETS.wasmInitMs, `wasm-init ≤ ${BUDGETS.wasmInitMs} ms`);
+  if (firstRenderMs !== null)
+    assert(firstRenderMs <= BUDGETS.firstRenderMs, `first-render ≤ ${BUDGETS.firstRenderMs} ms`);
   if (frames) assert(frames.fps >= BUDGETS.steadyFpsMin, `steady FPS ≥ ${BUDGETS.steadyFpsMin}`);
-  if (perf.heap !== null && perf.heap !== undefined) assert(perf.heap <= BUDGETS.heapMaxBytes, `heap ≤ ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB`);
+  if (perf.heap !== null && perf.heap !== undefined)
+    assert(perf.heap <= BUDGETS.heapMaxBytes, `heap ≤ ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB`);
 
   if (process.exitCode === 1) {
     console.log("\n--- perf_widget: SOME BUDGETS EXCEEDED ---");
@@ -192,13 +210,27 @@ try {
   console.error("perf_widget fatal:", err);
   process.exitCode = 1;
 } finally {
-  try { unlinkSync(nbPath); } catch {}
+  try {
+    unlinkSync(nbPath);
+  } catch {}
   if (browser) await browser.close().catch(() => {});
   if (server) {
-    try { server.kill(); } catch {}
-    try { server.stdout?.destroy(); } catch {}
-    try { server.stderr?.destroy(); } catch {}
-    try { server.unref(); } catch {}
-    setTimeout(() => { try { server.kill("SIGKILL"); } catch {} }, 3000).unref();
+    try {
+      server.kill();
+    } catch {}
+    try {
+      server.stdout?.destroy();
+    } catch {}
+    try {
+      server.stderr?.destroy();
+    } catch {}
+    try {
+      server.unref();
+    } catch {}
+    setTimeout(() => {
+      try {
+        server.kill("SIGKILL");
+      } catch {}
+    }, 3000).unref();
   }
 }
