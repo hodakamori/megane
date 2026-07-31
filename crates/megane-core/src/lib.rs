@@ -19,6 +19,7 @@ pub mod top;
 pub mod traj;
 pub mod trajectory;
 pub mod vasp;
+pub mod xsf;
 pub mod xtc;
 pub mod xyz;
 pub use parser::ParsedStructure;
