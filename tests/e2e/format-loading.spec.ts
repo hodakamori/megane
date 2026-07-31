@@ -69,6 +69,10 @@ const STRUCTURE_CASES: StructureCase[] = [
   // frames feed the playback timeline.
   { name: "xsf-si-diamond", file: "si_diamond.xsf", mime: "text/plain", expectedAtoms: 8 },
   { name: "axsf-water-relax", file: "water_relax.axsf", mime: "text/plain", expectedAtoms: 3 },
+  // CML: a 3D molecule with an explicit <bondArray>, and a crystal whose
+  // fractional coordinates are converted with the <crystal> cell.
+  { name: "cml-ethanol", file: "ethanol.cml", mime: "chemical/x-cml", expectedAtoms: 9 },
+  { name: "cml-si-diamond", file: "si_diamond.cml", mime: "chemical/x-cml", expectedAtoms: 8 },
   // VASP is the one format dispatched by *filename* rather than extension —
   // POSCAR / CONTCAR / XDATCAR carry no extension at all. These two cases
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
