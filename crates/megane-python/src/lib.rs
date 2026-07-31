@@ -265,6 +265,12 @@ fn parse_c3xml(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     let data = megane_core::c3xml::parse(text).map_err(PyValueError::new_err)?;
     PyStructure::from_parsed(py, data)
 }
+/// Parse a Wavefunction Odyssey (`.xodydata` / `.odydata`) file and return structured data. The XML and text flavours are detected from the content.
+#[pyfunction]
+fn parse_odydata(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::odydata::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
 /// Parse a CASTEP / Quantum ESPRESSO NMR `.magres` file and return structured data from its `[atoms]` block.
 #[pyfunction]
 fn parse_magres(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -578,6 +584,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_molden, m)?)?;
     m.add_function(wrap_pyfunction!(parse_jcampdx, m)?)?;
     m.add_function(wrap_pyfunction!(parse_c3xml, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_odydata, m)?)?;
     m.add_function(wrap_pyfunction!(parse_magres, m)?)?;
     m.add_function(wrap_pyfunction!(parse_gamess, m)?)?;
     m.add_function(wrap_pyfunction!(parse_phonon, m)?)?;

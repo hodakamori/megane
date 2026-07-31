@@ -80,6 +80,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_molden: structFn("parse_molden"),
     parse_xsf: structFn("parse_xsf"),
     parse_c3xml: structFn("parse_c3xml"),
+    parse_odydata: structFn("parse_odydata"),
     parse_cml: structFn("parse_cml"),
     parse_magres: structFn("parse_magres"),
     parse_gamess: structFn("parse_gamess"),
@@ -241,6 +242,23 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       ),
     );
     expect(calls).toContain("parse_c3xml");
+  });
+
+  it("routes an Odyssey XML file through the Odyssey parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile(
+        "sample.xodydata",
+        '<odyssey_simulation><structure><atom id="1" element="C" xyz="0 0 0"/></structure></odyssey_simulation>',
+      ),
+    );
+    expect(calls).toContain("parse_odydata");
+  });
+
+  it("routes an Odyssey text file through the same Odyssey parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile("sample.odydata", " title\n0 1\n6 0.0 0.0 0.0\nENDCART\n"),
+    );
+    expect(calls).toContain("parse_odydata");
   });
 
   it("routes a magres file through the magres parser", async () => {

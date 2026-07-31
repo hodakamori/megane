@@ -52,6 +52,7 @@ Legend:
 | VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | Molden | `.molden` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | Chem3D XML | `.c3xml` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| Odyssey | `.xodydata`, `.odydata` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | CASTEP magres | `.magres` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | GAMESS output | `.gamess` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | CASTEP phonon | `.phonon` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
@@ -134,6 +135,24 @@ reader's decision, and bonds are deliberately **not** inferred for it because
 projected 2D distances are meaningless. The binary `.cdx` and general `.cdxml`
 variants are out of scope. It shares `quick-xml` with the CML reader, so no new
 dependency.
+Note: **Odyssey** (Wavefunction Inc.'s teaching package, same vendor as
+Spartan) writes **two unrelated layouts** and megane reads both through one
+parser that picks by **content, not extension** — either layout turns up under
+either name. `.xodydata` is the modern XML default rooted at
+`<odyssey_simulation>`: `<atom>` carries `element` and `xyz`, `<bond>` carries
+`a`/`b`/`order`, and `<boundary box="x y z"/>` declares an orthorhombic
+periodic cell. `.odydata` is the older text layout shared with Spartan's
+archive input section (`ENDCART` / `ATOMLABELS` / `HESSIAN` … `ENDHESS`). Bond
+orders are spelled `s`/`d`/`t`/`a` or as integers, and **aromatic collapses to
+1** for display, matching the `.mol2` reader. Odyssey centres a periodic sample
+on the box centre, so atoms are shifted by `+(x/2, y/2, z/2)` into a cell drawn
+at the world origin. A file that declares no bonds falls back to distance
+inference. Wavefunction publishes **no schema**, so the reader is written
+against the element/attribute vocabulary its files use and fails loudly rather
+than guessing; `<group charge>` / `<member entity>` formal charges are skipped
+because there is no formal-charge channel to put them in, and
+wavefunction-based surfaces (orbitals, densities, electrostatic potentials) are
+not stored in these files at all. It reuses `quick-xml`, so no new dependency.
 Note: **magres** files are read for their `[atoms]` block only — the lattice
 and the labelled atoms become a normal periodic structure. Each block in a
 magres file declares its **own** `units` line, and the parser honours them
@@ -333,7 +352,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_magres`, `load_gamess`, `load_phonon`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_odydata`, `load_magres`, `load_gamess`, `load_phonon`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

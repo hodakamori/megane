@@ -54,6 +54,9 @@ type FileKind = "structure" | "trajectory" | "pipeline" | "unknown";
 const STRUCTURE_EXTS = [
   ".molden",
   ".c3xml",
+  // Wavefunction Odyssey (XML `.xodydata` and the older text `.odydata`).
+  ".xodydata",
+  ".odydata",
   ".magres",
   ".gamess",
   ".phonon",
@@ -105,6 +108,10 @@ const FILE_BOND_EXTS = [
   ".lammps",
   ".cml",
   ".c3xml",
+  // Odyssey <bond> / HESSIAN connectivity. A file that declares none still
+  // falls back to distance inference, since `nFileBonds` stays 0.
+  ".xodydata",
+  ".odydata",
 ];
 
 export function defaultBondSourceForFile(filename: string): "structure" | "distance" {

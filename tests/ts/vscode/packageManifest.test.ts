@@ -56,6 +56,9 @@ describe("vscode-megane package.json", () => {
         "*.jdx",
         "*.jcamp",
         "*.c3xml",
+        // Odyssey. Both layouts are claimed; the parser sniffs which is which.
+        "*.xodydata",
+        "*.odydata",
         "*.cml",
         "*.magres",
         "*.gamess",

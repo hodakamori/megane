@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ethanol in the Wavefunction Odyssey XML layout (.xodydata).
+
+  Hand-authored for megane's test suite against the element/attribute
+  vocabulary Odyssey files use; Wavefunction publishes no schema. Geometry is
+  the same ethanol as tests/fixtures/ethanol.cml so the two XML readers can be
+  compared directly. No vendor file was copied.
+-->
+<odyssey_simulation>
+  <title>ethanol</title>
+  <formula>C2H6O</formula>
+  <phase>gas</phase>
+  <structure>
+    <atom id="1" label="C1" element="C" xyz="1.1879 -0.3829 0.0000"/>
+    <atom id="2" label="C2" element="C" xyz="0.0000 0.5526 0.0000"/>
+    <atom id="3" label="O1" element="O" xyz="-1.1867 -0.2472 0.0000"/>
+    <atom id="4" label="H1" element="H" xyz="-1.9237 0.3529 0.0000"/>
+    <atom id="5" label="H2" element="H" xyz="0.0393 1.1963 0.8755"/>
+    <atom id="6" label="H3" element="H" xyz="0.0393 1.1963 -0.8755"/>
+    <atom id="7" label="H4" element="H" xyz="2.1276 0.1811 0.0000"/>
+    <atom id="8" label="H5" element="H" xyz="1.1677 -1.0179 0.8865"/>
+    <atom id="9" label="H6" element="H" xyz="1.1677 -1.0179 -0.8865"/>
+    <bond a="1" b="2" order="s"/>
+    <bond a="2" b="3" order="s"/>
+    <bond a="3" b="4" order="s"/>
+    <bond a="2" b="5" order="s"/>
+    <bond a="2" b="6" order="s"/>
+    <bond a="1" b="7" order="s"/>
+    <bond a="1" b="8" order="s"/>
+    <bond a="1" b="9" order="s"/>
+  </structure>
+</odyssey_simulation>
