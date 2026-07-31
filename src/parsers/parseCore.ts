@@ -291,7 +291,14 @@ function getParserForExtension(ext: string): ParseFn {
   switch (ext) {
     case ".gro":
       return wasmModule!.parse_gro;
+    // Jmol writes plain XYZ under a second extension. megane's XYZ reader
+    // already covers what Jmol's does -- multi-frame blocks, `Lattice=`
+    // extended headers, and extra per-atom columns after x/y/z (kept as the
+    // atom label) -- so `.jxyz` is an alias, not a second parser. The labels
+    // stay adjacent because `no-fallthrough` counts a comment-only case body
+    // as a fallthrough.
     case ".xyz":
+    case ".jxyz":
       return wasmModule!.parse_xyz;
     // XCrySDen. `.axsf` is the same grammar with an `ANIMSTEPS` header, so it
     // arrives as a multi-frame structure through the one parser.

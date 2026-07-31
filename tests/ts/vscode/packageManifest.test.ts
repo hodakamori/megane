@@ -42,6 +42,7 @@ describe("vscode-megane package.json", () => {
         "*.vasp",
         "*.xtc",
         "*.xyz",
+        "*.jxyz",
         "*.molden",
         "*.xsf",
         "*.axsf",
@@ -69,6 +70,10 @@ describe("vscode-megane package.json", () => {
 
   it("mentions VASP in the marketplace description", () => {
     expect(manifest.description).toContain("VASP");
+  });
+
+  it("mentions the Jmol .jxyz alias in the marketplace description", () => {
+    expect(manifest.description).toContain(".jxyz");
   });
 
   it("mentions Molden in the marketplace description", () => {

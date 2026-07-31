@@ -218,6 +218,11 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     },
   );
 
+  it("routes a .jxyz file through the XYZ parser (Jmol's second extension)", async () => {
+    await sync.parseStructureFile(fakeFile("benzene.jxyz", "1\ncomment\nC 0 0 0\n"));
+    expect(calls).toContain("parse_xyz");
+  });
+
   it("routes a Molden file through the Molden parser", async () => {
     await sync.parseStructureFile(
       fakeFile("water.molden", "[Molden Format]\n[Atoms] (Angs)\n O 1 8 0.0 0.0 0.0\n"),
