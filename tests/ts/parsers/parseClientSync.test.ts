@@ -81,6 +81,8 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_xsf: structFn("parse_xsf"),
     parse_c3xml: structFn("parse_c3xml"),
     parse_cml: structFn("parse_cml"),
+    parse_magres: structFn("parse_magres"),
+    parse_gamess: structFn("parse_gamess"),
     parse_phonon: structFn("parse_phonon"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
@@ -241,6 +243,24 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     expect(calls).toContain("parse_c3xml");
   });
 
+  it("routes a magres file through the magres parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile(
+        "si_nmr.magres",
+        "#$magres-abinitio-v1.0\n[atoms]\n atom Si Si 1 0.0 0.0 0.0\n[/atoms]\n",
+      ),
+    );
+    expect(calls).toContain("parse_magres");
+  });
+  it("routes a GAMESS file through the GAMESS parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile(
+        "run.gamess",
+        " COORDINATES OF ALL ATOMS ARE (ANGS)\n   ATOM   CHARGE       X              Y              Z\n ------------------------------------------------------------\n O           8.0    0.0    0.0    0.0\n",
+      ),
+    );
+    expect(calls).toContain("parse_gamess");
+  });
   it("routes a CASTEP phonon file through the CASTEP phonon parser", async () => {
     await sync.parseStructureFile(
       fakeFile(

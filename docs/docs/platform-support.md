@@ -52,6 +52,8 @@ Legend:
 | VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | Molden | `.molden` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | Chem3D XML | `.c3xml` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| CASTEP magres | `.magres` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| GAMESS output | `.gamess` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | CASTEP phonon | `.phonon` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
@@ -132,6 +134,33 @@ reader's decision, and bonds are deliberately **not** inferred for it because
 projected 2D distances are meaningless. The binary `.cdx` and general `.cdxml`
 variants are out of scope. It shares `quick-xml` with the CML reader, so no new
 dependency.
+Note: **magres** files are read for their `[atoms]` block only — the lattice
+and the labelled atoms become a normal periodic structure. Each block in a
+magres file declares its **own** `units` line, and the parser honours them
+independently (Angstrom or bohr for the lattice and the atoms separately)
+rather than assuming Angstrom. The `ms` / `efg` / `isc` entries in `[magres]`
+are 3×3 per-atom tensors with no home in the current renderer — showing them
+wants a per-atom scalar channel (e.g. isotropic shielding = trace/3) that the
+colour-by-property path could consume, plus optionally an ellipsoid
+representation — so they are deliberately left for a follow-up. Only the
+new-style `#$magres-abinitio-v1.0` variant is read; the **old-style**
+(pre-2010) free-form grammar is a different language and is rejected with a
+message that says so rather than misparsed.
+Note: **GAMESS** support reads the program's printed **log output**, not a data
+format. Every `COORDINATES OF ALL ATOMS ARE` banner block becomes a frame, so a
+geometry optimisation scrubs on the timeline like a multi-frame XYZ and the
+terminal `EQUILIBRIUM GEOMETRY LOCATED` block is simply the last one. The
+banner's `(ANGS)` / `(BOHR)` argument is honoured, and the element comes from
+the nuclear-charge column — rounded, since ECP runs print a fractional valence
+charge, with the atom label as the fallback when the rounded charge is not an
+element. Bonds are inferred by distance because GAMESS output carries no
+connectivity.
+
+Note: **`.gamess` is the only extension registered for it.** GAMESS logs are
+normally named `.log` or `.out`, and claiming those in the VS Code
+`customEditors` selector or the JupyterLab filetypes would hijack every log file
+in the user's workspace. Rename a log to `.gamess`, or load it through the Load
+Structure node — that is the deliberate trade-off, not an oversight.
 Note: **CASTEP `.phonon`** currently renders the **header only** — the unit
 cell, fractional coordinates, and species become a normal periodic structure, so
 the file opens and the cell draws. The frequencies and complex eigenvectors that
@@ -304,7 +333,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_phonon`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_magres`, `load_gamess`, `load_phonon`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

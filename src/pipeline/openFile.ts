@@ -54,6 +54,8 @@ type FileKind = "structure" | "trajectory" | "pipeline" | "unknown";
 const STRUCTURE_EXTS = [
   ".molden",
   ".c3xml",
+  ".magres",
+  ".gamess",
   ".phonon",
   ".pdb",
   ".ent",
