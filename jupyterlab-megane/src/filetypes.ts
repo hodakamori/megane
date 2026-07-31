@@ -175,6 +175,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-magres",
+    displayName: "CASTEP magres",
+    extensions: [".magres"],
+    mimeTypes: ["chemical/x-magres"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-gamess",
     displayName: "GAMESS output",
     extensions: [".gamess"],

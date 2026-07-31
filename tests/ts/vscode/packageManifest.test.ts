@@ -57,6 +57,7 @@ describe("vscode-megane package.json", () => {
         "*.jcamp",
         "*.c3xml",
         "*.cml",
+        "*.magres",
         "*.gamess",
         // VASP's standard filenames carry no extension, so the selector needs
         // basename globs alongside the `*.vasp` extension pattern.
@@ -98,6 +99,9 @@ describe("vscode-megane package.json", () => {
     expect(manifest.description).toContain("Chem3D XML");
   });
 
+  it("mentions magres in the marketplace description", () => {
+    expect(manifest.description).toContain("CASTEP magres");
+  });
   it("mentions GAMESS in the marketplace description", () => {
     expect(manifest.description).toContain("GAMESS output");
   });

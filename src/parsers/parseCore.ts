@@ -200,6 +200,7 @@ interface WasmModule {
   parse_xsf: ParseFn;
   parse_c3xml: ParseFn;
   parse_cml: ParseFn;
+  parse_magres: ParseFn;
   parse_gamess: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
@@ -257,6 +258,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_xsf: wasm.parse_xsf,
         parse_c3xml: wasm.parse_c3xml,
         parse_cml: wasm.parse_cml,
+        parse_magres: wasm.parse_magres,
         parse_gamess: wasm.parse_gamess,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
@@ -329,6 +331,10 @@ function getParserForExtension(ext: string): ParseFn {
     // Chemical Markup Language (Open Babel / Avogadro / ChemDraw).
     case ".cml":
       return wasmModule!.parse_cml;
+    // CASTEP / Quantum ESPRESSO NMR output. The [atoms] block is the
+    // structure; the ms/efg/isc tensors in [magres] are a follow-up.
+    case ".magres":
+      return wasmModule!.parse_magres;
     // GAMESS log output. Only `.gamess` is claimed -- registering `*.log`
     // or `*.out` would hijack every log file in the user's workspace.
     case ".gamess":

@@ -265,6 +265,12 @@ fn parse_c3xml(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     let data = megane_core::c3xml::parse(text).map_err(PyValueError::new_err)?;
     PyStructure::from_parsed(py, data)
 }
+/// Parse a CASTEP / Quantum ESPRESSO NMR `.magres` file and return structured data from its `[atoms]` block.
+#[pyfunction]
+fn parse_magres(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::magres::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
 /// Parse a GAMESS (US / Firefly) output file and return structured data. Each `COORDINATES OF ALL ATOMS ARE` block becomes a frame.
 #[pyfunction]
 fn parse_gamess(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -566,6 +572,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_molden, m)?)?;
     m.add_function(wrap_pyfunction!(parse_jcampdx, m)?)?;
     m.add_function(wrap_pyfunction!(parse_c3xml, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_magres, m)?)?;
     m.add_function(wrap_pyfunction!(parse_gamess, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;

@@ -7,6 +7,7 @@ from megane.parsers.gro import load_gro
 from megane.parsers.jcampdx import Spectrum, load_jcampdx
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj, load_lammpstrj_structure
+from megane.parsers.magres import load_magres
 from megane.parsers.mol import load_mol, load_sdf
 from megane.parsers.mol2 import load_mol2
 from megane.parsers.molden import load_molden
@@ -30,6 +31,7 @@ __all__ = [
     "load_lammps_data",
     "load_lammpstrj",
     "load_lammpstrj_structure",
+    "load_magres",
     "load_mol",
     "load_mol2",
     "load_molden",

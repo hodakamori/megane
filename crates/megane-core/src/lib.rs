@@ -11,6 +11,7 @@ pub mod gro;
 pub mod jcampdx;
 pub mod lammps_data;
 pub mod lammpstrj;
+pub mod magres;
 pub mod mmcif;
 pub mod mol;
 pub mod mol2;
