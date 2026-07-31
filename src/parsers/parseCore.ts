@@ -200,6 +200,7 @@ interface WasmModule {
   parse_xsf: ParseFn;
   parse_c3xml: ParseFn;
   parse_cml: ParseFn;
+  parse_magres: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
@@ -256,6 +257,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_xsf: wasm.parse_xsf,
         parse_c3xml: wasm.parse_c3xml,
         parse_cml: wasm.parse_cml,
+        parse_magres: wasm.parse_magres,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
@@ -327,6 +329,10 @@ function getParserForExtension(ext: string): ParseFn {
     // Chemical Markup Language (Open Babel / Avogadro / ChemDraw).
     case ".cml":
       return wasmModule!.parse_cml;
+    // CASTEP / Quantum ESPRESSO NMR output. The [atoms] block is the
+    // structure; the ms/efg/isc tensors in [magres] are a follow-up.
+    case ".magres":
+      return wasmModule!.parse_magres;
     case ".cif":
       return wasmModule!.parse_cif;
     case ".mmcif":

@@ -34,8 +34,8 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships 19 text filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, CML, Molden, XSF, JCAMP-DX, Chem3D XML, and the volumetric grids)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(19);
+  it("ships 20 text filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, CML, Molden, XSF, JCAMP-DX, Chem3D XML, the volumetric grids, and magres)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(20);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden / JCAMP-DX names", () => {
@@ -61,6 +61,7 @@ describe("jupyterlab filetypes", () => {
         "megane-molden",
         "megane-jcampdx",
         "megane-c3xml",
+        "megane-magres",
       ].sort(),
     );
   });
@@ -130,6 +131,12 @@ describe("jupyterlab filetypes", () => {
     expect(ft?.extensions).toEqual([".c3xml"]);
     expect(ft?.fileFormat).toBe("text");
   });
+  it("registers .magres for the magres filetype", () => {
+    const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-magres");
+    expect(ft).toBeDefined();
+    expect(ft?.extensions).toEqual([".magres"]);
+    expect(ft?.fileFormat).toBe("text");
+  });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
     const lammps = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-lammps-data");
@@ -177,7 +184,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(19);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(20);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

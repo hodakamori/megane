@@ -81,6 +81,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_xsf: structFn("parse_xsf"),
     parse_c3xml: structFn("parse_c3xml"),
     parse_cml: structFn("parse_cml"),
+    parse_magres: structFn("parse_magres"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),
@@ -238,6 +239,16 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       ),
     );
     expect(calls).toContain("parse_c3xml");
+  });
+
+  it("routes a magres file through the magres parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile(
+        "si_nmr.magres",
+        "#$magres-abinitio-v1.0\n[atoms]\n atom Si Si 1 0.0 0.0 0.0\n[/atoms]\n",
+      ),
+    );
+    expect(calls).toContain("parse_magres");
   });
 
   it("parseStructureText defaults to PDB and honors fileName", async () => {

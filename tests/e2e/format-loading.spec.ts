@@ -92,6 +92,9 @@ const STRUCTURE_CASES: StructureCase[] = [
     mime: "text/xml",
     expectedAtoms: 11,
   },
+  // CASTEP magres: the [atoms] block becomes the structure and the [magres]
+  // tensor block must not be mistaken for more atoms.
+  { name: "magres-si-nmr", file: "si_nmr.magres", mime: "text/plain", expectedAtoms: 8 },
 ];
 
 async function dropStructure(
