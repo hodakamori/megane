@@ -2,6 +2,7 @@ from megane.parsers.c3xml import load_c3xml
 from megane.parsers.cif import load_cif
 from megane.parsers.cml import load_cml
 from megane.parsers.dcd import load_dcd
+from megane.parsers.gamess import load_gamess
 from megane.parsers.gro import load_gro
 from megane.parsers.jcampdx import Spectrum, load_jcampdx
 from megane.parsers.lammps_data import load_lammps_data
@@ -24,6 +25,7 @@ __all__ = [
     "load_cif",
     "load_cml",
     "load_dcd",
+    "load_gamess",
     "load_gro",
     "load_jcampdx",
     "load_lammps_data",

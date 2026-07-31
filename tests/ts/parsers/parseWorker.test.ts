@@ -65,6 +65,7 @@ const { wasmMock } = vi.hoisted(() => {
     parse_c3xml: () => mockStructResult(3),
     parse_cml: () => mockStructResult(3),
     parse_magres: () => mockStructResult(3),
+    parse_gamess: () => mockStructResult(3),
     parse_vasp: () => mockStructResult(3),
     parse_structure_prefix: () => mockStructResult(3, 0),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),

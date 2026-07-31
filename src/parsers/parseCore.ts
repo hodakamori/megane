@@ -201,6 +201,7 @@ interface WasmModule {
   parse_c3xml: ParseFn;
   parse_cml: ParseFn;
   parse_magres: ParseFn;
+  parse_gamess: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
@@ -258,6 +259,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_c3xml: wasm.parse_c3xml,
         parse_cml: wasm.parse_cml,
         parse_magres: wasm.parse_magres,
+        parse_gamess: wasm.parse_gamess,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
@@ -333,6 +335,10 @@ function getParserForExtension(ext: string): ParseFn {
     // structure; the ms/efg/isc tensors in [magres] are a follow-up.
     case ".magres":
       return wasmModule!.parse_magres;
+    // GAMESS log output. Only `.gamess` is claimed -- registering `*.log`
+    // or `*.out` would hijack every log file in the user's workspace.
+    case ".gamess":
+      return wasmModule!.parse_gamess;
     case ".cif":
       return wasmModule!.parse_cif;
     case ".mmcif":

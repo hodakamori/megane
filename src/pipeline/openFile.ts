@@ -55,6 +55,7 @@ const STRUCTURE_EXTS = [
   ".molden",
   ".c3xml",
   ".magres",
+  ".gamess",
   ".pdb",
   ".ent",
   ".pdbx",

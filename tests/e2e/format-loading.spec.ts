@@ -95,6 +95,9 @@ const STRUCTURE_CASES: StructureCase[] = [
   // CASTEP magres: the [atoms] block becomes the structure and the [magres]
   // tensor block must not be mistaken for more atoms.
   { name: "magres-si-nmr", file: "si_nmr.magres", mime: "text/plain", expectedAtoms: 8 },
+  // GAMESS: a truncated optimisation log whose three coordinate blocks become
+  // frames, with the trailing INTERNUCLEAR DISTANCES table correctly ignored.
+  { name: "gamess-water-opt", file: "water_opt.gamess", mime: "text/plain", expectedAtoms: 3 },
 ];
 
 async function dropStructure(
