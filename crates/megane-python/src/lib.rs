@@ -203,6 +203,7 @@ fn parse_xsf(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     let data = megane_core::xsf::parse(text).map_err(PyValueError::new_err)?;
     PyStructure::from_parsed(py, data)
 }
+
 /// Parse a Chemical Markup Language (`.cml`) document and return structured data.
 #[pyfunction]
 fn parse_cml(py: Python<'_>, text: &str) -> PyResult<PyStructure> {

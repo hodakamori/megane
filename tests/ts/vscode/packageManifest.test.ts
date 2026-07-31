@@ -64,6 +64,7 @@ describe("vscode-megane package.json", () => {
   it("mentions XCrySDen XSF in the marketplace description", () => {
     expect(manifest.description).toContain("XCrySDen XSF");
   });
+
   it("mentions CML in the marketplace description", () => {
     expect(manifest.description).toContain("CML");
   });

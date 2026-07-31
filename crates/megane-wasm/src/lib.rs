@@ -978,6 +978,7 @@ pub fn parse_xsf(text: &str) -> Result<ParseResult, JsError> {
     let data = xsf::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
+
 /// Parse a Chemical Markup Language (`.cml`) document and return structured data.
 #[wasm_bindgen]
 pub fn parse_cml(text: &str) -> Result<ParseResult, JsError> {
