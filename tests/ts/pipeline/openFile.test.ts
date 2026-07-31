@@ -244,6 +244,8 @@ describe("usePipelineStore.openFile — AddBond default by file format", () => {
     ["system.lammps", "structure"],
     // CML carries an explicit <bondArray>, so AddBond should read the file.
     ["ethanol.cml", "structure"],
+    // Chem3D XML carries explicit <b> bond elements too.
+    ["molecule.c3xml", "structure"],
   ];
   const formatsWithoutBonds: Array<[string, string]> = [
     ["water.gro", "distance"],
