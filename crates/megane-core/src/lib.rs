@@ -18,6 +18,7 @@ pub mod mol2;
 pub mod molden;
 pub mod netcdf;
 pub mod parser;
+pub mod phonon;
 pub mod psf;
 pub mod top;
 pub mod traj;

@@ -56,6 +56,7 @@ const STRUCTURE_EXTS = [
   ".c3xml",
   ".magres",
   ".gamess",
+  ".phonon",
   ".pdb",
   ".ent",
   ".pdbx",

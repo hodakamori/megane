@@ -54,6 +54,7 @@ Legend:
 | Chem3D XML | `.c3xml` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | CASTEP magres | `.magres` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | GAMESS output | `.gamess` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| CASTEP phonon | `.phonon` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
 
@@ -160,6 +161,16 @@ normally named `.log` or `.out`, and claiming those in the VS Code
 `customEditors` selector or the JupyterLab filetypes would hijack every log file
 in the user's workspace. Rename a log to `.gamess`, or load it through the Load
 Structure node — that is the deliberate trade-off, not an oversight.
+Note: **CASTEP `.phonon`** currently renders the **header only** — the unit
+cell, fractional coordinates, and species become a normal periodic structure, so
+the file opens and the cell draws. The frequencies and complex eigenvectors that
+follow are parsed by the core (`phonon::parse_with_modes` returns a
+`PhononModes` alongside the structure) but are not yet surfaced to the viewer:
+displacing each atom along `Re(eigenvector)·cos(ωt)` over synthetic frames is a
+**feature**, not a parser concern — it needs a pipeline node plus a q-point and
+branch picker. That node should be **format-agnostic** so Molden's `[FREQ]` /
+`[FR-NORM-COORD]` can share it rather than growing a second implementation, and
+the issue asks for it to land separately.
 
 Note: **`.jxyz`** is Jmol's second extension for plain XYZ, not a separate
 format, so it is an **alias** to the XYZ reader rather than a second parser.
@@ -322,7 +333,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_magres`, `load_gamess`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`, `load_c3xml`, `load_magres`, `load_gamess`, `load_phonon`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

@@ -277,6 +277,12 @@ fn parse_gamess(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     let data = megane_core::gamess::parse(text).map_err(PyValueError::new_err)?;
     PyStructure::from_parsed(py, data)
 }
+/// Parse a CASTEP `.phonon` lattice-dynamics file and return the periodic structure from its header.
+#[pyfunction]
+fn parse_phonon(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::phonon::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
 
 /// Parse an MDL Molfile (V2000) text and return structured data.
 #[pyfunction]
@@ -574,6 +580,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_c3xml, m)?)?;
     m.add_function(wrap_pyfunction!(parse_magres, m)?)?;
     m.add_function(wrap_pyfunction!(parse_gamess, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_phonon, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;
     m.add_function(wrap_pyfunction!(parse_lammps_data, m)?)?;

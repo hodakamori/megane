@@ -202,6 +202,7 @@ interface WasmModule {
   parse_cml: ParseFn;
   parse_magres: ParseFn;
   parse_gamess: ParseFn;
+  parse_phonon: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
@@ -260,6 +261,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_cml: wasm.parse_cml,
         parse_magres: wasm.parse_magres,
         parse_gamess: wasm.parse_gamess,
+        parse_phonon: wasm.parse_phonon,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
@@ -339,6 +341,10 @@ function getParserForExtension(ext: string): ParseFn {
     // or `*.out` would hijack every log file in the user's workspace.
     case ".gamess":
       return wasmModule!.parse_gamess;
+    // CASTEP lattice dynamics. The header is the structure; mode
+    // animation is a follow-up feature, shared with Molden [FREQ].
+    case ".phonon":
+      return wasmModule!.parse_phonon;
     case ".cif":
       return wasmModule!.parse_cif;
     case ".mmcif":
