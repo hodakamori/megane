@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  getVectorsForFrame,
-  generateDemoVectors,
-} from "@/logic/vectorSourceLogic";
+import { getVectorsForFrame, generateDemoVectors } from "@/logic/vectorSourceLogic";
 import type { VectorSourceRefs } from "@/logic/vectorSourceLogic";
 
 describe("getVectorsForFrame", () => {

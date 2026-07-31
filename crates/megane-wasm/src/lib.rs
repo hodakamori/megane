@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use megane_core::{
     amber, bonds, cif, cml, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser,
-    psf, top, traj, xtc, xyz,
+    psf, top, traj, vasp, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -975,6 +975,14 @@ pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_cml(text: &str) -> Result<ParseResult, JsError> {
     let data = cml::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a VASP POSCAR / CONTCAR / XDATCAR (also `.vasp`) text and return
+/// structured data. An XDATCAR yields a multi-frame structure.
+#[wasm_bindgen]
+pub fn parse_vasp(text: &str) -> Result<ParseResult, JsError> {
+    let data = vasp::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 

@@ -69,6 +69,11 @@ const STRUCTURE_CASES: StructureCase[] = [
   // fractional coordinates are converted with the <crystal> cell.
   { name: "cml-ethanol", file: "ethanol.cml", mime: "chemical/x-cml", expectedAtoms: 9 },
   { name: "cml-si-diamond", file: "si_diamond.cml", mime: "chemical/x-cml", expectedAtoms: 8 },
+  // VASP is the one format dispatched by *filename* rather than extension —
+  // POSCAR / CONTCAR / XDATCAR carry no extension at all. These two cases
+  // therefore also cover `structureExtFromFileName`'s bare-name mapping.
+  { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
+  { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
 ];
 
 async function dropStructure(

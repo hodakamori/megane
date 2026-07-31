@@ -197,6 +197,7 @@ interface WasmModule {
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
   parse_cml: ParseFn;
+  parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
   parse_cif: ParseFn;
@@ -249,6 +250,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
         parse_cml: wasm.parse_cml,
+        parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
         parse_cif: wasm.parse_cif,
@@ -285,6 +287,12 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_gro;
     case ".xyz":
       return wasmModule!.parse_xyz;
+    // VASP POSCAR / CONTCAR / XDATCAR. Those filenames carry no extension, so
+    // `structureExtFromFileName` (fileNames.ts) maps them onto this synthetic
+    // `.vasp` extension before dispatch. An XDATCAR arrives as a multi-frame
+    // structure, exactly like a multi-frame XYZ.
+    case ".vasp":
+      return wasmModule!.parse_vasp;
     case ".mol":
     case ".sdf":
       return wasmModule!.parse_mol;

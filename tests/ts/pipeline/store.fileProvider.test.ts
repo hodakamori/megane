@@ -23,7 +23,11 @@ function makeProvider(dispose: () => void, trajectoryId = 1): LazyFrameProvider 
   };
   return new LazyFrameProvider(handle, meta, {
     decode: () =>
-      Promise.resolve({ positions: new Float32Array(6), vectors: new Float32Array(0), vectorChannelCount: 0 }),
+      Promise.resolve({
+        positions: new Float32Array(6),
+        vectors: new Float32Array(0),
+        vectorChannelCount: 0,
+      }),
     dispose,
     prefetchAhead: 0,
   });

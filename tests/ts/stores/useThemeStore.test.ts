@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  useThemeStore,
-  resolveTheme,
-  themeToHex,
-  type Theme,
-} from "@/stores/useThemeStore";
+import { useThemeStore, resolveTheme, themeToHex, type Theme } from "@/stores/useThemeStore";
 
 const STORAGE_KEY = "megane-theme";
 
@@ -103,11 +98,9 @@ describe("useThemeStore", () => {
   });
 
   it("setTheme tolerates a localStorage that throws", () => {
-    const setItem = vi
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new Error("quota exceeded");
-      });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
 
     expect(() => useThemeStore.getState().setTheme("dark")).not.toThrow();
     expect(useThemeStore.getState().theme).toBe("dark");

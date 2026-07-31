@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships twelve text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, and CML)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(12);
+  it("ships thirteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, and CML)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(13);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -54,6 +54,7 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-dump",
         "megane-amber-prmtop",
         "megane-cml",
+        "megane-vasp",
       ].sort(),
     );
   });
@@ -63,6 +64,22 @@ describe("jupyterlab filetypes", () => {
     expect(cml).toBeDefined();
     expect(cml?.extensions).toEqual([".cml"]);
     expect(cml?.fileFormat).toBe("text");
+  });
+
+  it("registers the VASP filetype with .vasp plus a basename pattern for POSCAR/CONTCAR/XDATCAR", () => {
+    const vasp = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-vasp");
+    expect(vasp).toBeDefined();
+    expect(vasp?.extensions).toEqual([".vasp"]);
+    expect(vasp?.fileFormat).toBe("text");
+    // JupyterLab matches `pattern` against the basename before falling back to
+    // extensions, which is the only way an extensionless POSCAR can open.
+    const re = new RegExp(vasp!.pattern!);
+    expect(re.test("POSCAR")).toBe(true);
+    expect(re.test("CONTCAR_relaxed")).toBe(true);
+    expect(re.test("XDATCAR-run2")).toBe(true);
+    expect(re.test("xdatcar")).toBe(true);
+    expect(re.test("MyPOSCAR")).toBe(false);
+    expect(re.test("notes.txt")).toBe(false);
   });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
@@ -109,13 +126,9 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(
-      STRUCTURE_FILETYPES_TEXT.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
-      STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(12);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(13);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

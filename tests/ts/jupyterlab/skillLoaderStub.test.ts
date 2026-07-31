@@ -35,9 +35,7 @@ describe("jupyterlab skillLoaderStub", () => {
   });
 
   it("executeSkill ignores its arguments and still returns null", () => {
-    const skills: PipelineSkill[] = [
-      { name: "skill-name", description: "d", content: "c" },
-    ];
+    const skills: PipelineSkill[] = [{ name: "skill-name", description: "d", content: "c" }];
     expect(executeSkill(skills, "skill-name")).toBeNull();
   });
 });

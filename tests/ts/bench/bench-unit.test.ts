@@ -31,18 +31,40 @@ import { NODE_PORTS, type SerializedPipeline } from "@/pipeline/types";
 const PERFECT_MOLECULE: SerializedPipeline = {
   version: 3,
   nodes: [
-    { id: "loader-1", type: "load_structure", position: { x: 0, y: 0 }, fileName: null, hasTrajectory: false, hasCell: true },
+    {
+      id: "loader-1",
+      type: "load_structure",
+      position: { x: 0, y: 0 },
+      fileName: null,
+      hasTrajectory: false,
+      hasCell: true,
+    },
     { id: "addbond-1", type: "add_bond", position: { x: 0, y: 300 }, bondSource: "structure" },
-    { id: "viewport-1", type: "viewport", position: { x: 0, y: 600 }, perspective: false, cellAxesVisible: true, pivotMarkerVisible: true },
+    {
+      id: "viewport-1",
+      type: "viewport",
+      position: { x: 0, y: 600 },
+      perspective: false,
+      cellAxesVisible: true,
+      pivotMarkerVisible: true,
+    },
   ],
   edges: [
     { source: "loader-1", target: "addbond-1", sourceHandle: "particle", targetHandle: "particle" },
-    { source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+    {
+      source: "loader-1",
+      target: "viewport-1",
+      sourceHandle: "particle",
+      targetHandle: "particle",
+    },
     { source: "addbond-1", target: "viewport-1", sourceHandle: "bond", targetHandle: "bond" },
   ],
 };
 
-function fenced(p: SerializedPipeline, explanation = "Loads the structure and shows bonds."): string {
+function fenced(
+  p: SerializedPipeline,
+  explanation = "Loads the structure and shows bonds.",
+): string {
   return "```json\n" + JSON.stringify(p) + "\n```\n\n" + explanation;
 }
 
@@ -58,7 +80,20 @@ describe("extract", () => {
   });
 
   it("prefers the last valid fence over an earlier one", () => {
-    const small: SerializedPipeline = { version: 3, nodes: [{ id: "v", type: "viewport", position: { x: 0, y: 0 }, perspective: false, cellAxesVisible: true, pivotMarkerVisible: true }], edges: [] };
+    const small: SerializedPipeline = {
+      version: 3,
+      nodes: [
+        {
+          id: "v",
+          type: "viewport",
+          position: { x: 0, y: 0 },
+          perspective: false,
+          cellAxesVisible: true,
+          pivotMarkerVisible: true,
+        },
+      ],
+      edges: [],
+    };
     const text = fenced(small, "first") + "\n" + fenced(PERFECT_MOLECULE, "second");
     expect(findLastValidPipeline(text)?.nodes).toHaveLength(3);
   });
@@ -70,14 +105,16 @@ describe("extract", () => {
   });
 
   it("reports an unclosed fence and recovers nothing", () => {
-    const r = extractPipeline("```json\n{ \"version\": 3, \"nodes\": [");
+    const r = extractPipeline('```json\n{ "version": 3, "nodes": [');
     expect(r.hasUnclosedFence).toBe(true);
     expect(r.pipeline).toBeNull();
     expect(r.source).toBe("none");
   });
 
   it("extractTrailingExplanation returns prose after the closed fence", () => {
-    expect(extractTrailingExplanation(fenced(PERFECT_MOLECULE, "Shows bonds."))).toBe("Shows bonds.");
+    expect(extractTrailingExplanation(fenced(PERFECT_MOLECULE, "Shows bonds."))).toBe(
+      "Shows bonds.",
+    );
     expect(extractTrailingExplanation("```json\n{")).toBe("");
   });
 });
@@ -96,7 +133,11 @@ describe("scoreSchema", () => {
   });
 
   it("penalizes a missing viewport", () => {
-    const p: SerializedPipeline = { ...PERFECT_MOLECULE, nodes: PERFECT_MOLECULE.nodes.slice(0, 2), edges: [PERFECT_MOLECULE.edges[0]] };
+    const p: SerializedPipeline = {
+      ...PERFECT_MOLECULE,
+      nodes: PERFECT_MOLECULE.nodes.slice(0, 2),
+      edges: [PERFECT_MOLECULE.edges[0]],
+    };
     const r = scoreSchema(p);
     expect(r.score).toBeLessThan(1);
     expect(r.checks.find((c) => c.label === "exactly one viewport node")?.passed).toBe(false);
@@ -105,16 +146,29 @@ describe("scoreSchema", () => {
   it("penalizes a type-incompatible edge", () => {
     const p: SerializedPipeline = {
       ...PERFECT_MOLECULE,
-      edges: [...PERFECT_MOLECULE.edges, { source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "bond" }],
+      edges: [
+        ...PERFECT_MOLECULE.edges,
+        {
+          source: "loader-1",
+          target: "viewport-1",
+          sourceHandle: "particle",
+          targetHandle: "bond",
+        },
+      ],
     };
     const r = scoreSchema(p);
-    expect(r.checks.find((c) => c.label === "edges connect type-compatible ports")?.passed).toBe(false);
+    expect(r.checks.find((c) => c.label === "edges connect type-compatible ports")?.passed).toBe(
+      false,
+    );
   });
 
   it("detects a cycle", () => {
     const p: SerializedPipeline = {
       ...PERFECT_MOLECULE,
-      edges: [...PERFECT_MOLECULE.edges, { source: "viewport-1", target: "addbond-1", sourceHandle: "x", targetHandle: "particle" }],
+      edges: [
+        ...PERFECT_MOLECULE.edges,
+        { source: "viewport-1", target: "addbond-1", sourceHandle: "x", targetHandle: "particle" },
+      ],
     };
     expect(scoreSchema(p).checks.find((c) => c.label === "graph is acyclic")?.passed).toBe(false);
   });
@@ -122,9 +176,21 @@ describe("scoreSchema", () => {
   it("flags a disconnected node", () => {
     const p: SerializedPipeline = {
       ...PERFECT_MOLECULE,
-      nodes: [...PERFECT_MOLECULE.nodes, { id: "orphan", type: "load_structure", position: { x: 500, y: 0 }, fileName: null, hasTrajectory: false, hasCell: false }],
+      nodes: [
+        ...PERFECT_MOLECULE.nodes,
+        {
+          id: "orphan",
+          type: "load_structure",
+          position: { x: 500, y: 0 },
+          fileName: null,
+          hasTrajectory: false,
+          hasCell: false,
+        },
+      ],
     };
-    expect(scoreSchema(p).checks.find((c) => c.label === "all nodes reach a viewport")?.passed).toBe(false);
+    expect(
+      scoreSchema(p).checks.find((c) => c.label === "all nodes reach a viewport")?.passed,
+    ).toBe(false);
   });
 });
 
@@ -138,7 +204,14 @@ describe("scoreTask", () => {
   it("rewards required node types and connections", () => {
     const rubric: Rubric = {
       requiredNodeTypes: ["load_structure", "add_bond", "viewport"],
-      requiredConnections: [{ sourceType: "add_bond", targetType: "viewport", sourceHandle: "bond", targetHandle: "bond" }],
+      requiredConnections: [
+        {
+          sourceType: "add_bond",
+          targetType: "viewport",
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        },
+      ],
       minNodes: 3,
     };
     expect(scoreTask(PERFECT_MOLECULE, rubric).score).toBe(1);
@@ -166,7 +239,13 @@ describe("scoreParams", () => {
 
   it("scores a matching parameter as full", () => {
     const r = scoreParams(PERFECT_MOLECULE, {
-      paramChecks: [{ label: "structure bonds", nodeType: "add_bond", test: (n) => (n as { bondSource?: string }).bondSource === "structure" }],
+      paramChecks: [
+        {
+          label: "structure bonds",
+          nodeType: "add_bond",
+          test: (n) => (n as { bondSource?: string }).bondSource === "structure",
+        },
+      ],
     });
     expect(r.score).toBe(1);
   });
@@ -180,7 +259,15 @@ describe("scoreParams", () => {
 
   it("treats a throwing predicate as a failure", () => {
     const r = scoreParams(PERFECT_MOLECULE, {
-      paramChecks: [{ label: "boom", nodeType: "add_bond", test: () => { throw new Error("x"); } }],
+      paramChecks: [
+        {
+          label: "boom",
+          nodeType: "add_bond",
+          test: () => {
+            throw new Error("x");
+          },
+        },
+      ],
     });
     expect(r.score).toBe(0);
   });
@@ -199,13 +286,18 @@ describe("scoreFormat", () => {
     const text = JSON.stringify(PERFECT_MOLECULE);
     const r = scoreFormat(text, extractPipeline(text));
     expect(r.score).toBeLessThan(1);
-    expect(r.checks.find((c) => c.label === "pipeline recovered from a fenced block")?.passed).toBe(false);
+    expect(r.checks.find((c) => c.label === "pipeline recovered from a fenced block")?.passed).toBe(
+      false,
+    );
   });
 
   it("penalizes a bullet-list explanation", () => {
-    const text = "```json\n" + JSON.stringify(PERFECT_MOLECULE) + "\n```\n- does a thing\n- does another";
+    const text =
+      "```json\n" + JSON.stringify(PERFECT_MOLECULE) + "\n```\n- does a thing\n- does another";
     const r = scoreFormat(text, extractPipeline(text));
-    expect(r.checks.find((c) => c.label === "explanation is a short single sentence")?.passed).toBe(false);
+    expect(r.checks.find((c) => c.label === "explanation is a short single sentence")?.passed).toBe(
+      false,
+    );
   });
 });
 
@@ -215,7 +307,13 @@ describe("scoreResponse", () => {
   it("gives a perfect fenced molecule near 1.0", () => {
     const rubric: Rubric = {
       requiredNodeTypes: ["load_structure", "add_bond", "viewport"],
-      paramChecks: [{ label: "structure", nodeType: "add_bond", test: (n) => (n as { bondSource?: string }).bondSource === "structure" }],
+      paramChecks: [
+        {
+          label: "structure",
+          nodeType: "add_bond",
+          test: (n) => (n as { bondSource?: string }).bondSource === "structure",
+        },
+      ],
     };
     const s = scoreResponse(fenced(PERFECT_MOLECULE), rubric);
     expect(s.total).toBe(1);

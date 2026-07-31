@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 
 - `megane-core` now depends on **`quick-xml`** (pull parser, no DTD processing or custom entity expansion, so untrusted XML cannot mount an XXE / billion-laughs attack). Cost to the browser bundle: `megane_wasm_bg.wasm` grows from 544,125 to 586,372 bytes raw (203,106 → 217,087 gzipped, **+6.9 %**), measured on an unoptimized `wasm-opt`-free build.
+- **VASP structure files** (`POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`) on every host. `XDATCAR` opens as a multi-frame structure, including variable-cell (ISIF ≥ 3) runs that re-emit the header per configuration. Because the standard VASP filenames carry no extension, megane now also dispatches by **basename** (`src/parsers/fileNames.ts`); VS Code registers `POSCAR*` / `CONTCAR*` / `XDATCAR*` globs and JupyterLab an `IFileType.pattern`. VASP 4 files with no species line fall back to the 1-based species index as an atomic-number proxy instead of failing.
 
 ## [0.10.0] - 2026-07-12
 
