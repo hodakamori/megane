@@ -384,7 +384,7 @@ async function waitForCanvasInWebview(page, timeoutMs) {
               // background is white-ish; count any pixel that is not near-white
               if (px[i] < 245 || px[i + 1] < 245 || px[i + 2] < 245) nonBg++;
             }
-            return nonBg > (w * h) * 0.001;
+            return nonBg > w * h * 0.001;
           });
           if (rendered) return true;
         }
@@ -408,7 +408,9 @@ async function runFormat(page, fmt, jsErrors) {
   await page.waitForTimeout(400);
   let buf = await page.screenshot({ fullPage: false });
   let r = compareToBaseline(`${fmt.id}--workbench-loaded`, buf);
-  r.ok ? recordPass(`${fmt.id} workbench-loaded`) : recordFail(`${fmt.id} workbench-loaded`, r.reason);
+  r.ok
+    ? recordPass(`${fmt.id} workbench-loaded`)
+    : recordFail(`${fmt.id} workbench-loaded`, r.reason);
 
   // Stage 2: open the file
   jsErrors.length = 0;
@@ -434,7 +436,9 @@ async function runFormat(page, fmt, jsErrors) {
   if (fmt.expectsCanvas && !rendered) {
     recordFail(`${fmt.id} viewer-rendered (canvas)`, "no rendered canvas detected");
   } else {
-    r.ok ? recordPass(`${fmt.id} viewer-rendered`) : recordFail(`${fmt.id} viewer-rendered`, r.reason);
+    r.ok
+      ? recordPass(`${fmt.id} viewer-rendered`)
+      : recordFail(`${fmt.id} viewer-rendered`, r.reason);
   }
 
   // Critical JS errors check (filtered like the existing render test)
@@ -468,7 +472,9 @@ let browser = null;
 const tmpDirsToClean = [];
 
 try {
-  console.log(`\n=== megane VS Code Extension Full-Screen E2E ${UPDATE_MODE ? "[UPDATE]" : ""} ===`);
+  console.log(
+    `\n=== megane VS Code Extension Full-Screen E2E ${UPDATE_MODE ? "[UPDATE]" : ""} ===`,
+  );
 
   const formats = FORMAT_FILTER ? FORMATS.filter((f) => f.id === FORMAT_FILTER) : FORMATS;
   if (formats.length === 0) {

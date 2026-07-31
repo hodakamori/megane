@@ -86,7 +86,10 @@ describe("executeSurfaceMesh", () => {
   });
 
   it("encodes color from params into vertex colors", () => {
-    const out = executeSurfaceMesh(baseParams({ color: "#ff0000", opacity: 1.0 }), inputs(makeParticle(3)));
+    const out = executeSurfaceMesh(
+      baseParams({ color: "#ff0000", opacity: 1.0 }),
+      inputs(makeParticle(3)),
+    );
     const mesh = out.get("mesh") as MeshData;
     if (mesh.colors.length > 0) {
       // First vertex R channel should be close to 1 (red).
@@ -103,7 +106,12 @@ describe("executeSurfaceMesh", () => {
   });
 
   it("uses default alphaRadius=3 when param not specified", () => {
-    const params: SurfaceMeshParams = { type: "surface_mesh", alphaRadius: 3.0, color: "#4488ff", opacity: 0.5 };
+    const params: SurfaceMeshParams = {
+      type: "surface_mesh",
+      alphaRadius: 3.0,
+      color: "#4488ff",
+      opacity: 0.5,
+    };
     const out = executeSurfaceMesh(params, inputs(makeParticle(3)));
     expect(out.has("mesh")).toBe(true);
   });

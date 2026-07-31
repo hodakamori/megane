@@ -26,16 +26,12 @@ describe("Timeline", () => {
   });
 
   it("returns null when totalFrames <= 1", () => {
-    const { container } = render(
-      <Timeline {...defaultProps} totalFrames={1} />
-    );
+    const { container } = render(<Timeline {...defaultProps} totalFrames={1} />);
     expect(container.firstChild).toBeNull();
   });
 
   it("returns null when totalFrames is 0", () => {
-    const { container } = render(
-      <Timeline {...defaultProps} totalFrames={0} />
-    );
+    const { container } = render(<Timeline {...defaultProps} totalFrames={0} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -136,14 +132,28 @@ describe("Timeline", () => {
 
   it("calls onLoopRangeChange when loop-start changes", () => {
     const onLoopRangeChange = vi.fn();
-    render(<Timeline {...defaultProps} loopStart={0} loopEnd={99} onLoopRangeChange={onLoopRangeChange} />);
+    render(
+      <Timeline
+        {...defaultProps}
+        loopStart={0}
+        loopEnd={99}
+        onLoopRangeChange={onLoopRangeChange}
+      />,
+    );
     fireEvent.change(screen.getByTestId("loop-start"), { target: { value: "10" } });
     expect(onLoopRangeChange).toHaveBeenCalledWith(10, 99);
   });
 
   it("calls onLoopRangeChange when loop-end changes", () => {
     const onLoopRangeChange = vi.fn();
-    render(<Timeline {...defaultProps} loopStart={0} loopEnd={99} onLoopRangeChange={onLoopRangeChange} />);
+    render(
+      <Timeline
+        {...defaultProps}
+        loopStart={0}
+        loopEnd={99}
+        onLoopRangeChange={onLoopRangeChange}
+      />,
+    );
     fireEvent.change(screen.getByTestId("loop-end"), { target: { value: "50" } });
     expect(onLoopRangeChange).toHaveBeenCalledWith(0, 50);
   });

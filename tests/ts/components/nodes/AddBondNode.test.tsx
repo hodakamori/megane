@@ -121,9 +121,9 @@ describe("AddBondNode", () => {
 
     const fileText = "[ bonds ]\n1 2";
     const file = makeFileWithText("system.top", fileText);
-    const input = screen.getByText("Load .top / .psf...").parentElement!.querySelector(
-      'input[type="file"]',
-    ) as HTMLInputElement;
+    const input = screen
+      .getByText("Load .top / .psf...")
+      .parentElement!.querySelector('input[type="file"]') as HTMLInputElement;
     Object.defineProperty(input, "files", {
       value: [file],
       writable: false,
@@ -202,9 +202,9 @@ describe("AddBondNode", () => {
     render(<AddBondNode {...nodeProps("ab1", seeded.data.params as AddBondParams)} />);
 
     const file = new File(["junk"], "system.json", { type: "application/json" });
-    const input = screen.getByText("Load .top / .psf...").parentElement!.querySelector(
-      'input[type="file"]',
-    ) as HTMLInputElement;
+    const input = screen
+      .getByText("Load .top / .psf...")
+      .parentElement!.querySelector('input[type="file"]') as HTMLInputElement;
     Object.defineProperty(input, "files", {
       value: [file],
       writable: false,

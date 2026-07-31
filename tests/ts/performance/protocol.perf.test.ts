@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  decodeSnapshot,
-  decodeFrame,
-  MSG_SNAPSHOT,
-  MSG_FRAME,
-} from "@/protocol/protocol";
+import { decodeSnapshot, decodeFrame, MSG_SNAPSHOT, MSG_FRAME } from "@/protocol/protocol";
 
 const MAGIC = 0x4e47454d;
 
@@ -16,29 +11,38 @@ function buildSnapshotBuffer(nAtoms: number, nBonds: number): ArrayBuffer {
   let offset = 0;
 
   // Header
-  view.setUint32(offset, MAGIC, true); offset += 4;
-  view.setUint8(offset, MSG_SNAPSHOT); offset += 1;
-  view.setUint8(offset, 0); offset += 1;
+  view.setUint32(offset, MAGIC, true);
+  offset += 4;
+  view.setUint8(offset, MSG_SNAPSHOT);
+  offset += 1;
+  view.setUint8(offset, 0);
+  offset += 1;
   offset += 2; // reserved
 
-  view.setUint32(offset, nAtoms, true); offset += 4;
-  view.setUint32(offset, nBonds, true); offset += 4;
+  view.setUint32(offset, nAtoms, true);
+  offset += 4;
+  view.setUint32(offset, nBonds, true);
+  offset += 4;
 
   // Random positions
   for (let i = 0; i < nAtoms * 3; i++) {
-    view.setFloat32(offset, Math.random() * 100, true); offset += 4;
+    view.setFloat32(offset, Math.random() * 100, true);
+    offset += 4;
   }
 
   // Elements
   for (let i = 0; i < nAtoms; i++) {
-    view.setUint8(offset, [1, 6, 7, 8][i % 4]); offset += 1;
+    view.setUint8(offset, [1, 6, 7, 8][i % 4]);
+    offset += 1;
   }
   offset += elemPadding;
 
   // Bonds
   for (let i = 0; i < nBonds; i++) {
-    view.setUint32(offset, i % nAtoms, true); offset += 4;
-    view.setUint32(offset, (i + 1) % nAtoms, true); offset += 4;
+    view.setUint32(offset, i % nAtoms, true);
+    offset += 4;
+    view.setUint32(offset, (i + 1) % nAtoms, true);
+    offset += 4;
   }
 
   return buf;
@@ -50,16 +54,22 @@ function buildFrameBuffer(nAtoms: number, frameId: number): ArrayBuffer {
   const view = new DataView(buf);
   let offset = 0;
 
-  view.setUint32(offset, MAGIC, true); offset += 4;
-  view.setUint8(offset, MSG_FRAME); offset += 1;
-  view.setUint8(offset, 0); offset += 1;
+  view.setUint32(offset, MAGIC, true);
+  offset += 4;
+  view.setUint8(offset, MSG_FRAME);
+  offset += 1;
+  view.setUint8(offset, 0);
+  offset += 1;
   offset += 2;
 
-  view.setUint32(offset, frameId, true); offset += 4;
-  view.setUint32(offset, nAtoms, true); offset += 4;
+  view.setUint32(offset, frameId, true);
+  offset += 4;
+  view.setUint32(offset, nAtoms, true);
+  offset += 4;
 
   for (let i = 0; i < nAtoms * 3; i++) {
-    view.setFloat32(offset, Math.random() * 100, true); offset += 4;
+    view.setFloat32(offset, Math.random() * 100, true);
+    offset += 4;
   }
 
   return buf;
@@ -88,9 +98,7 @@ describe("performance: protocol decoding", () => {
   });
 
   it("decode 1,000 frames (1000 atoms each) under 1500ms", () => {
-    const frames = Array.from({ length: 1_000 }, (_, i) =>
-      buildFrameBuffer(1_000, i),
-    );
+    const frames = Array.from({ length: 1_000 }, (_, i) => buildFrameBuffer(1_000, i));
     const time = benchmark(() => {
       for (const buf of frames) {
         decodeFrame(buf);

@@ -121,7 +121,7 @@ describe("TabSelector", () => {
     expect(alpha.getAttribute("tabindex")).toBe("-1");
   });
 
-  it("size=\"compact\" renders smaller buttons with no bottom margin", () => {
+  it('size="compact" renders smaller buttons with no bottom margin', () => {
     render(
       <TabSelector
         options={options}
