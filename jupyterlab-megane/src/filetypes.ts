@@ -97,6 +97,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-xsf",
+    displayName: "XCrySDen structure",
+    extensions: [".xsf", ".axsf"],
+    mimeTypes: ["chemical/x-xcrysden-structure"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     // Volumetric grids. Registered so double-clicking one opens megane, which
     // then explains that a grid needs a structure to overlay — see
     // VOLUMETRIC_ONLY_EXTENSIONS in trajectoryUtils.ts.

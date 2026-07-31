@@ -43,6 +43,8 @@ describe("vscode-megane package.json", () => {
         "*.xtc",
         "*.xyz",
         "*.molden",
+        "*.xsf",
+        "*.axsf",
         // Volumetric grids open the megane editor, which then explains that a
         // grid needs a structure to overlay.
         "*.cube",
@@ -55,6 +57,10 @@ describe("vscode-megane package.json", () => {
         "XDATCAR*",
       ].sort(),
     );
+  });
+
+  it("mentions XCrySDen XSF in the marketplace description", () => {
+    expect(manifest.description).toContain("XCrySDen XSF");
   });
 
   it("mentions the volumetric grids in the marketplace description", () => {
