@@ -1,7 +1,7 @@
 {
   "name": "vscode-megane",
   "displayName": "megane - Molecular Viewer",
-  "description": "View molecular structure files (PDB, GRO, XYZ (incl. Jmol .jxyz), MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE traj, XTC, LAMMPS dump, DCD, AMBER NetCDF, VASP POSCAR/CONTCAR/XDATCAR, Molden, CML, XCrySDen XSF) and JCAMP-DX spectra (.jdx, .jcamp) with megane",
+  "description": "View molecular structure files (PDB, GRO, XYZ (incl. Jmol .jxyz), MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE traj, XTC, LAMMPS dump, DCD, AMBER NetCDF, VASP POSCAR/CONTCAR/XDATCAR, CML, Molden, XCrySDen XSF, Chem3D XML) and JCAMP-DX spectra (.jdx, .jcamp) with megane",
   "version": "0.10.0",
   "publisher": "hodakamori",
   "license": "MIT",
@@ -103,6 +103,9 @@
           },
           {
             "filenamePattern": "*.axsf"
+          },
+          {
+            "filenamePattern": "*.c3xml"
           },
           {
             "filenamePattern": "*.jdx"

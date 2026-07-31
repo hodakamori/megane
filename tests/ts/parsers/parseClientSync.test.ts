@@ -79,6 +79,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_xyz: structFn("parse_xyz"),
     parse_molden: structFn("parse_molden"),
     parse_xsf: structFn("parse_xsf"),
+    parse_c3xml: structFn("parse_c3xml"),
     parse_cml: structFn("parse_cml"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
@@ -227,6 +228,16 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       fakeFile("water.molden", "[Molden Format]\n[Atoms] (Angs)\n O 1 8 0.0 0.0 0.0\n"),
     );
     expect(calls).toContain("parse_molden");
+  });
+
+  it("routes a Chem3D XML file through the Chem3D XML parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile(
+        "molecule.c3xml",
+        '<CDXML><fragment><n id="1" Element="6" Position="0 0 0"/></fragment></CDXML>',
+      ),
+    );
+    expect(calls).toContain("parse_c3xml");
   });
 
   it("parseStructureText defaults to PDB and honors fileName", async () => {

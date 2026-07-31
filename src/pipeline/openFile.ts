@@ -53,6 +53,7 @@ type FileKind = "structure" | "trajectory" | "pipeline" | "unknown";
 
 const STRUCTURE_EXTS = [
   ".molden",
+  ".c3xml",
   ".pdb",
   ".ent",
   ".pdbx",
@@ -91,7 +92,17 @@ const PIPELINE_SUFFIX = ".megane.json";
 // (PDB CONECT records, MOL/SDF bond block, LAMMPS data Bonds section).
 // Other supported structure formats (xyz, gro, cif, traj) carry no bond
 // information, so VDW distance inference is the more useful default.
-const FILE_BOND_EXTS = [".pdb", ".ent", ".pdbx", ".mol", ".sdf", ".data", ".lammps", ".cml"];
+const FILE_BOND_EXTS = [
+  ".pdb",
+  ".ent",
+  ".pdbx",
+  ".mol",
+  ".sdf",
+  ".data",
+  ".lammps",
+  ".cml",
+  ".c3xml",
+];
 
 export function defaultBondSourceForFile(filename: string): "structure" | "distance" {
   const lower = filename.toLowerCase();
