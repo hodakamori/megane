@@ -70,6 +70,9 @@ const STRUCTURE_CASES: StructureCase[] = [
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
   { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
   { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
+  // GAMESS: a truncated optimisation log whose three coordinate blocks become
+  // frames, with the trailing INTERNUCLEAR DISTANCES table correctly ignored.
+  { name: "gamess-water-opt", file: "water_opt.gamess", mime: "text/plain", expectedAtoms: 3 },
 ];
 
 async function dropStructure(

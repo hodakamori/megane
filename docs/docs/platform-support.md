@@ -48,6 +48,7 @@ Legend:
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| GAMESS output | `.gamess` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
 The **React component (npm)** column reflects the bundled `MeganeViewer` / `PipelineViewer`, which open these formats through the same WASM parser as Standalone (`parseStructureFile`); the host app wires the upload/drag-drop callbacks. The `MoleculeRenderer` core renderer consumes already-parsed snapshots.
 
@@ -75,6 +76,22 @@ convention LAMMPS dump uses for its integer `type` ids — and every atom is
 labelled `Type<N> (no species line)` so the substitution is visible in the viewer.
 `Selective dynamics` flags are parsed and ignored, and a trailing velocity block
 is skipped.
+
+Note: **GAMESS** support reads the program's printed **log output**, not a data
+format. Every `COORDINATES OF ALL ATOMS ARE` banner block becomes a frame, so a
+geometry optimisation scrubs on the timeline like a multi-frame XYZ and the
+terminal `EQUILIBRIUM GEOMETRY LOCATED` block is simply the last one. The
+banner's `(ANGS)` / `(BOHR)` argument is honoured, and the element comes from
+the nuclear-charge column — rounded, since ECP runs print a fractional valence
+charge, with the atom label as the fallback when the rounded charge is not an
+element. Bonds are inferred by distance because GAMESS output carries no
+connectivity.
+
+Note: **`.gamess` is the only extension registered for it.** GAMESS logs are
+normally named `.log` or `.out`, and claiming those in the VS Code
+`customEditors` selector or the JupyterLab filetypes would hijack every log file
+in the user's workspace. Rename a log to `.gamess`, or load it through the Load
+Structure node — that is the deliberate trade-off, not an oversight.
 
 Note: **Heterogeneous frames** — trajectories whose frames differ in atom count (adsorption/GCMC/reactions), unit cell (variable-cell / NPT), or elements — are supported by every multi-frame structure format: **ASE `.traj`**, **multi-frame / extended XYZ** (per-frame atom count and per-frame `Lattice=`), and **multi-MODEL PDB** (per-model atom count). Frame 0 defines the base topology; per-frame differences are carried alongside and the viewer swaps atoms, bonds, and cell as you scrub. Uniform trajectories (constant atoms/topology/cell, the common case) use an unchanged fast path and are unaffected. Large heterogeneous XYZ/PDB files that would otherwise stream lazily fall back to an eager parse so no frame is dropped.
 
@@ -169,7 +186,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_gamess`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

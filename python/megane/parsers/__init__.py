@@ -1,5 +1,6 @@
 from megane.parsers.cif import load_cif
 from megane.parsers.dcd import load_dcd
+from megane.parsers.gamess import load_gamess
 from megane.parsers.gro import load_gro
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj, load_lammpstrj_structure
@@ -15,6 +16,7 @@ from megane.parsers.xyz import load_xyz_trajectory
 __all__ = [
     "load_cif",
     "load_dcd",
+    "load_gamess",
     "load_gro",
     "load_lammps_data",
     "load_lammpstrj",

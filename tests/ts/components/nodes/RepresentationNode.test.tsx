@@ -32,18 +32,14 @@ describe("RepresentationNode", () => {
       id: "r1",
       params: { mode: "cartoon" },
     });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     const select = screen.getByTestId("representation-node-mode") as HTMLSelectElement;
     expect(select.value).toBe("cartoon");
   });
 
   it("defaults to atoms when no value is supplied", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     const select = screen.getByTestId("representation-node-mode") as HTMLSelectElement;
     expect(select.value).toBe("atoms");
   });
@@ -53,9 +49,7 @@ describe("RepresentationNode", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
     usePipelineStore.setState({ updateNodeParams });
 
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     fireEvent.change(screen.getByTestId("representation-node-mode"), {
       target: { value: "surface" },
     });
@@ -67,9 +61,7 @@ describe("RepresentationNode", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
     usePipelineStore.setState({ updateNodeParams });
 
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     expect(screen.getByRole("option", { name: "Line" })).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("representation-node-mode"), {
       target: { value: "line" },
@@ -79,17 +71,13 @@ describe("RepresentationNode", () => {
 
   it("renders inside a NodeShell with the Representation title", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     expect(screen.getByText("Representation")).toBeInTheDocument();
   });
 
   it("dropdown carries the 'nodrag' class so xyflow does not start a node drag", () => {
     const seeded = seedPipelineStore("representation", { id: "r1" });
-    render(
-      <RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />,
-    );
+    render(<RepresentationNode {...nodeProps("r1", seeded.data.params as RepresentationParams)} />);
     expect(screen.getByTestId("representation-node-mode").className).toContain("nodrag");
   });
 });

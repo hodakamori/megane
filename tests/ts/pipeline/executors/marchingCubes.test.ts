@@ -25,8 +25,12 @@ function xGradientField(nx: number, ny: number, nz: number): Float32Array {
 
 /** Sphere-like SDF: value = sqrt((x-cx)²+(y-cy)²+(z-cz)²) - r. */
 function sphereSdf(
-  nx: number, ny: number, nz: number,
-  cx: number, cy: number, cz: number,
+  nx: number,
+  ny: number,
+  nz: number,
+  cx: number,
+  cy: number,
+  cz: number,
   r: number,
 ): Float32Array {
   const d = new Float32Array(nx * ny * nz);
@@ -59,7 +63,15 @@ describe("marchingCubes", () => {
   it("returns triangles for a gradient field crossing the isoLevel", () => {
     // field goes 0→1→2→3 along x; isoLevel=1.5 should cross somewhere.
     const data = xGradientField(4, 4, 4);
-    const { positions, normals, indices } = marchingCubes(data, 4, 4, 4, ORIGIN_ZERO, UNIT_STEP, 1.5);
+    const { positions, normals, indices } = marchingCubes(
+      data,
+      4,
+      4,
+      4,
+      ORIGIN_ZERO,
+      UNIT_STEP,
+      1.5,
+    );
     expect(positions.length).toBeGreaterThan(0);
     expect(normals.length).toBe(positions.length);
     expect(indices.length).toBe(positions.length / 3);
@@ -131,7 +143,9 @@ describe("marchingCubes", () => {
   });
 
   it("works on a non-cubic grid (nx ≠ ny ≠ nz)", () => {
-    const nx = 4, ny = 3, nz = 2;
+    const nx = 4,
+      ny = 3,
+      nz = 2;
     const data = xGradientField(nx, ny, nz);
     const { positions } = marchingCubes(data, nx, ny, nz, ORIGIN_ZERO, UNIT_STEP, 1.5);
     expect(positions.length).toBeGreaterThan(0);
@@ -144,8 +158,14 @@ describe("marchingCubes", () => {
   it("handles a minimal 2×2×2 grid with one corner below threshold", () => {
     // Only corner (0,0,0) is below the isoLevel.
     const data = new Float32Array([
-      0, 1, 1, 1, // iz=0: v0=0 < 0.5, rest above
-      1, 1, 1, 1, // iz=1: all above
+      0,
+      1,
+      1,
+      1, // iz=0: v0=0 < 0.5, rest above
+      1,
+      1,
+      1,
+      1, // iz=1: all above
     ]);
     const { positions } = marchingCubes(data, 2, 2, 2, ORIGIN_ZERO, UNIT_STEP, 0.5);
     // Should produce exactly one triangle (3 vertices × 3 coords = 9 values).

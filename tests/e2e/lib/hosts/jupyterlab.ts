@@ -52,8 +52,7 @@ export function startJupyterLab(opts: StartJupyterLabOpts): Promise<JupyterLabHa
         cwd: opts.cwd ?? process.cwd(),
         env: {
           ...process.env,
-          JUPYTER_RUNTIME_DIR:
-            opts.runtimeDir ?? `/tmp/megane-jupyter-runtime-${opts.port}`,
+          JUPYTER_RUNTIME_DIR: opts.runtimeDir ?? `/tmp/megane-jupyter-runtime-${opts.port}`,
         },
         stdio: ["ignore", "pipe", "pipe"],
       },
@@ -76,7 +75,8 @@ export function startJupyterLab(opts: StartJupyterLabOpts): Promise<JupyterLabHa
         clearTimeout(timer);
         // Lab needs a moment after the URL banner before /lab is reachable.
         setTimeout(
-          () => resolve({ proc, port: opts.port, token: opts.token, notebookDir: opts.notebookDir }),
+          () =>
+            resolve({ proc, port: opts.port, token: opts.token, notebookDir: opts.notebookDir }),
           1500,
         );
       }
@@ -119,11 +119,7 @@ const DEFAULT_NOTEBOOK_METADATA = {
   },
 };
 
-export function writeNotebook(
-  notebookDir: string,
-  name: string,
-  body: NotebookSpec,
-): string {
+export function writeNotebook(notebookDir: string, name: string, body: NotebookSpec): string {
   const file = join(notebookDir, `${name}.ipynb`);
   const full = {
     nbformat: 4,

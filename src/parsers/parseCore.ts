@@ -196,6 +196,7 @@ interface WasmModule {
   parse_pdb: ParseFn;
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
+  parse_gamess: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
@@ -248,6 +249,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
+        parse_gamess: wasm.parse_gamess,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
@@ -296,6 +298,10 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_mol;
     case ".mol2":
       return wasmModule!.parse_mol2;
+    // GAMESS log output. Only `.gamess` is claimed -- registering `*.log`
+    // or `*.out` would hijack every log file in the user's workspace.
+    case ".gamess":
+      return wasmModule!.parse_gamess;
     case ".cif":
       return wasmModule!.parse_cif;
     case ".mmcif":

@@ -35,7 +35,7 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("ships twelve text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, and VASP)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(12);
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(13);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP names", () => {
@@ -54,6 +54,7 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-dump",
         "megane-amber-prmtop",
         "megane-vasp",
+        "megane-gamess",
       ].sort(),
     );
   });
@@ -72,6 +73,13 @@ describe("jupyterlab filetypes", () => {
     expect(re.test("xdatcar")).toBe(true);
     expect(re.test("MyPOSCAR")).toBe(false);
     expect(re.test("notes.txt")).toBe(false);
+  });
+
+  it("registers .gamess for the GAMESS filetype", () => {
+    const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-gamess");
+    expect(ft).toBeDefined();
+    expect(ft?.extensions).toEqual([".gamess"]);
+    expect(ft?.fileFormat).toBe("text");
   });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
@@ -118,13 +126,9 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(
-      STRUCTURE_FILETYPES_TEXT.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
-      STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(12);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(13);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

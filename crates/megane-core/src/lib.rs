@@ -4,6 +4,7 @@ pub mod bonds;
 pub mod cif;
 pub mod crystal;
 pub mod dcd;
+pub mod gamess;
 pub mod gro;
 pub mod lammps_data;
 pub mod lammpstrj;
@@ -19,6 +20,5 @@ pub mod trajectory;
 pub mod vasp;
 pub mod xtc;
 pub mod xyz;
-
 pub use parser::ParsedStructure;
 pub use trajectory::TrajectoryData;
