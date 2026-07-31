@@ -6,6 +6,7 @@ pub mod cml;
 pub mod crystal;
 pub mod dcd;
 pub mod gro;
+pub mod jcampdx;
 pub mod lammps_data;
 pub mod lammpstrj;
 pub mod mmcif;
