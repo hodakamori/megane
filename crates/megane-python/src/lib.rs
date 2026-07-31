@@ -196,6 +196,14 @@ fn parse_xyz(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     PyStructure::from_parsed(py, data)
 }
 
+/// Parse an XCrySDen structure file (`.xsf` / `.axsf`) and return structured
+/// data. An `ANIMSTEPS` animation yields a multi-frame structure.
+#[pyfunction]
+fn parse_xsf(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::xsf::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
+
 /// Parse a Chemical Markup Language (`.cml`) document and return structured data.
 #[pyfunction]
 fn parse_cml(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -506,6 +514,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_pdb, m)?)?;
     m.add_function(wrap_pyfunction!(parse_gro, m)?)?;
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_xsf, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cml, m)?)?;
     m.add_function(wrap_pyfunction!(parse_vasp, m)?)?;
     m.add_function(wrap_pyfunction!(parse_molden, m)?)?;

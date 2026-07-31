@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 
 - **Molden files** (`.molden`) on every host. The `[Atoms]` block becomes the structure, honouring its `(AU)` / `(Angs)` unit argument, and a `[GEOMETRIES] XYZ` block loads as a multi-frame optimisation via the shared XYZ frame reader. `[GTO]`/`[MO]` orbitals, `[FREQ]` normal modes, and any vendor-specific section are skipped tolerantly.
+- **XCrySDen structure files** (`.xsf` / `.axsf`) on every host. Handles the `CRYSTAL` / `SLAB` / `POLYMER` / `MOLECULE` / `ATOMS` dimensionality keywords, `PRIMVEC` lattice vectors, and `PRIMCOORD` atom blocks; an `ANIMSTEPS` `.axsf` loads as a multi-frame structure with per-frame cells for variable-cell animations. The optional per-atom force triple is exposed as a `force` vector channel for the Vector Overlay node. `CONVVEC` is consumed and discarded, and `BEGIN_BLOCK_DATAGRID_*` volumetric blocks are skipped.
 - **Chemical Markup Language** (`.cml`) on every host — the first XML format in `megane-core`. Reads the first `<molecule>` with atoms, honouring `x3`/`y3`/`z3`, packed `xyz3`, `xFract`/`yFract`/`zFract` (with the `<crystal>` cell), and 2D `x2`/`y2` depictions projected onto z = 0. An explicit `<bondArray>` supplies connectivity and bond orders; without one, bonds are inferred by distance.
 
 ### Changed

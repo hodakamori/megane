@@ -71,6 +71,9 @@ const STRUCTURE_EXTS = [
   ".lammpstrj",
   ".dump",
   ".trj",
+  // XCrySDen structure / animation.
+  ".xsf",
+  ".axsf",
   // Chemical Markup Language.
   ".cml",
   // VASP POSCAR / CONTCAR / XDATCAR (also `.vasp`). The extensionless
