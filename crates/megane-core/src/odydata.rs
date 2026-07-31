@@ -889,7 +889,10 @@ ENDCART
         for (a, b) in xml.positions.iter().zip(txt.positions.iter()) {
             assert!((a - b).abs() < 1e-4, "coordinates differ: {a} vs {b}");
         }
-        assert!(xml.box_matrix.is_none(), "the gas-phase fixture has no cell");
+        assert!(
+            xml.box_matrix.is_none(),
+            "the gas-phase fixture has no cell"
+        );
     }
 
     #[test]
