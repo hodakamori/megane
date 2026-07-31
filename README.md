@@ -32,7 +32,7 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 18 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 19 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF, JCAMP-DX) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
 - **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 16 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
@@ -56,7 +56,7 @@ One codebase, every environment.
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
-The secret: parsers for 18 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: parsers for 19 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF, JCAMP-DX) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
 
@@ -181,6 +181,14 @@ function App() {
 A grid has no atoms of its own, so it is rendered as an isosurface over a
 separately-loaded structure. `.dx` is shared with JCAMP-DX spectra, so the
 loader sniffs the content and says so if the file is really a spectrum.
+### Spectrum formats (`LoadSpectrum` node)
+
+A spectrum is a 2D (x, y) trace with no atoms or coordinates, so it is drawn by
+the terminal `SpectrumPlot` node instead of reaching the 3D renderer.
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| JCAMP-DX | `.jdx`, `.jcamp`, `.dx` | IR / NMR / MS / UV-Vis spectra; AFFN plus the compressed ASDF forms (SQZ, DIF, DUP). `.dx` is shared with OpenDX volumetric grids and resolved by sniffing the file head |
 
 ### Trajectory formats (`LoadTrajectory` node)
 
@@ -252,7 +260,7 @@ make test-all              # All tests
 src/                     TypeScript frontend
   renderer/              Three.js rendering (impostor, mesh, shaders)
   protocol/              Binary protocol decoder + web workers
-  parsers/               WASM-based file parsers (18 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data/dump, AMBER topology/NetCDF, XTC, DCD, ASE .traj, VASP, Molden, XCrySDen XSF)
+  parsers/               WASM-based file parsers (19 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data/dump, AMBER topology/NetCDF, XTC, DCD, ASE .traj, VASP, Molden, XCrySDen XSF, JCAMP-DX)
   logic/                 Bond / label / vector source logic
   components/            React UI components
   hooks/                 Custom React hooks
@@ -262,7 +270,7 @@ crates/                  Rust workspace
   megane-python/         PyO3 Python extension
   megane-wasm/           WASM bindings (wasm-bindgen)
 python/megane/           Python backend
-  parsers/               Python wrappers for 13 of the 15 supported formats (mmCIF and AMBER prmtop are accessible via the raw megane_parser PyO3 extension)
+  parsers/               Python wrappers for 14 of the 16 supported formats (mmCIF and AMBER prmtop are accessible via the raw megane_parser PyO3 extension)
   pipeline.py            Pipeline builder (NetworkX-style DAG)
   protocol.py            Binary protocol encoder
   server.py              `megane serve` backend (FastAPI + WebSocket)

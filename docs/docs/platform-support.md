@@ -179,8 +179,38 @@ with a GROMACS `.top`).
 
 ² Python `AddBonds` only wires GROMACS `.top` topology via the `top=` parameter. PSF bonds are accessible programmatically via `megane.parsers.psf.parse_psf_bonds(path)` or `megane_parser.parse_psf_bonds(text)`, but cannot be passed directly to an `AddBonds` pipeline node.
 
-Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/pipeline/executors/parseVolumetric.ts` (volumetric accept list + `.dx` content sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
-Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
+### Spectrum formats
+
+Spectrum files carry a 2D (x, y) trace and **no atoms or coordinates at all**,
+so they never reach the 3D renderer. They are opened with the **Load Spectrum**
+pipeline node and drawn by the **Spectrum Plot** node, a terminal node that
+produces no geometry.
+
+| Format | Extensions | Standalone | Jupyter widget | JupyterLab | VS Code | React (npm) | Python |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| JCAMP-DX | `.jdx`, `.jcamp`, `.dx`³ | ✓ | API | ✓⁴ | ✓⁴ | ✓ | ✓ |
+
+³ `.dx` is claimed by **both** JCAMP-DX and OpenDX volumetric grids, so it
+cannot be dispatched by extension alone. The Load Spectrum node sniffs the file
+head (`##TITLE=` / `##JCAMP-DX=` versus `object … class gridpositions`) and, when
+a `.dx` turns out to be an OpenDX grid, reports that instead of failing
+opaquely. Because the JupyterLab `IFileType` and VS Code `customEditors`
+registries can only match on extension, `.dx` is deliberately **not** registered
+with either host — only `.jdx` and `.jcamp` are.
+
+⁴ A spectrum has no coordinates, so opening one from the JupyterLab file browser
+or the VS Code editor surfaces an actionable message pointing at the Load
+Spectrum → Spectrum Plot pair in the always-mounted pipeline editor, rather than
+a blank viewport.
+
+Note: **JCAMP-DX** decoding covers the plain **AFFN** form and all three
+compressed **ASDF** forms — **SQZ** (sign-carrying digit), **DIF** (difference
+from the previous ordinate, with its Y-value checkpoint at each line start), and
+**DUP** (repeat the previous value _n_ times) — for both `##XYDATA=(X++(Y..Y))`
+and `##XYPOINTS=(XY..XY)` tables. `##XFACTOR=` / `##YFACTOR=` are applied, and a
+missing `##DELTAX=` is derived from `FIRSTX` / `LASTX` / `NPOINTS`.
+
+Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `src/pipeline/executors/parseVolumetric.ts` (volumetric accept list + `.dx` content sniffing), `src/parsers/spectrum.ts` (spectrum accept list and JCAMP-DX/OpenDX sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
 
 ## UI features
 
@@ -227,7 +257,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

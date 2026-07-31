@@ -17,7 +17,8 @@ export type PipelineDataType =
   | "mesh"
   | "trajectory"
   | "vector"
-  | "volumetric";
+  | "volumetric"
+  | "spectrum";
 
 /** Colors for each data type (used for handles and edges). */
 export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
@@ -29,6 +30,7 @@ export const DATA_TYPE_COLORS: Record<PipelineDataType, string> = {
   trajectory: "#ec4899", // pink
   vector: "#ef4444", // red
   volumetric: "#06b6d4", // cyan
+  spectrum: "#84cc16", // lime
 };
 
 /** Particle data flowing through the pipeline. */
@@ -124,6 +126,30 @@ export interface VolumetricData {
   dataMax: number;
 }
 
+/**
+ * A decoded spectrum flowing through the pipeline.
+ *
+ * Unlike every other pipeline data type this one has **no coordinates** — a
+ * spectrum is an ordinate sampled against an abscissa, not something in the 3D
+ * scene. It therefore never reaches the renderer; the Spectrum Plot node draws
+ * it as a 2D chart instead.
+ */
+export interface SpectrumData {
+  type: "spectrum";
+  /** `##TITLE=` from the file. */
+  title: string;
+  /** `##DATA TYPE=`, e.g. "INFRARED SPECTRUM". */
+  dataType: string;
+  /** `##XUNITS=`, e.g. "1/CM". */
+  xUnits: string;
+  /** `##YUNITS=`, e.g. "TRANSMITTANCE". */
+  yUnits: string;
+  /** Abscissa values. Same length as `y`. */
+  x: Float64Array;
+  /** Ordinate values. Same length as `x`. */
+  y: Float64Array;
+}
+
 // ─── Frame Provider ──────────────────────────────────────────────────
 
 /** Abstract interface for frame delivery (memory or streaming). */
@@ -185,7 +211,8 @@ export type PipelineData =
   | MeshData
   | TrajectoryData
   | VectorData
-  | VolumetricData;
+  | VolumetricData
+  | SpectrumData;
 
 // ─── Port Definitions ─────────────────────────────────────────────────
 
@@ -219,7 +246,9 @@ export type PipelineNodeType =
   | "surface_mesh"
   | "vector_overlay"
   | "load_volumetric"
-  | "isosurface";
+  | "isosurface"
+  | "load_spectrum"
+  | "spectrum_plot";
 
 /** Human-readable labels for node types. */
 export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
@@ -239,6 +268,8 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   surface_mesh: "Surface Mesh",
   vector_overlay: "Vectors",
   load_volumetric: "Load Volumetric",
+  load_spectrum: "Load Spectrum",
+  spectrum_plot: "Spectrum Plot",
   isosurface: "Isosurface",
 };
 
@@ -263,6 +294,8 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   surface_mesh: "overlay",
   vector_overlay: "overlay",
   load_volumetric: "data_load",
+  load_spectrum: "data_load",
+  spectrum_plot: "viewport",
   isosurface: "overlay",
   viewport: "viewport",
 };
@@ -377,6 +410,16 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   isosurface: {
     inputs: [{ name: "volumetric", dataType: "volumetric", label: "Volumetric" }],
     outputs: [{ name: "mesh", dataType: "mesh", label: "Mesh" }],
+  },
+  load_spectrum: {
+    inputs: [],
+    outputs: [{ name: "spectrum", dataType: "spectrum", label: "Spectrum" }],
+  },
+  // A terminal node like `viewport`: a spectrum has no 3D geometry, so the
+  // plot is where the data ends rather than something the renderer consumes.
+  spectrum_plot: {
+    inputs: [{ name: "spectrum", dataType: "spectrum", label: "Spectrum" }],
+    outputs: [],
   },
 };
 
@@ -556,6 +599,23 @@ export interface LoadVolumetricParams {
   parseError?: string | null;
 }
 
+export interface LoadSpectrumParams {
+  type: "load_spectrum";
+  fileName: string | null;
+  /** Ephemeral: the decoded spectrum. Not serialized. */
+  spectrumData?: SpectrumData | null;
+  /** Ephemeral: why the last load failed, surfaced in the node body. */
+  parseError?: string | null;
+}
+
+export interface SpectrumPlotParams {
+  type: "spectrum_plot";
+  /** Draw the abscissa high-to-low, the convention for IR and NMR. */
+  reverseX: boolean;
+  /** Stroke colour of the trace. */
+  color: string;
+}
+
 export interface IsosurfaceParams {
   type: "isosurface";
   /** Iso level for the positive contour. */
@@ -588,7 +648,9 @@ export type PipelineNodeParams =
   | SurfaceMeshParams
   | VectorOverlayParams
   | LoadVolumetricParams
-  | IsosurfaceParams;
+  | IsosurfaceParams
+  | LoadSpectrumParams
+  | SpectrumPlotParams;
 
 /** Default parameters for each node type. */
 export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
@@ -655,6 +717,12 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
       return { type, scale: 1.0 };
     case "load_volumetric":
       return { type, fileName: null };
+    case "load_spectrum":
+      return { type, fileName: null };
+    case "spectrum_plot":
+      // IR and NMR are conventionally plotted high-to-low, and both are the
+      // common case for JCAMP-DX, so reversed is the useful default.
+      return { type, reverseX: true, color: "#84cc16" };
     case "isosurface":
       return {
         type,

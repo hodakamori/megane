@@ -11,6 +11,7 @@ from megane.pipeline import (
     Color,
     Filter,
     Isosurface,
+    LoadSpectrum,
     LoadStructure,
     LoadTrajectory,
     LoadVector,
@@ -21,6 +22,7 @@ from megane.pipeline import (
     PortNamespace,
     Replicate,
     Representation,
+    SpectrumPlot,
     VectorOverlay,
     Viewport,
     build_pipeline,
@@ -152,6 +154,32 @@ class TestNodeClasses:
         assert n.path == ""
         assert set(n._out_ports) == {"volumetric"}
         assert n._inp_ports == {}
+
+    def test_load_spectrum(self):
+        n = LoadSpectrum("ethanol.jdx")
+        assert n.path == "ethanol.jdx"
+        assert n._node_type == "load_spectrum"
+
+    def test_load_spectrum_defaults(self):
+        n = LoadSpectrum()
+        assert n.path == ""
+        assert set(n._out_ports) == {"spectrum"}
+        assert n._inp_ports == {}
+
+    def test_spectrum_plot(self):
+        n = SpectrumPlot(reverse_x=False, color="#ff0000")
+        assert n.reverse_x is False
+        assert n.color == "#ff0000"
+        assert n._node_type == "spectrum_plot"
+
+    def test_spectrum_plot_defaults(self):
+        # IR and NMR are conventionally drawn high-to-low.
+        n = SpectrumPlot()
+        assert n.reverse_x is True
+        assert n.color == "#84cc16"
+        assert set(n._inp_ports) == {"spectrum"}
+        # Terminal: a spectrum has no geometry, so nothing flows onward.
+        assert n._out_ports == {}
 
     def test_isosurface(self):
         n = Isosurface(iso_level=0.02, color="#ff0000", opacity=0.5)
@@ -594,6 +622,25 @@ class TestPipelineSerialization:
         types = [config["type"] for _, config in rebuilt._nodes.values()]
         assert "color" in types
         assert "representation" in types
+
+    def test_spectrum_round_trip(self):
+        """A spectrum branch survives to_dict() -> from_dict() unchanged."""
+        pipe = Pipeline()
+        ls = pipe.add_node(LoadSpectrum("ethanol.jdx"))
+        sp = pipe.add_node(SpectrumPlot(reverse_x=False, color="#ff0000"))
+        pipe.add_edge(ls.out.spectrum, sp.inp.spectrum)
+        result = pipe.to_dict()
+
+        load_node = next(n for n in result["nodes"] if n["type"] == "load_spectrum")
+        assert load_node["fileName"] == "ethanol.jdx"
+        plot_node = next(n for n in result["nodes"] if n["type"] == "spectrum_plot")
+        assert plot_node["reverseX"] is False
+        assert plot_node["color"] == "#ff0000"
+
+        rebuilt = Pipeline.from_dict(result)
+        types = [config["type"] for _, config in rebuilt._nodes.values()]
+        assert "load_spectrum" in types
+        assert "spectrum_plot" in types
 
     def test_polyhedra_serialization(self):
         pipe = Pipeline()

@@ -33,16 +33,17 @@ const vscode = acquireVsCodeApi();
 // click is silently ignored inside the webview sandbox, so downloadBlob
 // (src/renderer/RenderCapture.ts) defers to this hook when it is installed.
 // Registered at module scope so it exists before any export can fire.
-(globalThis as { __MEGANE_SAVE_BLOB__?: (blob: Blob, filename: string) => void }).__MEGANE_SAVE_BLOB__ =
-  (blob, filename) => {
-    void blob.arrayBuffer().then((buf) => {
-      vscode.postMessage({
-        type: "saveFile",
-        filename,
-        bytes: Array.from(new Uint8Array(buf)),
-      });
+(
+  globalThis as { __MEGANE_SAVE_BLOB__?: (blob: Blob, filename: string) => void }
+).__MEGANE_SAVE_BLOB__ = (blob, filename) => {
+  void blob.arrayBuffer().then((buf) => {
+    vscode.postMessage({
+      type: "saveFile",
+      filename,
+      bytes: Array.from(new Uint8Array(buf)),
     });
-  };
+  });
+};
 
 function ThemeSync() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
@@ -99,6 +100,17 @@ function App() {
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
           lower.endsWith(".xtc") || lower.endsWith(".dcd") || lower.endsWith(".nc");
+        // A JCAMP-DX spectrum has no coordinates, so the 3D viewer has nothing
+        // to draw. `.dx` is excluded: it is shared with OpenDX grids and only
+        // content sniffing can tell them apart.
+        if (lower.endsWith(".jdx") || lower.endsWith(".jcamp")) {
+          setError(
+            `${filename} is a spectrum, which has no atoms or coordinates to render. ` +
+              "Add a Load Spectrum node in the pipeline editor and wire it to a " +
+              "Spectrum Plot node to view it.",
+          );
+          return;
+        }
         // Volumetric grids (CUBE, OpenDX) carry a scalar field but no atoms, so
         // there is nothing to render standalone. Guard them the same way.
         const isVolumetricOnly =
@@ -155,19 +167,15 @@ function App() {
             ...structureFiles.map(
               (sf) => new File([sf.content], sf.filename, { type: "text/plain" }),
             ),
-            ...trajectoryFiles.map(
-              (tf) => new File([new Uint8Array(tf.content)], tf.filename),
-            ),
+            ...trajectoryFiles.map((tf) => new File([new Uint8Array(tf.content)], tf.filename)),
           ];
 
           // Re-stringify the pipeline payload into a File so the canonical
           // openFile entry point sees the same .megane.json contract that
           // every other host uses.
-          const meganeFile = new File(
-            [JSON.stringify(pipeline)],
-            "pipeline.megane.json",
-            { type: "application/json" },
-          );
+          const meganeFile = new File([JSON.stringify(pipeline)], "pipeline.megane.json", {
+            type: "application/json",
+          });
           await usePipelineStore.getState().openFile(meganeFile, { companions });
 
           // Populate useMeganeLocal so MeganeViewer props (atom selection,
@@ -241,7 +249,15 @@ function App() {
           }}
         >
           <div style={{ fontWeight: "bold" }}>Error</div>
-          <div style={{ color: "var(--megane-text-secondary)", maxWidth: "400px", wordBreak: "break-word" }}>{error}</div>
+          <div
+            style={{
+              color: "var(--megane-text-secondary)",
+              maxWidth: "400px",
+              wordBreak: "break-word",
+            }}
+          >
+            {error}
+          </div>
         </div>
       </>
     );
@@ -272,22 +288,22 @@ function App() {
     <>
       <ThemeSync />
       <MeganeViewer
-      testContext="vscode"
-      onUploadStructure={handleUploadStructure}
-      onBondSourceChange={(s) =>
-        local.setBondSource(s as "structure" | "file" | "distance" | "none")
-      }
-      onLabelSourceChange={(s) => local.setLabelSource(s as "none" | "structure" | "file")}
-      onLoadLabelFile={(f) => local.loadLabelFile(f)}
-      onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
-      onLoadVectorFile={(f) => local.loadVectorFile(f)}
-      onLoadDemoVectors={() => local.loadDemoVectors()}
-      initialCameraState={initialCameraState}
-      onCameraStateChange={handleCameraStateChange}
-      onFrameChange={handleFrameChange}
-      onSelectionChange={handleSelectionChange}
-      onMeasurementChange={handleMeasurementChange}
-    />
+        testContext="vscode"
+        onUploadStructure={handleUploadStructure}
+        onBondSourceChange={(s) =>
+          local.setBondSource(s as "structure" | "file" | "distance" | "none")
+        }
+        onLabelSourceChange={(s) => local.setLabelSource(s as "none" | "structure" | "file")}
+        onLoadLabelFile={(f) => local.loadLabelFile(f)}
+        onVectorSourceChange={(s) => local.setVectorSource(s as "none" | "file" | "demo")}
+        onLoadVectorFile={(f) => local.loadVectorFile(f)}
+        onLoadDemoVectors={() => local.loadDemoVectors()}
+        initialCameraState={initialCameraState}
+        onCameraStateChange={handleCameraStateChange}
+        onFrameChange={handleFrameChange}
+        onSelectionChange={handleSelectionChange}
+        onMeasurementChange={handleMeasurementChange}
+      />
     </>
   );
 }

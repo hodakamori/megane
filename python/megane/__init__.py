@@ -1,6 +1,7 @@
 """megane - A fast, beautiful molecular viewer."""
 
 from megane.parsers.cif import load_cif
+from megane.parsers.jcampdx import load_jcampdx
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj_structure
 from megane.parsers.molden import load_molden
@@ -17,6 +18,7 @@ from megane.pipeline import (
     Color,
     Filter,
     Isosurface,
+    LoadSpectrum,
     LoadStructure,
     LoadTrajectory,
     LoadVector,
@@ -25,6 +27,7 @@ from megane.pipeline import (
     Pipeline,
     Replicate,
     Representation,
+    SpectrumPlot,
     Streaming,
     VectorOverlay,
     Viewport,
@@ -42,6 +45,7 @@ __all__ = [
     "Filter",
     "build_pipeline",
     "Isosurface",
+    "LoadSpectrum",
     "LoadStructure",
     "LoadTrajectory",
     "LoadVector",
@@ -51,10 +55,12 @@ __all__ = [
     "Pipeline",
     "Replicate",
     "Representation",
+    "SpectrumPlot",
     "Streaming",
     "VectorOverlay",
     "Viewport",
     "load_cif",
+    "load_jcampdx",
     "load_lammps_data",
     "load_lammpstrj_structure",
     "load_molden",
