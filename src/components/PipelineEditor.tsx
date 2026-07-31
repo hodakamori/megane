@@ -50,6 +50,8 @@ import { LoadVectorNode } from "./nodes/LoadVectorNode";
 import { VectorOverlayNode } from "./nodes/VectorOverlayNode";
 import { StreamingNode } from "./nodes/StreamingNode";
 import { LoadVolumetricNode } from "./nodes/LoadVolumetricNode";
+import { LoadSpectrumNode } from "./nodes/LoadSpectrumNode";
+import { SpectrumPlotNode } from "./nodes/SpectrumPlotNode";
 import { IsosurfaceNode } from "./nodes/IsosurfaceNode";
 import { PipelineChatBox } from "./PipelineChatBox";
 import { PipelineInspector } from "./PipelineInspector";
@@ -75,6 +77,8 @@ const nodeTypes = {
   surface_mesh: SurfaceMeshNode,
   vector_overlay: VectorOverlayNode,
   load_volumetric: LoadVolumetricNode,
+  load_spectrum: LoadSpectrumNode,
+  spectrum_plot: SpectrumPlotNode,
   isosurface: IsosurfaceNode,
 };
 
@@ -88,6 +92,11 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
     category: "data_load",
     label: "Volumetric",
     types: ["load_volumetric"],
+  },
+  {
+    category: "data_load",
+    label: "Spectrum",
+    types: ["load_spectrum", "spectrum_plot"],
   },
   { category: "bond", label: "Bond", types: ["add_bond"] },
   { category: "filter", label: "Filter", types: ["filter"] },

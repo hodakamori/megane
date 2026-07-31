@@ -25,6 +25,7 @@ import type {
   SurfaceMeshParams,
   VectorOverlayParams,
   LoadVolumetricParams,
+  LoadSpectrumParams,
   IsosurfaceParams,
   PipelineNodeType,
   NodeError,
@@ -49,6 +50,7 @@ import { executeSurfaceMesh } from "./executors/surfaceMesh";
 import { executeLoadVector } from "./executors/loadVector";
 import { executeVectorOverlay } from "./executors/vectorOverlay";
 import { executeLoadVolumetric } from "./executors/loadVolumetric";
+import { executeLoadSpectrum, selectPlottedSpectrum } from "./executors/spectrum";
 import { executeIsosurface } from "./executors/isosurface";
 import { executeViewport } from "./executors/viewport";
 
@@ -320,6 +322,23 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("vector")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "load_spectrum": {
+        const outputs = executeLoadSpectrum(data.params as LoadSpectrumParams);
+        edgeOutputs.set(id, outputs);
+        if (!outputs.has("spectrum")) {
+          addError(id, { message: "No spectrum loaded", severity: "warning" });
+        }
+        break;
+      }
+      case "spectrum_plot": {
+        // Terminal: a spectrum has no geometry, so nothing flows onward. The
+        // node component draws the chart from its own resolved input.
+        edgeOutputs.set(id, new Map());
+        if (!selectPlottedSpectrum(inputs)) {
+          addError(id, { message: "No spectrum input", severity: "warning" });
         }
         break;
       }
