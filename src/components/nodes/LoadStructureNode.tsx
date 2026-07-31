@@ -18,7 +18,7 @@ import { matchesStructureName } from "../../parsers/fileNames";
 // `.vasp` here. Its extensionless spellings (POSCAR / CONTCAR / XDATCAR) are
 // still accepted on drag-drop via `matchesStructureName`.
 const STRUCTURE_ACCEPT =
-  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp,.cml,.molden,.c3xml";
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp,.cml,.molden,.xsf,.axsf,.c3xml";
 export const STRUCTURE_EXTS = [
   ".molden",
   ".c3xml",
@@ -39,6 +39,9 @@ export const STRUCTURE_EXTS = [
   ".lammpstrj",
   ".dump",
   ".trj",
+  // XCrySDen structure / animation (`.axsf` is the animated variant).
+  ".xsf",
+  ".axsf",
   // Chemical Markup Language.
   ".cml",
   // VASP POSCAR / CONTCAR / XDATCAR. Bare (extensionless) VASP filenames are

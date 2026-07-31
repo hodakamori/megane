@@ -97,6 +97,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-xsf",
+    displayName: "XCrySDen structure",
+    extensions: [".xsf", ".axsf"],
+    mimeTypes: ["chemical/x-xcrysden-structure"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-cml",
     displayName: "Chemical Markup Language",
     extensions: [".cml"],
@@ -127,7 +135,6 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
-
     name: "megane-c3xml",
     displayName: "Chem3D XML",
     extensions: [".c3xml"],

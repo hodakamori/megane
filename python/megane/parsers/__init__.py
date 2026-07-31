@@ -12,6 +12,7 @@ from megane.parsers.netcdf import load_netcdf
 from megane.parsers.pdb import load_pdb
 from megane.parsers.traj import load_traj
 from megane.parsers.vasp import load_vasp
+from megane.parsers.xsf import load_xsf
 from megane.parsers.xtc import load_trajectory
 from megane.parsers.xyz import load_xyz_trajectory
 
@@ -32,6 +33,7 @@ __all__ = [
     "load_sdf",
     "load_traj",
     "load_trajectory",
+    "load_xsf",
     "load_vasp",
     "load_xyz_trajectory",
 ]

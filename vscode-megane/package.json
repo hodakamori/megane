@@ -1,7 +1,7 @@
 {
   "name": "vscode-megane",
   "displayName": "megane - Molecular Viewer",
-  "description": "View molecular structure files (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE traj, XTC, LAMMPS dump, DCD, AMBER NetCDF, VASP POSCAR/CONTCAR/XDATCAR, CML, Molden, Chem3D XML) with megane",
+  "description": "View molecular structure files (PDB, GRO, XYZ, MOL, SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER prmtop, ASE traj, XTC, LAMMPS dump, DCD, AMBER NetCDF, VASP POSCAR/CONTCAR/XDATCAR, CML, Molden, XCrySDen XSF, Chem3D XML) with megane",
   "version": "0.10.0",
   "publisher": "hodakamori",
   "license": "MIT",
@@ -93,10 +93,16 @@
             "filenamePattern": "*.molden"
           },
           {
-            "filenamePattern": "*.c3xml"
+            "filenamePattern": "*.cml"
           },
           {
-            "filenamePattern": "*.cml"
+            "filenamePattern": "*.xsf"
+          },
+          {
+            "filenamePattern": "*.axsf"
+          },
+          {
+            "filenamePattern": "*.c3xml"
           }
         ],
         "priority": "default"
