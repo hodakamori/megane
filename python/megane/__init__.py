@@ -4,6 +4,7 @@ from megane.parsers.cif import load_cif
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj_structure
 from megane.parsers.magres import load_magres
+from megane.parsers.molden import load_molden
 from megane.parsers.pdb import load_pdb
 from megane.parsers.traj import load_traj
 from megane.parsers.vasp import load_vasp
@@ -57,6 +58,7 @@ __all__ = [
     "load_lammps_data",
     "load_lammpstrj_structure",
     "load_magres",
+    "load_molden",
     "load_pdb",
     "load_traj",
     "load_trajectory",

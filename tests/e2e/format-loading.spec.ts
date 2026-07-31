@@ -70,6 +70,10 @@ const STRUCTURE_CASES: StructureCase[] = [
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
   { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
   { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
+  // Molden: a static `[Atoms] (AU)` geometry (which exercises the Bohr
+  // conversion) and a `[GEOMETRIES] XYZ` optimisation that becomes frames.
+  { name: "molden-water", file: "water.molden", mime: "text/plain", expectedAtoms: 3 },
+  { name: "molden-water-opt", file: "water_opt.molden", mime: "text/plain", expectedAtoms: 3 },
   // CASTEP magres: the [atoms] block becomes the structure and the [magres]
   // tensor block must not be mistaken for more atoms.
   { name: "magres-si-nmr", file: "si_nmr.magres", mime: "text/plain", expectedAtoms: 8 },

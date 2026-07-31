@@ -111,6 +111,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-molden",
+    displayName: "Molden",
+    extensions: [".molden"],
+    mimeTypes: ["chemical/x-molden"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-magres",
     displayName: "CASTEP magres",
     extensions: [".magres"],

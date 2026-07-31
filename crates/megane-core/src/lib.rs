@@ -11,6 +11,7 @@ pub mod magres;
 pub mod mmcif;
 pub mod mol;
 pub mod mol2;
+pub mod molden;
 pub mod netcdf;
 pub mod parser;
 pub mod psf;
