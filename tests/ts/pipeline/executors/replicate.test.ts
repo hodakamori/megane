@@ -342,9 +342,7 @@ describe("executeReplicate image-aware bond connectivity", () => {
       box,
     } as unknown as Snapshot;
     const particle = crossingParticle(snap);
-    expect(() =>
-      executeReplicate(params(2, 1, 1), inputs(particle, makeCell(box))),
-    ).not.toThrow();
+    expect(() => executeReplicate(params(2, 1, 1), inputs(particle, makeCell(box)))).not.toThrow();
     const out = executeReplicate(params(2, 1, 1), inputs(particle, makeCell(box)));
     const s = (out.get("particle") as ParticleData).source;
     expect(Array.from(s.bonds)).toEqual([0, 1, 2, 3]);

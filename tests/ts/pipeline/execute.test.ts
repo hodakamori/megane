@@ -157,9 +157,7 @@ describe("executePipeline", () => {
     });
 
     it("produces trajectory output when frames exist", () => {
-      const frames: Frame[] = [
-        { frameId: 0, nAtoms: 3, positions: new Float32Array(9) },
-      ];
+      const frames: Frame[] = [{ frameId: 0, nAtoms: 3, positions: new Float32Array(9) }];
       const meta: TrajectoryMeta = { nFrames: 1, timestepPs: 1.0, nAtoms: 3 };
 
       const nodes = [
@@ -199,12 +197,11 @@ describe("executePipeline", () => {
         makeNode("f", "filter", { query: "" }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
-      const edges = [
-        makeEdge("ls", "particle", "f", "in"),
-        makeEdge("f", "out", "vp", "particle"),
-      ];
+      const edges = [makeEdge("ls", "particle", "f", "in"), makeEdge("f", "out", "vp", "particle")];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       expect(result.particles).toHaveLength(1);
       expect(result.particles[0].indices).toBeNull(); // all atoms
     });
@@ -215,12 +212,11 @@ describe("executePipeline", () => {
         makeNode("f", "filter", { query: 'element == "H"' }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
-      const edges = [
-        makeEdge("ls", "particle", "f", "in"),
-        makeEdge("f", "out", "vp", "particle"),
-      ];
+      const edges = [makeEdge("ls", "particle", "f", "in"), makeEdge("f", "out", "vp", "particle")];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       expect(result.particles).toHaveLength(1);
       const indices = Array.from(result.particles[0].indices!);
       expect(indices).toEqual([3, 4]);
@@ -232,12 +228,11 @@ describe("executePipeline", () => {
         makeNode("f", "filter", { query: "invalid_syntax!!!" }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
-      const edges = [
-        makeEdge("ls", "particle", "f", "in"),
-        makeEdge("f", "out", "vp", "particle"),
-      ];
+      const edges = [makeEdge("ls", "particle", "f", "in"), makeEdge("f", "out", "vp", "particle")];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       expect(result.particles).toHaveLength(1);
       // Should pass through unchanged on parse error
       expect(result.particles[0].indices).toBeNull();
@@ -251,12 +246,11 @@ describe("executePipeline", () => {
         makeNode("m", "modify", { scale: 0.5, opacity: 1.0 }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
-      const edges = [
-        makeEdge("ls", "particle", "m", "in"),
-        makeEdge("m", "out", "vp", "particle"),
-      ];
+      const edges = [makeEdge("ls", "particle", "m", "in"), makeEdge("m", "out", "vp", "particle")];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       const p = result.particles[0];
       expect(p.scaleOverrides).not.toBeNull();
       expect(p.scaleOverrides!.length).toBe(5);
@@ -278,7 +272,9 @@ describe("executePipeline", () => {
         makeEdge("m", "out", "vp", "particle"),
       ];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       const p = result.particles[0];
       expect(p.scaleOverrides).not.toBeNull();
       // H atoms at indices 3,4 should be 2.0; others 1.0
@@ -371,10 +367,10 @@ describe("executePipeline", () => {
       // O at (0.5, 2, 2), H2 at (3.6, 2, 2), min-image displacement = -0.4-0.5 = -0.9? No...
       // dx = 3.6 - 0.5 = 3.1, fractional = 3.1/4 = 0.775, wrapped = 0.775 - 1 = -0.225
       // dxMin = -0.225 * 4 = -0.9, ghost_H2 = 0.5 + (-0.9) = -0.4
-      expect(bond.positions![3 * 3]).toBeCloseTo(-0.4, 1);  // ghost_H2 x
+      expect(bond.positions![3 * 3]).toBeCloseTo(-0.4, 1); // ghost_H2 x
       expect(bond.positions![3 * 3 + 1]).toBeCloseTo(2, 1); // ghost_H2 y
       // ghost_O = H2 - dMin = 3.6 - (-0.9) = 4.5
-      expect(bond.positions![4 * 3]).toBeCloseTo(4.5, 1);   // ghost_O x
+      expect(bond.positions![4 * 3]).toBeCloseTo(4.5, 1); // ghost_O x
     });
 
     it("PBC processing keeps all bonds when no box", () => {
@@ -489,9 +485,7 @@ describe("executePipeline", () => {
     });
 
     it("prioritizes file trajectory over structure trajectory", () => {
-      const structFrames: Frame[] = [
-        { frameId: 0, nAtoms: 3, positions: new Float32Array(9) },
-      ];
+      const structFrames: Frame[] = [{ frameId: 0, nAtoms: 3, positions: new Float32Array(9) }];
       const fileFrames: Frame[] = [
         { frameId: 0, nAtoms: 3, positions: new Float32Array(9) },
         { frameId: 1, nAtoms: 3, positions: new Float32Array(9) },
@@ -530,12 +524,11 @@ describe("executePipeline", () => {
         makeNode("f", "filter", { query: 'element == "H"' }, false), // disabled
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
-      const edges = [
-        makeEdge("ls", "particle", "f", "in"),
-        makeEdge("f", "out", "vp", "particle"),
-      ];
+      const edges = [makeEdge("ls", "particle", "f", "in"), makeEdge("f", "out", "vp", "particle")];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       expect(result.particles).toHaveLength(1);
       // Should pass through all atoms (filter disabled)
       expect(result.particles[0].indices).toBeNull();
@@ -556,7 +549,9 @@ describe("executePipeline", () => {
         makeEdge("m", "out", "vp", "particle"),
       ];
 
-      const { viewportState: result } = executePipeline(nodes, edges, { snapshot: fiveAtomSnapshot });
+      const { viewportState: result } = executePipeline(nodes, edges, {
+        snapshot: fiveAtomSnapshot,
+      });
       expect(result.particles).toHaveLength(1);
 
       const p = result.particles[0];
@@ -674,10 +669,7 @@ describe("executePipeline", () => {
         makeNode("c", "color", { mode: "byResidue", uniformColor: "#ffffff" }),
         makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
       ];
-      const edges = [
-        makeEdge("ls", "particle", "c", "in"),
-        makeEdge("c", "out", "vp", "particle"),
-      ];
+      const edges = [makeEdge("ls", "particle", "c", "in"), makeEdge("c", "out", "vp", "particle")];
       return executePipeline(nodes, edges, ctx).viewportState.particles[0];
     }
 

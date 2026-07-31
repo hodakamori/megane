@@ -124,7 +124,9 @@ describe("loadBondFileData", () => {
   }
 
   it("calls parseTopBonds for .top files", async () => {
-    const spy = vi.spyOn(structureParsers, "parseTopBonds").mockResolvedValue(new Uint32Array([0, 1]));
+    const spy = vi
+      .spyOn(structureParsers, "parseTopBonds")
+      .mockResolvedValue(new Uint32Array([0, 1]));
     const file = makeFile("topology.top", "[ bonds ]\n1 2\n");
     const result = await loadBondFileData(file, 3);
     expect(spy).toHaveBeenCalledOnce();
@@ -133,7 +135,9 @@ describe("loadBondFileData", () => {
   });
 
   it("calls parsePsfBonds for .psf files", async () => {
-    const spy = vi.spyOn(structureParsers, "parsePsfBonds").mockResolvedValue(new Uint32Array([0, 1]));
+    const spy = vi
+      .spyOn(structureParsers, "parsePsfBonds")
+      .mockResolvedValue(new Uint32Array([0, 1]));
     const file = makeFile("water.psf", "PSF\n");
     const result = await loadBondFileData(file, 3);
     expect(spy).toHaveBeenCalledOnce();
@@ -142,7 +146,9 @@ describe("loadBondFileData", () => {
   });
 
   it("calls parsePdbBonds for .pdb files", async () => {
-    const spy = vi.spyOn(structureParsers, "parsePdbBonds").mockResolvedValue(new Uint32Array([0, 1]));
+    const spy = vi
+      .spyOn(structureParsers, "parsePdbBonds")
+      .mockResolvedValue(new Uint32Array([0, 1]));
     const file = makeFile("mol.pdb", "ATOM\n");
     const result = await loadBondFileData(file, 3);
     expect(spy).toHaveBeenCalledOnce();

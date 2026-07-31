@@ -24,6 +24,7 @@
 import type { StoreApi } from "zustand";
 import type { Node, Edge } from "@xyflow/react";
 import { parseStructureFile, parseTopBonds, parsePsfBonds } from "../parsers/structure";
+import { isVaspBareName } from "../parsers/fileNames";
 import { parseXTCFile, parseLammpstrjFile, parseDCDFile, parseNetCDFFile } from "../parsers/xtc";
 import { createMinimalStructurePipeline } from "./defaults";
 import { getLayoutedElements } from "./layout";
@@ -72,6 +73,9 @@ const STRUCTURE_EXTS = [
   // XCrySDen structure / animation.
   ".xsf",
   ".axsf",
+  // VASP POSCAR / CONTCAR / XDATCAR (also `.vasp`). The extensionless
+  // spellings are classified by basename in `classify` below.
+  ".vasp",
 ];
 
 const TRAJECTORY_EXTS = [".xtc", ".lammpstrj", ".dump", ".trj", ".dcd", ".nc"];
@@ -145,6 +149,7 @@ function classify(filename: string): FileKind {
   // defaults to a standalone structure load on a generic/drag-drop open. The two
   // lists are otherwise disjoint, so pure trajectory formats are unaffected.
   for (const ext of STRUCTURE_EXTS) if (lower.endsWith(ext)) return "structure";
+  if (isVaspBareName(lower)) return "structure";
   for (const ext of TRAJECTORY_EXTS) if (lower.endsWith(ext)) return "trajectory";
   return "unknown";
 }

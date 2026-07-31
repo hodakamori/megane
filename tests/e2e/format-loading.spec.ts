@@ -69,6 +69,11 @@ const STRUCTURE_CASES: StructureCase[] = [
   // frames feed the playback timeline.
   { name: "xsf-si-diamond", file: "si_diamond.xsf", mime: "text/plain", expectedAtoms: 8 },
   { name: "axsf-water-relax", file: "water_relax.axsf", mime: "text/plain", expectedAtoms: 3 },
+  // VASP is the one format dispatched by *filename* rather than extension —
+  // POSCAR / CONTCAR / XDATCAR carry no extension at all. These two cases
+  // therefore also cover `structureExtFromFileName`'s bare-name mapping.
+  { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
+  { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
 ];
 
 async function dropStructure(

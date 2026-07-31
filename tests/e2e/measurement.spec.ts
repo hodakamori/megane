@@ -19,11 +19,7 @@
  */
 
 import { test, expect } from "playwright/test";
-import {
-  assertDomContract,
-  defaultViewerContract,
-  stabilizeUi,
-} from "./lib/setup";
+import { assertDomContract, defaultViewerContract, stabilizeUi } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
 import { getProjectedAtoms } from "./lib/render-utils";
 
@@ -115,7 +111,8 @@ test("measurement: second atom raises count=2 and renders a measurement label", 
   const projections = await getProjectedAtoms(boot!.scope);
   const rect = await getViewerRect();
   const visible = projections.filter(
-    (p) => p.depth > 0 && p.sx > 20 && p.sx < rect.width - 20 && p.sy > 20 && p.sy < rect.height - 20,
+    (p) =>
+      p.depth > 0 && p.sx > 20 && p.sx < rect.width - 20 && p.sy > 20 && p.sy < rect.height - 20,
   );
   if (visible.length < 2) test.skip(true, "fewer than 2 visible atoms in fixture");
   // Pick the visible atom farthest from the first one to make the click

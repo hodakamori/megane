@@ -12,9 +12,13 @@ import { usePipelineStore } from "../../pipeline/store";
 import { NodeShell } from "./NodeShell";
 import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
+import { matchesStructureName } from "../../parsers/fileNames";
 
+// The file-dialog filter can only express extensions, so VASP contributes
+// `.vasp` here. Its extensionless spellings (POSCAR / CONTCAR / XDATCAR) are
+// still accepted on drag-drop via `matchesStructureName`.
 const STRUCTURE_ACCEPT =
-  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.xsf,.axsf";
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.vasp,.xsf,.axsf";
 export const STRUCTURE_EXTS = [
   ".pdb",
   ".gro",
@@ -36,6 +40,9 @@ export const STRUCTURE_EXTS = [
   // XCrySDen structure / animation (`.axsf` is the animated variant).
   ".xsf",
   ".axsf",
+  // VASP POSCAR / CONTCAR / XDATCAR. Bare (extensionless) VASP filenames are
+  // matched by `matchesStructureName`, not by this suffix list.
+  ".vasp",
 ];
 
 /**
@@ -55,8 +62,7 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
 
   const handleFile = useCallback(
     (file: File) => {
-      const lower = file.name.toLowerCase();
-      if (!STRUCTURE_EXTS.some((ext) => lower.endsWith(ext))) return;
+      if (!matchesStructureName(file.name, STRUCTURE_EXTS)) return;
       updateNodeParams(id, { fileName: file.name });
       _onStructureLoad?.(id, file);
     },
@@ -68,9 +74,7 @@ export function LoadStructureNode({ id, data }: NodeProps<Node<PipelineNodeData>
       e.preventDefault();
       e.stopPropagation();
       const files = Array.from(e.dataTransfer.files);
-      const match = files.find((f) =>
-        STRUCTURE_EXTS.some((ext) => f.name.toLowerCase().endsWith(ext)),
-      );
+      const match = files.find((f) => matchesStructureName(f.name, STRUCTURE_EXTS));
       if (match) handleFile(match);
     },
     [handleFile],

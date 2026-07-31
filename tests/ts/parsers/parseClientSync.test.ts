@@ -78,6 +78,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
     parse_xsf: structFn("parse_xsf"),
+    parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),
     parse_mol: structFn("parse_mol"),
@@ -199,6 +200,14 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
     async (filename) => {
       await sync.parseStructureFile(fakeFile(filename, "ATOMS\n 14 0 0 0\n"));
       expect(calls).toContain("parse_xsf");
+    },
+  );
+
+  it.each([["POSCAR"], ["CONTCAR"], ["XDATCAR"], ["MgO.vasp"]])(
+    "routes the VASP file %s through the VASP structure parser",
+    async (filename) => {
+      await sync.parseStructureFile(fakeFile(filename, "Si\n 1.0\n"));
+      expect(calls).toContain("parse_vasp");
     },
   );
 

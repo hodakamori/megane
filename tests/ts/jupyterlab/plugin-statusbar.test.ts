@@ -60,10 +60,7 @@ describe("megane JupyterLab plugin – IStatusBar optional integration", () => {
     plugin.activate(mockApp as never, mockRestorer as never, fakeStatusBar as never);
 
     expect(setupFrameStatusBar).toHaveBeenCalledTimes(1);
-    expect(setupFrameStatusBar).toHaveBeenCalledWith(
-      expect.anything(),
-      fakeStatusBar,
-    );
+    expect(setupFrameStatusBar).toHaveBeenCalledWith(expect.anything(), fakeStatusBar);
   });
 
   it("skips setupFrameStatusBar when statusBar is null", () => {

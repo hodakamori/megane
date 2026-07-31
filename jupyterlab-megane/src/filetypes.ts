@@ -105,6 +105,20 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    // VASP structure files. `POSCAR` / `CONTCAR` / `XDATCAR` normally carry no
+    // extension at all, so this entry also declares a `pattern` — JupyterLab
+    // matches `IFileType.pattern` against the basename before it falls back to
+    // extension matching. The regex is case-sensitive (JupyterLab compiles it
+    // without flags), hence the explicit upper/lower alternatives.
+    name: "megane-vasp",
+    displayName: "VASP structure",
+    extensions: [".vasp"],
+    pattern: "^(POSCAR|CONTCAR|XDATCAR|poscar|contcar|xdatcar)([-_.].*)?$",
+    mimeTypes: ["chemical/x-vasp"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
     extensions: [".lammpstrj", ".dump", ".trj"],

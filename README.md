@@ -32,7 +32,7 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 16 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, XCrySDen XSF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 17 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, XCrySDen XSF) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
 - **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 16 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
@@ -56,7 +56,7 @@ One codebase, every environment.
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
-The secret: parsers for 16 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, XCrySDen XSF) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: parsers for 17 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, XCrySDen XSF) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
 
 ### Visual Pipelines
 
@@ -168,6 +168,7 @@ function App() {
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) — self-contained with elements, bonds, and frames |
 | XCrySDen | `.xsf`, `.axsf` | XCrySDen structure; `.axsf` is a multi-frame animation with optional per-frame cell and per-atom forces |
+| VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | VASP crystal structure; XDATCAR is multi-frame. Matched by filename as well as extension, since the standard names carry no extension |
 
 ### Trajectory formats (`LoadTrajectory` node)
 
@@ -239,7 +240,7 @@ make test-all              # All tests
 src/                     TypeScript frontend
   renderer/              Three.js rendering (impostor, mesh, shaders)
   protocol/              Binary protocol decoder + web workers
-  parsers/               WASM-based file parsers (16 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data/dump, AMBER topology/NetCDF, XTC, DCD, ASE .traj, XCrySDen XSF)
+  parsers/               WASM-based file parsers (17 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, LAMMPS data/dump, AMBER topology/NetCDF, XTC, DCD, ASE .traj, VASP, XCrySDen XSF)
   logic/                 Bond / label / vector source logic
   components/            React UI components
   hooks/                 Custom React hooks

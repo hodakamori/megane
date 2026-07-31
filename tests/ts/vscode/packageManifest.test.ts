@@ -39,15 +39,25 @@ describe("vscode-megane package.json", () => {
         "*.sdf",
         "*.traj",
         "*.trj",
+        "*.vasp",
         "*.xtc",
         "*.xyz",
         "*.xsf",
         "*.axsf",
+        // VASP's standard filenames carry no extension, so the selector needs
+        // basename globs alongside the `*.vasp` extension pattern.
+        "POSCAR*",
+        "CONTCAR*",
+        "XDATCAR*",
       ].sort(),
     );
   });
 
   it("mentions XCrySDen XSF in the marketplace description", () => {
     expect(manifest.description).toContain("XCrySDen XSF");
+  });
+
+  it("mentions VASP in the marketplace description", () => {
+    expect(manifest.description).toContain("VASP");
   });
 });

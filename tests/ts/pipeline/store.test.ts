@@ -27,7 +27,12 @@ describe("usePipelineStore", () => {
         },
       ],
       edges: [
-        { source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
+        {
+          source: "loader-1",
+          target: "viewport-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
       ],
     });
   });
@@ -193,8 +198,25 @@ describe("usePipelineStore", () => {
     it("clears execution context state when switching templates", () => {
       const store = usePipelineStore.getState();
       // Pre-populate execution context fields
-      store.setSnapshot({ positions: new Float32Array(3), elements: new Int32Array(1), nAtoms: 1, bonds: [], cell: null, pbc: [false, false, false] });
-      store.setNodeSnapshot("loader-1", { snapshot: { positions: new Float32Array(3), elements: new Int32Array(1), nAtoms: 1, bonds: [], cell: null, pbc: [false, false, false] }, atomLabels: null });
+      store.setSnapshot({
+        positions: new Float32Array(3),
+        elements: new Int32Array(1),
+        nAtoms: 1,
+        bonds: [],
+        cell: null,
+        pbc: [false, false, false],
+      });
+      store.setNodeSnapshot("loader-1", {
+        snapshot: {
+          positions: new Float32Array(3),
+          elements: new Int32Array(1),
+          nAtoms: 1,
+          bonds: [],
+          cell: null,
+          pbc: [false, false, false],
+        },
+        atomLabels: null,
+      });
       store.setNodeParseError("loader-1", "some error");
 
       usePipelineStore.getState().applyTemplate("molecule");
@@ -289,10 +311,30 @@ describe("usePipelineStore", () => {
           },
         ],
         edges: [
-          { source: "loader-1", target: "labels-1", sourceHandle: "particle", targetHandle: "particle" },
-          { source: "loader-1", target: "poly-1", sourceHandle: "particle", targetHandle: "particle" },
-          { source: "loader-1", target: "viewport-1", sourceHandle: "particle", targetHandle: "particle" },
-          { source: "labels-1", target: "viewport-1", sourceHandle: "label", targetHandle: "label" },
+          {
+            source: "loader-1",
+            target: "labels-1",
+            sourceHandle: "particle",
+            targetHandle: "particle",
+          },
+          {
+            source: "loader-1",
+            target: "poly-1",
+            sourceHandle: "particle",
+            targetHandle: "particle",
+          },
+          {
+            source: "loader-1",
+            target: "viewport-1",
+            sourceHandle: "particle",
+            targetHandle: "particle",
+          },
+          {
+            source: "labels-1",
+            target: "viewport-1",
+            sourceHandle: "label",
+            targetHandle: "label",
+          },
           { source: "poly-1", target: "viewport-1", sourceHandle: "mesh", targetHandle: "mesh" },
         ],
       };

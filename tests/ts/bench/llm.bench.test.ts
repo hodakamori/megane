@@ -21,53 +21,43 @@ import { join } from "node:path";
 import { DATASET } from "../../../bench/llm/dataset";
 import { runDataset } from "../../../bench/llm/runner";
 import { aggregate, toJSON, toMarkdown } from "../../../bench/llm/report";
-import {
-  assertConfig,
-  configFromEnv,
-  generatePipelineLive,
-} from "../../../bench/llm/providers";
+import { assertConfig, configFromEnv, generatePipelineLive } from "../../../bench/llm/providers";
 
 const ENABLED = process.env.MEGANE_LLM_BENCH === "1";
 
 describe.skipIf(!ENABLED)("megane LLM benchmark (live)", () => {
-  it(
-    "scores the dataset and writes a report",
-    async () => {
-      const config = configFromEnv();
-      assertConfig(config);
+  it("scores the dataset and writes a report", async () => {
+    const config = configFromEnv();
+    assertConfig(config);
 
-      const records = await runDataset(
-        DATASET,
-        (prompt) => generatePipelineLive(config, prompt),
-        {
-          onResult: (r, i, total) => {
-            const pct = Math.round(r.score.total * 100);
-            // eslint-disable-next-line no-console
-            console.log(`[${i + 1}/${total}] ${r.case.id}: ${pct}%${r.error ? ` (error: ${r.error})` : ""}`);
-          },
-        },
-      );
+    const records = await runDataset(DATASET, (prompt) => generatePipelineLive(config, prompt), {
+      onResult: (r, i, total) => {
+        const pct = Math.round(r.score.total * 100);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[${i + 1}/${total}] ${r.case.id}: ${pct}%${r.error ? ` (error: ${r.error})` : ""}`,
+        );
+      },
+    });
 
-      const agg = aggregate(records);
-      const meta = {
-        provider: config.provider,
-        model: config.model,
-        timestamp: new Date().toISOString(),
-      };
+    const agg = aggregate(records);
+    const meta = {
+      provider: config.provider,
+      model: config.model,
+      timestamp: new Date().toISOString(),
+    };
 
-      const dir = join(process.cwd(), "bench", "llm", "results");
-      mkdirSync(dir, { recursive: true });
-      const stamp = meta.timestamp.replace(/[:.]/g, "-");
-      const base = `${config.provider}-${config.model.replace(/[^\w.-]/g, "_")}-${stamp}`;
-      writeFileSync(join(dir, `${base}.json`), JSON.stringify(toJSON(meta, records, agg), null, 2));
-      const md = toMarkdown(meta, records, agg);
-      writeFileSync(join(dir, `${base}.md`), md);
+    const dir = join(process.cwd(), "bench", "llm", "results");
+    mkdirSync(dir, { recursive: true });
+    const stamp = meta.timestamp.replace(/[:.]/g, "-");
+    const base = `${config.provider}-${config.model.replace(/[^\w.-]/g, "_")}-${stamp}`;
+    writeFileSync(join(dir, `${base}.json`), JSON.stringify(toJSON(meta, records, agg), null, 2));
+    const md = toMarkdown(meta, records, agg);
+    writeFileSync(join(dir, `${base}.md`), md);
 
-      // eslint-disable-next-line no-console
-      console.log("\n" + md);
+    // eslint-disable-next-line no-console
+    console.log("\n" + md);
 
-      expect(records).toHaveLength(DATASET.length);
-    },
-    600_000,
-  );
+    expect(records).toHaveLength(DATASET.length);
+  }, 600_000);
 });

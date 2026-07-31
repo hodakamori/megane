@@ -9,21 +9,17 @@ const eagerFrames: Frame[] = [{ frameId: 0, nAtoms: 3, positions: new Float32Arr
 // A structure-file lazy provider: minimal handle (trajectoryId + nAtoms/nFrames)
 // with a basePositions frame 0 — the shape produced by indexStructureLazy.
 function makeStructureProvider(dispose: () => void, trajectoryId = 1): LazyFrameProvider {
-  return new LazyFrameProvider(
-    { trajectoryId, index: { nAtoms: 3, nFrames: 3 } },
-    meta,
-    {
-      decode: () =>
-        Promise.resolve({
-          positions: new Float32Array(9),
-          vectors: new Float32Array(0),
-          vectorChannelCount: 0,
-        }),
-      dispose,
-      prefetchAhead: 0,
-      basePositions: new Float32Array(9).fill(1),
-    },
-  );
+  return new LazyFrameProvider({ trajectoryId, index: { nAtoms: 3, nFrames: 3 } }, meta, {
+    decode: () =>
+      Promise.resolve({
+        positions: new Float32Array(9),
+        vectors: new Float32Array(0),
+        vectorChannelCount: 0,
+      }),
+    dispose,
+    prefetchAhead: 0,
+    basePositions: new Float32Array(9).fill(1),
+  });
 }
 
 describe("pipeline store — structureProvider channel", () => {
