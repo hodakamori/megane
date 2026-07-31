@@ -182,12 +182,10 @@ function makeWebviewPanel(): {
       onDispose = handler;
       return { dispose: vi.fn() };
     }),
-    onDidChangeViewState: vi.fn(
-      (handler: (e: { webviewPanel: FakeWebviewPanel }) => void) => {
-        onViewStateChange = handler;
-        return { dispose: vi.fn() };
-      },
-    ),
+    onDidChangeViewState: vi.fn((handler: (e: { webviewPanel: FakeWebviewPanel }) => void) => {
+      onViewStateChange = handler;
+      return { dispose: vi.fn() };
+    }),
   };
   return {
     panel,
@@ -364,7 +362,7 @@ describe("MeganeEditorProvider — structureViewer", () => {
     const provider = getProvider("megane.structureViewer");
     mockState.readFile
       .mockResolvedValueOnce(new Uint8Array([10, 20, 30])) // .gro doc bytes
-      .mockRejectedValueOnce(new Error("FileNotFound"));    // .top not present
+      .mockRejectedValueOnce(new Error("FileNotFound")); // .top not present
 
     const doc = { uri: VscodeUri.file("/work/water.gro"), dispose: vi.fn() };
     const { panel, fireMessage } = makeWebviewPanel();
@@ -913,9 +911,8 @@ describe("MeganePipelineEditorProvider — pipelineViewer", () => {
 });
 
 describe("handleSaveFileMessage", () => {
-  const docUri = () => VscodeUri.file("/work/sample.pdb") as unknown as Parameters<
-    typeof handleSaveFileMessage
-  >[1];
+  const docUri = () =>
+    VscodeUri.file("/work/sample.pdb") as unknown as Parameters<typeof handleSaveFileMessage>[1];
 
   it("writes the chosen file and shows an info message on success", async () => {
     const target = VscodeUri.file("/elsewhere/out.png");

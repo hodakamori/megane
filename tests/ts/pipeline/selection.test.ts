@@ -122,11 +122,7 @@ describe("evaluateSelection", () => {
   });
 
   it("handles nested not/and/or", () => {
-    const result = evaluateSelection(
-      'not (element == "H" or element == "O")',
-      testSnapshot,
-      null,
-    );
+    const result = evaluateSelection('not (element == "H" or element == "O")', testSnapshot, null);
     expect(result).toEqual(new Set([0, 1])); // C, N
   });
 

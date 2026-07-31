@@ -45,16 +45,12 @@ describe("buildTourSteps", () => {
   });
 
   it("anchored selectors are unique", () => {
-    const selectors = steps
-      .map((s) => s.element)
-      .filter((v): v is string => typeof v === "string");
+    const selectors = steps.map((s) => s.element).filter((v): v is string => typeof v === "string");
     expect(new Set(selectors).size).toBe(selectors.length);
   });
 
   it("expected anchors reference the documented data attributes", () => {
-    const selectors = steps
-      .map((s) => s.element)
-      .filter((v): v is string => typeof v === "string");
+    const selectors = steps.map((s) => s.element).filter((v): v is string => typeof v === "string");
     expect(selectors).toContain('[data-tour-anchor="viewport"]');
     expect(selectors).toContain('[data-testid="panel-pipeline"]');
     expect(selectors).toContain('[data-testid="pipeline-editor-tutorial"]');
@@ -62,9 +58,7 @@ describe("buildTourSteps", () => {
   });
 
   it("highlights the toolbar Tutorial button immediately after the Pipeline step", () => {
-    const pipelineIdx = steps.findIndex(
-      (s) => s.element === '[data-testid="panel-pipeline"]',
-    );
+    const pipelineIdx = steps.findIndex((s) => s.element === '[data-testid="panel-pipeline"]');
     const tutorialIdx = steps.findIndex(
       (s) => s.element === '[data-testid="pipeline-editor-tutorial"]',
     );
@@ -98,9 +92,7 @@ describe("buildPipelineTutorialSteps", () => {
   });
 
   it("anchors target the load_structure, add_bond and viewport node cards", () => {
-    const selectors = steps
-      .map((s) => s.element)
-      .filter((v): v is string => typeof v === "string");
+    const selectors = steps.map((s) => s.element).filter((v): v is string => typeof v === "string");
     expect(selectors).toContain('[data-testid="pipeline-node-load_structure"]');
     expect(selectors).toContain('[data-testid="pipeline-node-add_bond"]');
     expect(selectors).toContain('[data-testid="pipeline-node-viewport"]');

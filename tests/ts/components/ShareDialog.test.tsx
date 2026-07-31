@@ -15,18 +15,14 @@ describe("ShareDialog", () => {
   });
 
   it("renders a read-only input containing the URL when open", () => {
-    render(
-      <ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />,
-    );
+    render(<ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />);
     const input = screen.getByTestId("share-dialog-url-input") as HTMLInputElement;
     expect(input.value).toBe("http://x/#pipeline=abc");
     expect(input.readOnly).toBe(true);
   });
 
   it("selects the full URL when the input is clicked", () => {
-    render(
-      <ShareDialog open url="http://x/#pipeline=abcdef" tooLong={false} onClose={() => {}} />,
-    );
+    render(<ShareDialog open url="http://x/#pipeline=abcdef" tooLong={false} onClose={() => {}} />);
     const input = screen.getByTestId("share-dialog-url-input") as HTMLInputElement;
     fireEvent.click(input);
     expect(input.selectionStart).toBe(0);
@@ -147,9 +143,7 @@ describe("ShareDialog", () => {
   });
 
   it("'Open in new tab' anchor has correct href / target / rel", () => {
-    render(
-      <ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />,
-    );
+    render(<ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />);
     const anchor = screen.getByTestId("share-dialog-open-tab") as HTMLAnchorElement;
     expect(anchor.getAttribute("href")).toBe("http://x/#pipeline=abc");
     expect(anchor.getAttribute("target")).toBe("_blank");
@@ -164,9 +158,7 @@ describe("ShareDialog", () => {
       configurable: true,
     });
     try {
-      render(
-        <ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />,
-      );
+      render(<ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />);
       fireEvent.click(screen.getByTestId("share-dialog-copy"));
       await waitFor(() => {
         expect(writeText).toHaveBeenCalledWith("http://x/#pipeline=abc");

@@ -94,8 +94,7 @@ describe("MoleculeRenderer — heterogeneous frame slow path", () => {
     };
     renderer.updateFrame(frame);
 
-    const buf = internals.cellRenderer.mesh.geometry.getAttribute("position")
-      .array as Float32Array;
+    const buf = internals.cellRenderer.mesh.geometry.getAttribute("position").array as Float32Array;
     // The wireframe's origin corner sits at the frame's box origin.
     expect([buf[0], buf[1], buf[2]]).toEqual([160, 0, 600]);
     expect([buf[69], buf[70], buf[71]]).toEqual([240, 150, 900]);

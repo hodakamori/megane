@@ -69,7 +69,7 @@ function widgetNotebook(fileName: string): object {
         source: [
           "import megane\n",
           "from IPython.display import display, HTML\n",
-          "display(HTML('<script>window.parent.postMessage({type: \"megane-test-mode\"}, \"*\")</script>'))\n",
+          'display(HTML(\'<script>window.parent.postMessage({type: "megane-test-mode"}, "*")</script>\'))\n',
           "viewer = megane.MolecularViewer()\n",
           `viewer.load(\"${WORKSPACE}/${fileName}\")\n`,
           "viewer\n",

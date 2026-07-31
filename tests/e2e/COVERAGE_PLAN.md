@@ -33,6 +33,7 @@ prerequisites landed in PR #309 on branch
 prettier autofix; all 8 CI checks green on the merge head.
 
 Highlights:
+
 - `__megane_test` namespace + `__megane_test_pipeline_store` exposing
   `getProjectedAtomPositions`, `getCameraState`,
   `getVisibleSubsystems`, `setCameraMode`, `resetCamera`, and
@@ -52,9 +53,10 @@ Highlights:
 - Baselines: 50 → 65 (+15 webapp baselines). Cross-host baselines for
   jupyterlab-doc / vscode / widget-jupyterlab / widget-vscode are a
   mechanical follow-up (`MEGANE_E2E_UPDATE=1 npx playwright test
-  --project=...`).
+--project=...`).
 
 What is still OPEN after PR #309 (tracked below):
+
 - All of Phase 1 except 1.4 / 1.7.
 - Phase 2.5 vector / arrow rendering (label_generator and
   polyhedron_generator landed; the vector overlay needs a fixture
@@ -72,6 +74,7 @@ Pure spec / fixture additions. Should be doable as a single follow-up
 PR per host.
 
 ### 1.1 Pipeline graph editing (`pipeline-editor` project, webapp)
+
 - [ ] Drag a node from the palette onto the canvas.
 - [ ] Connect two nodes by dragging an edge between their handles.
 - [ ] Delete a node via keyboard shortcut.
@@ -85,12 +88,14 @@ PR per host.
   baseline showing the post-edit render.
 
 ### 1.2 Trajectory frame coverage (`playback` project)
+
 - [ ] Sweep all five frames of `caffeine_water` and capture a baseline
       at each. Catches "renderer caches frame 0 buffers" regressions.
 - [ ] FPS=1 vs FPS=15 visual baselines after a fixed elapsed time.
 - [ ] Loop wrap-around (frame N → frame 0).
 
 ### 1.3 Crystal / cell rendering (`format-loading` project)
+
 - [ ] Add a CIF fixture with a small cubic cell (e.g. NaCl is already
       committed). Capture a baseline showing the cell box edges.
 - [ ] Add a fixture with a triclinic cell.
@@ -99,8 +104,10 @@ PR per host.
 - [ ] PBC unwrapping toggle.
 
 ### 1.4 Multi-format on widget hosts
+
 Currently widget-jupyterlab / widget-vscode are PDB-only because
 `MolecularViewer.load()` is hard-wired. Two paths:
+
 - [ ] Use `viewer.set_pipeline(megane.Pipeline.load(json))` for
       non-PDB formats (programmatic, no API change).
 - [x] Or extend `MolecularViewer.load()` to dispatch on extension
@@ -109,11 +116,13 @@ Currently widget-jupyterlab / widget-vscode are PDB-only because
       legacy PDB fixtures.
 
 ### 1.5 Pipeline file format on remaining hosts
+
 - [ ] `.megane.json` open in **vscode pipelineViewer** (a custom editor
       view-type already exists; see `vscode-megane/src/extension.ts:18`).
 - [ ] `.megane.json` open in **jupyterlab-doc** (DocWidget supports it).
 
 ### 1.6 Render-modal output (without FFmpeg)
+
 - [ ] Click "Save PNG" and assert the download triggers (use
       `page.waitForEvent('download')`). FFmpeg-gated GIF/MP4 stays
       skipped; PNG export is pure-canvas and runs on every machine.
@@ -121,6 +130,7 @@ Currently widget-jupyterlab / widget-vscode are PDB-only because
       through the renderer.
 
 ### 1.7 Widget API quick fixes
+
 - [x] Fix `widget-api.spec.ts:103` failure. **(PR #309)** Replaced the
       `window.jupyterapp` lookup with a notebook-rewrite + Run All
       pattern via the existing `openLabNotebook` helper, removing the
@@ -138,12 +148,15 @@ These require modest changes in the React/renderer code so the test
 runner can observe state. None of them are user-visible.
 
 ### 2.1 AppearancePanel coverage
+
 Source state:
+
 - 6 testids already exist (`appearance-{atom,bond}-{opacity,scale}`,
   `appearance-vdw-scale`, `appearance-vector-scale`).
 - The panel does **not** mount in the webapp shell currently.
 
 Plan:
+
 - [x] Mount `AppearancePanel` inside the webapp's right sidebar (under
       a CollapsiblePanel). **(PR #309)** Mounted in `MeganeViewer.tsx`
       with `top=60` so it stacks below the pipeline-editor chip.
@@ -162,6 +175,7 @@ Plan:
       `WidgetViewer` mounts AppearancePanel.
 
 ### 2.2 Modify-node sliders
+
 - 2 testids already in `src/components/nodes/ModifyNode.tsx`
   (`modify-node-opacity`, `modify-node-scale`).
 - [x] Insert a Modify node into the default pipeline graph (extends
@@ -174,7 +188,9 @@ Plan:
       baseline per slider value. 3 webapp baselines committed.
 
 ### 2.3 Camera operations
+
 The OrbitControls drag path is non-deterministic. Either:
+
 - [x] Add a `viewer.setCameraMode(...)` and
       `viewer.resetCamera()` programmatic API on the renderer (already
       partially in place, just not exposed) and drive it from the test.
@@ -191,8 +207,10 @@ The OrbitControls drag path is non-deterministic. Either:
   - [ ] frustum-inset baseline (camera respects sidebar width)
 
 ### 2.4 Atom selection / measurement
+
 Per `e2e-coverage` skill notes, this was pulled from the previous PR
 because the renderer does not expose projected atom positions. Plan:
+
 - [x] Add `viewer.getProjectedAtomPositions()` to the renderer, gated on
       `_testMode` (already used by other hooks). **(PR #309)**
 - [x] Expose it on `window.__megane_test` (alongside
@@ -204,8 +222,10 @@ because the renderer does not expose projected atom positions. Plan:
       **(PR #309)** Count=3 / dihedral coverage left as a follow-up.
 
 ### 2.5 Vector / arrow / label / polyhedron rendering
+
 Each of these is a separate Renderer subsystem. They mount when the
 pipeline contains a corresponding node.
+
 - [x] Add fixture pipelines that include each kind of node + matching
       data file. **(PR #309)** label_generator and polyhedron_generator
       injected programmatically via `pipeline.insertNode`. The vector
@@ -223,21 +243,24 @@ pipeline contains a corresponding node.
 These are nice-to-haves that take time but no architectural work.
 
 ### 3.1 Cross-host fixture
+
 Currently each spec hard-codes its host. The `e2e-coverage` skill
-mentions a `tests/e2e/lib/host-fixture.ts` that *should* exist but
+mentions a `tests/e2e/lib/host-fixture.ts` that _should_ exist but
 doesn't. Plan:
+
 - [ ] Implement `hostFixture()` that reads `MEGANE_HOST` and returns
       `{ scope, project, context }` (see skill snippet).
 - [ ] Migrate **every feature spec** (`format-loading`, `playback`,
       `sidebar`, `pipeline-editor`, `pipeline-file`, `render-modal`,
       `appearance`, `measurement`) to use it.
 - [ ] Run each one against all 5 hosts via `for host in ...; do
-      MEGANE_HOST=$host npm run test:e2e:<feature>; done`.
+    MEGANE_HOST=$host npm run test:e2e:<feature>; done`.
 
 This explodes the matrix from ~41 tests to ~150 tests but each new
 combination is a free regression-detection seat.
 
 ### 3.2 More fixture diversity
+
 - [ ] Large protein (>50k atoms) — performance regression marker.
 - [ ] Long trajectory (>1000 frames) — frame-cache regression marker.
 - [ ] Mixed-element fixture (>10 distinct atomic numbers) — palette
@@ -246,12 +269,14 @@ combination is a free regression-detection seat.
       generation regression marker.
 
 ### 3.3 Save / dirty-state
+
 - [ ] DocWidget: edit pipeline → Ctrl+S → dirty indicator clears →
       reopen file → state preserved.
 - [ ] VSCode pipelineViewer: same.
-- [ ] Widget-* hosts: `viewer.save_pipeline(path)` round-trip.
+- [ ] Widget-\* hosts: `viewer.save_pipeline(path)` round-trip.
 
 ### 3.4 Error / edge cases
+
 - [ ] Malformed PDB → error banner mounts (testid exists?
       `defaultViewerContract` should add one).
 - [ ] Empty trajectory → Timeline does not mount.
@@ -262,6 +287,7 @@ combination is a free regression-detection seat.
 ## Phase 4 — out-of-scope for E2E
 
 Recorded here so we don't lose track:
+
 - Rust core unit tests live in `cargo test -p megane-core`.
 - TS unit tests live in `vitest`.
 - Python tests live in `pytest`.
@@ -276,7 +302,7 @@ These are "hot-path" utilities. Doing them once unblocks many tests.
 - [x] `tests/e2e/lib/host-fixture.ts` — `MEGANE_HOST`-driven fixture.
       **(PR #309)** Reads `test.info().project.metadata.meganeHost`
       first, falls back to the env var; returns `{scope, host,
-      context, teardown}`.
+    context, teardown}`.
 - [x] `tests/e2e/lib/pipeline.ts` — programmatic pipeline editing
       helpers (insertNode, connectEdge, setNodeParam, removeNode,
       listNodes). **(PR #309)** Drives `window.__megane_test_pipeline_store`

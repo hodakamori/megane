@@ -2,13 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseCube, BOHR_TO_ANGSTROM } from "@/pipeline/executors/parseCube";
 
 /** Minimal valid CUBE file with a 2×2×2 grid and one atom. */
-function makeCube(
-  nx = 2,
-  ny = 2,
-  nz = 2,
-  nAtoms = 1,
-  dataValues?: number[],
-): string {
+function makeCube(nx = 2, ny = 2, nz = 2, nAtoms = 1, dataValues?: number[]): string {
   const lines: string[] = [
     "Comment line 1",
     "Comment line 2",
@@ -122,7 +116,7 @@ describe("parseCube", () => {
       "3  0  1  0",
       "3  0  0  1",
       "6  0  1  1  1",
-      "0.1  0.2",  // only 2 values, need 27
+      "0.1  0.2", // only 2 values, need 27
     ];
     expect(() => parseCube(lines.join("\n"))).toThrow(/expected 27/i);
   });
@@ -133,7 +127,15 @@ describe("parseCube", () => {
   });
 
   it("throws on malformed grid axis", () => {
-    const lines = ["C1", "C2", "1  0  0  0", "0  1  0  0", "2  0  1  0", "2  0  0  1", "6  0  1  1  1"];
+    const lines = [
+      "C1",
+      "C2",
+      "1  0  0  0",
+      "0  1  0  0",
+      "2  0  1  0",
+      "2  0  0  1",
+      "6  0  1  1  1",
+    ];
     expect(() => parseCube(lines.join("\n"))).toThrow();
   });
 
