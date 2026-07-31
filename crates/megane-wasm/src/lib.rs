@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser, psf,
-    top, traj, xtc, xyz,
+    amber, bonds, cif, cml, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser,
+    psf, top, traj, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -968,6 +968,13 @@ pub fn parse_gro(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
     let data = xyz::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a Chemical Markup Language (`.cml`) document and return structured data.
+#[wasm_bindgen]
+pub fn parse_cml(text: &str) -> Result<ParseResult, JsError> {
+    let data = cml::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 

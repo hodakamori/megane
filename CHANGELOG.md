@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **Chemical Markup Language** (`.cml`) on every host — the first XML format in `megane-core`. Reads the first `<molecule>` with atoms, honouring `x3`/`y3`/`z3`, packed `xyz3`, `xFract`/`yFract`/`zFract` (with the `<crystal>` cell), and 2D `x2`/`y2` depictions projected onto z = 0. An explicit `<bondArray>` supplies connectivity and bond orders; without one, bonds are inferred by distance.
+
+### Changed
+
+- `megane-core` now depends on **`quick-xml`** (pull parser, no DTD processing or custom entity expansion, so untrusted XML cannot mount an XXE / billion-laughs attack). Cost to the browser bundle: `megane_wasm_bg.wasm` grows from 544,125 to 586,372 bytes raw (203,106 → 217,087 gzipped, **+6.9 %**), measured on an unoptimized `wasm-opt`-free build.
+
 ## [0.10.0] - 2026-07-12
 
 ### Added

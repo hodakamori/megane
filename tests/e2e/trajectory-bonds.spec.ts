@@ -245,10 +245,7 @@ test("trajectory-bonds: play through the trajectory leaves bond broken at the en
   // restored). Both are acceptable as long as the data-bond-count
   // matches the visible frame.
   const finalFrame = Number(
-    await scope
-      .locator('[data-testid="megane-viewer"]')
-      .first()
-      .getAttribute("data-current-frame"),
+    await scope.locator('[data-testid="megane-viewer"]').first().getAttribute("data-current-frame"),
   );
   const finalBondCount = await readBondCount(scope);
   if (finalFrame === EXPECTED_FRAMES - 1) {

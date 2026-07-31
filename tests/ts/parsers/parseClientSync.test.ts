@@ -77,6 +77,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_cml: structFn("parse_cml"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),
     parse_mol: structFn("parse_mol"),
@@ -192,6 +193,11 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       expect(out.frames.length).toBe(1); // frame 0 is the snapshot; one extra frame
     },
   );
+
+  it("routes a .cml file through the CML parser", async () => {
+    await sync.parseStructureFile(fakeFile("ethanol.cml", "<molecule/>"));
+    expect(calls).toContain("parse_cml");
+  });
 
   it("parseStructureText defaults to PDB and honors fileName", async () => {
     await sync.parseStructureText("ATOM", "y.cif");

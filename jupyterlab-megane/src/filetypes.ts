@@ -97,6 +97,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-cml",
+    displayName: "Chemical Markup Language",
+    extensions: [".cml"],
+    mimeTypes: ["chemical/x-cml"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
     extensions: [".lammpstrj", ".dump", ".trj"],

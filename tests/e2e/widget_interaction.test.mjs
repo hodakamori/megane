@@ -19,12 +19,7 @@ import { randomBytes } from "crypto";
 import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { assert } from "./utils/assert.mjs";
-import {
-  REPO_ROOT,
-  getChromium,
-  saveScreenshot,
-  sleep,
-} from "./utils/playwright.mjs";
+import { REPO_ROOT, getChromium, saveScreenshot, sleep } from "./utils/playwright.mjs";
 
 const FIXTURES = join(REPO_ROOT, "tests", "fixtures");
 const TOKEN = randomBytes(16).toString("hex");
@@ -86,14 +81,20 @@ function spawnLab() {
     const timer = setTimeout(() => reject(new Error("JupyterLab did not start in time")), 60000);
     const handler = (data) => {
       const line = data.toString();
-      if (line.includes(String(PORT)) && (line.includes("http://") || line.includes("is running at"))) {
+      if (
+        line.includes(String(PORT)) &&
+        (line.includes("http://") || line.includes("is running at"))
+      ) {
         clearTimeout(timer);
         resolve(proc);
       }
     };
     proc.stdout.on("data", handler);
     proc.stderr.on("data", handler);
-    proc.on("error", (err) => { clearTimeout(timer); reject(err); });
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -203,13 +204,27 @@ try {
   console.error("widget_interaction fatal:", err);
   process.exitCode = 1;
 } finally {
-  try { unlinkSync(nbPath); } catch {}
+  try {
+    unlinkSync(nbPath);
+  } catch {}
   if (browser) await browser.close().catch(() => {});
   if (server) {
-    try { server.kill(); } catch {}
-    try { server.stdout?.destroy(); } catch {}
-    try { server.stderr?.destroy(); } catch {}
-    try { server.unref(); } catch {}
-    setTimeout(() => { try { server.kill("SIGKILL"); } catch {} }, 3000).unref();
+    try {
+      server.kill();
+    } catch {}
+    try {
+      server.stdout?.destroy();
+    } catch {}
+    try {
+      server.stderr?.destroy();
+    } catch {}
+    try {
+      server.unref();
+    } catch {}
+    setTimeout(() => {
+      try {
+        server.kill("SIGKILL");
+      } catch {}
+    }, 3000).unref();
   }
 }

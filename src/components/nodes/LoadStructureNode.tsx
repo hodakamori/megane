@@ -14,7 +14,7 @@ import { smallBtnStyle, fileNameStyle } from "../ui";
 import { useRef, useCallback } from "react";
 
 const STRUCTURE_ACCEPT =
-  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj";
+  ".pdb,.gro,.xyz,.mol,.sdf,.mol2,.cif,.mmcif,.data,.lammps,.prmtop,.traj,.lammpstrj,.dump,.trj,.cml";
 export const STRUCTURE_EXTS = [
   ".pdb",
   ".gro",
@@ -33,6 +33,8 @@ export const STRUCTURE_EXTS = [
   ".lammpstrj",
   ".dump",
   ".trj",
+  // Chemical Markup Language.
+  ".cml",
 ];
 
 /**

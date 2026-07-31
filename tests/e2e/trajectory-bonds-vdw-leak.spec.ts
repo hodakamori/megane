@@ -127,7 +127,13 @@ test("trajectory-bonds-vdw-leak: 250 frame swaps with bondSource=distance surviv
           return { completed: i + 1, total: swaps, worstMs: worst, bailed: true };
         }
       }
-      return { completed: swaps, total: swaps, worstMs: worst, totalMs: performance.now() - start, bailed: false };
+      return {
+        completed: swaps,
+        total: swaps,
+        worstMs: worst,
+        totalMs: performance.now() - start,
+        bailed: false,
+      };
     },
     [FRAME_SWAPS, TRAJECTORY_LENGTH, 1500],
   );
@@ -137,9 +143,10 @@ test("trajectory-bonds-vdw-leak: 250 frame swaps with bondSource=distance surviv
   ).toBe(false);
 
   // Reload / context-loss detection.
-  expect(recordedEvents, `unexpected events during playback: ${recordedEvents.join(", ")}`).not.toContain(
-    "webglcontextlost",
-  );
+  expect(
+    recordedEvents,
+    `unexpected events during playback: ${recordedEvents.join(", ")}`,
+  ).not.toContain("webglcontextlost");
   expect(recordedEvents).not.toContain("framenavigated");
 
   // Renderer must still be alive and have advanced through the swaps.

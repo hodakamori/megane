@@ -34,8 +34,8 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships eleven text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, and mmCIF)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(11);
+  it("ships twelve text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, and CML)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(12);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop names", () => {
@@ -53,8 +53,16 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-data",
         "megane-lammps-dump",
         "megane-amber-prmtop",
+        "megane-cml",
       ].sort(),
     );
+  });
+
+  it("registers .cml for the Chemical Markup Language filetype", () => {
+    const cml = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-cml");
+    expect(cml).toBeDefined();
+    expect(cml?.extensions).toEqual([".cml"]);
+    expect(cml?.fileFormat).toBe("text");
   });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
@@ -107,7 +115,7 @@ describe("jupyterlab filetypes", () => {
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
       STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
     );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(11);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(12);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

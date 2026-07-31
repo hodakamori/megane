@@ -115,7 +115,8 @@ export function startViteServer({ cwd = REPO_ROOT, port = randomPort(15000, 1000
 
     let buf = "";
     const timer = setTimeout(
-      () => reject(new Error(`Vite dev server did not start in time (last buf: ${buf.slice(-400)})`)),
+      () =>
+        reject(new Error(`Vite dev server did not start in time (last buf: ${buf.slice(-400)})`)),
       90000,
     );
     const handler = (data) => {
@@ -133,7 +134,10 @@ export function startViteServer({ cwd = REPO_ROOT, port = randomPort(15000, 1000
     };
     proc.stdout.on("data", handler);
     proc.stderr.on("data", handler);
-    proc.on("error", (err) => { clearTimeout(timer); reject(err); });
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -168,7 +172,10 @@ export function startJupyterLab({
     );
     const handler = (data) => {
       buf += data.toString();
-      if (buf.includes(String(port)) && (buf.includes("http://") || buf.includes("is running at"))) {
+      if (
+        buf.includes(String(port)) &&
+        (buf.includes("http://") || buf.includes("is running at"))
+      ) {
         clearTimeout(timer);
         resolve({
           proc,
@@ -181,7 +188,10 @@ export function startJupyterLab({
     };
     proc.stdout.on("data", handler);
     proc.stderr.on("data", handler);
-    proc.on("error", (err) => { clearTimeout(timer); reject(err); });
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -206,16 +216,31 @@ export function startCodeServer({ workspaceDir, port = randomPort(38000, 1000) }
     };
     proc.stdout.on("data", handler);
     proc.stderr.on("data", handler);
-    proc.on("error", (err) => { clearTimeout(timer); reject(err); });
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
 function killProc(proc) {
-  try { proc.kill(); } catch {}
-  try { proc.stdout?.destroy(); } catch {}
-  try { proc.stderr?.destroy(); } catch {}
-  try { proc.unref(); } catch {}
-  setTimeout(() => { try { proc.kill("SIGKILL"); } catch {} }, 3000).unref();
+  try {
+    proc.kill();
+  } catch {}
+  try {
+    proc.stdout?.destroy();
+  } catch {}
+  try {
+    proc.stderr?.destroy();
+  } catch {}
+  try {
+    proc.unref();
+  } catch {}
+  setTimeout(() => {
+    try {
+      proc.kill("SIGKILL");
+    } catch {}
+  }, 3000).unref();
 }
 
 // ---- Canvas inspection (works in main page or a frame) ----
@@ -233,7 +258,12 @@ const READ_PIXELS_FN = (sel) => {
       if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) nonWhite++;
     }
     const total = canvas.width * canvas.height;
-    return { hasContent: nonWhite > total * 0.001, totalPixels: total, nonWhitePixels: nonWhite, found: true };
+    return {
+      hasContent: nonWhite > total * 0.001,
+      totalPixels: total,
+      nonWhitePixels: nonWhite,
+      found: true,
+    };
   }
   const width = gl.drawingBufferWidth;
   const height = gl.drawingBufferHeight;
@@ -244,14 +274,23 @@ const READ_PIXELS_FN = (sel) => {
   for (let i = 0; i < pixels.length; i += 4) {
     if (pixels[i] < 250 || pixels[i + 1] < 250 || pixels[i + 2] < 250) nonWhite++;
   }
-  return { hasContent: nonWhite > total * 0.001, totalPixels: total, nonWhitePixels: nonWhite, found: true };
+  return {
+    hasContent: nonWhite > total * 0.001,
+    totalPixels: total,
+    nonWhitePixels: nonWhite,
+    found: true,
+  };
 };
 
 export async function readCanvasPixels(pageOrFrame, selector = "canvas") {
   return pageOrFrame.evaluate(READ_PIXELS_FN, selector);
 }
 
-export async function waitForCanvasNonEmpty(pageOrFrame, selector = "canvas", { timeout = 15000, interval = 500 } = {}) {
+export async function waitForCanvasNonEmpty(
+  pageOrFrame,
+  selector = "canvas",
+  { timeout = 15000, interval = 500 } = {},
+) {
   const deadline = Date.now() + timeout;
   let last = { hasContent: false, totalPixels: 0, nonWhitePixels: 0, found: false };
   while (Date.now() < deadline) {
@@ -281,7 +320,8 @@ export async function setupPerfHooks(context) {
 
 export async function collectPerf(pageOrFrame) {
   return pageOrFrame.evaluate(() => {
-    const measures = performance.getEntriesByType("measure")
+    const measures = performance
+      .getEntriesByType("measure")
       .filter((m) => m.name.startsWith("megane:"))
       .map((m) => ({ name: m.name, duration: m.duration, startTime: m.startTime }));
     const frameTimes = (window.__meganeFrameTimes || []).slice();
