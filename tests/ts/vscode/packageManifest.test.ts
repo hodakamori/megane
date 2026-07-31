@@ -42,6 +42,10 @@ describe("vscode-megane package.json", () => {
         "*.vasp",
         "*.xtc",
         "*.xyz",
+        // JCAMP-DX spectra. `*.dx` is intentionally absent — it collides with
+        // OpenDX volumetric grids and only content sniffing separates them.
+        "*.jdx",
+        "*.jcamp",
         // VASP's standard filenames carry no extension, so the selector needs
         // basename globs alongside the `*.vasp` extension pattern.
         "POSCAR*",
@@ -53,5 +57,9 @@ describe("vscode-megane package.json", () => {
 
   it("mentions VASP in the marketplace description", () => {
     expect(manifest.description).toContain("VASP");
+  });
+
+  it("mentions JCAMP-DX in the marketplace description", () => {
+    expect(manifest.description).toContain("JCAMP-DX");
   });
 });

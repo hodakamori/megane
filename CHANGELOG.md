@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **JCAMP-DX spectra** (`.jdx`, `.jcamp`, `.dx`) on every host, via two new pipeline nodes: **Load Spectrum** and the terminal **Spectrum Plot**, which draws the trace as a 2D line chart (abscissa reversed by default, the IR/NMR convention). Decoding covers plain AFFN plus all three compressed ASDF forms — SQZ, DIF, and DUP — for both `##XYDATA=(X++(Y..Y))` and `##XYPOINTS=(XY..XY)` tables. Because `.dx` is claimed by both JCAMP-DX and OpenDX volumetric grids, the two are told apart by sniffing the file head, and a misrouted file gets an actionable message pointing at the other node. Python gets `megane.load_jcampdx()` returning a `Spectrum` (title, units, x, y) and the `LoadSpectrum` / `SpectrumPlot` pipeline classes.
 - **VASP structure files** (`POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`) on every host. `XDATCAR` opens as a multi-frame structure, including variable-cell (ISIF ≥ 3) runs that re-emit the header per configuration. Because the standard VASP filenames carry no extension, megane now also dispatches by **basename** (`src/parsers/fileNames.ts`); VS Code registers `POSCAR*` / `CONTCAR*` / `XDATCAR*` globs and JupyterLab an `IFileType.pattern`. VASP 4 files with no species line fall back to the 1-based species index as an atomic-number proxy instead of failing.
 
 ## [0.10.0] - 2026-07-12

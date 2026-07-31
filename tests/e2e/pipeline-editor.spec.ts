@@ -78,6 +78,45 @@ test.describe("pipeline-editor: webapp default graph", () => {
     await expect(nx).toHaveValue("2");
   });
 
+  // Wiring the two nodes together needs a ReactFlow handle drag, which is
+  // covered by the unit tests (resolveConnectedSpectrum); this spec covers what
+  // only a browser can: the real WASM decode of a real file.
+  test("Load Spectrum decodes a JCAMP-DX file through WASM", async ({ page }) => {
+    await page.locator('[data-testid="pipeline-editor-tab-editor"]').click();
+
+    // Add both spectrum nodes from the Add Node palette.
+    await page.getByTitle("Add Node").click();
+    await page.getByRole("button", { name: "Load Spectrum", exact: true }).click();
+    await page.getByTitle("Add Node").click();
+    await page.getByRole("button", { name: "Spectrum Plot", exact: true }).click();
+
+    const loadNode = page.locator('[data-testid="pipeline-node-load_spectrum"]').first();
+    const plotNode = page.locator('[data-testid="pipeline-node-spectrum_plot"]').first();
+    await expect(loadNode).toBeVisible();
+    await expect(plotNode).toBeVisible();
+
+    // Nothing loaded yet, so the plot shows its empty state.
+    await expect(page.locator('[data-testid="load-spectrum-filename"]').first()).toHaveText(
+      /No spectrum loaded/,
+    );
+    await expect(page.locator('[data-testid="spectrum-plot-empty"]').first()).toBeVisible();
+
+    // Feed the real fixture through the real WASM decoder.
+    await page
+      .locator('[data-testid="load-spectrum-input"]')
+      .first()
+      .setInputFiles("tests/fixtures/ethanol_ir.jdx");
+
+    await expect(page.locator('[data-testid="load-spectrum-filename"]').first()).toHaveText(
+      "ethanol_ir.jdx",
+    );
+    await expect(page.locator('[data-testid="load-spectrum-error"]').first()).toBeHidden();
+    // 121 points, infrared, wavenumbers — straight from the file header.
+    await expect(page.locator('[data-testid="load-spectrum-summary"]').first()).toHaveText(
+      /INFRARED SPECTRUM · 121 points · 1\/CM/,
+    );
+  });
+
   test("tab selector switches between editor and chat panes", async ({ page }) => {
     const editorTab = page.locator('[data-testid="pipeline-editor-tab-editor"]');
     const chatTab = page.locator('[data-testid="pipeline-editor-tab-chat"]');

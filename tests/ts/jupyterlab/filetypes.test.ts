@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships twelve text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, and VASP)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(12);
+  it("ships thirteen text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, VASP, and JCAMP-DX)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(13);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / JCAMP-DX names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -54,8 +54,20 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-dump",
         "megane-amber-prmtop",
         "megane-vasp",
+        "megane-jcampdx",
       ].sort(),
     );
+  });
+
+  it("registers .jdx and .jcamp for the JCAMP-DX spectrum filetype", () => {
+    const jcamp = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-jcampdx");
+    expect(jcamp).toBeDefined();
+    expect(jcamp?.extensions).toEqual([".jdx", ".jcamp"]);
+    expect(jcamp?.fileFormat).toBe("text");
+    expect(jcamp?.mimeTypes).toEqual(["chemical/x-jcamp-dx"]);
+    // `.dx` is intentionally absent — it collides with OpenDX volumetric grids
+    // and only content sniffing can tell the two apart.
+    expect(jcamp?.extensions).not.toContain(".dx");
   });
 
   it("registers the VASP filetype with .vasp plus a basename pattern for POSCAR/CONTCAR/XDATCAR", () => {
@@ -124,7 +136,7 @@ describe("jupyterlab filetypes", () => {
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
       STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
     );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(12);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(13);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

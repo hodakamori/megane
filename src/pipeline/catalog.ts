@@ -139,6 +139,42 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
     inPrompt: true,
     pythonClass: "LoadVolumetric",
   },
+  load_spectrum: {
+    description:
+      "Loads a JCAMP-DX spectrum (.jdx / .jcamp) -- IR, NMR, MS, or UV/Vis.\nA spectrum has no 3D coordinates, so it feeds the Spectrum Plot node\nrather than the Viewport.",
+    params: [
+      {
+        jsonKey: "fileName",
+        tsType: "string | null",
+        default: "null",
+        doc: "Path/name of the JCAMP-DX file.",
+      },
+    ],
+    promptOutputs: "`spectrum` (spectrum data type)",
+    inPrompt: true,
+    pythonClass: "LoadSpectrum",
+  },
+  spectrum_plot: {
+    description:
+      "Draws a spectrum as a 2D line chart. Terminal node -- a spectrum has no\ngeometry, so it does not reach the 3D renderer.",
+    params: [
+      {
+        jsonKey: "reverseX",
+        tsType: "boolean",
+        default: "true",
+        doc: "Draw the abscissa high-to-low, the convention for IR and NMR.",
+      },
+      {
+        jsonKey: "color",
+        tsType: "string",
+        default: '"#84cc16"',
+        doc: "Hex stroke colour of the trace.",
+      },
+    ],
+    promptInputs: "`spectrum`",
+    inPrompt: true,
+    pythonClass: "SpectrumPlot",
+  },
   add_bond: {
     description: "Detects or infers bonds between atoms.",
     params: [
