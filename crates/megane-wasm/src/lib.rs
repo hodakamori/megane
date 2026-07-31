@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser, psf,
-    top, traj, vasp, xsf, xtc, xyz,
+    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, molden, netcdf, parser,
+    psf, top, traj, vasp, xsf, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -984,6 +984,13 @@ pub fn parse_xsf(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_vasp(text: &str) -> Result<ParseResult, JsError> {
     let data = vasp::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a Molden file (`.molden`) and return structured data. A `[GEOMETRIES] XYZ` block yields a multi-frame structure.
+#[wasm_bindgen]
+pub fn parse_molden(text: &str) -> Result<ParseResult, JsError> {
+    let data = molden::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 
