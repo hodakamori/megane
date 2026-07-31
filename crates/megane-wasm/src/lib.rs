@@ -1,9 +1,9 @@
-use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
+use js_sys::{Float32Array, Float64Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, molden, netcdf, parser,
-    psf, top, traj, vasp, xsf, xtc, xyz,
+    amber, bonds, cif, dcd, gro, jcampdx, lammps_data, lammpstrj, mmcif, mol, mol2, molden, netcdf,
+    parser, psf, top, traj, vasp, xsf, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -985,6 +985,56 @@ pub fn parse_xsf(text: &str) -> Result<ParseResult, JsError> {
 pub fn parse_vasp(text: &str) -> Result<ParseResult, JsError> {
     let data = vasp::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
+}
+
+/// A decoded JCAMP-DX spectrum, exposed to JavaScript.
+///
+/// A spectrum has no coordinates, so it deliberately does NOT reuse
+/// `ParseResult` — nothing about atoms, bonds, or a unit cell applies. The
+/// host turns this into the `spectrum` pipeline data type.
+#[wasm_bindgen]
+pub struct SpectrumResult {
+    #[wasm_bindgen(getter_with_clone)]
+    pub title: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub data_type: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub x_units: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub y_units: String,
+    pub n_points: usize,
+    x: Vec<f64>,
+    y: Vec<f64>,
+}
+
+#[wasm_bindgen]
+impl SpectrumResult {
+    /// Abscissa values (wavenumber, ppm, m/z, … — see `x_units`).
+    pub fn x(&self) -> Float64Array {
+        Float64Array::from(&self.x[..])
+    }
+
+    /// Ordinate values (transmittance, absorbance, … — see `y_units`).
+    pub fn y(&self) -> Float64Array {
+        Float64Array::from(&self.y[..])
+    }
+}
+
+/// Parse a JCAMP-DX spectrum (`.jdx` / `.jcamp`) and return its decoded
+/// abscissa/ordinate arrays. Handles the AFFN, SQZ, DIF, and DUP encodings of
+/// an `(X++(Y..Y))` table as well as `(XY..XY)` peak tables.
+#[wasm_bindgen]
+pub fn parse_jcampdx(text: &str) -> Result<SpectrumResult, JsError> {
+    let s = jcampdx::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(SpectrumResult {
+        title: s.title,
+        data_type: s.data_type,
+        x_units: s.x_units,
+        y_units: s.y_units,
+        n_points: s.x.len(),
+        x: s.x,
+        y: s.y,
+    })
 }
 
 /// Parse a Molden file (`.molden`) and return structured data. A `[GEOMETRIES] XYZ` block yields a multi-frame structure.
