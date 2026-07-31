@@ -218,6 +218,39 @@ fn parse_vasp(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     PyStructure::from_parsed(py, data)
 }
 
+/// A decoded JCAMP-DX spectrum. Deliberately not a `PyStructure` -- a spectrum
+/// has no coordinates, so nothing about atoms, bonds, or a cell applies.
+#[pyclass]
+struct PySpectrum {
+    #[pyo3(get)]
+    title: String,
+    #[pyo3(get)]
+    data_type: String,
+    #[pyo3(get)]
+    x_units: String,
+    #[pyo3(get)]
+    y_units: String,
+    #[pyo3(get)]
+    x: Py<PyArray1<f64>>,
+    #[pyo3(get)]
+    y: Py<PyArray1<f64>>,
+}
+
+/// Parse a JCAMP-DX spectrum (`.jdx` / `.jcamp`) into its decoded
+/// abscissa/ordinate arrays.
+#[pyfunction]
+fn parse_jcampdx(py: Python<'_>, text: &str) -> PyResult<PySpectrum> {
+    let s = megane_core::jcampdx::parse(text).map_err(PyValueError::new_err)?;
+    Ok(PySpectrum {
+        title: s.title,
+        data_type: s.data_type,
+        x_units: s.x_units,
+        y_units: s.y_units,
+        x: Array1::from(s.x).into_pyarray(py).unbind(),
+        y: Array1::from(s.y).into_pyarray(py).unbind(),
+    })
+}
+
 /// Parse a Molden file (`.molden`) and return structured data. A `[GEOMETRIES] XYZ` block yields a multi-frame structure.
 #[pyfunction]
 fn parse_molden(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -524,6 +557,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_cml, m)?)?;
     m.add_function(wrap_pyfunction!(parse_vasp, m)?)?;
     m.add_function(wrap_pyfunction!(parse_molden, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_jcampdx, m)?)?;
     m.add_function(wrap_pyfunction!(parse_c3xml, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;
