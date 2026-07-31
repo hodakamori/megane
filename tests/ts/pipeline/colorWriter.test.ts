@@ -105,13 +105,7 @@ describe("makeColorWriter", () => {
 
   it("uses atomLabels when computing byResidue colors", () => {
     const labels = ["ALA1", "GLY2", "VAL3"];
-    const writer = makeColorWriter(
-      "byResidue",
-      "#000000",
-      makeParticle(),
-      labels,
-      undefined,
-    );
+    const writer = makeColorWriter("byResidue", "#000000", makeParticle(), labels, undefined);
     const buf = new Float32Array(9);
     buf.fill(NO_OVERRIDE);
     writer(buf, 0);
@@ -124,13 +118,7 @@ describe("makeColorWriter", () => {
   });
 
   it("respects an explicit colorRange in byBFactor mode", () => {
-    const writer = makeColorWriter(
-      "byBFactor",
-      "#000000",
-      makeParticle(),
-      null,
-      [0, 100],
-    );
+    const writer = makeColorWriter("byBFactor", "#000000", makeParticle(), null, [0, 100]);
     const buf = new Float32Array(9);
     buf.fill(NO_OVERRIDE);
     writer(buf, 0); // bfactor 10 → near blue

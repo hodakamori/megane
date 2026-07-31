@@ -168,6 +168,17 @@ function App() {
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (atom names, elements, bonds) |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) — self-contained with elements, bonds, and frames |
 
+### Volumetric formats (`LoadVolumetric` node)
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| Gaussian CUBE | `.cube`, `.cub` | Gaussian cube grid (Bohr, converted to Angstrom on read) |
+| OpenDX | `.dx` | OpenDX scalar field — the APBS electrostatics output, also read by VMD and PyMOL |
+
+A grid has no atoms of its own, so it is rendered as an isosurface over a
+separately-loaded structure. `.dx` is shared with JCAMP-DX spectra, so the
+loader sniffs the content and says so if the file is really a spectrum.
+
 ### Trajectory formats (`LoadTrajectory` node)
 
 | Format | Extension | Description |

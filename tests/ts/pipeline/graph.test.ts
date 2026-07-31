@@ -19,12 +19,7 @@ function makeNode(id: string): Node<PipelineNodeData> {
   };
 }
 
-function makeEdge(
-  source: string,
-  target: string,
-  sourceHandle = "out",
-  targetHandle = "in",
-): Edge {
+function makeEdge(source: string, target: string, sourceHandle = "out", targetHandle = "in"): Edge {
   return {
     id: `e-${source}-${target}`,
     source,
@@ -53,12 +48,7 @@ describe("topologicalSort", () => {
   it("sorts a diamond DAG", () => {
     // A → B, A → C, B → D, C → D
     const nodes = [makeNode("a"), makeNode("b"), makeNode("c"), makeNode("d")];
-    const edges = [
-      makeEdge("a", "b"),
-      makeEdge("a", "c"),
-      makeEdge("b", "d"),
-      makeEdge("c", "d"),
-    ];
+    const edges = [makeEdge("a", "b"), makeEdge("a", "c"), makeEdge("b", "d"), makeEdge("c", "d")];
     const result = topologicalSort(nodes, edges);
     expect(result).toHaveLength(4);
     expect(result.indexOf("a")).toBeLessThan(result.indexOf("b"));
@@ -130,9 +120,7 @@ describe("collectInputs", () => {
 
   it("collects single input", () => {
     const edges: Edge[] = [makeEdge("a", "b", "out", "in")];
-    const edgeOutputs: EdgeOutputs = new Map([
-      ["a", new Map([["out", dummyParticle]])],
-    ]);
+    const edgeOutputs: EdgeOutputs = new Map([["a", new Map([["out", dummyParticle]])]]);
     const result = collectInputs("b", edges, edgeOutputs);
     expect(result.has("in")).toBe(true);
     expect(result.get("in")).toHaveLength(1);
@@ -167,9 +155,7 @@ describe("collectInputs", () => {
       sourceHandle: null,
       targetHandle: null,
     };
-    const edgeOutputs: EdgeOutputs = new Map([
-      ["a", new Map([["out", dummyParticle]])],
-    ]);
+    const edgeOutputs: EdgeOutputs = new Map([["a", new Map([["out", dummyParticle]])]]);
     const result = collectInputs("b", [edge], edgeOutputs);
     expect(result.size).toBe(0);
   });

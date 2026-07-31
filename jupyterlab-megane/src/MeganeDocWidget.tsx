@@ -16,7 +16,7 @@ import { usePlaybackStore } from "@megane/stores/usePlaybackStore";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
-import { TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
+import { TRAJECTORY_ONLY_EXTENSIONS, VOLUMETRIC_ONLY_EXTENSIONS } from "./trajectoryUtils";
 import { createSubscription, createFrameSubscription } from "./frameSubscription";
 import type { SelectionState, Measurement } from "@megane/types";
 
@@ -109,6 +109,16 @@ function DocBody({
           ? Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
           : new TextEncoder().encode(raw);
         const file = new File([bytes], filename);
+        if (VOLUMETRIC_ONLY_EXTENSIONS.has(ext)) {
+          // A scalar grid carries a field but no atoms, so there is nothing to
+          // render on its own. Same shape of guard as the trajectory-only
+          // formats: say what to do instead of failing obscurely.
+          throw new Error(
+            `${filename} is a volumetric grid, which has no atoms to render on its own. ` +
+              "Open a structure file (PDB, GRO, etc.) first, then add a Load Volumetric node " +
+              "in the pipeline editor and point it at this file to draw an isosurface.",
+          );
+        }
         if (TRAJECTORY_ONLY_EXTENSIONS.has(ext)) {
           // Trajectory-only formats need a topology already loaded. Surface
           // an actionable error; the always-mounted pipeline editor lets the

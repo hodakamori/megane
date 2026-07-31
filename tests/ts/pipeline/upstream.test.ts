@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Node, Edge } from "@xyflow/react";
-import {
-  findUpstreamLoadStructureId,
-  getElementsPresentInUpstream,
-} from "@/pipeline/upstream";
+import { findUpstreamLoadStructureId, getElementsPresentInUpstream } from "@/pipeline/upstream";
 import type { PipelineNodeData, NodeSnapshotData } from "@/pipeline/execute";
 import type { Snapshot } from "@/types";
 

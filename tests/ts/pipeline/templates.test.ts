@@ -35,8 +35,14 @@ describe("PIPELINE_TEMPLATES", () => {
       // All edges reference existing node IDs
       const ids = new Set(nodes.map((n) => n.id));
       for (const e of edges) {
-        expect(ids.has(e.source), `template "${t.id}": edge source "${e.source}" not in nodes`).toBe(true);
-        expect(ids.has(e.target), `template "${t.id}": edge target "${e.target}" not in nodes`).toBe(true);
+        expect(
+          ids.has(e.source),
+          `template "${t.id}": edge source "${e.source}" not in nodes`,
+        ).toBe(true);
+        expect(
+          ids.has(e.target),
+          `template "${t.id}": edge target "${e.target}" not in nodes`,
+        ).toBe(true);
       }
     }
   });

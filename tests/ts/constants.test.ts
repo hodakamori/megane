@@ -48,9 +48,7 @@ describe("getColor", () => {
   it("Ti(22) and Sr(38) have distinct colors", () => {
     const ti = getColor(22);
     const sr = getColor(38);
-    const dist = Math.sqrt(
-      (ti[0] - sr[0]) ** 2 + (ti[1] - sr[1]) ** 2 + (ti[2] - sr[2]) ** 2,
-    );
+    const dist = Math.sqrt((ti[0] - sr[0]) ** 2 + (ti[1] - sr[1]) ** 2 + (ti[2] - sr[2]) ** 2);
     expect(dist).toBeGreaterThan(0.1);
   });
 });

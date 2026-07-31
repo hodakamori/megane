@@ -97,6 +97,25 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    // Volumetric grids. Registered so double-clicking one opens megane, which
+    // then explains that a grid needs a structure to overlay — see
+    // VOLUMETRIC_ONLY_EXTENSIONS in trajectoryUtils.ts.
+    name: "megane-cube",
+    displayName: "Gaussian CUBE",
+    extensions: [".cube", ".cub"],
+    mimeTypes: ["chemical/x-gaussian-cube"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
+    name: "megane-opendx",
+    displayName: "OpenDX grid",
+    extensions: [".dx"],
+    mimeTypes: ["chemical/x-opendx"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
     extensions: [".lammpstrj", ".dump", ".trj"],

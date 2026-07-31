@@ -34,8 +34,8 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships eleven text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, and mmCIF)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(11);
+  it("ships thirteen text filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, and the volumetric grids)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(13);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop names", () => {
@@ -53,8 +53,17 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-data",
         "megane-lammps-dump",
         "megane-amber-prmtop",
+        "megane-cube",
+        "megane-opendx",
       ].sort(),
     );
+  });
+
+  it("registers the volumetric grid filetypes", () => {
+    const cube = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-cube");
+    expect(cube?.extensions).toEqual([".cube", ".cub"]);
+    const dx = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-opendx");
+    expect(dx?.extensions).toEqual([".dx"]);
   });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
@@ -101,13 +110,9 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(
-      STRUCTURE_FILETYPES_TEXT.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(
-      STRUCTURE_FILETYPES_BINARY.map((f) => f.name),
-    );
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(11);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(13);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

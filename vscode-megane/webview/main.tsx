@@ -99,6 +99,18 @@ function App() {
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
           lower.endsWith(".xtc") || lower.endsWith(".dcd") || lower.endsWith(".nc");
+        // Volumetric grids (CUBE, OpenDX) carry a scalar field but no atoms, so
+        // there is nothing to render standalone. Guard them the same way.
+        const isVolumetricOnly =
+          lower.endsWith(".cube") || lower.endsWith(".cub") || lower.endsWith(".dx");
+        if (isVolumetricOnly) {
+          setError(
+            `${filename} is a volumetric grid, which has no atoms to render on its own. ` +
+              "Open a structure file (PDB, GRO, etc.) first, then add a Load Volumetric node " +
+              "in the pipeline editor and point it at this file to draw an isosurface.",
+          );
+          return;
+        }
         // Trajectory-only formats (XTC, DCD, NetCDF) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by

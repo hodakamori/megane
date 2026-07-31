@@ -32,10 +32,7 @@ describe("useAIConfigStore", () => {
   });
 
   it("loads persisted provider and model from localStorage", async () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ provider: "openai", model: "gpt-4o" }),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ provider: "openai", model: "gpt-4o" }));
     const { useAIConfigStore } = await import("@/ai/config");
     const state = useAIConfigStore.getState();
     expect(state.provider).toBe("openai");
