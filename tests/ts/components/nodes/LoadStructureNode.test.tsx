@@ -151,6 +151,28 @@ describe("LoadStructureNode", () => {
     expect(handler).toHaveBeenCalledWith("ls1", file);
   });
 
+  it.each(["POSCAR", "CONTCAR", "XDATCAR_run2"])(
+    "drag-and-drop accepts the extensionless VASP file %s",
+    (filename) => {
+      const updateNodeParams = vi.fn();
+      const handler = vi.fn();
+      const seeded = seedPipelineStore("load_structure", { id: "ls1" });
+      usePipelineStore.setState({ updateNodeParams });
+      setStructureLoadHandler(handler);
+
+      render(
+        <LoadStructureNode {...nodeProps("ls1", seeded.data.params as LoadStructureParams)} />,
+      );
+
+      const file = new File(["dummy"], filename, { type: "text/plain" });
+      const dropZone = screen.getByTestId("load-structure-filename").parentElement!;
+      fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+
+      expect(updateNodeParams).toHaveBeenCalledWith("ls1", { fileName: filename });
+      expect(handler).toHaveBeenCalledWith("ls1", file);
+    },
+  );
+
   it("drag-and-drop ignores files with unsupported extensions", () => {
     const updateNodeParams = vi.fn();
     const handler = vi.fn();

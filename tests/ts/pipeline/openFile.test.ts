@@ -91,6 +91,28 @@ describe("usePipelineStore.openFile — single structure file", () => {
     expect(state.nodeSnapshots[loader!.id]?.snapshot.nAtoms).toBe(5);
   });
 
+  it.each(["POSCAR", "CONTCAR_relaxed", "XDATCAR", "MgO.vasp"])(
+    "classifies the VASP file %s as a structure open",
+    async (filename) => {
+      mockParseStructureFile.mockResolvedValueOnce({
+        snapshot: makeSnapshot(8, true),
+        frames: [],
+        meta: null,
+        labels: null,
+        vectorChannels: [],
+      });
+
+      const file = new File(["POSCAR"], filename);
+      await usePipelineStore.getState().openFile(file, { mode: "replace" });
+
+      const state = usePipelineStore.getState();
+      const loader = state.nodes.find((n) => n.type === "load_structure");
+      expect(loader).toBeDefined();
+      expect((loader!.data.params as { fileName: string }).fileName).toBe(filename);
+      expect(state.nodeSnapshots[loader!.id]?.snapshot.nAtoms).toBe(8);
+    },
+  );
+
   it("drops the redundant load_trajectory node and rewires for multi-frame .traj", async () => {
     mockParseStructureFile.mockResolvedValueOnce({
       snapshot: makeSnapshot(8),
