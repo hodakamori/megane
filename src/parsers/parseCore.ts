@@ -196,6 +196,7 @@ interface WasmModule {
   parse_pdb: ParseFn;
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
+  parse_c3xml: ParseFn;
   parse_cml: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
@@ -249,6 +250,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
+        parse_c3xml: wasm.parse_c3xml,
         parse_cml: wasm.parse_cml,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
@@ -298,6 +300,10 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_mol;
     case ".mol2":
       return wasmModule!.parse_mol2;
+    // Chem3D XML (CDXML family). Nodes carry explicit bonds, so no
+    // distance inference is needed for genuine 3D input.
+    case ".c3xml":
+      return wasmModule!.parse_c3xml;
     // Chemical Markup Language (Open Babel / Avogadro / ChemDraw).
     case ".cml":
       return wasmModule!.parse_cml;

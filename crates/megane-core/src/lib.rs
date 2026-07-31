@@ -1,6 +1,7 @@
 pub mod amber;
 pub mod atomic;
 pub mod bonds;
+pub mod c3xml;
 pub mod cif;
 pub mod cml;
 pub mod crystal;
@@ -20,6 +21,5 @@ pub mod trajectory;
 pub mod vasp;
 pub mod xtc;
 pub mod xyz;
-
 pub use parser::ParsedStructure;
 pub use trajectory::TrajectoryData;

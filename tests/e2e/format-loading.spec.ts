@@ -74,6 +74,13 @@ const STRUCTURE_CASES: StructureCase[] = [
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
   { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
   { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
+  // Chem3D XML: <n> nodes carry explicit <b> bonds, so nothing is inferred.
+  {
+    name: "c3xml-3d-molecule",
+    file: "methoxymethylamine.c3xml",
+    mime: "text/xml",
+    expectedAtoms: 11,
+  },
 ];
 
 async function dropStructure(

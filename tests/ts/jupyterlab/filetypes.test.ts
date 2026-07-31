@@ -35,7 +35,7 @@ describe("jupyterlab filetypes", () => {
   });
 
   it("ships thirteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, and CML)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(13);
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(14);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP names", () => {
@@ -55,6 +55,7 @@ describe("jupyterlab filetypes", () => {
         "megane-amber-prmtop",
         "megane-cml",
         "megane-vasp",
+        "megane-c3xml",
       ].sort(),
     );
   });
@@ -80,6 +81,13 @@ describe("jupyterlab filetypes", () => {
     expect(re.test("xdatcar")).toBe(true);
     expect(re.test("MyPOSCAR")).toBe(false);
     expect(re.test("notes.txt")).toBe(false);
+  });
+
+  it("registers .c3xml for the Chem3D XML filetype", () => {
+    const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-c3xml");
+    expect(ft).toBeDefined();
+    expect(ft?.extensions).toEqual([".c3xml"]);
+    expect(ft?.fileFormat).toBe("text");
   });
 
   it("registers both .data and .lammps for the LAMMPS-data filetype", () => {
@@ -128,7 +136,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(13);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(14);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

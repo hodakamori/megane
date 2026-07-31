@@ -1,3 +1,4 @@
+from megane.parsers.c3xml import load_c3xml
 from megane.parsers.cif import load_cif
 from megane.parsers.cml import load_cml
 from megane.parsers.dcd import load_dcd
@@ -14,6 +15,7 @@ from megane.parsers.xtc import load_trajectory
 from megane.parsers.xyz import load_xyz_trajectory
 
 __all__ = [
+    "load_c3xml",
     "load_cif",
     "load_cml",
     "load_dcd",

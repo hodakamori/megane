@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **Chem3D XML** (`.c3xml`) on every host, reusing the `quick-xml` reader added for CML. `<n>` nodes and `<b>` bonds give explicit connectivity and bond orders; 2D-only drawings are projected onto z = 0 without inventing bonds.
 - **Chemical Markup Language** (`.cml`) on every host — the first XML format in `megane-core`. Reads the first `<molecule>` with atoms, honouring `x3`/`y3`/`z3`, packed `xyz3`, `xFract`/`yFract`/`zFract` (with the `<crystal>` cell), and 2D `x2`/`y2` depictions projected onto z = 0. An explicit `<bondArray>` supplies connectivity and bond orders; without one, bonds are inferred by distance.
 
 ### Changed

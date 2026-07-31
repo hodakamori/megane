@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, cml, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser,
-    psf, top, traj, vasp, xtc, xyz,
+    amber, bonds, c3xml, cif, cml, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf,
+    parser, psf, top, traj, vasp, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -983,6 +983,13 @@ pub fn parse_cml(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_vasp(text: &str) -> Result<ParseResult, JsError> {
     let data = vasp::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a Chem3D XML (`.c3xml`) document and return structured data.
+#[wasm_bindgen]
+pub fn parse_c3xml(text: &str) -> Result<ParseResult, JsError> {
+    let data = c3xml::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 
