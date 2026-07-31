@@ -48,6 +48,7 @@ Legend:
 | ASE trajectory | `.traj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | XCrySDen | `.xsf`, `.axsf` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
+| CML | `.cml` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 | Molden | `.molden` | ✓ | API | ✓ | ✓ | ✓ | ✓ |
 
@@ -70,6 +71,20 @@ Overlay node can draw it with no format-specific wiring. `CONVVEC` is consumed
 and discarded — `PRIMVEC` is the cell megane draws — and
 `BEGIN_BLOCK_DATAGRID_*` volumetric blocks are skipped; mapping those onto the
 isosurface pipeline is a follow-up.
+Note: **CML** (Chemical Markup Language) is the first XML format in the core.
+The reader loads the **first `<molecule>` that carries atoms** — multi-molecule
+files (several `<molecule>` elements under `<cml>` / `<list>`) are not yet
+treated as frames. Coordinates are read in this order of preference:
+`x3`/`y3`/`z3`, a packed `xyz3="x y z"`, `xFract`/`yFract`/`zFract` (converted
+with the `<crystal>` cell parameters), and finally `x2`/`y2`, which is a **2D
+depiction projected onto z = 0** so the file still opens — visibly flat, which
+is the honest rendering of flat input. A `<bondArray>` supplies explicit
+connectivity (including bond orders; aromatic collapses to 1, matching the MOL2
+reader), and bonds are inferred by distance only when the file has none.
+Fractional coordinates without a `<crystal>` cell are a clear error rather than
+a silent misplacement. XML is read with `quick-xml`, a pull parser that performs
+no DTD processing and no custom entity expansion, so an untrusted `.cml` cannot
+mount an XXE or billion-laughs attack.
 Note: **VASP** files are the one format megane dispatches by **filename**, not
 only by extension: `POSCAR`, `CONTCAR`, and `XDATCAR` are conventionally written
 with no extension at all. `src/parsers/fileNames.ts` maps those bare names (and
@@ -236,7 +251,7 @@ How data gets into the viewer on each platform:
 | **JupyterLab** | Click a registered file type in the file browser | Internally reads `context.model` (`jupyterlab-megane/src/MeganeDocWidget.tsx`) |
 | **VS Code** | Open a registered file from the explorer; extension host posts `loadFile` / `loadPipeline` to the webview | `postMessage({ type: "loadFile", … })` (`vscode-megane/webview/main.tsx`) |
 | **React (npm)** | Host-wired upload/drag-drop into `MeganeViewer`, or a `pipeline` prop on `PipelineViewer` (`fileUrl` fetched at mount) | `parseStructureFile(file)` / `parseStructureText(text)`, `MoleculeRenderer.loadSnapshot(snapshot)` |
-| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
+| **Python** | `from megane import …` or `from megane.parsers import …` | Top-level `megane`: `load_pdb`, `load_cif`, `load_jcampdx` (JCAMP-DX spectra), `load_lammps_data`, `load_lammpstrj_structure`, `load_traj`, `load_trajectory` (XTC), `load_xyz_trajectory`. Full set via `megane.parsers`: additionally `load_gro`, `load_mol`, `load_sdf`, `load_mol2`, `load_dcd`, `load_netcdf`, `load_lammpstrj`, `load_vasp`, `load_molden`, `load_xsf`, `load_cml`. `load_jcampdx` returns a `Spectrum` (title/units/x/y) rather than a structure, since a spectrum has no atoms. Raw PyO3 functions (all formats including mmCIF and AMBER prmtop) are in the native extension `megane_parser`: `from megane import megane_parser; megane_parser.parse_mmcif(text)`, `megane_parser.parse_prmtop(text)`, etc. |
 
 ## Known gaps
 

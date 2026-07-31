@@ -34,8 +34,8 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships fifteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, Molden, XSF, and JCAMP-DX)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(15);
+  it("ships 16 text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, Molden, XSF, JCAMP-DX, and CML)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(16);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden / JCAMP-DX names", () => {
@@ -54,6 +54,7 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-dump",
         "megane-amber-prmtop",
         "megane-xsf",
+        "megane-cml",
         "megane-vasp",
         "megane-molden",
         "megane-jcampdx",
@@ -77,6 +78,13 @@ describe("jupyterlab filetypes", () => {
     // `.dx` is intentionally absent — it collides with OpenDX volumetric grids
     // and only content sniffing can tell the two apart.
     expect(jcamp?.extensions).not.toContain(".dx");
+  });
+
+  it("registers .cml for the Chemical Markup Language filetype", () => {
+    const cml = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-cml");
+    expect(cml).toBeDefined();
+    expect(cml?.extensions).toEqual([".cml"]);
+    expect(cml?.fileFormat).toBe("text");
   });
 
   it("registers the VASP filetype with .vasp plus a basename pattern for POSCAR/CONTCAR/XDATCAR", () => {
@@ -154,7 +162,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(15);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(16);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

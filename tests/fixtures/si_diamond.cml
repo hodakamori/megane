@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<molecule id="si-diamond" xmlns="http://www.xml-cml.org/schema">
+  <crystal>
+    <scalar title="a" units="units:angstrom">5.43</scalar>
+    <scalar title="b" units="units:angstrom">5.43</scalar>
+    <scalar title="c" units="units:angstrom">5.43</scalar>
+    <scalar title="alpha" units="units:degree">90.0</scalar>
+    <scalar title="beta" units="units:degree">90.0</scalar>
+    <scalar title="gamma" units="units:degree">90.0</scalar>
+  </crystal>
+  <atomArray>
+    <atom id="a1" elementType="Si" xFract="0.00" yFract="0.00" zFract="0.00"/>
+    <atom id="a2" elementType="Si" xFract="0.00" yFract="0.50" zFract="0.50"/>
+    <atom id="a3" elementType="Si" xFract="0.50" yFract="0.00" zFract="0.50"/>
+    <atom id="a4" elementType="Si" xFract="0.50" yFract="0.50" zFract="0.00"/>
+    <atom id="a5" elementType="Si" xFract="0.25" yFract="0.25" zFract="0.25"/>
+    <atom id="a6" elementType="Si" xFract="0.25" yFract="0.75" zFract="0.75"/>
+    <atom id="a7" elementType="Si" xFract="0.75" yFract="0.25" zFract="0.75"/>
+    <atom id="a8" elementType="Si" xFract="0.75" yFract="0.75" zFract="0.25"/>
+  </atomArray>
+</molecule>

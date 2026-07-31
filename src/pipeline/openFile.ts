@@ -76,6 +76,8 @@ const STRUCTURE_EXTS = [
   // XCrySDen structure / animation.
   ".xsf",
   ".axsf",
+  // Chemical Markup Language.
+  ".cml",
   // VASP POSCAR / CONTCAR / XDATCAR (also `.vasp`). The extensionless
   // spellings are classified by basename in `classify` below.
   ".vasp",
@@ -89,7 +91,7 @@ const PIPELINE_SUFFIX = ".megane.json";
 // (PDB CONECT records, MOL/SDF bond block, LAMMPS data Bonds section).
 // Other supported structure formats (xyz, gro, cif, traj) carry no bond
 // information, so VDW distance inference is the more useful default.
-const FILE_BOND_EXTS = [".pdb", ".ent", ".pdbx", ".mol", ".sdf", ".data", ".lammps"];
+const FILE_BOND_EXTS = [".pdb", ".ent", ".pdbx", ".mol", ".sdf", ".data", ".lammps", ".cml"];
 
 export function defaultBondSourceForFile(filename: string): "structure" | "distance" {
   const lower = filename.toLowerCase();

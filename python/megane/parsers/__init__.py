@@ -1,4 +1,5 @@
 from megane.parsers.cif import load_cif
+from megane.parsers.cml import load_cml
 from megane.parsers.dcd import load_dcd
 from megane.parsers.gro import load_gro
 from megane.parsers.jcampdx import Spectrum, load_jcampdx
@@ -18,6 +19,7 @@ from megane.parsers.xyz import load_xyz_trajectory
 __all__ = [
     "Spectrum",
     "load_cif",
+    "load_cml",
     "load_dcd",
     "load_gro",
     "load_jcampdx",
