@@ -2,6 +2,7 @@ from megane.parsers.cif import load_cif
 from megane.parsers.dcd import load_dcd
 from megane.parsers.gamess import load_gamess
 from megane.parsers.gro import load_gro
+from megane.parsers.jcampdx import Spectrum, load_jcampdx
 from megane.parsers.lammps_data import load_lammps_data
 from megane.parsers.lammpstrj import load_lammpstrj, load_lammpstrj_structure
 from megane.parsers.mol import load_mol, load_sdf
@@ -16,10 +17,12 @@ from megane.parsers.xtc import load_trajectory
 from megane.parsers.xyz import load_xyz_trajectory
 
 __all__ = [
+    "Spectrum",
     "load_cif",
     "load_dcd",
     "load_gamess",
     "load_gro",
+    "load_jcampdx",
     "load_lammps_data",
     "load_lammpstrj",
     "load_lammpstrj_structure",

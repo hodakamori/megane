@@ -16,7 +16,7 @@ import { usePlaybackStore } from "@megane/stores/usePlaybackStore";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
-import { TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
+import { SPECTRUM_ONLY_EXTENSIONS, TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
 import { createSubscription, createFrameSubscription } from "./frameSubscription";
 import type { SelectionState, Measurement } from "@megane/types";
 
@@ -109,6 +109,15 @@ function DocBody({
           ? Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
           : new TextEncoder().encode(raw);
         const file = new File([bytes], filename);
+        if (SPECTRUM_ONLY_EXTENSIONS.has(ext)) {
+          // A spectrum has no coordinates at all, so the 3D viewer has nothing
+          // to draw. Point at the node that does display it.
+          throw new Error(
+            `${filename} is a spectrum, which has no atoms or coordinates to render. ` +
+              "Add a Load Spectrum node in the pipeline editor and wire it to a " +
+              "Spectrum Plot node to view it.",
+          );
+        }
         if (TRAJECTORY_ONLY_EXTENSIONS.has(ext)) {
           // Trajectory-only formats need a topology already loaded. Surface
           // an actionable error; the always-mounted pipeline editor lets the

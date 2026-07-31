@@ -99,6 +99,17 @@ function App() {
         const lower = filename.toLowerCase();
         const isTrajectoryOnly =
           lower.endsWith(".xtc") || lower.endsWith(".dcd") || lower.endsWith(".nc");
+        // A JCAMP-DX spectrum has no coordinates, so the 3D viewer has nothing
+        // to draw. `.dx` is excluded: it is shared with OpenDX grids and only
+        // content sniffing can tell them apart.
+        if (lower.endsWith(".jdx") || lower.endsWith(".jcamp")) {
+          setError(
+            `${filename} is a spectrum, which has no atoms or coordinates to render. ` +
+              "Add a Load Spectrum node in the pipeline editor and wire it to a " +
+              "Spectrum Plot node to view it.",
+          );
+          return;
+        }
         // Trajectory-only formats (XTC, DCD, NetCDF) need a topology loaded
         // first. Surface an actionable error rather than silently failing —
         // the user can recover via the always-mounted pipeline editor by

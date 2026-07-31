@@ -509,6 +509,46 @@ class Isosurface(PipelineNode):
         self.negative_color = negative_color
 
 
+class LoadSpectrum(PipelineNode):
+    """Load a JCAMP-DX spectrum (.jdx / .jcamp) and output spectrum data.
+
+    The file is decoded in the browser; this node only tracks the filename.
+    A spectrum has no 3D coordinates, so it flows to :class:`SpectrumPlot`
+    rather than to :class:`Viewport`.
+
+    Ports:
+        out.spectrum — spectrum data
+    """
+
+    _node_type = "load_spectrum"
+    _out_ports = {"spectrum": "spectrum"}
+    _inp_ports: dict[str, str] = {}
+
+    def __init__(self, path: str = "") -> None:
+        super().__init__()
+        self.path = path
+
+
+class SpectrumPlot(PipelineNode):
+    """Draw a spectrum as a 2D line chart.
+
+    Terminal node — a spectrum has no geometry, so nothing flows onward to the
+    3D renderer.
+
+    Ports:
+        inp.spectrum — spectrum data (from :class:`LoadSpectrum`)
+    """
+
+    _node_type = "spectrum_plot"
+    _out_ports: dict[str, str] = {}
+    _inp_ports = {"spectrum": "spectrum"}
+
+    def __init__(self, *, reverse_x: bool = True, color: str = "#84cc16") -> None:
+        super().__init__()
+        self.reverse_x = reverse_x
+        self.color = color
+
+
 class Viewport(PipelineNode):
     """3D rendering output node.
 
@@ -798,6 +838,13 @@ class Pipeline:
                 show_negative=nd.get("showNegative", False),
                 negative_color=nd.get("negativeColor", "#ff4444"),
             )
+        elif ntype == "load_spectrum":
+            return LoadSpectrum(nd.get("fileName") or "")
+        elif ntype == "spectrum_plot":
+            return SpectrumPlot(
+                reverse_x=nd.get("reverseX", True),
+                color=nd.get("color", "#84cc16"),
+            )
         else:
             raise ValueError(f"Unknown node type {ntype!r}")
 
@@ -962,6 +1009,11 @@ class Pipeline:
             base["opacity"] = node.opacity
             base["showNegative"] = node.show_negative
             base["negativeColor"] = node.negative_color
+        elif isinstance(node, LoadSpectrum):
+            base["fileName"] = node.path
+        elif isinstance(node, SpectrumPlot):
+            base["reverseX"] = node.reverse_x
+            base["color"] = node.color
         elif isinstance(node, Viewport):
             base["perspective"] = node.perspective
             base["cellAxesVisible"] = node.cell_axes_visible

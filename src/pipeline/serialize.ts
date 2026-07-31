@@ -25,8 +25,13 @@ export function serializePipeline(
     version: 3,
     nodes: nodes.map((n) => {
       // Strip ephemeral (non-serializable) fields from params
-      const { bondFileData, ...params } = n.data.params as typeof n.data.params & {
+      // `spectrumData` holds Float64Arrays and `parseError` is a transient UI
+      // message; both are documented as "not serialized" on LoadSpectrumParams.
+      const { bondFileData, spectrumData, parseError, ...params } = n.data
+        .params as typeof n.data.params & {
         bondFileData?: unknown;
+        spectrumData?: unknown;
+        parseError?: unknown;
       };
       return {
         ...params,
