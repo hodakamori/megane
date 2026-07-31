@@ -72,6 +72,9 @@ const STRUCTURE_EXTS = [
   ".lammpstrj",
   ".dump",
   ".trj",
+  // XCrySDen structure / animation.
+  ".xsf",
+  ".axsf",
   // VASP POSCAR / CONTCAR / XDATCAR (also `.vasp`). The extensionless
   // spellings are classified by basename in `classify` below.
   ".vasp",
