@@ -7,6 +7,7 @@ from megane.parsers.mol import load_mol, load_sdf
 from megane.parsers.mol2 import load_mol2
 from megane.parsers.netcdf import load_netcdf
 from megane.parsers.pdb import load_pdb
+from megane.parsers.phonon import load_phonon
 from megane.parsers.traj import load_traj
 from megane.parsers.vasp import load_vasp
 from megane.parsers.xtc import load_trajectory
@@ -23,6 +24,7 @@ __all__ = [
     "load_mol2",
     "load_netcdf",
     "load_pdb",
+    "load_phonon",
     "load_sdf",
     "load_traj",
     "load_trajectory",

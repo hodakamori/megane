@@ -12,6 +12,7 @@ pub mod mol;
 pub mod mol2;
 pub mod netcdf;
 pub mod parser;
+pub mod phonon;
 pub mod psf;
 pub mod top;
 pub mod traj;
@@ -19,6 +20,5 @@ pub mod trajectory;
 pub mod vasp;
 pub mod xtc;
 pub mod xyz;
-
 pub use parser::ParsedStructure;
 pub use trajectory::TrajectoryData;

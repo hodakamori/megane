@@ -30,7 +30,13 @@ import {
   waitForReady,
 } from "./lib/setup";
 import { bootHost, getHost, type HostBoot } from "./lib/host-fixture";
-import { connectEdge, findNodeIdByType, insertNode, setNodeParam, type Scope } from "./lib/pipeline";
+import {
+  connectEdge,
+  findNodeIdByType,
+  insertNode,
+  setNodeParam,
+  type Scope,
+} from "./lib/pipeline";
 import { getVisibleSubsystems } from "./lib/render-utils";
 
 const PLATFORM = "water-line";
@@ -38,7 +44,11 @@ const FIXTURE = "caffeine_water.pdb";
 const FIXTURE_ATOMS = 3024;
 
 /** Remove every edge feeding `targetHandle` of `targetId` (drops a default edge). */
-async function removeEdgesInto(scope: Scope, targetId: string, targetHandle: string): Promise<void> {
+async function removeEdgesInto(
+  scope: Scope,
+  targetId: string,
+  targetHandle: string,
+): Promise<void> {
   await scope.evaluate(
     ({ t, h }) => {
       const w = window as Window & {

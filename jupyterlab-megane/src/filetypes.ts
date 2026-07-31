@@ -111,6 +111,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-phonon",
+    displayName: "CASTEP phonon",
+    extensions: [".phonon"],
+    mimeTypes: ["chemical/x-castep-phonon"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-lammps-dump",
     displayName: "LAMMPS dump",
     extensions: [".lammpstrj", ".dump", ".trj"],

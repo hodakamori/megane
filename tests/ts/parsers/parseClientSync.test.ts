@@ -77,6 +77,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_phonon: structFn("parse_phonon"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),
@@ -201,6 +202,16 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
       expect(calls).toContain("parse_vasp");
     },
   );
+
+  it("routes a CASTEP phonon file through the CASTEP phonon parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile(
+        "si_gamma.phonon",
+        " BEGIN header\n Number of ions 1\n Unit cell vectors (A)\n 5.0 0.0 0.0\n 0.0 5.0 0.0\n 0.0 0.0 5.0\n Fractional Co-ordinates\n  1 0.0 0.0 0.0 Si 28.0\n END header\n",
+      ),
+    );
+    expect(calls).toContain("parse_phonon");
+  });
 
   it("parseStructureText defaults to PDB and honors fileName", async () => {
     await sync.parseStructureText("ATOM", "y.cif");

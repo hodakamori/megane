@@ -63,13 +63,27 @@ function inputs(particle: ParticleData): Map<string, PipelineData[]> {
 function tio6() {
   const elements = [22, 8, 8, 8, 8, 8, 8];
   const positions = [
-    0, 0, 0, // Ti
-    2, 0, 0, // O
-    -2, 0, 0, // O
-    0, 2, 0, // O
-    0, -2, 0, // O
-    0, 0, 2, // O
-    0, 0, -2, // O
+    0,
+    0,
+    0, // Ti
+    2,
+    0,
+    0, // O
+    -2,
+    0,
+    0, // O
+    0,
+    2,
+    0, // O
+    0,
+    -2,
+    0, // O
+    0,
+    0,
+    2, // O
+    0,
+    0,
+    -2, // O
   ];
   return makeParticle(elements, positions);
 }
@@ -107,26 +121,17 @@ describe("executePolyhedronGenerator (VESTA-style auto-detect)", () => {
   });
 
   it("excludes a center when its Z is in excludedCenters", () => {
-    const out = executePolyhedronGenerator(
-      baseParams({ excludedCenters: [22] }),
-      inputs(tio6()),
-    );
+    const out = executePolyhedronGenerator(baseParams({ excludedCenters: [22] }), inputs(tio6()));
     expect(out.size).toBe(0);
   });
 
   it("excludes a ligand when its Z is in excludedLigands", () => {
-    const out = executePolyhedronGenerator(
-      baseParams({ excludedLigands: [8] }),
-      inputs(tio6()),
-    );
+    const out = executePolyhedronGenerator(baseParams({ excludedLigands: [8] }), inputs(tio6()));
     expect(out.size).toBe(0);
   });
 
   it("respects covalent-radius × tolerance cutoff (tightening to 0.7 drops all neighbours)", () => {
-    const out = executePolyhedronGenerator(
-      baseParams({ cutoffTolerance: 0.7 }),
-      inputs(tio6()),
-    );
+    const out = executePolyhedronGenerator(baseParams({ cutoffTolerance: 0.7 }), inputs(tio6()));
     // 0.7 × (1.6 + 0.66) = 1.58 Å, but Ti–O is 2.0 Å, so no ligand qualifies.
     expect(out.size).toBe(0);
   });
@@ -134,16 +139,8 @@ describe("executePolyhedronGenerator (VESTA-style auto-detect)", () => {
   it("generates no polyhedron when fewer than 4 ligands are within range", () => {
     // Same Ti, but only three O atoms in plane.
     const elements = [22, 8, 8, 8];
-    const positions = [
-      0, 0, 0,
-      2, 0, 0,
-      0, 2, 0,
-      0, 0, 2,
-    ];
-    const out = executePolyhedronGenerator(
-      baseParams(),
-      inputs(makeParticle(elements, positions)),
-    );
+    const positions = [0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2];
+    const out = executePolyhedronGenerator(baseParams(), inputs(makeParticle(elements, positions)));
     expect(out.size).toBe(0);
   });
 
@@ -154,13 +151,27 @@ describe("executePolyhedronGenerator (VESTA-style auto-detect)", () => {
     const box = new Float32Array([4, 0, 0, 0, 4, 0, 0, 0, 4]);
     const elements = [22, 8, 8, 8, 8, 8, 8];
     const positions = [
-      2, 2, 2, // Ti at cell centre
-      0.5, 2, 2, // O at -1.5 Å under PBC = wraps to 2.5 Å on the other side
-      3.5, 2, 2,
-      2, 0.5, 2,
-      2, 3.5, 2,
-      2, 2, 0.5,
-      2, 2, 3.5,
+      2,
+      2,
+      2, // Ti at cell centre
+      0.5,
+      2,
+      2, // O at -1.5 Å under PBC = wraps to 2.5 Å on the other side
+      3.5,
+      2,
+      2,
+      2,
+      0.5,
+      2,
+      2,
+      3.5,
+      2,
+      2,
+      2,
+      0.5,
+      2,
+      2,
+      3.5,
     ];
     const out = executePolyhedronGenerator(
       baseParams(),

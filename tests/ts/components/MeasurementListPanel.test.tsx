@@ -144,7 +144,11 @@ describe("MeasurementListPanel", () => {
     addMeasurement(distanceMeasurement);
     render(<MeasurementListPanel elements={null} />);
     fireEvent.click(screen.getByTestId("measurement-export-csv"));
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Name,Type"), "measurements.csv", "text/csv");
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("Name,Type"),
+      "measurements.csv",
+      "text/csv",
+    );
     spy.mockRestore();
   });
 

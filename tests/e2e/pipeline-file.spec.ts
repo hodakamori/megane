@@ -11,11 +11,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { test, expect } from "playwright/test";
-import {
-  assertDomContract,
-  defaultViewerContract,
-  waitForReady,
-} from "./lib/setup";
+import { assertDomContract, defaultViewerContract, waitForReady } from "./lib/setup";
 
 const REPO = join(fileURLToPath(import.meta.url), "..", "..", "..");
 
@@ -48,8 +44,7 @@ test.describe("pipeline-file: webapp .megane.json", () => {
         const dt = new DataTransfer();
         dt.items.add(pipelineFile);
         dt.items.add(companionFile);
-        const target =
-          document.querySelector('[data-testid="megane-viewer"]') ?? document.body;
+        const target = document.querySelector('[data-testid="megane-viewer"]') ?? document.body;
         const ev = new DragEvent("drop", {
           bubbles: true,
           cancelable: true,
@@ -76,9 +71,7 @@ test.describe("pipeline-file: webapp .megane.json", () => {
       { timeout: 30_000 },
     );
 
-    await assertDomContract(page, [
-      ...defaultViewerContract({ context: "webapp" }),
-    ]);
+    await assertDomContract(page, [...defaultViewerContract({ context: "webapp" })]);
 
     // Sanity: the renderer must have an atom count > 0 (water.gro is small).
     const atomAttr = await page
@@ -90,9 +83,7 @@ test.describe("pipeline-file: webapp .megane.json", () => {
     // graph lacks one (water.megane.json is the canonical broken fixture —
     // it wires LoadStructure.particle straight to Viewport.particle). The
     // resulting graph should render with a non-zero bond count.
-    const addBondCount = await page
-      .locator('[data-testid="pipeline-node-add_bond"]')
-      .count();
+    const addBondCount = await page.locator('[data-testid="pipeline-node-add_bond"]').count();
     expect(addBondCount, "AddBond node must be present after open").toBeGreaterThanOrEqual(1);
 
     const bondAttr = await page
@@ -109,8 +100,7 @@ test.describe("pipeline-file: webapp .megane.json", () => {
     // reflect that — previously, apply.ts overrode them with hardcoded
     // CellData.axesVisible: true on every cell-data update.
     const viewerVisibility = await page.evaluate(() => {
-      const store = (window as { __megane_test_pipeline_store?: any })
-        .__megane_test_pipeline_store;
+      const store = (window as { __megane_test_pipeline_store?: any }).__megane_test_pipeline_store;
       const vs = store?.getState().viewportState;
       return {
         cellAxesVisible: vs?.cellAxesVisible,

@@ -2,8 +2,8 @@ use js_sys::{Float32Array, Object, Reflect, Uint32Array, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 use megane_core::{
-    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser, psf,
-    top, traj, vasp, xtc, xyz,
+    amber, bonds, cif, dcd, gro, lammps_data, lammpstrj, mmcif, mol, mol2, netcdf, parser, phonon,
+    psf, top, traj, vasp, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -976,6 +976,13 @@ pub fn parse_xyz(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_vasp(text: &str) -> Result<ParseResult, JsError> {
     let data = vasp::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+
+/// Parse a CASTEP `.phonon` lattice-dynamics file and return the periodic structure from its header.
+#[wasm_bindgen]
+pub fn parse_phonon(text: &str) -> Result<ParseResult, JsError> {
+    let data = phonon::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 

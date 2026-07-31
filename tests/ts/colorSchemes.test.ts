@@ -26,13 +26,7 @@ function makeSnapshot(over: Partial<Snapshot> = {}): Snapshot {
 
 describe("COLOR_SCHEME_LABELS", () => {
   it("provides a label for every scheme", () => {
-    const schemes: ColorScheme[] = [
-      "byElement",
-      "byResidue",
-      "byChain",
-      "byBFactor",
-      "byProperty",
-    ];
+    const schemes: ColorScheme[] = ["byElement", "byResidue", "byChain", "byBFactor", "byProperty"];
     for (const s of schemes) {
       expect(COLOR_SCHEME_LABELS[s]).toBeTypeOf("string");
       expect(COLOR_SCHEME_LABELS[s].length).toBeGreaterThan(0);
@@ -90,9 +84,7 @@ describe("getAtomColorForScheme — byChain", () => {
     // 'A' → 0, 'a' → 0 (same slot per implementation)
     expect(getAtomColorForScheme(0, snap, ctx)).toEqual(getAtomColorForScheme(2, snap, ctx));
     // 'B' → 1
-    expect(getAtomColorForScheme(1, snap, ctx)).not.toEqual(
-      getAtomColorForScheme(0, snap, ctx),
-    );
+    expect(getAtomColorForScheme(1, snap, ctx)).not.toEqual(getAtomColorForScheme(0, snap, ctx));
     // '0' → palette index 52 → wraps modulo palette length
     const c0 = getAtomColorForScheme(3, snap, ctx);
     expect(c0).toHaveLength(3);

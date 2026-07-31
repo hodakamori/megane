@@ -52,6 +52,7 @@ export interface OpenFileOptions {
 type FileKind = "structure" | "trajectory" | "pipeline" | "unknown";
 
 const STRUCTURE_EXTS = [
+  ".phonon",
   ".pdb",
   ".ent",
   ".pdbx",

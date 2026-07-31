@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- **CASTEP phonon files** (`.phonon`) on every host, structure half. The header's unit cell, fractional coordinates, and species render as a periodic structure. Frequencies and complex eigenvectors are parsed into a `PhononModes` struct ready for a follow-up mode-animation node, which should be shared with Molden `[FREQ]` rather than duplicated.
 - **VASP structure files** (`POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`) on every host. `XDATCAR` opens as a multi-frame structure, including variable-cell (ISIF ≥ 3) runs that re-emit the header per configuration. Because the standard VASP filenames carry no extension, megane now also dispatches by **basename** (`src/parsers/fileNames.ts`); VS Code registers `POSCAR*` / `CONTCAR*` / `XDATCAR*` globs and JupyterLab an `IFileType.pattern`. VASP 4 files with no species line fall back to the 1-based species index as an atomic-number proxy instead of failing.
 
 ## [0.10.0] - 2026-07-12

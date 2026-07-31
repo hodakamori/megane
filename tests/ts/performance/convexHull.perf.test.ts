@@ -19,9 +19,18 @@ describe("performance: computeConvexHull", () => {
     const pts = new Float32Array(12 * 3);
     const phi = (1 + Math.sqrt(5)) / 2;
     const verts = [
-      [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
-      [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
-      [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1],
+      [-1, phi, 0],
+      [1, phi, 0],
+      [-1, -phi, 0],
+      [1, -phi, 0],
+      [0, -1, phi],
+      [0, 1, phi],
+      [0, -1, -phi],
+      [0, 1, -phi],
+      [phi, 0, -1],
+      [phi, 0, 1],
+      [-phi, 0, -1],
+      [-phi, 0, 1],
     ];
     for (let i = 0; i < 12; i++) {
       pts[i * 3] = verts[i][0];
@@ -38,9 +47,7 @@ describe("performance: computeConvexHull", () => {
 
   it("1000 iterations of 6-point hull under 200ms total", () => {
     // Octahedron vertices
-    const pts = new Float32Array([
-      1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1,
-    ]);
+    const pts = new Float32Array([1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1]);
 
     const start = performance.now();
     for (let i = 0; i < 1000; i++) {
@@ -53,8 +60,7 @@ describe("performance: computeConvexHull", () => {
 
   it("8-point cube hull is consistently fast", () => {
     const pts = new Float32Array([
-      0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0,
-      0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
+      0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
     ]);
 
     const time = benchmark(() => {

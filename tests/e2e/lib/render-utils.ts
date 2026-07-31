@@ -74,13 +74,10 @@ export async function getVisibleSubsystems(scope: Scope): Promise<SubsystemVisib
 }
 
 export async function setCameraMode(scope: Scope, mode: CameraMode): Promise<void> {
-  await scope.evaluate(
-    (m) => {
-      const w = window as Window & { __megane_test?: TestApi };
-      w.__megane_test?.setCameraMode(m);
-    },
-    mode,
-  );
+  await scope.evaluate((m) => {
+    const w = window as Window & { __megane_test?: TestApi };
+    w.__megane_test?.setCameraMode(m);
+  }, mode);
 }
 
 export async function resetCamera(scope: Scope): Promise<void> {

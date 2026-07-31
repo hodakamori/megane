@@ -70,6 +70,9 @@ const STRUCTURE_CASES: StructureCase[] = [
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
   { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
   { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
+  // CASTEP .phonon: the header becomes the periodic structure; the q-point
+  // frequency and eigenvector blocks must not be read as more atoms.
+  { name: "phonon-si-gamma", file: "si_gamma.phonon", mime: "text/plain", expectedAtoms: 2 },
 ];
 
 async function dropStructure(
