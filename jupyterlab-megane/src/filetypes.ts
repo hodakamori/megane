@@ -99,6 +99,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-xsf",
+    displayName: "XCrySDen structure",
+    extensions: [".xsf", ".axsf"],
+    mimeTypes: ["chemical/x-xcrysden-structure"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     // VASP structure files. `POSCAR` / `CONTCAR` / `XDATCAR` normally carry no
     // extension at all, so this entry also declares a `pattern` — JupyterLab
     // matches `IFileType.pattern` against the basename before it falls back to
