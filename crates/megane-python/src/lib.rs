@@ -211,6 +211,13 @@ fn parse_vasp(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
     PyStructure::from_parsed(py, data)
 }
 
+/// Parse a Molden file (`.molden`) and return structured data. A `[GEOMETRIES] XYZ` block yields a multi-frame structure.
+#[pyfunction]
+fn parse_molden(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
+    let data = megane_core::molden::parse(text).map_err(PyValueError::new_err)?;
+    PyStructure::from_parsed(py, data)
+}
+
 /// Parse a Chem3D XML (`.c3xml`) document and return structured data.
 #[pyfunction]
 fn parse_c3xml(py: Python<'_>, text: &str) -> PyResult<PyStructure> {
@@ -508,6 +515,7 @@ fn megane_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_xyz, m)?)?;
     m.add_function(wrap_pyfunction!(parse_cml, m)?)?;
     m.add_function(wrap_pyfunction!(parse_vasp, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_molden, m)?)?;
     m.add_function(wrap_pyfunction!(parse_c3xml, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol, m)?)?;
     m.add_function(wrap_pyfunction!(parse_mol2, m)?)?;

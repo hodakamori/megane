@@ -74,6 +74,10 @@ const STRUCTURE_CASES: StructureCase[] = [
   // therefore also cover `structureExtFromFileName`'s bare-name mapping.
   { name: "vasp-poscar", file: "POSCAR_si_diamond", mime: "text/plain", expectedAtoms: 8 },
   { name: "vasp-xdatcar", file: "XDATCAR_si_md", mime: "text/plain", expectedAtoms: 8 },
+  // Molden: a static `[Atoms] (AU)` geometry (which exercises the Bohr
+  // conversion) and a `[GEOMETRIES] XYZ` optimisation that becomes frames.
+  { name: "molden-water", file: "water.molden", mime: "text/plain", expectedAtoms: 3 },
+  { name: "molden-water-opt", file: "water_opt.molden", mime: "text/plain", expectedAtoms: 3 },
   // Chem3D XML: <n> nodes carry explicit <b> bonds, so nothing is inferred.
   {
     name: "c3xml-3d-molecule",

@@ -34,11 +34,11 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships thirteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, and CML)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(14);
+  it("ships fifteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, CML, Molden, and Chem3D XML)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(15);
   });
 
-  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP names", () => {
+  it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden names", () => {
     const names = STRUCTURE_FILETYPES_TEXT.map((f) => f.name).sort();
     expect(names).toEqual(
       [
@@ -55,6 +55,7 @@ describe("jupyterlab filetypes", () => {
         "megane-amber-prmtop",
         "megane-cml",
         "megane-vasp",
+        "megane-molden",
         "megane-c3xml",
       ].sort(),
     );
@@ -81,6 +82,13 @@ describe("jupyterlab filetypes", () => {
     expect(re.test("xdatcar")).toBe(true);
     expect(re.test("MyPOSCAR")).toBe(false);
     expect(re.test("notes.txt")).toBe(false);
+  });
+
+  it("registers .molden for the Molden filetype", () => {
+    const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-molden");
+    expect(ft).toBeDefined();
+    expect(ft?.extensions).toEqual([".molden"]);
+    expect(ft?.fileFormat).toBe("text");
   });
 
   it("registers .c3xml for the Chem3D XML filetype", () => {
@@ -136,7 +144,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(14);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(15);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });

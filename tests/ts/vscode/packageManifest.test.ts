@@ -42,6 +42,7 @@ describe("vscode-megane package.json", () => {
         "*.vasp",
         "*.xtc",
         "*.xyz",
+        "*.molden",
         "*.c3xml",
         "*.cml",
         // VASP's standard filenames carry no extension, so the selector needs
@@ -59,6 +60,10 @@ describe("vscode-megane package.json", () => {
 
   it("mentions VASP in the marketplace description", () => {
     expect(manifest.description).toContain("VASP");
+  });
+
+  it("mentions Molden in the marketplace description", () => {
+    expect(manifest.description).toContain("Molden");
   });
 
   it("mentions Chem3D XML in the marketplace description", () => {

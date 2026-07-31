@@ -119,6 +119,15 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    name: "megane-molden",
+    displayName: "Molden",
+    extensions: [".molden"],
+    mimeTypes: ["chemical/x-molden"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
+
     name: "megane-c3xml",
     displayName: "Chem3D XML",
     extensions: [".c3xml"],
