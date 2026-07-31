@@ -43,6 +43,8 @@ describe("vscode-megane package.json", () => {
         "*.xtc",
         "*.xyz",
         "*.molden",
+        "*.xsf",
+        "*.axsf",
         // JCAMP-DX spectra. `*.dx` is intentionally absent — it collides with
         // OpenDX volumetric grids and only content sniffing separates them.
         "*.jdx",
@@ -54,6 +56,10 @@ describe("vscode-megane package.json", () => {
         "XDATCAR*",
       ].sort(),
     );
+  });
+
+  it("mentions XCrySDen XSF in the marketplace description", () => {
+    expect(manifest.description).toContain("XCrySDen XSF");
   });
 
   it("mentions VASP in the marketplace description", () => {

@@ -34,8 +34,8 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships fourteen text structure filetypes (incl. LAMMPS dump trajectory, AMBER prmtop, mmCIF, VASP, Molden, and JCAMP-DX)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(14);
+  it("ships fifteen text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, Molden, XSF, and JCAMP-DX)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(15);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden / JCAMP-DX names", () => {
@@ -53,11 +53,19 @@ describe("jupyterlab filetypes", () => {
         "megane-lammps-data",
         "megane-lammps-dump",
         "megane-amber-prmtop",
+        "megane-xsf",
         "megane-vasp",
         "megane-molden",
         "megane-jcampdx",
       ].sort(),
     );
+  });
+
+  it("registers both .xsf and .axsf for the XCrySDen filetype", () => {
+    const xsf = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-xsf");
+    expect(xsf).toBeDefined();
+    expect(xsf?.extensions).toEqual([".xsf", ".axsf"]);
+    expect(xsf?.fileFormat).toBe("text");
   });
 
   it("registers .jdx and .jcamp for the JCAMP-DX spectrum filetype", () => {
@@ -140,7 +148,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(14);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(15);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });
