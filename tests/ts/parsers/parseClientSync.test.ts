@@ -77,6 +77,7 @@ const { calls, wasmMock } = vi.hoisted(() => {
     parse_pdb: structFn("parse_pdb"),
     parse_gro: structFn("parse_gro"),
     parse_xyz: structFn("parse_xyz"),
+    parse_molden: structFn("parse_molden"),
     parse_vasp: structFn("parse_vasp"),
     parse_structure_prefix: structFn("parse_structure_prefix"),
     decode_trajectory_frame0: () => new Float32Array(4 * 3),
@@ -205,6 +206,13 @@ describe("parseClientSync (main-thread path with mocked wasm)", () => {
   it("routes a .jxyz file through the XYZ parser (Jmol's second extension)", async () => {
     await sync.parseStructureFile(fakeFile("benzene.jxyz", "1\ncomment\nC 0 0 0\n"));
     expect(calls).toContain("parse_xyz");
+  });
+
+  it("routes a Molden file through the Molden parser", async () => {
+    await sync.parseStructureFile(
+      fakeFile("water.molden", "[Molden Format]\n[Atoms] (Angs)\n O 1 8 0.0 0.0 0.0\n"),
+    );
+    expect(calls).toContain("parse_molden");
   });
 
   it("parseStructureText defaults to PDB and honors fileName", async () => {

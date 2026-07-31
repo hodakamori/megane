@@ -196,6 +196,7 @@ interface WasmModule {
   parse_pdb: ParseFn;
   parse_gro: ParseFn;
   parse_xyz: ParseFn;
+  parse_molden: ParseFn;
   parse_vasp: ParseFn;
   parse_mol: ParseFn;
   parse_mol2: ParseFn;
@@ -248,6 +249,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_pdb: wasm.parse_pdb,
         parse_gro: wasm.parse_gro,
         parse_xyz: wasm.parse_xyz,
+        parse_molden: wasm.parse_molden,
         parse_vasp: wasm.parse_vasp,
         parse_mol: wasm.parse_mol,
         parse_mol2: wasm.parse_mol2,
@@ -303,6 +305,10 @@ function getParserForExtension(ext: string): ParseFn {
       return wasmModule!.parse_mol;
     case ".mol2":
       return wasmModule!.parse_mol2;
+    // Molden. `[Atoms]` is the static structure; a `[GEOMETRIES] XYZ`
+    // block makes it multi-frame via the shared XYZ frame reader.
+    case ".molden":
+      return wasmModule!.parse_molden;
     case ".cif":
       return wasmModule!.parse_cif;
     case ".mmcif":

@@ -43,6 +43,7 @@ describe("vscode-megane package.json", () => {
         "*.xtc",
         "*.xyz",
         "*.jxyz",
+        "*.molden",
         // VASP's standard filenames carry no extension, so the selector needs
         // basename globs alongside the `*.vasp` extension pattern.
         "POSCAR*",
@@ -58,5 +59,9 @@ describe("vscode-megane package.json", () => {
 
   it("mentions the Jmol .jxyz alias in the marketplace description", () => {
     expect(manifest.description).toContain(".jxyz");
+  });
+
+  it("mentions Molden in the marketplace description", () => {
+    expect(manifest.description).toContain("Molden");
   });
 });
