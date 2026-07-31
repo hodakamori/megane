@@ -42,7 +42,7 @@ const BUDGETS = {
   parseWater100kMs: 5000,
   firstRenderMs: 2500,
   steadyFpsMin: 24,
-  stutterRatioMax: 0.10,
+  stutterRatioMax: 0.1,
   heapMaxBytes: 1500 * 1024 * 1024,
 };
 
@@ -72,7 +72,9 @@ async function runScenarioOnce({ context, server, fixture, fixtureKey }) {
     await sleep(500);
 
     // Observe steady FPS for 5 seconds. Reset frame times first.
-    await page.evaluate(() => { window.__meganeFrameTimes = []; });
+    await page.evaluate(() => {
+      window.__meganeFrameTimes = [];
+    });
     await sleep(5000);
 
     const perf = await collectPerf(page);
@@ -96,11 +98,19 @@ async function runScenario({ context, server, fixture, fixtureKey, runs = 3 }) {
     return m ? m.duration : null;
   }
 
-  const wasmInit = results.map((r) => pickMeasure(r.perf.measures, (m) => m.name === "megane:wasm-init")).filter((v) => v !== null);
-  const parse = results.map((r) => pickMeasure(r.perf.measures, (m) => m.name.startsWith("megane:parse:"))).filter((v) => v !== null);
-  const firstRender = results.map((r) => pickMeasure(r.perf.measures, (m) => m.name === "megane:first-render")).filter((v) => v !== null);
+  const wasmInit = results
+    .map((r) => pickMeasure(r.perf.measures, (m) => m.name === "megane:wasm-init"))
+    .filter((v) => v !== null);
+  const parse = results
+    .map((r) => pickMeasure(r.perf.measures, (m) => m.name.startsWith("megane:parse:")))
+    .filter((v) => v !== null);
+  const firstRender = results
+    .map((r) => pickMeasure(r.perf.measures, (m) => m.name === "megane:first-render"))
+    .filter((v) => v !== null);
   const fps = results.map((r) => (r.frames ? r.frames.fps : null)).filter((v) => v !== null);
-  const stutter = results.map((r) => (r.frames ? r.frames.stutterRatio : null)).filter((v) => v !== null);
+  const stutter = results
+    .map((r) => (r.frames ? r.frames.stutterRatio : null))
+    .filter((v) => v !== null);
   const heap = results.map((r) => r.perf.heap).filter((v) => v !== null && v !== undefined);
 
   return {
@@ -141,17 +151,38 @@ try {
     fixtureKey: "1crn",
   });
   out.scenarios.small = small;
-  console.log(`  wasm-init      median = ${small.wasmInitMs?.toFixed(1)} ms (budget ${BUDGETS.wasmInitMs})`);
-  console.log(`  parse(1crn)    median = ${small.parseMs?.toFixed(1)} ms (budget ${BUDGETS.parse1CrnMs})`);
-  console.log(`  first-render   median = ${small.firstRenderMs?.toFixed(1)} ms (budget ${BUDGETS.firstRenderMs})`);
-  console.log(`  steady fps     median = ${small.fps?.toFixed(1)} (budget ≥ ${BUDGETS.steadyFpsMin})`);
-  console.log(`  stutter ratio  median = ${(small.stutterRatio ?? 0).toFixed(3)} (budget ≤ ${BUDGETS.stutterRatioMax})`);
+  console.log(
+    `  wasm-init      median = ${small.wasmInitMs?.toFixed(1)} ms (budget ${BUDGETS.wasmInitMs})`,
+  );
+  console.log(
+    `  parse(1crn)    median = ${small.parseMs?.toFixed(1)} ms (budget ${BUDGETS.parse1CrnMs})`,
+  );
+  console.log(
+    `  first-render   median = ${small.firstRenderMs?.toFixed(1)} ms (budget ${BUDGETS.firstRenderMs})`,
+  );
+  console.log(
+    `  steady fps     median = ${small.fps?.toFixed(1)} (budget ≥ ${BUDGETS.steadyFpsMin})`,
+  );
+  console.log(
+    `  stutter ratio  median = ${(small.stutterRatio ?? 0).toFixed(3)} (budget ≤ ${BUDGETS.stutterRatioMax})`,
+  );
 
-  if (small.wasmInitMs !== null) assert(small.wasmInitMs <= BUDGETS.wasmInitMs, `WASM init ≤ ${BUDGETS.wasmInitMs} ms`);
-  if (small.parseMs !== null) assert(small.parseMs <= BUDGETS.parse1CrnMs, `parse(1crn) ≤ ${BUDGETS.parse1CrnMs} ms`);
-  if (small.firstRenderMs !== null) assert(small.firstRenderMs <= BUDGETS.firstRenderMs, `first-render ≤ ${BUDGETS.firstRenderMs} ms`);
-  if (small.fps !== null) assert(small.fps >= BUDGETS.steadyFpsMin, `steady FPS ≥ ${BUDGETS.steadyFpsMin}`);
-  if (small.stutterRatio !== null) assert(small.stutterRatio <= BUDGETS.stutterRatioMax, `stutter ratio ≤ ${BUDGETS.stutterRatioMax}`);
+  if (small.wasmInitMs !== null)
+    assert(small.wasmInitMs <= BUDGETS.wasmInitMs, `WASM init ≤ ${BUDGETS.wasmInitMs} ms`);
+  if (small.parseMs !== null)
+    assert(small.parseMs <= BUDGETS.parse1CrnMs, `parse(1crn) ≤ ${BUDGETS.parse1CrnMs} ms`);
+  if (small.firstRenderMs !== null)
+    assert(
+      small.firstRenderMs <= BUDGETS.firstRenderMs,
+      `first-render ≤ ${BUDGETS.firstRenderMs} ms`,
+    );
+  if (small.fps !== null)
+    assert(small.fps >= BUDGETS.steadyFpsMin, `steady FPS ≥ ${BUDGETS.steadyFpsMin}`);
+  if (small.stutterRatio !== null)
+    assert(
+      small.stutterRatio <= BUDGETS.stutterRatioMax,
+      `stutter ratio ≤ ${BUDGETS.stutterRatioMax}`,
+    );
 
   console.log("\n=== Scenario: medium (water_100k.pdb) ===");
   const medium = await runScenario({
@@ -162,12 +193,26 @@ try {
     runs: 1,
   });
   out.scenarios.medium = medium;
-  console.log(`  parse(100k)    = ${medium.parseMs?.toFixed(1)} ms (budget ${BUDGETS.parseWater100kMs})`);
-  console.log(`  first-render   = ${medium.firstRenderMs?.toFixed(1)} ms (budget ${BUDGETS.firstRenderMs})`);
-  console.log(`  heap           = ${(medium.heapBytes ?? 0) / (1024 * 1024)} MB (budget ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB)`);
+  console.log(
+    `  parse(100k)    = ${medium.parseMs?.toFixed(1)} ms (budget ${BUDGETS.parseWater100kMs})`,
+  );
+  console.log(
+    `  first-render   = ${medium.firstRenderMs?.toFixed(1)} ms (budget ${BUDGETS.firstRenderMs})`,
+  );
+  console.log(
+    `  heap           = ${(medium.heapBytes ?? 0) / (1024 * 1024)} MB (budget ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB)`,
+  );
 
-  if (medium.parseMs !== null) assert(medium.parseMs <= BUDGETS.parseWater100kMs, `parse(water_100k) ≤ ${BUDGETS.parseWater100kMs} ms`);
-  if (medium.heapBytes !== null && medium.heapBytes !== undefined) assert(medium.heapBytes <= BUDGETS.heapMaxBytes, `heap ≤ ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB`);
+  if (medium.parseMs !== null)
+    assert(
+      medium.parseMs <= BUDGETS.parseWater100kMs,
+      `parse(water_100k) ≤ ${BUDGETS.parseWater100kMs} ms`,
+    );
+  if (medium.heapBytes !== null && medium.heapBytes !== undefined)
+    assert(
+      medium.heapBytes <= BUDGETS.heapMaxBytes,
+      `heap ≤ ${BUDGETS.heapMaxBytes / (1024 * 1024)} MB`,
+    );
 
   savePerfJson("app", out);
 

@@ -97,7 +97,9 @@ async function downloadVsixAsync(url, destPath) {
           return;
         }
         if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download VSIX: HTTP ${response.statusCode} from ${requestUrl}`));
+          reject(
+            new Error(`Failed to download VSIX: HTTP ${response.statusCode} from ${requestUrl}`),
+          );
           return;
         }
         response.pipe(file);
@@ -133,21 +135,16 @@ async function startCodeServer() {
   return new Promise((resolve, reject) => {
     const proc = spawn(
       "code-server",
-      [
-        "--auth", "none",
-        "--port", String(PORT),
-        "--disable-telemetry",
-        WORKSPACE_DIR,
-      ],
+      ["--auth", "none", "--port", String(PORT), "--disable-telemetry", WORKSPACE_DIR],
       {
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, HOME: "/root" },
-      }
+      },
     );
 
     const timer = setTimeout(
       () => reject(new Error("code-server did not start within 30s")),
-      30000
+      30000,
     );
 
     const handler = (data) => {
@@ -297,7 +294,11 @@ try {
                 nonWhite++;
               }
             }
-            return { hasContent: nonWhite > total * 0.001, totalPixels: total, nonWhitePixels: nonWhite };
+            return {
+              hasContent: nonWhite > total * 0.001,
+              totalPixels: total,
+              nonWhitePixels: nonWhite,
+            };
           });
           break;
         }
@@ -319,11 +320,11 @@ try {
   assert(canvasFound, "megane custom editor canvas is created in webview");
 
   console.log(
-    `  Canvas: ${canvasResult.nonWhitePixels}/${canvasResult.totalPixels} non-white pixels`
+    `  Canvas: ${canvasResult.nonWhitePixels}/${canvasResult.totalPixels} non-white pixels`,
   );
   assert(
     canvasResult.hasContent,
-    `Canvas contains rendered atoms (${canvasResult.nonWhitePixels} non-white pixels)`
+    `Canvas contains rendered atoms (${canvasResult.nonWhitePixels} non-white pixels)`,
   );
 
   const criticalErrors = jsErrors.filter(
@@ -334,11 +335,11 @@ try {
       !e.includes("Shader Error") &&
       !e.includes("WebGLProgram") &&
       !e.includes("open-vsx.org") &&
-      !e.includes("CORS policy")
+      !e.includes("CORS policy"),
   );
   assert(
     criticalErrors.length === 0,
-    `No critical JS errors (found ${criticalErrors.length}: ${JSON.stringify(criticalErrors)})`
+    `No critical JS errors (found ${criticalErrors.length}: ${JSON.stringify(criticalErrors)})`,
   );
 
   console.log("\n=== VS Code Extension Rendering Test: PASSED ===");
@@ -353,7 +354,9 @@ try {
     server.stderr?.destroy();
     server.unref();
     setTimeout(() => {
-      try { server.kill("SIGKILL"); } catch {}
+      try {
+        server.kill("SIGKILL");
+      } catch {}
     }, 3000).unref();
   }
 }
