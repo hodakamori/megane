@@ -115,6 +115,25 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    // Volumetric grids. Registered so double-clicking one opens megane, which
+    // then explains that a grid needs a structure to overlay — see
+    // VOLUMETRIC_ONLY_EXTENSIONS in trajectoryUtils.ts.
+    name: "megane-cube",
+    displayName: "Gaussian CUBE",
+    extensions: [".cube", ".cub"],
+    mimeTypes: ["chemical/x-gaussian-cube"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
+    name: "megane-opendx",
+    displayName: "OpenDX grid",
+    extensions: [".dx"],
+    mimeTypes: ["chemical/x-opendx"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     // VASP structure files. `POSCAR` / `CONTCAR` / `XDATCAR` normally carry no
     // extension at all, so this entry also declares a `pattern` — JupyterLab
     // matches `IFileType.pattern` against the basename before it falls back to
@@ -144,6 +163,14 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     displayName: "JCAMP-DX spectrum",
     extensions: [".jdx", ".jcamp"],
     mimeTypes: ["chemical/x-jcamp-dx"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
+    name: "megane-c3xml",
+    displayName: "Chem3D XML",
+    extensions: [".c3xml"],
+    mimeTypes: ["chemical/x-c3xml"],
     fileFormat: "text",
     contentType: "file",
   },

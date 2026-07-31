@@ -85,6 +85,13 @@ const STRUCTURE_CASES: StructureCase[] = [
   // Jmol's `.jxyz` is plain XYZ under a second extension, with extra per-atom
   // columns after x/y/z that must not disturb the coordinate read.
   { name: "jxyz-benzene", file: "benzene.jxyz", mime: "chemical/x-xyz", expectedAtoms: 12 },
+  // Chem3D XML: <n> nodes carry explicit <b> bonds, so nothing is inferred.
+  {
+    name: "c3xml-3d-molecule",
+    file: "methoxymethylamine.c3xml",
+    mime: "text/xml",
+    expectedAtoms: 11,
+  },
   // CASTEP .phonon: the header becomes the periodic structure; the q-point
   // frequency and eigenvector blocks must not be read as more atoms.
   { name: "phonon-si-gamma", file: "si_gamma.phonon", mime: "text/plain", expectedAtoms: 2 },

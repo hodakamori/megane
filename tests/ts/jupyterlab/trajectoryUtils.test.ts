@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   TRAJECTORY_ONLY_EXTENSIONS,
+  VOLUMETRIC_ONLY_EXTENSIONS,
   isTrajectoryOnly,
+  isVolumetricOnly,
 } from "../../../jupyterlab-megane/src/trajectoryUtils";
 
 describe("TRAJECTORY_ONLY_EXTENSIONS", () => {
@@ -67,5 +69,25 @@ describe("isTrajectoryOnly", () => {
   it("uses the last dot for extension detection", () => {
     expect(isTrajectoryOnly("archive.tar.xtc")).toBe(true);
     expect(isTrajectoryOnly("archive.xtc.pdb")).toBe(false);
+  });
+});
+
+describe("isVolumetricOnly", () => {
+  it.each([".cube", ".cub", ".dx"])("claims %s", (ext) => {
+    expect(isVolumetricOnly(`grid${ext}`)).toBe(true);
+  });
+
+  it("is case-insensitive", () => {
+    expect(isVolumetricOnly("DENSITY.CUBE")).toBe(true);
+  });
+
+  it("does not claim structure or trajectory formats", () => {
+    expect(isVolumetricOnly("1crn.pdb")).toBe(false);
+    expect(isVolumetricOnly("run.xtc")).toBe(false);
+    expect(isVolumetricOnly("POSCAR")).toBe(false);
+  });
+
+  it("exposes the same set it tests against", () => {
+    expect([...VOLUMETRIC_ONLY_EXTENSIONS].sort()).toEqual([".cub", ".cube", ".dx"]);
   });
 });

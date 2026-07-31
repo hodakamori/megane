@@ -6,23 +6,22 @@ import { MeganeViewer } from "@megane/components/MeganeViewer";
 import { ErrorBoundary } from "@megane/components/ErrorBoundary";
 import { useMeganeLocal } from "@megane/hooks/useMeganeLocal";
 import { usePipelineStore } from "@megane/pipeline/store";
-import {
-  capturePipelineStore,
-  type PipelineStoreSnapshot,
-} from "@megane/pipeline/storeSnapshot";
+import { capturePipelineStore, type PipelineStoreSnapshot } from "@megane/pipeline/storeSnapshot";
 import { useTour } from "@megane/tour/useTour";
 import { useThemeStore } from "@megane/stores/useThemeStore";
 import { usePlaybackStore } from "@megane/stores/usePlaybackStore";
 import "@megane/styles/megane.css";
 import { ensureWasmUrl } from "./wasmLoader";
 import { STRUCTURE_FILETYPES_BINARY } from "./filetypes";
-import { SPECTRUM_ONLY_EXTENSIONS, TRAJECTORY_ONLY_EXTENSIONS } from "./trajectoryUtils";
+import {
+  SPECTRUM_ONLY_EXTENSIONS,
+  TRAJECTORY_ONLY_EXTENSIONS,
+  VOLUMETRIC_ONLY_EXTENSIONS,
+} from "./trajectoryUtils";
 import { createSubscription, createFrameSubscription } from "./frameSubscription";
 import type { SelectionState, Measurement } from "@megane/types";
 
-const BINARY_EXTENSIONS = new Set(
-  STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []),
-);
+const BINARY_EXTENSIONS = new Set(STRUCTURE_FILETYPES_BINARY.flatMap((f) => f.extensions ?? []));
 
 /**
  * Subscription channel used by `DocBody` to re-load when the host
@@ -103,8 +102,7 @@ function DocBody({
         // because contentsModel can be null in some restore paths.
         const dot = filename.lastIndexOf(".");
         const ext = dot >= 0 ? filename.slice(dot).toLowerCase() : "";
-        const isBase64 =
-          context.contentsModel?.format === "base64" || BINARY_EXTENSIONS.has(ext);
+        const isBase64 = context.contentsModel?.format === "base64" || BINARY_EXTENSIONS.has(ext);
         const bytes = isBase64
           ? Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
           : new TextEncoder().encode(raw);
@@ -116,6 +114,16 @@ function DocBody({
             `${filename} is a spectrum, which has no atoms or coordinates to render. ` +
               "Add a Load Spectrum node in the pipeline editor and wire it to a " +
               "Spectrum Plot node to view it.",
+          );
+        }
+        if (VOLUMETRIC_ONLY_EXTENSIONS.has(ext)) {
+          // A scalar grid carries a field but no atoms, so there is nothing to
+          // render on its own. Same shape of guard as the trajectory-only
+          // formats: say what to do instead of failing obscurely.
+          throw new Error(
+            `${filename} is a volumetric grid, which has no atoms to render on its own. ` +
+              "Open a structure file (PDB, GRO, etc.) first, then add a Load Volumetric node " +
+              "in the pipeline editor and point it at this file to draw an isosurface.",
           );
         }
         if (TRAJECTORY_ONLY_EXTENSIONS.has(ext)) {
@@ -203,11 +211,7 @@ function DocBody({
 
   if (typeof state === "object") {
     return (
-      <div
-        className="megane-jupyter-status error"
-        data-testid="megane-doc-root"
-        data-state="error"
-      >
+      <div className="megane-jupyter-status error" data-testid="megane-doc-root" data-state="error">
         <div className="label">Error</div>
         <div>{state.error}</div>
       </div>
@@ -216,22 +220,14 @@ function DocBody({
 
   if (state === "loading") {
     return (
-      <div
-        className="megane-jupyter-status"
-        data-testid="megane-doc-root"
-        data-state="loading"
-      >
+      <div className="megane-jupyter-status" data-testid="megane-doc-root" data-state="loading">
         Loading structure...
       </div>
     );
   }
 
   return (
-    <div
-      data-testid="megane-doc-root"
-      data-state="ready"
-      style={{ width: "100%", height: "100%" }}
-    >
+    <div data-testid="megane-doc-root" data-state="ready" style={{ width: "100%", height: "100%" }}>
       <ThemeSync />
       <MeganeViewer
         testContext="jupyterlab-doc"

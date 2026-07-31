@@ -34,8 +34,8 @@ describe("jupyterlab filetypes", () => {
     expect(PIPELINE_FILETYPE.contentType).toBe("file");
   });
 
-  it("ships 17 text structure filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, Molden, CML, XSF, JCAMP-DX, and CASTEP phonon)", () => {
-    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(17);
+  it("ships 20 text filetypes (incl. LAMMPS dump, AMBER prmtop, mmCIF, VASP, CML, Molden, XSF, JCAMP-DX, Chem3D XML, the volumetric grids, and CASTEP phonon)", () => {
+    expect(STRUCTURE_FILETYPES_TEXT).toHaveLength(20);
   });
 
   it("includes the canonical PDB / GRO / XYZ / MOL / SDF / MOL2 / CIF / mmCIF / LAMMPS-data / LAMMPS-dump / AMBER-prmtop / VASP / Molden / JCAMP-DX names", () => {
@@ -55,9 +55,12 @@ describe("jupyterlab filetypes", () => {
         "megane-amber-prmtop",
         "megane-xsf",
         "megane-cml",
+        "megane-cube",
+        "megane-opendx",
         "megane-vasp",
         "megane-molden",
         "megane-jcampdx",
+        "megane-c3xml",
         "megane-phonon",
       ].sort(),
     );
@@ -68,6 +71,12 @@ describe("jupyterlab filetypes", () => {
     expect(xsf).toBeDefined();
     expect(xsf?.extensions).toEqual([".xsf", ".axsf"]);
     expect(xsf?.fileFormat).toBe("text");
+  });
+  it("registers .cml for the Chemical Markup Language filetype", () => {
+    const cml = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-cml");
+    expect(cml).toBeDefined();
+    expect(cml?.extensions).toEqual([".cml"]);
+    expect(cml?.fileFormat).toBe("text");
   });
 
   it("registers .jdx and .jcamp for the JCAMP-DX spectrum filetype", () => {
@@ -80,12 +89,11 @@ describe("jupyterlab filetypes", () => {
     // and only content sniffing can tell the two apart.
     expect(jcamp?.extensions).not.toContain(".dx");
   });
-
-  it("registers .cml for the Chemical Markup Language filetype", () => {
-    const cml = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-cml");
-    expect(cml).toBeDefined();
-    expect(cml?.extensions).toEqual([".cml"]);
-    expect(cml?.fileFormat).toBe("text");
+  it("registers the volumetric grid filetypes", () => {
+    const cube = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-cube");
+    expect(cube?.extensions).toEqual([".cube", ".cub"]);
+    const dx = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-opendx");
+    expect(dx?.extensions).toEqual([".dx"]);
   });
 
   it("registers the VASP filetype with .vasp plus a basename pattern for POSCAR/CONTCAR/XDATCAR", () => {
@@ -117,6 +125,12 @@ describe("jupyterlab filetypes", () => {
     expect(ft?.fileFormat).toBe("text");
   });
 
+  it("registers .c3xml for the Chem3D XML filetype", () => {
+    const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-c3xml");
+    expect(ft).toBeDefined();
+    expect(ft?.extensions).toEqual([".c3xml"]);
+    expect(ft?.fileFormat).toBe("text");
+  });
   it("registers .phonon for the CASTEP phonon filetype", () => {
     const ft = STRUCTURE_FILETYPES_TEXT.find((f) => f.name === "megane-phonon");
     expect(ft).toBeDefined();
@@ -170,7 +184,7 @@ describe("jupyterlab filetypes", () => {
   it("derives the *_NAMES_* arrays from .map(f => f.name)", () => {
     expect(STRUCTURE_FILETYPE_NAMES_TEXT).toEqual(STRUCTURE_FILETYPES_TEXT.map((f) => f.name));
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toEqual(STRUCTURE_FILETYPES_BINARY.map((f) => f.name));
-    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(17);
+    expect(STRUCTURE_FILETYPE_NAMES_TEXT).toHaveLength(20);
     expect(STRUCTURE_FILETYPE_NAMES_BINARY).toHaveLength(4);
   });
 });
