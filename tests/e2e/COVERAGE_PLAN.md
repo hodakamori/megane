@@ -254,7 +254,7 @@ doesn't. Plan:
       `sidebar`, `pipeline-editor`, `pipeline-file`, `render-modal`,
       `appearance`, `measurement`) to use it.
 - [ ] Run each one against all 5 hosts via `for host in ...; do
-  MEGANE_HOST=$host npm run test:e2e:<feature>; done`.
+    MEGANE_HOST=$host npm run test:e2e:<feature>; done`.
 
 This explodes the matrix from ~41 tests to ~150 tests but each new
 combination is a free regression-detection seat.
@@ -302,7 +302,7 @@ These are "hot-path" utilities. Doing them once unblocks many tests.
 - [x] `tests/e2e/lib/host-fixture.ts` — `MEGANE_HOST`-driven fixture.
       **(PR #309)** Reads `test.info().project.metadata.meganeHost`
       first, falls back to the env var; returns `{scope, host,
-  context, teardown}`.
+    context, teardown}`.
 - [x] `tests/e2e/lib/pipeline.ts` — programmatic pipeline editing
       helpers (insertNode, connectEdge, setNodeParam, removeNode,
       listNodes). **(PR #309)** Drives `window.__megane_test_pipeline_store`
