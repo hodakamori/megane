@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 
+- **GIF export in the VS Code extension** produced no file: the progress bar advanced and then nothing happened, while PNG and MP4 saved normally. GIF is the only export that spawns a Web Worker (gif.js encodes there), and the webview bundle is built with Vite's default `base: "/"`, so the emitted worker URL was `/gif.worker.js` — the origin root, not the `media/` directory the file actually ships in. gif.js never listens for its worker's `onerror`, so the encode produced no Blob and the extension-host save bridge was never reached. The worker source is now inlined into every host bundle and wrapped in a `blob:` URL at runtime, so it no longer depends on a host's asset base path — the same failure that hit JupyterLab as #497 and VS Code as #599.
 - `serializePipeline` now strips the ephemeral `volumetricData` from Load Volumetric params, which its own type had always documented as "not serialized".
 
 ## [0.10.0] - 2026-07-12

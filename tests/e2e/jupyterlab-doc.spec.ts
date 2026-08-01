@@ -24,6 +24,7 @@ import {
   openLabFile,
   type JupyterLabHandle,
 } from "./lib/hosts/jupyterlab";
+import { expectGifFile, openRenderModal, useSmallGifExport } from "./lib/render-modal";
 
 const PLATFORM = "jupyterlab-doc";
 
@@ -165,4 +166,42 @@ test("DocWidget recovers when switching between two open files", async ({ page }
   });
   expect(visibleAtoms, "second-opened file should drive the visible viewer").toBeGreaterThan(0);
   expect(visibleAtoms).not.toBe(327);
+});
+
+/**
+ * Regression test for issue #497 — the JupyterLab half of the GIF-export bug
+ * whose VSCode twin is #599 (see tests/e2e/vscode.spec.ts).
+ *
+ * gif.js encodes in a Web Worker, and the labextension serves its assets from
+ * a different base path than the document, so resolving that worker as a URL
+ * used to 404 and feed gif.js an HTML error page. gif.js never listens for its
+ * worker's onerror, so the encode froze at 80% and produced no download at all.
+ * The unit tests pin the worker-source contract; only a real browser proves the
+ * bundled labextension can actually finish an encode.
+ */
+test("GIF export completes in the DocWidget (issue #497)", async ({ page }) => {
+  await openLabFile(page, { port: PORT, token: TOKEN, file: "water_multiframe.xyz" });
+
+  const viewer = page.locator('[data-testid="megane-viewer"]').last();
+  await expect(viewer).toHaveAttribute("data-megane-context", "jupyterlab-doc");
+  expect(Number(await viewer.getAttribute("data-total-frames"))).toBeGreaterThan(1);
+
+  // Export failures surface as an alert(); report its text rather than waiting
+  // out the download timeout.
+  let exportError: string | null = null;
+  page.on("dialog", (dialog) => {
+    exportError = dialog.message();
+    void dialog.dismiss();
+  });
+
+  await openRenderModal(page);
+  await useSmallGifExport(page);
+
+  const download = page.waitForEvent("download", { timeout: 120_000 });
+  await page.locator('[data-testid="render-modal-export"]').click();
+
+  const file = await download;
+  expect(exportError, `export alert: ${exportError}`).toBeNull();
+  expect(file.suggestedFilename()).toBe("megane-render.gif");
+  expectGifFile(await file.path());
 });

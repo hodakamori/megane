@@ -89,14 +89,18 @@ function TabButton({
   label,
   active,
   onClick,
+  testid,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  testid?: string;
 }) {
   return (
     <button
       onClick={active ? undefined : onClick}
+      data-testid={testid}
+      data-active={active}
       style={{
         flex: 1,
         background: active ? "rgba(59,130,246,0.08)" : "none",
@@ -306,11 +310,13 @@ export function RenderModal({
         <div style={tabContainerStyle}>
           <TabButton
             label="Snapshot"
+            testid="render-modal-tab-snapshot"
             active={mode === "snapshot"}
             onClick={() => setMode("snapshot")}
           />
           <TabButton
             label="Animation"
+            testid="render-modal-tab-animation"
             active={mode === "animation"}
             onClick={() => {
               if (hasAnimation) setMode("animation");
@@ -330,26 +336,31 @@ export function RenderModal({
             <>
               <TabButton
                 label="PNG"
+                testid="render-modal-format-png"
                 active={snapshotFormat === "png"}
                 onClick={() => setSnapshotFormat("png")}
               />
               <TabButton
                 label="EPS"
+                testid="render-modal-format-eps"
                 active={snapshotFormat === "eps"}
                 onClick={() => setSnapshotFormat("eps")}
               />
               <TabButton
                 label="SVG"
+                testid="render-modal-format-svg"
                 active={snapshotFormat === "svg"}
                 onClick={() => setSnapshotFormat("svg")}
               />
               <TabButton
                 label="glTF"
+                testid="render-modal-format-gltf"
                 active={snapshotFormat === "gltf"}
                 onClick={() => setSnapshotFormat("gltf")}
               />
               <TabButton
                 label="OBJ"
+                testid="render-modal-format-obj"
                 active={snapshotFormat === "obj"}
                 onClick={() => setSnapshotFormat("obj")}
               />
@@ -358,11 +369,13 @@ export function RenderModal({
             <>
               <TabButton
                 label="GIF"
+                testid="render-modal-format-gif"
                 active={animationFormat === "gif"}
                 onClick={() => setAnimationFormat("gif")}
               />
               <TabButton
                 label="MP4"
+                testid="render-modal-format-mp4"
                 active={animationFormat === "mp4"}
                 onClick={() => setAnimationFormat("mp4")}
               />
@@ -383,6 +396,7 @@ export function RenderModal({
                 min={1}
                 max={7680}
                 disabled={exporting}
+                data-testid="render-modal-width"
               />
               <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600 }}>×</span>
               <input
@@ -393,6 +407,7 @@ export function RenderModal({
                 min={1}
                 max={4320}
                 disabled={exporting}
+                data-testid="render-modal-height"
               />
             </div>
 
@@ -485,6 +500,7 @@ export function RenderModal({
                 min={0}
                 max={endFrame}
                 disabled={exporting}
+                data-testid="render-modal-start-frame"
               />
               <span style={{ color: "#94a3b8", fontSize: 12, fontWeight: 600 }}>–</span>
               <input
@@ -499,6 +515,7 @@ export function RenderModal({
                 min={startFrame}
                 max={totalFrames - 1}
                 disabled={exporting}
+                data-testid="render-modal-end-frame"
               />
             </div>
             <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>

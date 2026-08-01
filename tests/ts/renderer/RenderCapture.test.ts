@@ -349,17 +349,38 @@ describe("captureObj", () => {
   });
 });
 
-// Regression coverage for issue #497: GIF export freezes at 80% in JupyterLab
-// because gif.js cannot load its Web Worker from the raw workerScript URL and
-// hangs silently during encode. The fix fetches the worker source and hands
-// gif.js a same-origin blob: URL instead.
-describe("resolveGifWorkerScript (issue #497)", () => {
+// Regression coverage for issues #497 (JupyterLab) and #599 (VSCode): GIF
+// export freezes at 80% and never produces a file because gif.js cannot load
+// its Web Worker and hangs silently during encode instead of erroring. Both
+// hosts failed on the *URL* — a labextension base path in #497, Vite's default
+// `base: "/"` emitting `/gif.worker.js` for the VSCode webview in #599 — so the
+// worker source is inlined at build time and only ever handed to gif.js as a
+// blob: URL built in-process.
+describe("resolveGifWorkerScript (issues #497, #599)", () => {
   let createObjectURL: ReturnType<typeof vi.fn>;
+  let blobs: BlobPart[][];
 
   beforeEach(() => {
-    createObjectURL = vi.fn().mockReturnValue("blob:gif-worker-url");
+    blobs = [];
+    createObjectURL = vi.fn((blob: Blob) => {
+      void blob;
+      return "blob:gif-worker-url";
+    });
     Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
     Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+
+    // Capture what gets wrapped: asserting on the Blob's contents is the only
+    // way to prove the real worker source (not an HTML error page) is used.
+    const RealBlob = globalThis.Blob;
+    vi.stubGlobal(
+      "Blob",
+      class extends RealBlob {
+        constructor(parts: BlobPart[] = [], options?: BlobPropertyBag) {
+          super(parts, options);
+          blobs.push(parts);
+        }
+      },
+    );
   });
 
   afterEach(() => {
@@ -367,42 +388,43 @@ describe("resolveGifWorkerScript (issue #497)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("fetches the worker script and returns a same-origin blob: URL", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: () => Promise.resolve("self.onmessage = () => {};"),
-    });
+  it("returns a blob: URL built from the bundled worker source", () => {
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const script = await resolveGifWorkerScript();
+    const script = resolveGifWorkerScript();
 
-    // The bug: the old code passed the raw worker URL straight to gif.js without
-    // ever fetching it. A correct implementation must fetch and wrap it.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toContain("gif.worker.js");
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(script).toBe("blob:gif-worker-url");
-    expect(script.startsWith("blob:")).toBe(true);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    // The bug in both #497 and #599 was a worker URL resolved against a host
+    // base path. Nothing may be fetched over the network: a URL that has to be
+    // retrieved is a URL that a host can serve a 404 page for.
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to the direct URL when the fetch fails", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve("") });
-    vi.stubGlobal("fetch", fetchMock);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("wraps the real gif.js worker source, not a placeholder", () => {
+    resolveGifWorkerScript();
 
-    const script = await resolveGifWorkerScript();
+    const source = String(blobs.at(-1)?.[0] ?? "");
+    expect(source).toContain("gif.worker.js");
+    expect(source).toContain("onmessage");
+    // Bundled as source text, so it must be substantially larger than any
+    // stub — the real worker is ~16 KB.
+    expect(source.length).toBeGreaterThan(5000);
+  });
 
+  it("throws instead of hanging when the bundled source is unusable", () => {
+    // A bundler that resolved `?raw` to an empty string or an HTML error page
+    // would otherwise reproduce the original silent freeze at 80%.
+    expect(() => resolveGifWorkerScript("")).toThrow(/gif\.js worker source/);
+    expect(() => resolveGifWorkerScript("<!DOCTYPE html><html></html>")).toThrow(
+      /gif\.js worker source/,
+    );
     expect(createObjectURL).not.toHaveBeenCalled();
-    expect(script.startsWith("blob:")).toBe(false);
-    expect(script).toContain("gif.worker.js");
-    expect(warn).toHaveBeenCalled();
   });
 });
 
-describe("captureGif (issue #497)", () => {
+describe("captureGif (issues #497, #599)", () => {
   let createObjectURL: ReturnType<typeof vi.fn>;
   let revokeObjectURL: ReturnType<typeof vi.fn>;
 
@@ -426,12 +448,12 @@ describe("captureGif (issue #497)", () => {
     Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
     Object.defineProperty(URL, "revokeObjectURL", { value: revokeObjectURL, configurable: true });
 
+    // No fetch stub: the worker source is inlined at build time, so an encode
+    // that reaches the network at all is the #497 / #599 bug coming back.
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve("self.onmessage = () => {};"),
+      vi.fn(() => {
+        throw new Error("captureGif must not fetch the gif.js worker");
       }),
     );
   });

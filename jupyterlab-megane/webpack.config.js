@@ -51,6 +51,14 @@ module.exports = {
         generator: {
           filename: "[name].[hash][ext]"
         }
+      },
+      // Vite's `?raw` suffix (src/renderer/RenderCapture.ts inlines the gif.js
+      // worker with it) means "import this file as a string". `asset/source` is
+      // webpack's equivalent; without this rule the labextension build fails to
+      // resolve a file literally named `gif.worker.js?raw`.
+      {
+        resourceQuery: /raw/,
+        type: "asset/source"
       }
     ]
   }

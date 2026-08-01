@@ -5,6 +5,9 @@
 import type { MoleculeRenderer } from "./MoleculeRenderer";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
+// The gif.js worker is inlined as source text rather than resolved as a URL at
+// runtime — see resolveGifWorkerScript below for why.
+import gifWorkerSource from "gif.js/dist/gif.worker.js?raw";
 
 /** Composite WebGL canvas and label overlay onto an offscreen canvas. */
 export function compositeCanvases(
@@ -186,38 +189,40 @@ export async function captureSnapshot(
 }
 
 /**
- * Resolve the gif.js worker script into a same-origin `blob:` URL.
+ * Build the gif.js worker script as a same-origin `blob:` URL.
  *
- * gif.js spawns Web Workers from its `workerScript` URL during `render()`.
- * When that URL resolves to a cross-origin or otherwise unfetchable path — as
- * happens inside the JupyterLab labextension, where assets are served from a
- * different base path than the document — the worker either fails to construct
- * or loads a 404 HTML page and throws while parsing. gif.js does not listen for
- * the worker's `onerror`, so the encode hangs silently forever: the GIF progress
- * bar freezes at the frame-capture / encode boundary (80%). MP4 export is
- * unaffected because MediaRecorder needs no worker.
+ * gif.js spawns Web Workers from its `workerScript` URL during `render()` and
+ * never listens for the worker's `onerror`, so *any* failure to load that
+ * script hangs the encode forever: the GIF progress bar freezes at the
+ * frame-capture / encode boundary (80%), no Blob is produced, and the download
+ * (or the host save dialog) is never reached. MP4 export is unaffected because
+ * MediaRecorder needs no worker.
  *
- * Fetching the script ourselves and handing gif.js a same-origin `blob:` URL
- * sidesteps the cross-origin restriction. If the fetch fails we fall back to the
- * raw URL so hosts where the direct path already worked do not regress. See
- * issue #497.
+ * Resolving the worker as a *URL* is host-dependent and has broken twice:
+ *
+ *  - #497 (JupyterLab): the labextension serves its assets from a different
+ *    base path than the document, so the URL 404'd and gif.js parsed an HTML
+ *    error page as JavaScript.
+ *  - #599 (VSCode): the webview bundle is built with Vite's default
+ *    `base: "/"`, so the emitted URL was `/gif.worker.js` — the origin root
+ *    rather than the extension's `media/` directory the file actually ships in.
+ *
+ * Both were the same bug wearing a different host, so the worker source is now
+ * inlined into the bundle at build time and wrapped in a Blob here. There is no
+ * fetch to fail, no base path to get wrong, and nothing for a host CSP to
+ * reject beyond `worker-src blob:`, which every megane host already allows.
  */
-export async function resolveGifWorkerScript(): Promise<string> {
-  const workerUrl = new URL("gif.js/dist/gif.worker.js", import.meta.url).href;
-  try {
-    const response = await fetch(workerUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const source = await response.text();
-    const blob = new Blob([source], { type: "application/javascript" });
-    return URL.createObjectURL(blob);
-  } catch (err) {
-    console.warn(
-      `megane: could not fetch GIF worker script (${String(err)}); falling back to direct URL`,
+export function resolveGifWorkerScript(source: string = gifWorkerSource): string {
+  // A bundler that silently resolves the `?raw` import to something other than
+  // the worker source would reintroduce the silent hang, so fail loudly here
+  // instead of handing gif.js a script that can never post a frame back.
+  if (!source || !source.includes("onmessage")) {
+    throw new Error(
+      "megane: the bundled gif.js worker source is missing or invalid; GIF export cannot start",
     );
-    return workerUrl;
   }
+  const blob = new Blob([source], { type: "application/javascript" });
+  return URL.createObjectURL(blob);
 }
 
 /** Capture animation frames as GIF using gif.js. */
@@ -254,7 +259,7 @@ export async function captureGif(
 
   // Dynamically import gif.js
   const GIF = (await import("gif.js")).default;
-  const workerScript = await resolveGifWorkerScript();
+  const workerScript = resolveGifWorkerScript();
   const gif = new GIF({
     workers: 2,
     quality: 10,
@@ -289,11 +294,7 @@ export async function captureGif(
 
   // Render GIF
   return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      if (workerScript.startsWith("blob:")) {
-        URL.revokeObjectURL(workerScript);
-      }
-    };
+    const cleanup = () => URL.revokeObjectURL(workerScript);
     gif.on("finished", (blob: Blob) => {
       cleanup();
       onProgress?.(1);
