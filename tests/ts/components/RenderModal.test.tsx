@@ -268,3 +268,64 @@ describe("RenderModal", () => {
     expect(screen.getByText("Resolution")).toBeTruthy();
   });
 });
+
+// The GIF export E2E (tests/e2e/lib/render-modal.ts, guarding issues #497 and
+// #599) drives the modal entirely through these testids. Renaming one would
+// otherwise surface as a Playwright timeout in the VSCode project — which needs
+// code-server and only runs locally — so pin the contract here instead.
+describe("RenderModal: animation export testids", () => {
+  function renderTrajectoryModal() {
+    return render(
+      <RenderModal
+        open
+        onClose={() => {}}
+        rendererRef={makeRendererRef()}
+        totalFrames={5}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+  }
+
+  it("marks the active tab and format so E2E can await the switch", () => {
+    renderTrajectoryModal();
+
+    const snapshotTab = screen.getByTestId("render-modal-tab-snapshot");
+    const animationTab = screen.getByTestId("render-modal-tab-animation");
+    expect(snapshotTab.getAttribute("data-active")).toBe("true");
+    expect(animationTab.getAttribute("data-active")).toBe("false");
+
+    fireEvent.click(animationTab);
+
+    expect(screen.getByTestId("render-modal-tab-animation").getAttribute("data-active")).toBe(
+      "true",
+    );
+    // GIF is the default animation format, and the E2E relies on that default.
+    expect(screen.getByTestId("render-modal-format-gif").getAttribute("data-active")).toBe("true");
+    expect(screen.getByTestId("render-modal-format-mp4").getAttribute("data-active")).toBe("false");
+  });
+
+  it("exposes the resolution and frame-range inputs the GIF export drives", () => {
+    renderTrajectoryModal();
+    fireEvent.click(screen.getByTestId("render-modal-tab-animation"));
+
+    const width = screen.getByTestId("render-modal-width") as HTMLInputElement;
+    fireEvent.change(width, { target: { value: "160" } });
+    expect((screen.getByTestId("render-modal-width") as HTMLInputElement).value).toBe("160");
+    // Aspect stays locked by default, so height follows the 800×600 canvas.
+    expect((screen.getByTestId("render-modal-height") as HTMLInputElement).value).toBe("120");
+
+    const endFrame = screen.getByTestId("render-modal-end-frame") as HTMLInputElement;
+    expect(endFrame.value).toBe("4");
+    fireEvent.change(endFrame, { target: { value: "1" } });
+    expect((screen.getByTestId("render-modal-end-frame") as HTMLInputElement).value).toBe("1");
+    expect((screen.getByTestId("render-modal-start-frame") as HTMLInputElement).value).toBe("0");
+  });
+
+  it("keeps the snapshot format testids addressable", () => {
+    renderTrajectoryModal();
+    for (const fmt of ["png", "eps", "svg", "gltf", "obj"]) {
+      expect(screen.getByTestId(`render-modal-format-${fmt}`)).toBeTruthy();
+    }
+  });
+});

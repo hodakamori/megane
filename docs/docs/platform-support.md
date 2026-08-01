@@ -325,12 +325,15 @@ Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/meg
 | `selection_change` / `measurement` events | ✓ (React props) | ✓ | ✓² | ✓² | ✓ (React props) | n/a |
 | Programmatic frame seek (`frame_index = N`) | ✓ | ✓ | ✓³ | ✓⁴ | ✓ | n/a |
 | Export downloads (render output, pipeline JSON, measurement CSV/JSON) | ✓ | ✓⁵ | ✓ | ✓ (save dialog) | ✓ | n/a |
+| Animation export (GIF)⁶ | ✓ | ✓⁵ | ✓ | ✓ (save dialog) | ✓ | n/a |
 
 ³ JupyterLab: call `meganeReactView.seekFrame(N)` on a `MeganeReactView` instance obtained from the widget tracker. This delegates to `usePlaybackStore.seekFrame(N)` in the viewer.
 
 ⁴ VS Code: call `vscode.commands.executeCommand('megane.seekFrame', N)` from another extension, or call `meganeEditorProvider.seekFrame(N)` on an `MeganeEditorProvider` reference. The command posts a `seekFrame` message to the most recently active megane webview panel.
 
 ⁵ Jupyter widget: export downloads work when the notebook runs in a browser (JupyterLab, Jupyter Notebook). Inside a VS Code notebook the widget renders in a sandboxed webview with no path to the extension host, so downloads are unavailable — see Known gaps.
+
+⁶ GIF is the only export that runs in a Web Worker (gif.js encodes there; MP4 uses MediaRecorder on the main thread). The encoder source is inlined into each host bundle and loaded from a `blob:` URL, so it does not depend on the host's asset base path — resolving it as a URL broke JupyterLab (#497) and VS Code (#599), in both cases hanging the encode instead of erroring. Keep it worker-source-inlined when touching `resolveGifWorkerScript`.
 
 Notes:
 

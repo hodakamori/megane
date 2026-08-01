@@ -9,6 +9,7 @@
 
 import { test, expect } from "playwright/test";
 import { defaultViewerContract, assertDomContract, waitForReady } from "./lib/setup";
+import { expectGifFile, useSmallGifExport } from "./lib/render-modal";
 
 const PLATFORM = "render-modal";
 
@@ -40,10 +41,39 @@ test.describe("render-modal: webapp", () => {
     void PLATFORM;
   });
 
+  // Regression coverage for issues #497 / #599: gif.js loads its encoder as a
+  // Web Worker, and when that worker script cannot be loaded it hangs at 80%
+  // instead of erroring — no Blob, no download, no save dialog. Only a real
+  // browser exercising the built bundle can catch it, so assert an actual GIF
+  // lands on disk rather than mocking the encoder.
+  test("exports a GIF (gif.js worker must load)", async ({ page }) => {
+    await page.locator('[data-testid="pipeline-editor-render"]').click();
+    await expect(page.locator('[data-testid="render-modal"]')).toBeVisible();
+
+    // Export failures surface as an alert(); fail with its text instead of
+    // waiting out the download timeout.
+    let exportError: string | null = null;
+    page.on("dialog", (dialog) => {
+      exportError = dialog.message();
+      void dialog.dismiss();
+    });
+
+    await useSmallGifExport(page);
+
+    const download = page.waitForEvent("download", { timeout: 120_000 });
+    await page.locator('[data-testid="render-modal-export"]').click();
+
+    const file = await download;
+    expect(exportError, `export alert: ${exportError}`).toBeNull();
+    expect(file.suggestedFilename()).toBe("megane-render.gif");
+
+    expectGifFile(await file.path());
+  });
+
   test("animation export gated on MEGANE_E2E_FFMPEG", async () => {
     test.skip(
       process.env.MEGANE_E2E_FFMPEG !== "1",
-      "GIF/MP4 export requires MEGANE_E2E_FFMPEG=1 + ffmpeg on PATH",
+      "MP4 export requires MEGANE_E2E_FFMPEG=1 + ffmpeg on PATH",
     );
     // Implementation lands when ffmpeg is gated in.
   });

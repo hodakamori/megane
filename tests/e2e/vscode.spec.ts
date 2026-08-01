@@ -15,7 +15,7 @@
  * `window.__MEGANE_TEST__ = true` before the bundle loads.
  */
 
-import { copyFileSync, existsSync, mkdirSync, rmSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { test, expect } from "playwright/test";
@@ -25,6 +25,7 @@ import {
   expectFullPageMatch,
   expectViewerRegionMatch,
 } from "./lib/setup";
+import { expectGifFile, openRenderModal, useSmallGifExport } from "./lib/render-modal";
 import {
   startCodeServer,
   stopCodeServer,
@@ -121,17 +122,7 @@ test("render export is saved through the extension-host saveFile bridge", async 
     ...defaultViewerContract({ expectedAtoms: 327, context: "vscode" }),
   ]);
 
-  // The pipeline panel (which hosts the Render button) starts collapsed when
-  // the webview iframe is narrow (< 768px), which it is under code-server.
-  // Expand it first so the Render button is visible.
-  const panel = wv.locator('[data-testid="panel-pipeline"]');
-  if ((await panel.getAttribute("data-collapsed")) === "true") {
-    await wv.locator('[data-testid="panel-pipeline-toggle"]').click();
-    await expect(panel).toHaveAttribute("data-collapsed", "false");
-  }
-
-  await wv.locator('[data-testid="pipeline-editor-render"]').click();
-  await expect(wv.locator('[data-testid="render-modal"]')).toBeVisible();
+  await openRenderModal(wv);
   await wv.locator('[data-testid="render-modal-export"]').click();
 
   await expect
@@ -140,4 +131,47 @@ test("render export is saved through the extension-host saveFile bridge", async 
       timeout: 60_000,
     })
     .toBe(true);
+});
+
+/**
+ * Regression test for issue #599: "Cannot find rendered GIF file".
+ *
+ * PNG/MP4 export worked in the VSCode webview while GIF silently hung at 80%,
+ * because GIF is the only export that spawns a Web Worker: gif.js loaded its
+ * worker from a URL the webview could not serve, and it never listens for the
+ * worker's onerror, so no Blob was produced and the saveFile bridge (and with
+ * it the save dialog) was never reached.
+ *
+ * This asserts the file actually lands on disk. It only holds inside a real
+ * webview — the host CSP, the `vscode-webview` origin, and the built bundle's
+ * asset URLs are all part of the bug — so it cannot be moved to a unit test or
+ * to the webapp project, which serves from the origin root and never failed.
+ */
+test("GIF export reaches the saveFile bridge (issue #599)", async ({ page }) => {
+  const exported = join(WORKSPACE, "megane-render.gif");
+  rmSync(exported, { force: true });
+
+  // A trajectory is required — the Animation tab is disabled for single-frame
+  // structures.
+  const wv = await openVscodeFile(page, { port: PORT, file: "water_multiframe.xyz" });
+  await assertDomContract(wv, [...defaultViewerContract({ context: "vscode" })]);
+
+  const viewer = wv.locator('[data-testid="megane-viewer"]');
+  expect(Number(await viewer.getAttribute("data-total-frames"))).toBeGreaterThan(1);
+
+  await openRenderModal(wv);
+  await useSmallGifExport(wv);
+
+  await wv.locator('[data-testid="render-modal-export"]').click();
+
+  await expect
+    .poll(() => (existsSync(exported) ? statSync(exported).size : 0), {
+      message:
+        "expected the extension host to write megane-render.gif into the workspace — " +
+        "an empty poll means gif.js never finished encoding (the #599 hang)",
+      timeout: 180_000,
+    })
+    .toBeGreaterThan(100);
+
+  expectGifFile(exported);
 });
