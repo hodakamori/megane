@@ -199,6 +199,7 @@ interface WasmModule {
   parse_molden: ParseFn;
   parse_xsf: ParseFn;
   parse_c3xml: ParseFn;
+  parse_odydata: ParseFn;
   parse_cml: ParseFn;
   parse_magres: ParseFn;
   parse_gamess: ParseFn;
@@ -258,6 +259,7 @@ export async function ensureInit(wasmUrl?: string): Promise<void> {
         parse_molden: wasm.parse_molden,
         parse_xsf: wasm.parse_xsf,
         parse_c3xml: wasm.parse_c3xml,
+        parse_odydata: wasm.parse_odydata,
         parse_cml: wasm.parse_cml,
         parse_magres: wasm.parse_magres,
         parse_gamess: wasm.parse_gamess,
@@ -330,6 +332,12 @@ function getParserForExtension(ext: string): ParseFn {
     // distance inference is needed for genuine 3D input.
     case ".c3xml":
       return wasmModule!.parse_c3xml;
+    // Wavefunction Odyssey. `.xodydata` is XML and `.odydata` is the older
+    // Spartan-style text layout, but either layout can turn up under either
+    // name, so one parser sniffs the content and handles both.
+    case ".xodydata":
+    case ".odydata":
+      return wasmModule!.parse_odydata;
     // Chemical Markup Language (Open Babel / Avogadro / ChemDraw).
     case ".cml":
       return wasmModule!.parse_cml;

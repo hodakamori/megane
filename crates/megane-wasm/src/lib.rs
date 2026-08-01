@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use megane_core::{
     amber, bonds, c3xml, cif, cml, dcd, gamess, gro, jcampdx, lammps_data, lammpstrj, magres,
-    mmcif, mol, mol2, molden, netcdf, parser, phonon, psf, top, traj, vasp, xsf, xtc, xyz,
+    mmcif, mol, mol2, molden, netcdf, odydata, parser, phonon, psf, top, traj, vasp, xsf, xtc, xyz,
 };
 
 /// Serialize a slice of `VectorChannel`s into two parallel outputs:
@@ -1055,6 +1055,12 @@ pub fn parse_molden(text: &str) -> Result<ParseResult, JsError> {
 #[wasm_bindgen]
 pub fn parse_c3xml(text: &str) -> Result<ParseResult, JsError> {
     let data = c3xml::parse(text).map_err(|e| JsError::new(&e))?;
+    Ok(ParseResult::from_parsed(data))
+}
+/// Parse a Wavefunction Odyssey (`.xodydata` / `.odydata`) file and return structured data. The XML and text flavours are detected from the content.
+#[wasm_bindgen]
+pub fn parse_odydata(text: &str) -> Result<ParseResult, JsError> {
+    let data = odydata::parse(text).map_err(|e| JsError::new(&e))?;
     Ok(ParseResult::from_parsed(data))
 }
 /// Parse a CASTEP / Quantum ESPRESSO NMR `.magres` file and return structured data from its `[atoms]` block.

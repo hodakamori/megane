@@ -246,6 +246,9 @@ describe("usePipelineStore.openFile — AddBond default by file format", () => {
     ["ethanol.cml", "structure"],
     // Chem3D XML carries explicit <b> bond elements too.
     ["molecule.c3xml", "structure"],
+    // Odyssey carries <bond> elements (XML) / a HESSIAN block (text).
+    ["sample.xodydata", "structure"],
+    ["sample.odydata", "structure"],
   ];
   const formatsWithoutBonds: Array<[string, string]> = [
     ["water.gro", "distance"],

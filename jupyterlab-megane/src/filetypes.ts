@@ -175,6 +175,16 @@ export const STRUCTURE_FILETYPES_TEXT: DocumentRegistry.IFileType[] = [
     contentType: "file",
   },
   {
+    // Both Odyssey layouts are text, so one entry covers the XML `.xodydata`
+    // and the older `.odydata`; the parser tells them apart by content.
+    name: "megane-odydata",
+    displayName: "Odyssey data",
+    extensions: [".xodydata", ".odydata"],
+    mimeTypes: ["chemical/x-odydata"],
+    fileFormat: "text",
+    contentType: "file",
+  },
+  {
     name: "megane-magres",
     displayName: "CASTEP magres",
     extensions: [".magres"],
