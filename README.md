@@ -49,14 +49,14 @@ One codebase, every environment.
 | Distribution | How | Install |
 |---|---|---|
 | **Jupyter widget** | anywidget inline viewer | `pip install megane` |
-| **JupyterLab extension** | Open .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .dcd, .nc, .lammpstrj/.dump, .megane.json from the file browser | `pip install megane` |
+| **JupyterLab extension** | Open any supported structure, trajectory, volumetric, or spectrum file — plus `.megane.json` pipelines — straight from the file browser | `pip install megane` |
 | **Standalone web app** | `megane serve` in the browser | `pip install megane` |
 | **React component (npm)** | `<MeganeViewer />` component | `npm install megane-viewer` |
-| **VS Code extension** | Custom editor for .pdb, .gro, .xyz, .mol, .sdf, .mol2, .cif, .mmcif, .data/.lammps, .prmtop, .traj, .xtc, .lammpstrj, .dump, .dcd, .nc, .megane.json | Extension |
+| **VS Code extension** | Custom editor for the same file types, registered by extension and by VASP basename (`POSCAR`/`CONTCAR`/`XDATCAR`) | Extension |
 
 For a per-platform breakdown of supported formats and UI features (including known gaps), see [Platform Support](https://hodakamori.github.io/megane/platform-support).
 
-The secret: parsers for 25 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CML, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF, JCAMP-DX, Chem3D XML, Odyssey, CASTEP magres, GAMESS output, CASTEP phonon) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere.
+The secret: parsers for 26 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CML, LAMMPS data, AMBER topology, GROMACS topology, CHARMM/NAMD PSF, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF, JCAMP-DX, Chem3D XML, Odyssey, CASTEP magres, GAMESS output, CASTEP phonon) are written in **Rust** and compiled to both **PyO3** (Python) and **WASM** (browser). Parse once, run anywhere. The volumetric readers (Gaussian CUBE, OpenDX) are TypeScript-side.
 
 ### Visual Pipelines
 
