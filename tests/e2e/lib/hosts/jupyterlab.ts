@@ -33,9 +33,32 @@ export interface StartJupyterLabOpts {
   timeoutMs?: number;
 }
 
+/**
+ * Writes user settings that keep Lab's own chrome out of the pixel baselines.
+ *
+ * `fetchNews` defaults to "none", which makes Lab pop a "Would you like to get
+ * notified about official Jupyter news?" toast over the bottom-right of the
+ * page. It lands whenever it wins the race with the first capture, so it shows
+ * up as an intermittent full-page/viewer-region diff rather than an honest
+ * failure. "false" declines the news feed without asking.
+ *
+ * Returns the directory to hand to JUPYTERLAB_SETTINGS_DIR.
+ */
+function writeQuietLabSettings(port: number): string {
+  const dir = `/tmp/megane-jupyter-settings-${port}`;
+  const pluginDir = join(dir, "@jupyterlab", "apputils-extension");
+  mkdirSync(pluginDir, { recursive: true });
+  writeFileSync(
+    join(pluginDir, "notification.jupyterlab-settings"),
+    JSON.stringify({ fetchNews: "false", checkForUpdates: false, doNotDisturbMode: true }, null, 2),
+  );
+  return dir;
+}
+
 export function startJupyterLab(opts: StartJupyterLabOpts): Promise<JupyterLabHandle> {
   return new Promise((resolve, reject) => {
     mkdirSync(opts.notebookDir, { recursive: true });
+    const settingsDir = writeQuietLabSettings(opts.port);
     const proc = spawn(
       "jupyter",
       [
@@ -53,6 +76,7 @@ export function startJupyterLab(opts: StartJupyterLabOpts): Promise<JupyterLabHa
         env: {
           ...process.env,
           JUPYTER_RUNTIME_DIR: opts.runtimeDir ?? `/tmp/megane-jupyter-runtime-${opts.port}`,
+          JUPYTERLAB_SETTINGS_DIR: settingsDir,
         },
         stdio: ["ignore", "pipe", "pipe"],
       },
