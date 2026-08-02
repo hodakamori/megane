@@ -46,10 +46,13 @@ const STRUCTURE_CASES: StructureCase[] = [
   { name: "sdf-ethanol", file: "ethanol.sdf", mime: "chemical/x-mdl-sdfile" },
   { name: "cif-nacl", file: "nacl.cif", mime: "chemical/x-cif" },
   {
+    // 10 atoms in the asymmetric unit x 4 general positions of P 1 21/n 1.
+    // CIF symmetry expansion became automatic on load in 0.8.0, so the whole
+    // unit cell is what reaches the renderer.
     name: "cif-glycine-csd",
     file: "glycine_csd.cif",
     mime: "chemical/x-cif",
-    expectedAtoms: 10,
+    expectedAtoms: 40,
   },
   { name: "lammps-water", file: "water.lammps", mime: "text/plain" },
   // Offset simulation box (xlo/ylo/zlo far from 0): the cell must render
