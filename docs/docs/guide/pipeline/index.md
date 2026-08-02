@@ -70,7 +70,7 @@ Jump straight to a node, e.g. [`polyhedron_generator`](/reference/node-reference
 
 ## Data Types
 
-Seven typed data channels flow through color-coded edges:
+Nine typed data channels flow through color-coded edges:
 
 | Type | Color | Description |
 |------|-------|-------------|
@@ -80,7 +80,9 @@ Seven typed data channels flow through color-coded edges:
 | **label** | Violet | Text labels positioned at atoms |
 | **mesh** | Gray | Triangle mesh for polyhedra rendering |
 | **trajectory** | Pink | Multi-frame coordinate data |
-| **vector** | Teal | Per-atom 3D vector data (forces, velocities, etc.) |
+| **vector** | Red | Per-atom 3D vector data (forces, velocities, etc.) |
+| **volumetric** | Cyan | Scalar field on a 3D grid, consumed by the Isosurface node |
+| **spectrum** | Lime | 2D (x, y) trace, consumed by the terminal Spectrum Plot node |
 
 ## Filter DSL
 

@@ -18,11 +18,15 @@ Double-click any supported file in the JupyterLab file browser and megane opens 
 
 | File type | Extensions |
 |-----------|-----------|
-| Structures | `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop`, `.traj` |
-| Trajectories | `.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc` |
+| Structures | `.pdb`, `.gro`, `.xyz`, `.jxyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop`, `.traj`, `.lammpstrj`, `.dump`, `.trj`, `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp`, `.molden`, `.xsf`, `.axsf`, `.cml`, `.c3xml`, `.xodydata`, `.odydata`, `.magres`, `.gamess`, `.phonon` |
+| Trajectories | `.xtc`, `.dcd`, `.nc` |
+| Volumetric grids | `.cube`, `.cub`, `.dx` |
+| Spectra | `.jdx`, `.jcamp`, `.dx` |
 | Pipelines | `.megane.json` |
 
-Trajectory-only formats (`.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc`) need a topology loaded first — open the structure file, then wire the trajectory in through the pipeline editor. Opening one directly surfaces an actionable error.
+The VASP names are matched as filenames rather than extensions, so `POSCAR`, `POSCAR.orig` and friends all open.
+
+Trajectory-only formats (`.xtc`, `.dcd`, `.nc`) and volumetric grids (`.cube`, `.cub`, `.dx`) need a structure loaded first — open the structure file, then wire the trajectory or grid in through the pipeline editor. Opening one directly surfaces an actionable error. LAMMPS dumps are *not* in that group: they carry their own topology in frame 0, so `.lammpstrj` / `.dump` / `.trj` open standalone as multi-frame structures (and can still be attached to a separate topology through the Load Trajectory node).
 
 ## Visual pipeline editor
 

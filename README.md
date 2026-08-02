@@ -32,8 +32,8 @@
 ## Features
 
 - **1M+ Atoms at 60fps** — Billboard impostor rendering scales from small molecules to massive complexes in real time. InstancedMesh for small systems auto-switches to GPU-accelerated billboard impostors for large systems. Stream XTC trajectories over WebSocket.
-- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 25 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CML, LAMMPS data, AMBER topology, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF, JCAMP-DX, Chem3D XML, Odyssey, CASTEP magres, GAMESS output, CASTEP phonon) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
-- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 16 node types with 7 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
+- **Runs Everywhere** — Jupyter widget, standalone web app (`megane serve`), React component (npm), and VS Code extension. Rust-based parsers for 26 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CML, LAMMPS data, AMBER topology, GROMACS topology, CHARMM/NAMD PSF, XTC, DCD, ASE .traj, LAMMPS dump, AMBER NetCDF, VASP, Molden, XCrySDen XSF, JCAMP-DX, Chem3D XML, Odyssey, CASTEP magres, GAMESS output, CASTEP phonon) shared between Python (PyO3) and browser (WASM) — parse once, run anywhere.
+- **Visual Pipeline Editor** — Build visualization workflows by wiring nodes or let the AI generator build them from natural language. 19 node types with 9 typed data channels flowing through color-coded edges. Load multiple structures with layer-based rendering to compare systems side by side.
 - **Embed & Integrate** — Control the viewer from Plotly via ipywidgets events. Embed in MDX / Next.js docs. React to `frame_change`, `selection_change`, and `measurement` events. Use the framework-agnostic renderer from Vue, Svelte, or vanilla JS.
 
 ### Scale
@@ -62,9 +62,9 @@ The secret: parsers for 26 formats (PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CM
 
 Wire nodes to build visualization workflows — no code required.
 
-**16 node types** across 5 categories: load data (structure, trajectory, streaming, vector, volumetric), bonds, process (filter, modify, color, representation), overlay (labels, polyhedra, surface meshes, isosurfaces, vectors), and display in a 3D viewport.
+**19 node types** across 5 categories: load data (structure, trajectory, streaming, vector, volumetric, spectrum), bonds, process (filter, modify, color, representation, replicate), overlay (labels, polyhedra, surface meshes, isosurfaces, vectors), and display in a 3D viewport or a 2D spectrum plot.
 
-**8 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector, volumetric — flow through color-coded edges. Only matching types can connect.
+**9 typed data channels** — particle, bond, cell, label, mesh, trajectory, vector, volumetric, spectrum — flow through color-coded edges. Only matching types can connect.
 
 Pipelines serialize to JSON, so you can save, share, and version-control your visualization recipes.
 
@@ -266,7 +266,7 @@ make test-all              # All tests
 src/                     TypeScript frontend
   renderer/              Three.js rendering (impostor, mesh, shaders)
   protocol/              Binary protocol decoder + web workers
-  parsers/               WASM-based file parsers (25 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CML, LAMMPS data/dump, AMBER topology/NetCDF, XTC, DCD, ASE .traj, VASP, Molden, XCrySDen XSF, JCAMP-DX, Chem3D XML, Odyssey, CASTEP magres, GAMESS output, CASTEP phonon)
+  parsers/               WASM-based file parsers (26 formats: PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, mmCIF, CML, LAMMPS data/dump, AMBER topology/NetCDF, GROMACS topology, CHARMM/NAMD PSF, XTC, DCD, ASE .traj, VASP, Molden, XCrySDen XSF, JCAMP-DX, Chem3D XML, Odyssey, CASTEP magres, GAMESS output, CASTEP phonon)
   logic/                 Bond / label / vector source logic
   components/            React UI components
   hooks/                 Custom React hooks

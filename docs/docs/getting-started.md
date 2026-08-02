@@ -95,19 +95,33 @@ For multiple independent viewers per page (e.g. embedding in MDX docs), use
 |--------|-----------|-------------|
 | PDB | `.pdb` | Protein Data Bank — most common molecular structure format |
 | GRO | `.gro` | GROMACS structure file |
-| XYZ | `.xyz` | Simple cartesian coordinate format (single- or multi-frame) |
+| XYZ | `.xyz`, `.jxyz` | Simple cartesian coordinate format (single- or multi-frame); `.jxyz` is Jmol's second name for it |
 | MOL | `.mol` | MDL Molfile (V2000) — small molecules with bond information |
 | SDF | `.sdf` | MDL SDfile — uses the MOL V2000 parser |
 | MOL2 | `.mol2` | Tripos MOL2 |
-| CIF | `.cif` | Crystallographic Information File |
+| CIF | `.cif` | Crystallographic Information File — the asymmetric unit is expanded to the full cell on load |
 | mmCIF | `.mmcif` | Macromolecular CIF (PDBx/mmCIF) — large structure databases |
 | LAMMPS data | `.data`, `.lammps` | LAMMPS data file |
 | AMBER topology | `.prmtop` | AMBER parameter/topology file (no coordinates) |
+| VASP | `POSCAR`, `CONTCAR`, `XDATCAR`, `.vasp` | VASP crystal structure; `XDATCAR` is multi-frame. Matched by filename as well as extension |
+| Molden | `.molden` | Molden output — `[Atoms]` geometry and `[GEOMETRIES] XYZ` optimisation frames |
+| XCrySDen | `.xsf`, `.axsf` | XCrySDen structure; `.axsf` is a multi-frame animation with optional per-atom forces |
+| CML | `.cml` | Chemical Markup Language (Open Babel / Avogadro / ChemDraw) |
+| Chem3D XML | `.c3xml` | PerkinElmer Chem3D / ChemDraw XML |
+| Odyssey | `.xodydata`, `.odydata` | Wavefunction Odyssey — XML and older Spartan-style text layouts |
+| CASTEP magres | `.magres` | CASTEP / Quantum ESPRESSO NMR output — the `[atoms]` block |
+| GAMESS output | `.gamess` | GAMESS (US / Firefly) log — each coordinate block becomes a frame |
+| CASTEP phonon | `.phonon` | CASTEP lattice-dynamics output (structure half) |
 | XTC | `.xtc` | GROMACS compressed trajectory |
 | DCD | `.dcd` | CHARMM/NAMD binary trajectory |
 | ASE .traj | `.traj` | ASE trajectory (ULM binary format) |
-| LAMMPS dump | `.lammpstrj`, `.dump` | LAMMPS dump trajectory |
+| LAMMPS dump | `.lammpstrj`, `.dump`, `.trj` | LAMMPS dump — opens standalone as a multi-frame structure, or attaches to a topology |
 | AMBER NetCDF | `.nc` | AMBER compressed trajectory (NetCDF format) |
+| Gaussian CUBE | `.cube`, `.cub` | Volumetric grid, rendered as an isosurface over a loaded structure |
+| OpenDX | `.dx` | Volumetric scalar field (APBS electrostatics) |
+| JCAMP-DX | `.jdx`, `.jcamp`, `.dx` | IR / NMR / MS / UV-Vis spectra, drawn by the `SpectrumPlot` node |
+| GROMACS topology | `.top` | Bond connectivity for the Add Bond node |
+| CHARMM/NAMD PSF | `.psf` | Bond connectivity for the Add Bond node |
 
 Not every host opens every extension from its native file picker — see
 [Platform Support](./platform-support) for the per-host matrix.
