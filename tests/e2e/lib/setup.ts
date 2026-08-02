@@ -429,6 +429,19 @@ export async function stabilizeUi(scope: Page | Frame): Promise<void> {
           caret-color: transparent !important;
         }
         ::-webkit-scrollbar { display: none !important; }
+        /*
+         * JupyterLab host chrome that is not ours and does not hold still.
+         * The file browser lists whatever the notebook dir accumulated from
+         * earlier specs and dates it with a relative "2m ago" column, so a
+         * full-page capture drifts with how much of the suite ran before it —
+         * that alone is ~2% and flips these projects red in a full sweep
+         * while they pass in a small one. visibility keeps the panel's box so
+         * only the text drops out. Toasts are hidden outright as a belt to
+         * JUPYTERLAB_SETTINGS_DIR's braces, since a baseline with one painted
+         * in is worse than no baseline.
+         */
+        .jp-DirListing-content, .jp-FileBrowser-filterBox { visibility: hidden !important; }
+        .jp-Notification-Toast, .Toastify, .Toastify__toast-container { display: none !important; }
       `;
       document.head.appendChild(style);
     })
