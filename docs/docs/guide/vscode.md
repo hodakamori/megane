@@ -15,10 +15,15 @@ Once installed, the extension registers a custom editor for the supported file t
 
 | File type | Extensions |
 |-----------|-----------|
-| Structures | `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop`, `.traj` |
-| Trajectories | `.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc` |
+| Structures | `.pdb`, `.gro`, `.xyz`, `.jxyz`, `.mol`, `.sdf`, `.mol2`, `.cif`, `.mmcif`, `.data`, `.lammps`, `.prmtop`, `.traj`, `.lammpstrj`, `.dump`, `.trj`, `POSCAR*`, `CONTCAR*`, `XDATCAR*`, `.vasp`, `.molden`, `.xsf`, `.axsf`, `.cml`, `.c3xml`, `.xodydata`, `.odydata`, `.magres`, `.gamess`, `.phonon` |
+| Trajectories | `.xtc`, `.dcd`, `.nc` |
+| Volumetric grids | `.cube`, `.cub`, `.dx` |
+| Spectra | `.jdx`, `.jcamp`, `.dx` |
+| Pipelines | `.megane.json` |
 
-Trajectory-only formats (`.xtc`, `.dcd`, `.lammpstrj`, `.dump`, `.nc`) need a topology loaded first — open the structure file, then wire the trajectory in via the pipeline editor. Opening one directly surfaces an actionable error.
+The VASP entries are registered as filename globs rather than extensions, so `POSCAR`, `CONTCAR.bak` and similar all open.
+
+Trajectory-only formats (`.xtc`, `.dcd`, `.nc`) and volumetric grids (`.cube`, `.cub`, `.dx`) need a structure loaded first — open the structure file, then wire the trajectory or grid in via the pipeline editor. Opening one directly surfaces an actionable error. LAMMPS dumps are *not* in that group: frame 0 supplies the topology, so `.lammpstrj` / `.dump` / `.trj` open standalone as multi-frame structures (and can still be attached to a separate topology through the Load Trajectory node).
 
 ## Visual pipeline editor
 

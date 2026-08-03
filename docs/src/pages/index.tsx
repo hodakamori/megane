@@ -145,11 +145,11 @@ const CAPABILITIES = [
   },
   {
     title: "One Rust core, every host",
-    body: "PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data, XTC, ASE .traj and more are parsed in Rust, compiled to both PyO3 and WASM. Parse once, run anywhere — Jupyter, browser, React, VS Code, JupyterLab.",
+    body: "PDB, GRO, XYZ, MOL/SDF, MOL2, CIF, LAMMPS data and dump, VASP, Molden, XCrySDen, CML, XTC, ASE .traj and more are parsed in Rust, compiled to both PyO3 and WASM. Parse once, run anywhere — Jupyter, browser, React, VS Code, JupyterLab.",
   },
   {
     title: "Visual pipeline editor",
-    body: "Wire 11 node types across 5 categories to load, filter, style and overlay — no code required. 7 typed data channels flow through color-coded edges; only matching types connect. Pipelines serialize to JSON to save and share.",
+    body: "Wire 19 node types across 5 categories to load, filter, style and overlay — no code required. 9 typed data channels flow through color-coded edges; only matching types connect. Pipelines serialize to JSON to save and share.",
   },
   {
     title: "Embed & integrate",

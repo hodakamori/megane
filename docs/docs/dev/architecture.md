@@ -10,7 +10,7 @@ megane's visual pipeline is built on three core principles:
 
 ### Typed Data Flow
 
-The pipeline is a directed acyclic graph where edges carry one of **8 typed data channels**: `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, `vector`, and `volumetric`. Nodes declare typed input/output ports via `NODE_PORTS` in `src/pipeline/types.ts`. The UI prevents connections between incompatible port types at the graph level (see `canConnect()`), so executors can trust that incoming data has the expected shape.
+The pipeline is a directed acyclic graph where edges carry one of **9 typed data channels**: `particle`, `bond`, `cell`, `trajectory`, `label`, `mesh`, `vector`, `volumetric`, and `spectrum`. Nodes declare typed input/output ports via `NODE_PORTS` in `src/pipeline/types.ts`. The UI prevents connections between incompatible port types at the graph level (see `canConnect()`), so executors can trust that incoming data has the expected shape.
 
 ### Separation of Computation and Rendering
 
@@ -55,7 +55,7 @@ flowchart TB
 
 ## Pipeline Data Types
 
-Eight typed channels flow through pipeline edges. Defined in `src/pipeline/types.ts`.
+Nine typed channels flow through pipeline edges. Defined in `src/pipeline/types.ts`.
 
 | Channel | Interface | Key Fields | Produced By | Consumed By |
 |---------|-----------|------------|-------------|-------------|
@@ -67,6 +67,7 @@ Eight typed channels flow through pipeline edges. Defined in `src/pipeline/types
 | `mesh` | `MeshData` | `positions`, `indices`, `normals`, `colors` | PolyhedronGenerator, SurfaceMesh, Isosurface | Viewport |
 | `vector` | `VectorData` | `frames` (VectorFrame[]), `scale` | LoadVector, VectorOverlay | VectorOverlay, Viewport |
 | `volumetric` | `VolumetricData` | `nx`, `ny`, `nz`, `origin`, `step`, `data` | LoadVolumetric | Isosurface |
+| `spectrum` | `SpectrumData` | `title`, `dataType`, `xUnits`, `yUnits`, `x`, `y` | LoadSpectrum | SpectrumPlot |
 
 Each edge in the UI is color-coded by data type (`DATA_TYPE_COLORS`). Filter and Modify nodes are generic — they accept both `particle` and `bond` inputs via `GENERIC_NODE_ACCEPTS`. The Color and Representation nodes are particle-only modifiers that share the same Modify category in the toolbar (Ovito-style stack: each modifier owns one visual property — Modify = scale & opacity, Color = per-atom palette, Representation = atoms/licorice/cartoon/both/surface/line).
 
