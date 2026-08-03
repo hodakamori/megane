@@ -18,10 +18,11 @@
  */
 
 import { spawn, execSync, execFileSync } from "child_process";
-import { mkdirSync, writeFileSync, existsSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { createWriteStream } from "fs";
 import { get as httpsGet } from "https";
+import { gunzipSync } from "zlib";
 import { getChromium } from "./utils/playwright.mjs";
 
 const chromium = getChromium();
@@ -42,6 +43,8 @@ const EXTENSION_NAME = "vscode-megane";
 const MARKETPLACE_URL = `https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${PUBLISHER}/vsextensions/${EXTENSION_NAME}/${VERSION}/vspackage`;
 const VSIX_PATH = `/tmp/vscode-megane-${VERSION}.vsix`;
 const WORKSPACE_DIR = `/tmp/megane-ws-${VERSION}`;
+const USER_DATA_DIR = `/tmp/megane-render-verify-${VERSION}/user-data`;
+const EXTENSIONS_DIR = `/tmp/megane-render-verify-${VERSION}/extensions`;
 const PORT = 38000 + Math.floor(Math.random() * 1000);
 const CWD = process.cwd();
 
@@ -74,9 +77,37 @@ function ensureCodeServer() {
   }
 }
 
+const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
+const ZIP_MAGIC = Buffer.from([0x50, 0x4b]); // "PK"
+
+/**
+ * Normalize a downloaded VSIX to a plain zip on disk.
+ *
+ * The Marketplace `vspackage` endpoint serves the package gzip-encoded, and
+ * `https.get` does not honour `Content-Encoding` for us — piping the response
+ * straight to a file leaves gzip bytes behind. code-server then rejects the
+ * install with a yauzl `Extract` error that looks like a broken release when
+ * the published VSIX is perfectly fine.
+ */
+function ensureUncompressedVsix(destPath) {
+  let buf = readFileSync(destPath);
+  if (buf.subarray(0, 2).equals(GZIP_MAGIC)) {
+    buf = gunzipSync(buf);
+    writeFileSync(destPath, buf);
+    console.log("VSIX arrived gzip-encoded; decompressed in place");
+  }
+  if (!buf.subarray(0, 2).equals(ZIP_MAGIC)) {
+    throw new Error(
+      `${destPath} is not a zip archive (leading bytes ${buf.subarray(0, 2).toString("hex")}). ` +
+        `The Marketplace download likely returned an error page.`,
+    );
+  }
+}
+
 async function downloadVsixAsync(url, destPath) {
   if (existsSync(destPath)) {
     console.log(`VSIX already exists at ${destPath}, skipping download`);
+    ensureUncompressedVsix(destPath);
     return;
   }
 
@@ -106,6 +137,12 @@ async function downloadVsixAsync(url, destPath) {
         file.on("finish", () => {
           file.close();
           console.log(`VSIX downloaded to ${destPath}`);
+          try {
+            ensureUncompressedVsix(destPath);
+          } catch (err) {
+            reject(err);
+            return;
+          }
           resolve();
         });
         file.on("error", reject);
@@ -116,9 +153,52 @@ async function downloadVsixAsync(url, destPath) {
   });
 }
 
+/**
+ * Write the same deterministic settings `lib/hosts/code-server.ts` uses.
+ *
+ * Without `workbench.startupEditor: "none"` code-server opens its Welcome
+ * walkthrough, which keeps editor focus and hides the megane webview behind
+ * a `.webview` iframe belonging to the walkthrough — the file never opens and
+ * the failure looks like a broken extension. `editorAssociations` pins `.pdb`
+ * to the megane custom editor so the double-click cannot land in the text
+ * editor instead.
+ */
+function writeUserSettings() {
+  const settingsDir = join(USER_DATA_DIR, "User");
+  mkdirSync(settingsDir, { recursive: true });
+  writeFileSync(
+    join(settingsDir, "settings.json"),
+    JSON.stringify(
+      {
+        "workbench.startupEditor": "none",
+        "workbench.editorAssociations": { "*.pdb": "megane.structureViewer" },
+        "update.mode": "none",
+        "telemetry.telemetryLevel": "off",
+        "security.workspace.trust.enabled": false,
+        "extensions.autoCheckUpdates": false,
+        "window.commandCenter": false,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
 function installExtension(vsixPath) {
   console.log(`Installing extension from ${vsixPath}...`);
-  execFileSync("code-server", ["--install-extension", vsixPath], { stdio: "inherit" });
+  mkdirSync(EXTENSIONS_DIR, { recursive: true });
+  execFileSync(
+    "code-server",
+    [
+      "--user-data-dir",
+      USER_DATA_DIR,
+      "--extensions-dir",
+      EXTENSIONS_DIR,
+      "--install-extension",
+      vsixPath,
+    ],
+    { stdio: "inherit" },
+  );
   console.log("Extension installed");
 }
 
@@ -135,10 +215,22 @@ async function startCodeServer() {
   return new Promise((resolve, reject) => {
     const proc = spawn(
       "code-server",
-      ["--auth", "none", "--port", String(PORT), "--disable-telemetry", WORKSPACE_DIR],
+      [
+        "--auth",
+        "none",
+        "--port",
+        String(PORT),
+        "--user-data-dir",
+        USER_DATA_DIR,
+        "--extensions-dir",
+        EXTENSIONS_DIR,
+        "--disable-telemetry",
+        "--disable-update-check",
+        WORKSPACE_DIR,
+      ],
       {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, HOME: "/root" },
+        env: { ...process.env, HOME: "/root", MEGANE_E2E_MODE: "1" },
       },
     );
 
@@ -165,6 +257,44 @@ async function startCodeServer() {
   });
 }
 
+/**
+ * Resolve the frame that actually owns the megane renderer.
+ *
+ * Mirrors `getWebviewFrame` in lib/hosts/code-server.ts: the webview shell
+ * varies between code-server releases, so match on markers only the megane
+ * bundle sets rather than on a selector path.
+ */
+async function waitForMeganeFrame(page, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const seen = new Set();
+  while (Date.now() < deadline) {
+    for (const frame of page.frames()) {
+      if (frame === page.mainFrame()) continue;
+      const url = frame.url();
+      seen.add(url);
+      if (url.includes("webWorkerExtensionHostIframe")) continue;
+      try {
+        const isMegane = await frame.evaluate(() => {
+          if (document.querySelector('[data-testid="megane-viewer"]')) return true;
+          if (document.querySelector('[data-testid="viewer-root"]')) return true;
+          return !!window.__MEGANE_CONTEXT__;
+        });
+        if (isMegane) return frame;
+      } catch {
+        // Frame mid-navigation or detached; retry on the next sweep.
+      }
+    }
+    await page.waitForTimeout(250);
+  }
+  throw new Error(
+    `megane webview frame did not appear within ${timeoutMs}ms. Frames seen: ${JSON.stringify(
+      Array.from(seen),
+      null,
+      2,
+    )}`,
+  );
+}
+
 // ---- Main ----
 
 let server = null;
@@ -180,6 +310,7 @@ try {
   await downloadVsixAsync(MARKETPLACE_URL, VSIX_PATH);
 
   // Step 3: Install extension into code-server
+  writeUserSettings();
   installExtension(VSIX_PATH);
 
   // Step 4: Set up workspace with test PDB
@@ -231,23 +362,15 @@ try {
     console.log("No trust dialog found, continuing");
   }
 
-  // Try clicking test.pdb in the explorer tree
-  try {
-    const fileItem = page.getByText("test.pdb").first();
-    await fileItem.waitFor({ timeout: 5000 });
-    await fileItem.dblclick();
-    console.log("File opened via explorer click");
-  } catch {
-    // Fallback: try Quick Open (Ctrl+P)
-    console.log("Explorer click failed, trying Quick Open (Ctrl+P)...");
-    await page.keyboard.press("Control+p");
-    await page.waitForTimeout(1000);
-    await page.keyboard.type("test.pdb");
-    await page.waitForTimeout(1000);
-    await page.keyboard.press("Enter");
-    console.log("File opened via Quick Open");
-  }
-  console.log("File open command issued");
+  // Open from the explorer tree. Ctrl+P is deliberately not used as a
+  // fallback: on code-server's web build the welcome / walkthrough tab eats
+  // the keystrokes, so a "success" there can leave the file unopened. Same
+  // reasoning as `openVscodeFile` in lib/hosts/code-server.ts.
+  const treeItem = page.getByRole("treeitem", { name: "test.pdb", exact: true });
+  await treeItem.waitFor({ state: "visible", timeout: 30000 });
+  await treeItem.click({ force: true });
+  await treeItem.dblclick({ force: true });
+  console.log("File opened via explorer tree");
 
   // Wait for the megane custom editor canvas to appear
   // The canvas is inside a webview iframe
@@ -258,18 +381,17 @@ try {
   let canvasResult = { hasContent: false, totalPixels: 0, nonWhitePixels: 0 };
 
   try {
-    // Wait for a webview frame to appear (megane opens in a webview)
-    await page.waitForSelector(".webview", { timeout: 20000 });
-    console.log("Webview element detected");
+    // Don't gate on `.webview` visibility: code-server stacks several
+    // iframes per webview and other contributions (walkthrough, chat panel)
+    // own `.webview` nodes of their own. Scan every frame for the megane
+    // renderer instead — the strategy `getWebviewFrame` uses.
+    const megFrame = await waitForMeganeFrame(page, 90000);
+    console.log(`megane webview frame: ${megFrame.url()}`);
 
     // Allow WASM to load and Three.js to render
     await page.waitForTimeout(5000);
 
-    // Access the webview iframe content
-    const frames = page.frames();
-    console.log(`Total frames: ${frames.length}`);
-
-    for (const frame of frames) {
+    for (const frame of [megFrame]) {
       try {
         const canvas = await frame.$("canvas");
         if (canvas) {
@@ -327,16 +449,25 @@ try {
     `Canvas contains rendered atoms (${canvasResult.nonWhitePixels} non-white pixels)`,
   );
 
-  const criticalErrors = jsErrors.filter(
-    (e) =>
+  // Classify against a path-stripped copy of each message. Host stack traces
+  // embed the checkout path (…/megane/.code-server/…), so a bare "megane"
+  // substring test otherwise flags unrelated code-server noise — e.g.
+  // `vscode.git` failing to activate on the npm-built code-server — as a
+  // megane regression. Other extensions' activation failures are host
+  // problems either way, so they are excluded outright.
+  const criticalErrors = jsErrors.filter((raw) => {
+    const e = raw.replace(/\/\S+/g, "<path>");
+    if (/Activating extension '(?!megane|hodakamori\.)/.test(e)) return false;
+    return (
       (e.includes("Cannot read propert") ||
         e.includes("acquireVsCodeApi") ||
         e.includes("megane")) &&
       !e.includes("Shader Error") &&
       !e.includes("WebGLProgram") &&
       !e.includes("open-vsx.org") &&
-      !e.includes("CORS policy"),
-  );
+      !e.includes("CORS policy")
+    );
+  });
   assert(
     criticalErrors.length === 0,
     `No critical JS errors (found ${criticalErrors.length}: ${JSON.stringify(criticalErrors)})`,
