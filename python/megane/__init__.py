@@ -85,4 +85,4 @@ __all__ = [
     "view",
     "view_traj",
 ]
-__version__ = "0.11.0"
+__version__ = "0.12.0"
