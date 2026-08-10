@@ -12,6 +12,8 @@ megane can be embedded in React applications as a component library, published t
 npm install megane-viewer
 ```
 
+`megane-viewer` works with both React 18 and React 19 — it declares a peer dependency of `react@^18.2.0 || ^19.0.0` (and the matching `react-dom`) and uses your app's React instance rather than bundling its own.
+
 ## Full-Featured Viewer
 
 The easiest way to get started is the `MeganeViewer` component. It includes the 3D viewport, sidebar, appearance panel, timeline, tooltip, and measurement panel — everything you need in a single component.
