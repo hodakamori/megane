@@ -85,6 +85,12 @@ try {
           "megane-tour-prefs",
           JSON.stringify({ dontShowAgain: true }),
         );
+        // The Pipeline panel opens on the Chat tab by default; the hero
+        // screenshot needs the visual editor visible.
+        sessionStorage.setItem(
+          "megane-pipeline-ui",
+          JSON.stringify({ mode: "editor" }),
+        );
       } catch {
         /* noop */
       }
