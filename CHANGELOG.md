@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`megane-viewer` now supports React 18 and React 19.** `react` / `react-dom` moved from `dependencies` to `peerDependencies` (`^18.2.0 || ^19.0.0`) — the npm library bundle has always externalized React and used the host app's copy, but the old `dependencies` entry forced React 19 into consumers' trees and risked a duplicate React. Development and the self-contained bundles (webapp, anywidget, VSCode webview) stay on React 19; the JupyterLab labextension already ran on the host's React 18. CI gains a `test-ts-react18` job that type-checks and runs the unit suite against React 18 to keep the lower bound honest.
+
+### Fixed
+
+- Testing Library auto-cleanup never ran in the vitest suite (vitest runs with `globals` disabled, which silently disables it), so components stayed mounted across tests in a file. Their re-run effects could re-register stale module-level handlers over the next test's registrations — masked by scheduling luck on React 19, but failing deterministically on React 18. `tests/ts/setup.ts` now calls `cleanup()` in an explicit `afterEach`.
+
 ## [0.11.0] - 2026-08-02
 
 ### Added

@@ -94,6 +94,8 @@ pip install megane
 npm install megane-viewer
 ```
 
+Works with React 18 and React 19 (peer dependency: `react@^18.2.0 || ^19.0.0`).
+
 ## Quick Start
 
 ### Jupyter widget
