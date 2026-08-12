@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-12
+
 ### Added
 
 - **The `megane-viewer` npm package now ships TypeScript declarations.** `npm run build:lib` emits `dist/types/` (`tsc -p tsconfig.build-types.json` + a post-processing pass that strips stylesheet side-effect imports and adds explicit `.js` extensions so `moduleResolution: node16/nodenext` consumers resolve them), and the `.` / `./lib` exports carry `types` conditions. Consumers no longer hit `TS7016: Could not find a declaration file` or need hand-written ambient declarations. `@types/three` moved from `devDependencies` to `dependencies` because the public declarations reference three's types.
