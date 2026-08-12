@@ -129,7 +129,10 @@ orders, so no distance inference is needed for genuine 3D input. The schema is
 only loosely documented, so the reader is permissive: it accepts the long
 spellings (`<node>` / `<bond>` with `Begin` / `End`) some exports use, `Element`
 may be an atomic **number or a symbol**, and a node with no `Element` defaults to
-carbon — the CDXML convention. A **2D-only drawing** (`p="x y"` instead of
+carbon — the CDXML convention. Chem3D's **native** export (root
+`<C3XML version="…">`, the dialect Chem3D 10+ actually writes) is also read:
+atoms are `<atom symbol="C" cartCoords="x y z">` elements and bonds are
+`<bond bondAtom1 bondAtom2 bondOrder>` elements. A **2D-only drawing** (`p="x y"` instead of
 `Position`) is projected onto z = 0 so the file still opens, matching the CML
 reader's decision, and bonds are deliberately **not** inferred for it because
 projected 2D distances are meaningless. The binary `.cdx` and general `.cdxml`
@@ -154,7 +157,10 @@ because there is no formal-charge channel to put them in, and
 wavefunction-based surfaces (orbitals, densities, electrostatic potentials) are
 not stored in these files at all. It reuses `quick-xml`, so no new dependency.
 Note: **magres** files are read for their `[atoms]` block only — the lattice
-and the labelled atoms become a normal periodic structure. Each block in a
+and the labelled atoms become a normal periodic structure. Both block-delimiter
+spellings found in the wild are accepted: the documented `[atoms]` … `[/atoms]`
+and the XML-style `<atoms>` … `</atoms>` that CASTEP itself and CCP-NC's
+`format.py` emit. Each block in a
 magres file declares its **own** `units` line, and the parser honours them
 independently (Angstrom or bohr for the lattice and the atoms separately)
 rather than assuming Angstrom. The `ms` / `efg` / `isc` entries in `[magres]`
@@ -304,6 +310,16 @@ from the previous ordinate, with its Y-value checkpoint at each line start), and
 **DUP** (repeat the previous value _n_ times) — for both `##XYDATA=(X++(Y..Y))`
 and `##XYPOINTS=(XY..XY)` tables. `##XFACTOR=` / `##YFACTOR=` are applied, and a
 missing `##DELTAX=` is derived from `FIRSTX` / `LASTX` / `NPOINTS`.
+**Compound (link) files** (`##BLOCKS=n` with embedded `##TITLE=` … `##END=`
+blocks — multi-spectra collections, GC-MS runs, Bruker `*_assigned` exports)
+are split and each block parsed with its own headers; the first full-spectrum
+(`##XYDATA=`) block is shown, falling back to the first peak table, since the
+plot surface renders one spectrum. **NTUPLES** exports (`##DATA CLASS=NTUPLES`,
+Bruker XWIN-NMR/TopSpin) are read via their `##DATA TABLE= (X++(R..R)), XYDATA`
+real page — the imaginary page is skipped and the abscissa is rebuilt from the
+X variable's `##FIRST=` / `##LAST=` because Bruker writes the X column as a raw
+point counter. True nD data (`##NUM DIM=` ≥ 2, e.g. HMBC) has no 1D rendering
+and is rejected with a message that says so.
 
 Sources of truth: `crates/megane-wasm/src/lib.rs` (browser parsers), `crates/megane-python/src/lib.rs` (Python parsers), `src/components/nodes/LoadStructureNode.tsx` and `src/components/nodes/LoadTrajectoryNode.tsx` (standalone accept lists), `src/components/nodes/AddBondNode.tsx` (topology accept list), `src/parsers/fileNames.ts` (filename-based dispatch for extensionless VASP files), `src/pipeline/executors/parseVolumetric.ts` (volumetric accept list + `.dx` content sniffing), `src/parsers/spectrum.ts` (spectrum accept list and JCAMP-DX/OpenDX sniffing), `jupyterlab-megane/src/filetypes.ts` (JupyterLab `IFileType` registrations), `vscode-megane/package.json` (VS Code `customEditors`).
 

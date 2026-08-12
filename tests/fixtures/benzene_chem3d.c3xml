@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<C3XML
+ version="10.0"
+><model
+ id="1"
+ objectDisplayMode="BallAndStick"
+><atom
+ id="22"
+ symbol="H"
+ pdbSymbol=" H  "
+ userNum="12"
+ cartCoords="0 0 2.457"
+/><atom
+ id="8"
+ symbol="H"
+ pdbSymbol=" H  "
+ userNum="11"
+ cartCoords="-2.128 0 1.229"
+/><atom
+ id="11"
+ symbol="H"
+ pdbSymbol=" H  "
+ userNum="10"
+ cartCoords="2.128 0 1.229"
+/><atom
+ id="14"
+ symbol="H"
+ pdbSymbol=" H  "
+ userNum="9"
+ cartCoords="2.128 0 -1.229"
+/><atom
+ id="18"
+ symbol="H"
+ pdbSymbol=" H  "
+ userNum="8"
+ cartCoords="-2.128 0 -1.229"
+/><atom
+ id="7"
+ symbol="C"
+ pdbSymbol=" C  "
+ userNum="7"
+ cartCoords="-1.199 0 0.692"
+/><atom
+ id="10"
+ symbol="C"
+ pdbSymbol=" C  "
+ userNum="6"
+ cartCoords="1.199 0 0.692"
+/><atom
+ id="13"
+ symbol="C"
+ pdbSymbol=" C  "
+ userNum="5"
+ cartCoords="1.199 0 -0.692"
+/><atom
+ id="17"
+ symbol="C"
+ pdbSymbol=" C  "
+ userNum="4"
+ cartCoords="-1.199 0 -0.692"
+/><atom
+ id="21"
+ symbol="C"
+ pdbSymbol=" C  "
+ userNum="3"
+ cartCoords="0 0 1.385"
+/><atom
+ id="26"
+ symbol="C"
+ pdbSymbol=" C  "
+ userNum="2"
+ cartCoords="0 0 -1.385"
+/><atom
+ id="29"
+ symbol="H"
+ pdbSymbol=" H  "
+ userNum="1"
+ cartCoords="0 0 -2.457"
+/><bond
+ id="6"
+ bondAtom1="7"
+ bondAtom2="8"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="9"
+ bondAtom1="10"
+ bondAtom2="11"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="12"
+ bondAtom1="13"
+ bondAtom2="14"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="15"
+ bondAtom1="13"
+ bondAtom2="10"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="16"
+ bondAtom1="17"
+ bondAtom2="18"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="19"
+ bondAtom1="17"
+ bondAtom2="7"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="20"
+ bondAtom1="21"
+ bondAtom2="22"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="23"
+ bondAtom1="21"
+ bondAtom2="7"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="24"
+ bondAtom1="21"
+ bondAtom2="10"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="25"
+ bondAtom1="26"
+ bondAtom2="17"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="27"
+ bondAtom1="26"
+ bondAtom2="13"
+ bondOrderType="0"
+ bondOrder="1"
+/><bond
+ id="28"
+ bondAtom1="29"
+ bondAtom2="26"
+ bondOrderType="0"
+ bondOrder="1"
+/>
+</model></C3XML>
