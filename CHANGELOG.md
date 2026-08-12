@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **The `megane-viewer` npm package now ships TypeScript declarations.** `npm run build:lib` emits `dist/types/` (`tsc -p tsconfig.build-types.json` + a post-processing pass that strips stylesheet side-effect imports and adds explicit `.js` extensions so `moduleResolution: node16/nodenext` consumers resolve them), and the `.` / `./lib` exports carry `types` conditions. Consumers no longer hit `TS7016: Could not find a declaration file` or need hand-written ambient declarations. `@types/three` moved from `devDependencies` to `dependencies` because the public declarations reference three's types.
+- **The bundled stylesheet is importable via the `exports` map.** `import "megane-viewer/styles.css"` (alias) and `import "megane-viewer/dist/megane-viewer.css"` (real path) both resolve; previously any stylesheet import failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`. Deep imports of `./dist/widget.js` / `./dist/lib.js` and `./package.json` are exported as well.
+
+### Fixed
+
+- **The npm library bundle crashed React 18 hosts with `Objects are not valid as a React child`.** `vite.lib.config.ts` externalized only the exact specifiers `react` / `react-dom` / `three`, so subpath imports — most importantly `react/jsx-runtime`, which the automatic JSX transform emits — were bundled into `dist/lib.js`, baking in React 19's element symbol (`react.transitional.element`) that React 18's reconciler does not recognize. The externals are now prefix regexes (`/^react($|\/)/` etc.), so `react/jsx-runtime`, `react/jsx-dev-runtime`, `react-dom/client`, and `three/examples/jsm/*` all resolve from the host application (~147 kB smaller bundle). The anywidget `widget.js` bundle intentionally stays fully self-contained. Verified by rendering `MeganeViewer` from the packed tarball on both React 18 (previously crashed, now renders) and React 19 hosts.
+
 ## [0.12.0] - 2026-08-10
 
 ### Changed
@@ -134,7 +143,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 #### Representations / rendering
 
-- **Cartoon/ribbon representation** for proteins, rewritten for Mol*-quality output (#362, #400, #411)
+- **Cartoon/ribbon representation** for proteins, rewritten for Mol\*-quality output (#362, #400, #411)
 - **Solvent-Accessible Surface (SAS) representation** (#406)
 - **OVITO-style surface mesh** pipeline node (alpha-shape envelope) and template (#412, #432)
 - **Isosurface representation** for volumetric data (#364, #443)
@@ -233,6 +242,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [0.6.2] - 2026-03-25
 
 No user-facing changes in this version.
+
 ## [0.6.1] - 2026-03-25
 
 ### Fixed
