@@ -28,7 +28,12 @@ export default defineConfig({
       fileName: () => "lib.js",
     },
     rollupOptions: {
-      external: ["react", "react-dom", "three"],
+      // Match subpaths too (react/jsx-runtime, react-dom/client,
+      // three/examples/jsm/*): exact-string externals leaked
+      // react/jsx-runtime into the bundle, baking in the building React's
+      // element symbol (react.transitional.element on React 19) and crashing
+      // React 18 hosts with "Objects are not valid as a React child".
+      external: [/^react($|\/)/, /^react-dom($|\/)/, /^three($|\/)/],
     },
     minify: true,
     sourcemap: false,
