@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-08-12
+
 ### Fixed
 
 - **Four real-world file layouts from Jmol's demo corpus (`jsmol/data`) failed to load and now parse on every host.** Tested all 67 non-image files of that corpus against megane's parsers and fixed everything fixable:
