@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Four real-world file layouts from Jmol's demo corpus (`jsmol/data`) failed to load and now parse on every host.** Tested all 67 non-image files of that corpus against megane's parsers and fixed everything fixable:
+  - **`.magres`** — CASTEP itself and CCP-NC's `format.py` delimit blocks with XML-style `<atoms>` … `</atoms>` rather than the documented `[atoms]` form; all three corpus files (`CuO2CCHF2.magres`, `croconic_new.magres`) were rejected with "[atoms] block contains no atom lines". Both spellings are now accepted.
+  - **`.c3xml`** — Chem3D's native export (root `<C3XML version="10.0">`, e.g. `benzene.c3xml`) stores atoms as `<atom symbol cartCoords>` and bonds as `<bond bondAtom1 bondAtom2 bondOrder>`; the parser only knew the CDXML-style `<n Position>` dialect. Both dialects are now read.
+  - **JCAMP-DX compound (link) files** (`##BLOCKS=n` — `Crspectra.jdx`, `pimentoGCMS2.dx`, `aquation20.jdx`, Bruker `*_assigned` exports) were scanned as if they were one spectrum, mixing titles/factors/data across embedded blocks. Blocks are now split and parsed independently; the first full-spectrum (`##XYDATA=`) block is returned, falling back to the first peak table. Header values also drop their `$$` inline comments, so titles like `Propan-2-ol 13C{1H} $$ Begin of the data block` come back clean.
+  - **JCAMP-DX NTUPLES** (`##DATA CLASS=NTUPLES`, Bruker XWIN-NMR/TopSpin 1D exports such as `sample78-1hnmr.jdx`) failed with "no ##XYDATA= found". The real (`R`) `##DATA TABLE=` page is now decoded — imaginary page skipped, abscissa rebuilt from the X variable's `##FIRST=`/`##LAST=` since Bruker writes the X column as a raw point counter. True nD data (`##NUM DIM=` ≥ 2, e.g. `t2d.jdx`) is rejected with a message that says so instead of a misleading one.
+  - **mmCIF under `.cif`** — macromolecular CIFs served with the small-molecule extension (wwPDB's `1cbs.cif`) failed with "CIF file contains no atom sites"; the CIF parser now detects dotted `_atom_site.` tags and delegates to the mmCIF parser.
+
 ## [0.13.0] - 2026-08-12
 
 ### Added

@@ -22,6 +22,12 @@
 //! permissive: it accepts the long spellings (`node`/`bond`/`Begin`/`End`) that
 //! some exports use, and `Element` may be an atomic number or a symbol.
 //!
+//! Chem3D's **native** `.c3xml` export (root `<C3XML version="…">`) is a
+//! different dialect from the CDXML-style one above: atoms are `<atom>`
+//! elements carrying `symbol="C"` and `cartCoords="x y z"`, and bonds are
+//! `<bond bondAtom1="…" bondAtom2="…" bondOrder="…"/>`. Both dialects are
+//! read by this one parser.
+//!
 //! **2D-only drawings** carry `p="x y"` instead of `Position` and have no third
 //! dimension at all. Rather than rejecting them, they are projected onto
 //! `z = 0` — the same decision the CML reader makes for `x2`/`y2`, so the two
@@ -97,9 +103,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                 let name = norm_key(e.name().as_ref());
                 match name.as_str() {
                     "cdxml" | "fragment" | "chemdraw" | "c3xml" => saw_root = true,
-                    "n" | "node" => {
+                    "n" | "node" | "atom" => {
                         let map = attrs(e);
-                        let (pos, is_3d) = if let Some(p) = map.get("position") {
+                        let (pos, is_3d) = if let Some(p) =
+                            map.get("position").or_else(|| map.get("cartcoords"))
+                        {
                             let v = coords(p);
                             if v.len() >= 3 {
                                 ([v[0], v[1], v[2]], true)
@@ -121,9 +129,10 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                         };
                         any_3d |= is_3d;
 
-                        // `Element` is an atomic number in Chem3D's own exports,
-                        // but some writers put the symbol there instead.
-                        let z = match map.get("element") {
+                        // `Element` is an atomic number in CDXML-style exports,
+                        // but some writers put the symbol there instead; the
+                        // native dialect spells it `symbol="C"`.
+                        let z = match map.get("element").or_else(|| map.get("symbol")) {
                             Some(v) => match v.trim().parse::<i32>() {
                                 Ok(n) if (1..=118).contains(&n) => n as u8,
                                 _ => symbol_to_atomic_num(&capitalize(v.trim())),
@@ -138,11 +147,20 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
                     }
                     "b" | "bond" => {
                         let map = attrs(e);
-                        let begin = map.get("b").or_else(|| map.get("begin")).cloned();
-                        let end = map.get("e").or_else(|| map.get("end")).cloned();
+                        let begin = map
+                            .get("b")
+                            .or_else(|| map.get("begin"))
+                            .or_else(|| map.get("bondatom1"))
+                            .cloned();
+                        let end = map
+                            .get("e")
+                            .or_else(|| map.get("end"))
+                            .or_else(|| map.get("bondatom2"))
+                            .cloned();
                         if let (Some(b), Some(e2)) = (begin, end) {
                             let order = map
                                 .get("order")
+                                .or_else(|| map.get("bondorder"))
                                 .and_then(|o| o.trim().parse::<u8>().ok())
                                 .filter(|o| (1..=4).contains(o))
                                 .unwrap_or(1);
@@ -160,7 +178,9 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         return Err("not a Chem3D XML file: no <CDXML> or <fragment> element found".into());
     }
     if elements.is_empty() {
-        return Err("c3xml: document contains no <n> nodes with coordinates".into());
+        return Err(
+            "c3xml: document contains no <n> nodes or <atom> elements with coordinates".into(),
+        );
     }
 
     let n_atoms = elements.len();
@@ -343,6 +363,37 @@ mod tests {
         assert_eq!(s.n_file_bonds, 1);
     }
 
+    /// Chem3D's native dialect: `<C3XML>` root, `<atom symbol cartCoords>`
+    /// atoms, `<bond bondAtom1 bondAtom2 bondOrder>` bonds.
+    #[test]
+    fn parses_the_native_chem3d_dialect() {
+        let text = r#"<?xml version="1.0" encoding="UTF-8" ?>
+<C3XML version="10.0"><model id="1"
+><atom id="3" symbol="O" pdbSymbol=" O  " userNum="1" cartCoords="0 0 0.117"
+/><atom id="4" symbol="H" userNum="2" cartCoords="0 0.757 -0.469"
+/><atom id="5" symbol="H" userNum="3" cartCoords="0 -0.757 -0.469"
+/><bond id="6" bondAtom1="3" bondAtom2="4" bondOrderType="0" bondOrder="1"
+/><bond id="7" bondAtom1="3" bondAtom2="5" bondOrderType="0" bondOrder="1"
+/></model></C3XML>"#;
+        let s = parse(text).unwrap();
+        assert_eq!(s.n_atoms, 3);
+        assert_eq!(s.elements, vec![8, 1, 1]);
+        assert_eq!(s.n_file_bonds, 2);
+        assert_eq!(s.bond_orders.unwrap(), vec![1, 1]);
+        assert!((s.positions[2] - 0.117).abs() < 1e-5);
+    }
+
+    /// Jmol's benzene demo trimmed to its model block — a real Chem3D 10.0
+    /// export (the layout that used to be rejected).
+    #[test]
+    fn parses_a_real_chem3d_export_fixture() {
+        let s = parse(include_str!("../../../tests/fixtures/benzene_chem3d.c3xml")).unwrap();
+        assert_eq!(s.n_atoms, 12);
+        assert_eq!(s.elements.iter().filter(|&&z| z == 6).count(), 6);
+        assert_eq!(s.elements.iter().filter(|&&z| z == 1).count(), 6);
+        assert_eq!(s.n_file_bonds, 12);
+    }
+
     #[test]
     fn rejects_a_document_with_no_cdxml_root() {
         let err = match parse("<html><body/></html>") {
@@ -358,7 +409,7 @@ mod tests {
             Ok(_) => panic!("expected an error"),
             Err(e) => e,
         };
-        assert!(err.contains("no <n> nodes"), "unexpected: {err}");
+        assert!(err.contains("no <n> nodes or <atom>"), "unexpected: {err}");
     }
 
     #[test]

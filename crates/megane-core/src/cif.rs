@@ -217,6 +217,16 @@ pub fn extract_symmetry_ops(text: &str) -> Vec<String> {
     ops
 }
 
+/// True when the document carries mmCIF-style dotted `_atom_site.` tags
+/// (`_atom_site.Cartn_x` …) instead of the small-molecule `_atom_site_*` ones.
+fn text_has_mmcif_atom_sites(text: &str) -> bool {
+    text.lines().any(|l| {
+        l.trim_start()
+            .to_ascii_lowercase()
+            .starts_with("_atom_site.")
+    })
+}
+
 pub fn parse(text: &str) -> Result<ParsedStructure, String> {
     let lines: Vec<&str> = text.lines().collect();
 
@@ -401,6 +411,13 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
 
     let n_atoms = elements.len();
     if n_atoms == 0 {
+        // Macromolecular CIFs use dotted `_atom_site.` tags (mmCIF grammar)
+        // rather than the small-molecule `_atom_site_` ones, yet ship under
+        // the same `.cif` extension (e.g. wwPDB downloads). Delegate instead
+        // of erroring so hosts don't need to sniff the dialect themselves.
+        if text_has_mmcif_atom_sites(text) {
+            return crate::mmcif::parse(text);
+        }
         return Err("CIF file contains no atom sites".to_string());
     }
 
@@ -468,6 +485,26 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A macromolecular (mmCIF-grammar) file under the `.cif` extension —
+    /// exactly what wwPDB serves as `1cbs.cif` — must be delegated to the
+    /// mmCIF parser instead of failing with "no atom sites".
+    #[test]
+    fn delegates_a_dotted_tag_mmcif_document_to_the_mmcif_parser() {
+        let s = parse(include_str!("../../../tests/fixtures/1ala.mmcif")).unwrap();
+        assert!(s.n_atoms > 0);
+    }
+
+    /// A document with neither `_atom_site_*` nor `_atom_site.` tags still
+    /// gets the plain-CIF error, not an mmCIF one.
+    #[test]
+    fn a_cif_without_any_atom_sites_still_errors() {
+        let err = match parse("data_x\n_cell_length_a 5.0\n") {
+            Ok(_) => panic!("expected an error"),
+            Err(e) => e,
+        };
+        assert!(err.contains("no atom sites"), "unexpected: {err}");
+    }
 
     /// Regression test for Issue #558. `pbc_bond_split.cif` lists a single
     /// molecule wrapped into the cell so the carbonyl oxygen sits on the far

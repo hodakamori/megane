@@ -28,6 +28,10 @@
 //!
 //! The **old-style** (pre-2010) free-form `.magres` is a different grammar
 //! entirely and is rejected with a clear message instead of being misparsed.
+//!
+//! Block delimiters come in two spellings in the wild: the format definition
+//! writes `[atoms]` … `[/atoms]`, but CASTEP itself and CCP-NC's `format.py`
+//! emit `<atoms>` … `</atoms>`. Both are accepted.
 
 use crate::atomic::{capitalize, symbol_to_atomic_num};
 use crate::bonds;
@@ -86,11 +90,11 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         if t.is_empty() {
             continue;
         }
-        if t.eq_ignore_ascii_case("[atoms]") {
+        if t.eq_ignore_ascii_case("[atoms]") || t.eq_ignore_ascii_case("<atoms>") {
             in_atoms = true;
             continue;
         }
-        if t.eq_ignore_ascii_case("[/atoms]") {
+        if t.eq_ignore_ascii_case("[/atoms]") || t.eq_ignore_ascii_case("</atoms>") {
             in_atoms = false;
             continue;
         }
@@ -256,6 +260,46 @@ mod tests {
         let s = parse(text).unwrap();
         assert!(s.box_matrix.is_none());
         assert_eq!(s.bonds.len(), 2);
+    }
+
+    /// CASTEP and CCP-NC's `format.py` write the block delimiters as XML-style
+    /// `<atoms>` … `</atoms>` rather than the documented `[atoms]` form.
+    #[test]
+    fn accepts_angle_bracket_block_delimiters() {
+        let text = "\
+#$magres-abinitio-v1.0
+<calculation>
+calc_code CASTEP
+</calculation>
+<atoms>
+  units lattice Angstrom
+  lattice  5.43 0.0 0.0  0.0 5.43 0.0  0.0 0.0 5.43
+  units atom Angstrom
+  atom Si Si 1  0.0 0.0 0.0
+  atom Si Si 2  1.3575 1.3575 1.3575
+</atoms>
+<magres>
+  units ms ppm
+</magres>
+";
+        let s = parse(text).unwrap();
+        assert_eq!(s.n_atoms, 2);
+        assert_eq!(s.elements, vec![14, 14]);
+        assert!((s.box_matrix.expect("lattice")[0] - 5.43).abs() < 1e-5);
+    }
+
+    /// Jmol's croconic-acid demo file — a real CCP-NC `format.py` export with
+    /// angle-bracket delimiters (the layout that used to be rejected).
+    #[test]
+    fn parses_a_real_ccpnc_fixture() {
+        let s = parse(include_str!("../../../tests/fixtures/croconic_acid.magres")).unwrap();
+        assert_eq!(s.n_atoms, 48); // 8 H + 20 C + 20 O
+        assert_eq!(s.elements.iter().filter(|&&z| z == 1).count(), 8);
+        assert_eq!(s.elements.iter().filter(|&&z| z == 6).count(), 20);
+        assert_eq!(s.elements.iter().filter(|&&z| z == 8).count(), 20);
+        let cell = s.box_matrix.expect("lattice");
+        assert!((cell[0] - 8.86546).abs() < 1e-4);
+        assert_eq!(s.atom_labels.as_ref().unwrap()[0], "H1");
     }
 
     #[test]
