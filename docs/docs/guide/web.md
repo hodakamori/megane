@@ -14,12 +14,21 @@ npm install megane-viewer
 
 `megane-viewer` works with both React 18 and React 19 — it declares a peer dependency of `react@^18.2.0 || ^19.0.0` (and the matching `react-dom`) and uses your app's React instance rather than bundling its own.
 
+The package ships TypeScript declarations for both entry points (`megane-viewer` and `megane-viewer/lib`), so no manual ambient declarations are needed.
+
+Import the bundled stylesheet once (e.g. in your app entry) so the viewer UI is styled:
+
+```ts
+import "megane-viewer/styles.css";
+```
+
 ## Full-Featured Viewer
 
 The easiest way to get started is the `MeganeViewer` component. It includes the 3D viewport, sidebar, appearance panel, timeline, tooltip, and measurement panel — everything you need in a single component.
 
 ```tsx
 import { useCallback } from "react";
+import "megane-viewer/styles.css";
 import { MeganeViewer } from "megane-viewer/lib";
 import { usePipelineStore } from "megane-viewer/lib";
 

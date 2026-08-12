@@ -136,6 +136,7 @@ docker run --rm -p 8080:8080 -v ./mydata:/data megane \
 
 ```tsx
 import { useCallback } from "react";
+import "megane-viewer/styles.css";
 import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
 
 function App() {

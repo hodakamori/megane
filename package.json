@@ -21,13 +21,27 @@
   ],
   "main": "./dist/widget.js",
   "module": "./dist/widget.js",
+  "types": "./dist/types/widget.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/types/widget.d.ts",
       "import": "./dist/widget.js"
     },
     "./lib": {
+      "types": "./dist/types/lib.d.ts",
       "import": "./dist/lib.js"
-    }
+    },
+    "./styles.css": "./dist/megane-viewer.css",
+    "./dist/megane-viewer.css": "./dist/megane-viewer.css",
+    "./dist/lib.js": {
+      "types": "./dist/types/lib.d.ts",
+      "import": "./dist/lib.js"
+    },
+    "./dist/widget.js": {
+      "types": "./dist/types/widget.d.ts",
+      "import": "./dist/widget.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist/",
@@ -37,10 +51,11 @@
   "scripts": {
     "dev": "vite",
     "build:wasm": "node scripts/build-wasm.mjs",
-    "build": "npm run build:wasm && tsc && vite build && vite build --config vite.widget.config.ts && rm -rf dist && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts && npm run build:lab",
+    "build": "npm run build:wasm && tsc && vite build && vite build --config vite.widget.config.ts && rm -rf dist && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts && npm run build:types && npm run build:lab",
     "build:app": "npm run build:wasm && tsc && vite build",
     "build:widget": "vite build --config vite.widget.config.ts",
-    "build:lib": "npm run build:wasm && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts",
+    "build:lib": "npm run build:wasm && vite build --config vite.widget.config.ts --outDir dist && vite build --config vite.lib.config.ts && npm run build:types",
+    "build:types": "tsc -p tsconfig.build-types.json && node scripts/postprocess-dts.mjs",
     "build:lab": "cd jupyterlab-megane && npm install && npm run build",
     "preview": "vite preview",
     "demo:video": "node scripts/demo-video.mjs",
@@ -90,6 +105,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
+    "@types/three": "^0.183.0",
     "@xyflow/react": "^12.0.0",
     "driver.js": "^1.4.0",
     "gif.js": "^0.2.0",
@@ -109,7 +125,6 @@
     "@types/react-dom": "^19.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@types/three": "^0.183.0",
     "@vitejs/plugin-react": "^4.3.0",
     "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.39.4",

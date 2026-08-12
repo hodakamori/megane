@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": false,
+    "stripInternal": true,
+    "rootDir": "src",
+    "outDir": "dist/types"
+  },
+  "include": ["src/lib.ts", "src/widget.ts", "src/vite-env.d.ts", "src/types/gif.js.d.ts"],
+  "references": []
+}
