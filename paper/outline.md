@@ -131,8 +131,8 @@ Impact Statement, AI Usage Disclosure. No API documentation in the paper.
 - [ ] `paper/paper.md` + `paper/paper.bib` on a dedicated branch
 - [ ] Word count 750–1750
 - [ ] Development history: JOSS guideline asks for ~6 months of public
-      iterative history; repo started 2026-07-05 — consider submission
-      timing (~2027-01) or be ready to justify maturity in the
-      pre-review.
+      iterative history; first commit is 2026-02-27 (~2,000 commits),
+      so the guideline is met from ~2026-09 onward — no need to delay
+      submission.
 - [ ] Archive a release (Zenodo DOI) at acceptance time
 - [ ] Author ORCID + affiliation filled in
