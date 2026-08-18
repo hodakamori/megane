@@ -183,11 +183,14 @@ fn invert3x3(m: &[f32; 9]) -> Option<[f32; 9]> {
 /// Connectivity for the unwrap is determined with the minimum-image convention
 /// using the same covalent-radius criterion as `infer_bonds`, so exactly the
 /// bonds that inference would otherwise find (were the molecule contiguous) are
-/// used to knit each component together. Atoms with no bonds, and molecules
-/// that are already whole, are left untouched (all lattice shifts are zero), so
-/// this is a no-op for the common contiguous case. Positions are modified in
-/// place. The unit cell is unchanged, so whole molecules may poke slightly
-/// outside the `[0,1)` box (the standard VESTA/Mercury depiction).
+/// used to knit each component together. A finite molecule has a consistent
+/// lattice shift for every path through its bond graph. An extended periodic
+/// network has at least one cycle with non-zero lattice winding; such a component
+/// cannot be made whole in a single image and is deliberately left in the home
+/// cell. Atoms with no bonds, periodic networks, and molecules that are already
+/// whole are therefore untouched. Positions are modified in place. The unit cell
+/// is unchanged, so a finite whole molecule may poke slightly outside the
+/// `[0,1)` box (the standard VESTA/Mercury depiction).
 pub fn unwrap_molecules(positions: &mut [f32], elements: &[u8], box_matrix: &[f32; 9]) {
     let n = elements.len();
     if n < 2 {
@@ -235,8 +238,12 @@ pub fn unwrap_molecules(positions: &mut [f32], elements: &[u8], box_matrix: &[f3
         }
     }
 
-    // Flood-fill each connected component, accumulating lattice shifts so the
-    // whole molecule is expressed in one image. The seed atom stays put.
+    // Flood-fill each connected component, accumulating lattice shifts so a
+    // finite molecule is expressed in one image. The seed atom stays put. If an
+    // already visited atom is reached with a different shift, the component has
+    // a non-zero periodic winding and is an extended network rather than a
+    // finite molecule. Reset every shift in that component so its crystallographic
+    // coordinates remain in the home cell.
     let mut shift = vec![[0i32; 3]; n];
     let mut visited = vec![false; n];
     let mut stack: Vec<usize> = Vec::new();
@@ -246,13 +253,24 @@ pub fn unwrap_molecules(positions: &mut [f32], elements: &[u8], box_matrix: &[f3
         }
         visited[start] = true;
         stack.push(start);
+        let mut component = Vec::new();
+        let mut has_periodic_winding = false;
         while let Some(i) = stack.pop() {
+            component.push(i);
             for &(j, s) in &adj[i] {
+                let expected = [shift[i][0] + s[0], shift[i][1] + s[1], shift[i][2] + s[2]];
                 if !visited[j] {
                     visited[j] = true;
-                    shift[j] = [shift[i][0] + s[0], shift[i][1] + s[1], shift[i][2] + s[2]];
+                    shift[j] = expected;
                     stack.push(j);
+                } else if shift[j] != expected {
+                    has_periodic_winding = true;
                 }
+            }
+        }
+        if has_periodic_winding {
+            for i in component {
+                shift[i] = [0, 0, 0];
             }
         }
     }
@@ -304,6 +322,56 @@ pub fn infer_bonds(
             None
         }
     })
+}
+
+/// Infer covalent bonds with the minimum-image convention without moving atoms
+/// out of their crystallographic cell. This is the appropriate path for
+/// periodic structures: connectivity may cross a cell face, while structural
+/// coordinates remain exactly as supplied by the file.
+pub fn infer_bonds_periodic(
+    positions: &[f32],
+    elements: &[u8],
+    n_atoms: usize,
+    existing_bonds: &HashSet<(u32, u32)>,
+    box_matrix: &[f32; 9],
+) -> Vec<(u32, u32)> {
+    let minv = match invert3x3(box_matrix) {
+        Some(matrix) => matrix,
+        None => return infer_bonds(positions, elements, n_atoms, existing_bonds),
+    };
+    let mut inferred = Vec::with_capacity(n_atoms);
+
+    for i in 0..n_atoms {
+        for j in (i + 1)..n_atoms {
+            let mut dx = positions[j * 3] - positions[i * 3];
+            let mut dy = positions[j * 3 + 1] - positions[i * 3 + 1];
+            let mut dz = positions[j * 3 + 2] - positions[i * 3 + 2];
+
+            let mut fa = dx * minv[0] + dy * minv[3] + dz * minv[6];
+            let mut fb = dx * minv[1] + dy * minv[4] + dz * minv[7];
+            let mut fc = dx * minv[2] + dy * minv[5] + dz * minv[8];
+            fa -= fa.round();
+            fb -= fb.round();
+            fc -= fc.round();
+
+            dx = fa * box_matrix[0] + fb * box_matrix[3] + fc * box_matrix[6];
+            dy = fa * box_matrix[1] + fb * box_matrix[4] + fc * box_matrix[7];
+            dz = fa * box_matrix[2] + fb * box_matrix[5] + fc * box_matrix[8];
+
+            let dist_sq = dx * dx + dy * dy + dz * dz;
+            let threshold =
+                (covalent_radius(elements[i]) + covalent_radius(elements[j])) * BOND_TOLERANCE;
+            let pair = (i as u32, j as u32);
+            if dist_sq > MIN_BOND_DIST * MIN_BOND_DIST
+                && dist_sq <= threshold * threshold
+                && !existing_bonds.contains(&pair)
+            {
+                inferred.push(pair);
+            }
+        }
+    }
+
+    inferred
 }
 
 /// Infer bonds using VDW radii: bond if distance <= (vdw_i + vdw_j) * 0.6.
@@ -382,6 +450,26 @@ mod tests {
         assert_eq!(bonds, vec![(0, 1)]);
     }
 
+    #[test]
+    fn test_infer_bonds_periodic_recovers_split_bond_without_moving_atoms() {
+        let a = 8.0f32;
+        let box_m = [a, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, a];
+        let positions = vec![0.4, 4.0, 4.0, 7.16, 4.0, 4.0];
+        let elements = vec![6u8, 8u8];
+        let before = positions.clone();
+
+        let inferred = infer_bonds_periodic(
+            &positions,
+            &elements,
+            elements.len(),
+            &HashSet::new(),
+            &box_m,
+        );
+
+        assert_eq!(inferred, vec![(0, 1)]);
+        assert_eq!(positions, before);
+    }
+
     /// A molecule already whole must be left exactly as-is (all shifts zero).
     #[test]
     fn test_unwrap_molecules_noop_for_contiguous() {
@@ -421,6 +509,27 @@ mod tests {
         assert!(set.contains(&(2, 3)));
         // Molecule B was already whole — untouched.
         assert!((positions[6] - 3.0).abs() < 1e-6 && (positions[9] - 4.2).abs() < 1e-6);
+    }
+
+    /// A bond graph whose cycle winds around the cell is an extended periodic
+    /// network, not a finite molecule. There is no single set of atom images
+    /// that makes every edge whole, so crystallographic positions must remain
+    /// in the home cell.
+    #[test]
+    fn test_unwrap_molecules_leaves_periodic_network_in_home_cell() {
+        let a = 3.0f32;
+        let box_m = [a, 0.0, 0.0, 0.0, a, 0.0, 0.0, 0.0, a];
+        let mut positions = vec![
+            0.3, 1.5, 1.5, // C at fractional x = 0.1
+            1.5, 1.5, 1.5, // C at fractional x = 0.5
+            2.7, 1.5, 1.5, // C at fractional x = 0.9
+        ];
+        let elements = vec![6u8, 6u8, 6u8];
+        let before = positions.clone();
+
+        unwrap_molecules(&mut positions, &elements, &box_m);
+
+        assert_eq!(positions, before);
     }
 
     #[test]

@@ -20,34 +20,59 @@ interface DisplaySite {
   imageC: number;
 }
 
+type PeriodicDisplacement = [number, number, number, number, number, number];
+
 function siteKey(sourceIndex: number, a: number, b: number, c: number): string {
   return `${sourceIndex}:${a}:${b}:${c}`;
 }
 
-function minimumImage(
+function periodicDisplacementsWithinCutoff(
   dx: number,
   dy: number,
   dz: number,
   box: Float32Array,
   inverse: Float32Array,
-): [number, number, number, number, number, number] {
-  let sx = inverse[0] * dx + inverse[3] * dy + inverse[6] * dz;
-  let sy = inverse[1] * dx + inverse[4] * dy + inverse[7] * dz;
-  let sz = inverse[2] * dx + inverse[5] * dy + inverse[8] * dz;
-  const wrapA = Math.round(sx);
-  const wrapB = Math.round(sy);
-  const wrapC = Math.round(sz);
-  sx -= wrapA;
-  sy -= wrapB;
-  sz -= wrapC;
-  return [
-    box[0] * sx + box[3] * sy + box[6] * sz,
-    box[1] * sx + box[4] * sy + box[7] * sz,
-    box[2] * sx + box[5] * sy + box[8] * sz,
-    -wrapA,
-    -wrapB,
-    -wrapC,
-  ];
+  cutoffSq: number,
+): PeriodicDisplacement[] {
+  const fa = inverse[0] * dx + inverse[3] * dy + inverse[6] * dz;
+  const fb = inverse[1] * dx + inverse[4] * dy + inverse[7] * dz;
+  const fc = inverse[2] * dx + inverse[5] * dy + inverse[8] * dz;
+  const cutoff = Math.sqrt(cutoffSq);
+  const epsilon = 1e-7;
+
+  // If a Cartesian displacement is within the cutoff, each of its fractional
+  // components is bounded by cutoff times the corresponding reciprocal-vector
+  // length. These bounds enumerate every lattice image inside the sphere,
+  // including multiple equally near images of the same structural atom.
+  const radiusA = cutoff * Math.hypot(inverse[0], inverse[3], inverse[6]);
+  const radiusB = cutoff * Math.hypot(inverse[1], inverse[4], inverse[7]);
+  const radiusC = cutoff * Math.hypot(inverse[2], inverse[5], inverse[8]);
+  const aMin = Math.ceil(-fa - radiusA - epsilon);
+  const aMax = Math.floor(-fa + radiusA + epsilon);
+  const bMin = Math.ceil(-fb - radiusB - epsilon);
+  const bMax = Math.floor(-fb + radiusB + epsilon);
+  const cMin = Math.ceil(-fc - radiusC - epsilon);
+  const cMax = Math.floor(-fc + radiusC + epsilon);
+  const images: PeriodicDisplacement[] = [];
+
+  for (let imageA = aMin; imageA <= aMax; imageA++) {
+    for (let imageB = bMin; imageB <= bMax; imageB++) {
+      for (let imageC = cMin; imageC <= cMax; imageC++) {
+        const sa = fa + imageA;
+        const sb = fb + imageB;
+        const sc = fc + imageC;
+        const imageDx = box[0] * sa + box[3] * sb + box[6] * sc;
+        const imageDy = box[1] * sa + box[4] * sb + box[7] * sc;
+        const imageDz = box[2] * sa + box[5] * sb + box[8] * sc;
+        const distanceSq = imageDx * imageDx + imageDy * imageDy + imageDz * imageDz;
+        if (distanceSq <= cutoffSq + epsilon && distanceSq > 0.01) {
+          images.push([imageDx, imageDy, imageDz, imageA, imageB, imageC]);
+        }
+      }
+    }
+  }
+
+  return images;
 }
 
 /** Convert directed coordination relationships to the normal bond stream. */
@@ -232,26 +257,27 @@ export function executeCoordinationGenerator(
     for (const ligandSource of ligandSourceIndices) {
       const cutoff = centerCutoffs.get(elements[ligandSource]);
       if (cutoff === undefined) continue;
-      let dx = positions[ligandSource * 3] - centerSourceX;
-      let dy = positions[ligandSource * 3 + 1] - centerSourceY;
-      let dz = positions[ligandSource * 3 + 2] - centerSourceZ;
-      let imageA = 0;
-      let imageB = 0;
-      let imageC = 0;
+      const dx = positions[ligandSource * 3] - centerSourceX;
+      const dy = positions[ligandSource * 3 + 1] - centerSourceY;
+      const dz = positions[ligandSource * 3 + 2] - centerSourceZ;
+      let displacements: PeriodicDisplacement[];
       if (box && inverse) {
-        [dx, dy, dz, imageA, imageB, imageC] = minimumImage(dx, dy, dz, box, inverse);
+        displacements = periodicDisplacementsWithinCutoff(dx, dy, dz, box, inverse, cutoff);
+      } else {
+        const distanceSq = dx * dx + dy * dy + dz * dz;
+        displacements = distanceSq <= cutoff && distanceSq > 0.01 ? [[dx, dy, dz, 0, 0, 0]] : [];
       }
-      const distanceSq = dx * dx + dy * dy + dz * dz;
-      if (distanceSq > cutoff || distanceSq <= 0.01) continue;
 
-      imageA += center.imageA;
-      imageB += center.imageB;
-      imageC += center.imageC;
-      const x = center.x + dx;
-      const y = center.y + dy;
-      const z = center.z + dz;
-      const ligand = appendOutsideSite(ligandSource, imageA, imageB, imageC, x, y, z);
-      relationships.push(center.dataIndex, ligand.dataIndex);
+      for (const [imageDx, imageDy, imageDz, relativeA, relativeB, relativeC] of displacements) {
+        const imageA = center.imageA + relativeA;
+        const imageB = center.imageB + relativeB;
+        const imageC = center.imageC + relativeC;
+        const x = center.x + imageDx;
+        const y = center.y + imageDy;
+        const z = center.z + imageDz;
+        const ligand = appendOutsideSite(ligandSource, imageA, imageB, imageC, x, y, z);
+        relationships.push(center.dataIndex, ligand.dataIndex);
+      }
     }
   }
 

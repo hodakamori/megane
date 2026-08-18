@@ -129,6 +129,45 @@ fn split_tag_value(line: &str) -> Option<(&str, &str)> {
 }
 
 /// Extract the symop field from a single data row of a symmetry loop.
+fn split_cif_fields(line: &str) -> Vec<String> {
+    let bytes = line.as_bytes();
+    let mut fields = Vec::new();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i == bytes.len() {
+            break;
+        }
+
+        if bytes[i] == b'\'' || bytes[i] == b'"' {
+            let quote = bytes[i];
+            i += 1;
+            let start = i;
+            while i < bytes.len()
+                && !(bytes[i] == quote
+                    && (i + 1 == bytes.len() || bytes[i + 1].is_ascii_whitespace()))
+            {
+                i += 1;
+            }
+            fields.push(line[start..i].to_string());
+            if i < bytes.len() {
+                i += 1;
+            }
+        } else {
+            let start = i;
+            while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            fields.push(line[start..i].to_string());
+        }
+    }
+
+    fields
+}
+
 fn extract_symop_field(line: &str, col: usize, col_count: usize) -> Option<String> {
     let line = line.trim();
     // Single-column loop: the entire (possibly quoted) line is the symop.
@@ -136,16 +175,13 @@ fn extract_symop_field(line: &str, col: usize, col_count: usize) -> Option<Strin
         let v = strip_quotes(line);
         return (!v.is_empty()).then(|| v.to_string());
     }
-    let fields: Vec<&str> = line.split_whitespace().collect();
+    let fields = split_cif_fields(line);
     if fields.len() < col_count {
-        // Quoted symop containing spaces desynced the column count — fall back
-        // to the first token that looks like an `x,y,z` operation.
-        return fields
-            .iter()
-            .find(|f| f.contains(','))
-            .map(|f| strip_quotes(f).to_string());
+        // Some malformed-but-common files omit the id/flag columns and provide
+        // only the operation. Preserve the existing comma-token fallback.
+        return fields.into_iter().find(|field| field.contains(','));
     }
-    fields.get(col).map(|f| strip_quotes(f).to_string())
+    fields.get(col).cloned()
 }
 
 /// Extract crystallographic symmetry operations from CIF/mmCIF text.
@@ -421,18 +457,15 @@ pub fn parse(text: &str) -> Result<ParsedStructure, String> {
         return Err("CIF file contains no atom sites".to_string());
     }
 
-    // Make molecules whole before inferring bonds. CIFs frequently list every
-    // atom wrapped into the [0,1) cell, which splits a molecule that straddles
-    // a face; since bond inference is not periodic, the cross-boundary bonds
-    // would otherwise be dropped (Issue #558). Unwrapping is a no-op when the
-    // asymmetric unit is already contiguous.
-    if let Some(bm) = box_matrix.as_ref() {
-        bonds::unwrap_molecules(&mut positions, &elements, bm);
-    }
-
-    // Infer bonds on the (now whole) asymmetric unit.
+    // Infer periodic connectivity without changing the crystallographic atom
+    // sites. Moving atoms to make a finite molecule whole is invalid for an
+    // extended inorganic network and corrupts which atoms belong to the home
+    // cell. Downstream bond rendering resolves cross-boundary bond images.
     let empty_bonds = HashSet::new();
-    let bonds = bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds);
+    let bonds = match box_matrix.as_ref() {
+        Some(bm) => bonds::infer_bonds_periodic(&positions, &elements, n_atoms, &empty_bonds, bm),
+        None => bonds::infer_bonds(&positions, &elements, n_atoms, &empty_bonds),
+    };
 
     let labels = if atom_labels.iter().any(|l| !l.is_empty()) {
         Some(atom_labels)
@@ -508,8 +541,8 @@ mod tests {
 
     /// Regression test for Issue #558. `pbc_bond_split.cif` lists a single
     /// molecule wrapped into the cell so the carbonyl oxygen sits on the far
-    /// side of the a-face from the carbon. The parser must unwrap the molecule
-    /// and recover the C–O bond that non-periodic inference would otherwise drop.
+    /// side of the a-face from the carbon. Periodic inference must recover the
+    /// C–O bond without changing either atom's crystallographic coordinates.
     #[test]
     fn test_parse_recovers_bond_across_periodic_boundary() {
         let text = std::fs::read_to_string(concat!(
@@ -519,6 +552,11 @@ mod tests {
         .expect("read fixture");
         let s = parse(&text).unwrap();
         assert_eq!(s.n_atoms, 4);
+        let matrix = s.box_matrix.expect("fixture cell");
+        let expected_oxygen = fract_to_cart(0.895, 0.5, 0.5, &matrix);
+        assert!((s.positions[3] - expected_oxygen.0).abs() < 1e-4);
+        assert!((s.positions[4] - expected_oxygen.1).abs() < 1e-4);
+        assert!((s.positions[5] - expected_oxygen.2).abs() < 1e-4);
         // C–O (the boundary-crossing bond) plus the two C–H bonds.
         assert_eq!(s.bonds.len(), 3);
         let has = |a: u32, b: u32| s.bonds.contains(&(a, b)) || s.bonds.contains(&(b, a));
@@ -528,6 +566,36 @@ mod tests {
         );
         assert!(has(0, 2));
         assert!(has(0, 3));
+    }
+
+    /// Extended inorganic networks must keep the crystallographic atom sites
+    /// in the home cell. Treating the network as one finite molecule moves
+    /// arbitrary atoms by lattice vectors and corrupts the displayed structure.
+    #[test]
+    fn test_parse_periodic_network_keeps_sites_in_home_cell() {
+        let text = include_str!("../../../tests/fixtures/zn3in2o6_periodic.cif");
+        let s = parse(text).expect("parse Zn3In2O6 fixture");
+        assert_eq!(s.n_atoms, 33);
+        assert_eq!(s.symmetry_ops, vec!["x, y, z"]);
+
+        let matrix = s.box_matrix.expect("fixture cell");
+        let one_third = 1.0 / 3.0;
+        let two_thirds = 2.0 / 3.0;
+        let expected_fractional = [
+            (2, two_thirds, one_third, 0.20210733),
+            (8, 0.0, 0.0, 0.868_774),
+            (15, 0.0, 0.0, 0.084_947),
+            (16, two_thirds, one_third, 0.24936233),
+            (27, one_third, two_thirds, 0.751_613_7),
+            (28, 0.0, 0.0, 0.916_029),
+        ];
+        for (index, fx, fy, fz) in expected_fractional {
+            let (x, y, z) = fract_to_cart(fx, fy, fz, &matrix);
+            let actual = &s.positions[index * 3..index * 3 + 3];
+            assert!((actual[0] - x).abs() < 1e-4, "atom {index} x shifted");
+            assert!((actual[1] - y).abs() < 1e-4, "atom {index} y shifted");
+            assert!((actual[2] - z).abs() < 1e-4, "atom {index} z shifted");
+        }
     }
 
     #[test]
@@ -566,6 +634,19 @@ _space_group_symop_operation_xyz
 "#;
         let ops = extract_symmetry_ops(cif);
         assert_eq!(ops, vec!["x,y,z", "-x,-y,-z"]);
+    }
+
+    #[test]
+    fn test_extract_symmetry_ops_quoted_field_with_spaces() {
+        let cif = r#"data_x
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+1 'x, y, z'
+2 '-x, -y, -z'
+"#;
+        let ops = extract_symmetry_ops(cif);
+        assert_eq!(ops, vec!["x, y, z", "-x, -y, -z"]);
     }
 
     #[test]

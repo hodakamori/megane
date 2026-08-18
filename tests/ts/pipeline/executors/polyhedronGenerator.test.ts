@@ -135,15 +135,27 @@ describe("Coordination -> Polyhedra responsibility split", () => {
   });
 
   it("applies minimum-image PBC in Coordination, not Polyhedra", () => {
-    const box = new Float32Array([4, 0, 0, 0, 4, 0, 0, 0, 4]);
+    const box = new Float32Array([6, 0, 0, 0, 6, 0, 0, 0, 6]);
     const particle = makeParticle(
       [22, 8, 8, 8, 8, 8, 8],
-      [2, 2, 2, 0.5, 2, 2, 3.5, 2, 2, 2, 0.5, 2, 2, 3.5, 2, 2, 2, 0.5, 2, 2, 3.5],
+      [3, 3, 3, 1, 3, 3, 5, 3, 3, 3, 1, 3, 3, 5, 3, 3, 3, 1, 3, 3, 5],
       box,
     );
     const coordination = coordinate(particle).get("coordination") as CoordinationData;
     expect(coordination.nBonds).toBe(6);
     expect(polyhedra(coordination).has("mesh")).toBe(true);
+  });
+
+  it("keeps distinct periodic images of the same ligand source", () => {
+    const box = new Float32Array([3, 0, 0, 0, 10, 0, 0, 0, 10]);
+    const particle = makeParticle([22, 8], [1.5, 5, 5, 0, 5, 5], box);
+
+    const coordination = coordinate(particle).get("coordination") as CoordinationData;
+
+    expect(coordination.nBonds).toBe(2);
+    expect(Array.from(coordination.bondIndices)).toEqual([0, 1, 0, 2]);
+    expect(coordination.outsideBoundaryImages?.sourceIndices).toEqual(new Uint32Array([1]));
+    expect(coordination.outsideBoundaryImages?.latticeShifts).toEqual(new Int32Array([1, 0, 0]));
   });
 
   it("completes visible centers on the coordination/bond stream without Polyhedra", () => {
@@ -155,7 +167,7 @@ describe("Coordination -> Polyhedra responsibility split", () => {
     );
     particle.drawingBoundary = generateDrawingBoundaryImages(particle.source);
 
-    const result = coordinate(particle);
+    const result = coordinate(particle, coordinationParams({ cutoffTolerance: 0.7 }));
     const coordination = result.get("coordination") as CoordinationData;
     const bonds = result.get("bond") as BondData;
     expect(coordination.outsideBoundaryImages?.elements).toEqual(new Uint8Array([8]));
