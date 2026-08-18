@@ -61,6 +61,7 @@ import {
   Filter,
   Modify,
   DrawingBoundary,
+  BoundaryCompletion,
   Color,
   Representation,
   AddBonds,
@@ -85,6 +86,7 @@ Constructor parameters mirror the Python API (using an options object instead of
 | `AddBonds(source="distance")`            | `new AddBonds({ source: 'distance' })`           |
 | `AddLabels(source="element")`            | `new AddLabels({ source: 'element' })`           |
 | `DrawingBoundary(x_min=0, x_max=1)`      | `new DrawingBoundary({ xMin: 0, xMax: 1 })`      |
+| `BoundaryCompletion(mode="components")`  | `new BoundaryCompletion({ mode: "components" })` |
 | `AddCoordination(excluded_centers=[38])` | `new AddCoordination({ excludedCenters: [38] })` |
 | `AddPolyhedra(opacity=0.5)`              | `new AddPolyhedra({ opacity: 0.5 })`             |
 | `VectorOverlay(scale=2.0)`               | `new VectorOverlay({ scale: 2.0 })`              |

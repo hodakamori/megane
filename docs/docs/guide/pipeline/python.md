@@ -61,6 +61,7 @@ from megane import (
     Filter,
     Modify,
     DrawingBoundary,
+    BoundaryCompletion,
     Color,
     Representation,
     AddBonds,
@@ -296,6 +297,19 @@ Drawing Boundary creates periodic display copies inside inclusive fractional
 bounds without changing structural atom indices or enlarging the cell.
 
 **Ports:** `inp.particle`, `out.particle`
+
+### BoundaryCompletion
+
+```python
+BoundaryCompletion(*, mode: Literal["neighbors", "components"] = "neighbors")
+```
+
+Adds bond-connected periodic display copies without changing crystallographic
+coordinates. `"neighbors"` completes one bond shell. `"components"` completes
+finite connected components, but deliberately leaves infinite periodic
+networks unexpanded.
+
+**Ports:** `inp.particle`, `inp.bond`, `out.particle`, `out.bond`
 
 ### AddCoordination
 

@@ -93,6 +93,14 @@ Unlike Replicate it does not alter the structural atom count or unit cell.
 - Inputs: `particle`
 - Outputs: `particle` with Drawing Boundary copies
 
+### boundary_completion
+Adds bond-connected periodic display atoms outside Drawing Boundary without
+changing crystallographic coordinates. Finite-component mode deliberately leaves
+infinite periodic networks unexpanded.
+- Parameters: `{ type: "boundary_completion", mode: "neighbors" | "components" }`
+- Inputs: `particle` from Drawing Boundary and periodic `bond` data
+- Outputs: completed `particle` and `bond`
+
 ### color
 Recolors atoms using a palette mode, overriding the default per-element coloring.
 - Parameters: `{ type: "color", mode: "uniform" | "byElement" | "byResidue" | "byChain" | "byBFactor" | "byProperty", uniformColor: string, range?: [number, number] }`

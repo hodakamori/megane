@@ -160,6 +160,16 @@ It does not change structural atom indices or enlarge the unit cell.
 | `yMin`, `yMax` | `number` | Inclusive bounds along lattice vector b (default `0`, `1`) |
 | `zMin`, `zMax` | `number` | Inclusive bounds along lattice vector c (default `0`, `1`) |
 
+#### `boundary_completion`
+
+Adds bond-connected periodic display copies outside Drawing Boundary without
+changing crystallographic coordinates. It requires both particle and bond
+inputs and emits completed versions of both streams.
+
+| Field  | Type     | Description                                                                                                               |
+| ------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `mode` | `string` | `"neighbors"` completes one bond shell; `"components"` completes only finite connected components (default `"neighbors"`) |
+
 #### `coordination_generator`
 
 Finds directed relationships between center atoms and their bonded neighbors.

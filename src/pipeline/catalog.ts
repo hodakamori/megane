@@ -317,6 +317,22 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
     inPrompt: true,
     pythonClass: "DrawingBoundary",
   },
+  boundary_completion: {
+    description:
+      "Adds bond-connected periodic display atoms outside Drawing Boundary without\nchanging crystallographic coordinates. Finite-component mode deliberately leaves\ninfinite periodic networks unexpanded.",
+    params: [
+      {
+        jsonKey: "mode",
+        tsType: '"neighbors" | "components"',
+        default: '"neighbors"',
+        doc: "Complete one neighbor shell or each finite connected component.",
+      },
+    ],
+    promptInputs: "`particle` from Drawing Boundary and periodic `bond` data",
+    promptOutputs: "completed `particle` and `bond`",
+    inPrompt: true,
+    pythonClass: "BoundaryCompletion",
+  },
   color: {
     description:
       "Recolors atoms using a palette mode, overriding the default per-element coloring.",

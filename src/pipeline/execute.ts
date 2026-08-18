@@ -19,6 +19,7 @@ import type {
   ModifyParams,
   ReplicateParams,
   DrawingBoundaryParams,
+  BoundaryCompletionParams,
   CoordinationGeneratorParams,
   ColorParams,
   RepresentationParams,
@@ -45,6 +46,7 @@ import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
 import { executeReplicate } from "./executors/replicate";
 import { executeDrawingBoundary } from "./executors/drawingBoundary";
+import { executeBoundaryCompletion } from "./executors/boundaryCompletion";
 import { executeCoordinationGenerator } from "./executors/coordinationGenerator";
 import { executeColor } from "./executors/color";
 import { executeRepresentation } from "./executors/representation";
@@ -244,6 +246,17 @@ export function executePipeline(
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
         } else if (!outputs.has("coordination")) {
           addError(id, { message: "No coordination pairs found", severity: "warning" });
+        }
+        break;
+      }
+      case "boundary_completion": {
+        const outputs = executeBoundaryCompletion(data.params as BoundaryCompletionParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length || !inputs.get("bond")?.length) {
+          addError(id, {
+            message: "Particle and bond inputs are both required",
+            severity: "warning",
+          });
         }
         break;
       }

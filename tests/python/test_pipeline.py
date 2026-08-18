@@ -9,6 +9,7 @@ from megane.pipeline import (
     AddCoordination,
     AddLabels,
     AddPolyhedra,
+    BoundaryCompletion,
     Color,
     DrawingBoundary,
     Filter,
@@ -140,6 +141,15 @@ class TestNodeClasses:
         assert n.x_max == 1.1
         assert n.z_max == 2.0
         assert n._node_type == "drawing_boundary"
+
+    def test_boundary_completion(self):
+        n = BoundaryCompletion(mode="components")
+        assert n.mode == "components"
+        assert n._node_type == "boundary_completion"
+        assert n.inp.particle.handle == "particle"
+        assert n.inp.bond.handle == "bond"
+        assert n.out.particle.handle == "particle"
+        assert n.out.bond.handle == "bond"
 
     def test_add_coordination(self):
         n = AddCoordination(
@@ -688,6 +698,22 @@ class TestPipelineSerialization:
         poly_node = next(n for n in result["nodes"] if n["type"] == "polyhedron_generator")
         assert poly_node["opacity"] == 0.7
         assert "excludedCenters" not in poly_node
+
+    def test_boundary_completion_round_trip(self):
+        pipe = Pipeline()
+        node = pipe.add_node(BoundaryCompletion(mode="components"))
+        result = pipe.to_dict()
+        serialized = next(n for n in result["nodes"] if n["id"] == node._id)
+        assert serialized["type"] == "boundary_completion"
+        assert serialized["mode"] == "components"
+
+        rebuilt = Pipeline.from_dict(result)
+        rebuilt_node = next(
+            value for value, config in rebuilt._nodes.values()
+            if config["type"] == "boundary_completion"
+        )
+        assert isinstance(rebuilt_node, BoundaryCompletion)
+        assert rebuilt_node.mode == "components"
 
 
 class TestPipelineDataLoading:

@@ -321,6 +321,28 @@ class DrawingBoundary(PipelineNode):
         self.z_max = z_max
 
 
+class BoundaryCompletion(PipelineNode):
+    """Add bond-connected periodic copies to a Drawing Boundary.
+
+    ``neighbors`` completes one bond shell. ``components`` completes finite
+    connected components while leaving infinite periodic networks unchanged.
+
+    Ports:
+        inp.particle — atom data carrying a Drawing Boundary
+        inp.bond     — periodic bond topology
+        out.particle — atom data carrying completed display copies
+        out.bond     — bonds repeated over the completed copies
+    """
+
+    _node_type = "boundary_completion"
+    _out_ports = {"particle": "particle", "bond": "bond"}
+    _inp_ports = {"particle": "particle", "bond": "bond"}
+
+    def __init__(self, *, mode: Literal["neighbors", "components"] = "neighbors") -> None:
+        super().__init__()
+        self.mode = mode
+
+
 class Color(PipelineNode):
     """Recolor the upstream particle stream by a chosen scheme.
 
@@ -860,6 +882,8 @@ class Pipeline:
                 z_min=nd.get("zMin", 0.0),
                 z_max=nd.get("zMax", 1.0),
             )
+        elif ntype == "boundary_completion":
+            return BoundaryCompletion(mode=nd.get("mode", "neighbors"))
         elif ntype == "add_bond":
             bond_source = nd.get("bondSource", "distance")
             if bond_source == "file":
@@ -1052,6 +1076,8 @@ class Pipeline:
             base["yMax"] = node.y_max
             base["zMin"] = node.z_min
             base["zMax"] = node.z_max
+        elif isinstance(node, BoundaryCompletion):
+            base["mode"] = node.mode
         elif isinstance(node, AddBonds):
             if node.top is not None:
                 base["bondSource"] = "file"

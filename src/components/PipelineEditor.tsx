@@ -42,6 +42,7 @@ import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
 import { ReplicateNode } from "./nodes/ReplicateNode";
 import { DrawingBoundaryNode } from "./nodes/DrawingBoundaryNode";
+import { BoundaryCompletionNode } from "./nodes/BoundaryCompletionNode";
 import { CoordinationGeneratorNode } from "./nodes/CoordinationGeneratorNode";
 import { ColorNode } from "./nodes/ColorNode";
 import { RepresentationNode } from "./nodes/RepresentationNode";
@@ -74,6 +75,7 @@ const nodeTypes = {
   modify: ModifyNode,
   replicate: ReplicateNode,
   drawing_boundary: DrawingBoundaryNode,
+  boundary_completion: BoundaryCompletionNode,
   color: ColorNode,
   representation: RepresentationNode,
   label_generator: LabelGeneratorNode,
@@ -107,7 +109,14 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   {
     category: "modify",
     label: "Modify",
-    types: ["modify", "color", "representation", "replicate", "drawing_boundary"],
+    types: [
+      "modify",
+      "color",
+      "representation",
+      "replicate",
+      "drawing_boundary",
+      "boundary_completion",
+    ],
   },
   {
     category: "overlay",

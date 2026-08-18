@@ -455,7 +455,8 @@ function findReachableViewport(
         tgt.type !== "modify" &&
         tgt.type !== "color" &&
         tgt.type !== "representation" &&
-        tgt.type !== "drawing_boundary"
+        tgt.type !== "drawing_boundary" &&
+        tgt.type !== "boundary_completion"
       )
         continue;
       if (!visited.has(tgt.id)) {

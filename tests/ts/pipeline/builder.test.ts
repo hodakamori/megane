@@ -9,6 +9,7 @@ import {
   Filter,
   Modify,
   DrawingBoundary,
+  BoundaryCompletion,
   AddBonds,
   AddCoordination,
   AddLabels,
@@ -253,6 +254,20 @@ describe("DrawingBoundary", () => {
       zMin: 0,
       zMax: 2,
     });
+  });
+});
+
+describe("BoundaryCompletion", () => {
+  it("serializes its finite-component policy and exposes both stream types", () => {
+    const node = new BoundaryCompletion({ mode: "components" });
+    expect(node._toSerializedParams()).toEqual({
+      type: "boundary_completion",
+      mode: "components",
+    });
+    expect(node.inp.particle.handle).toBe("particle");
+    expect(node.inp.bond.handle).toBe("bond");
+    expect(node.out.particle.handle).toBe("particle");
+    expect(node.out.bond.handle).toBe("bond");
   });
 });
 

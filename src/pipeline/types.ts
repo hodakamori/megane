@@ -84,6 +84,15 @@ export interface DrawingBoundaryData {
   images: PeriodicAtomImageData;
 }
 
+/** Structural bonds with the exact periodic image used by each target atom. */
+export interface PeriodicBondTopologyData {
+  /** Structural atom pairs, oriented source -> target. */
+  bondIndices: Uint32Array;
+  /** Integer target-image shifts, interleaved (a,b,c), one triple per bond. */
+  targetLatticeShifts: Int32Array;
+  bondOrders: Uint8Array | null;
+}
+
 /** Bond data flowing through the pipeline. */
 export interface BondData {
   type: "bond";
@@ -109,6 +118,8 @@ export interface BondData {
    * environment of visible centers even when no polyhedron mesh is connected.
    */
   periodicImages?: PeriodicAtomImageData | null;
+  /** Non-rendering topology retained for boundary completion and provenance. */
+  periodicTopology?: PeriodicBondTopologyData | null;
 }
 
 /**
@@ -295,6 +306,7 @@ export type PipelineNodeType =
   | "modify"
   | "replicate"
   | "drawing_boundary"
+  | "boundary_completion"
   | "color"
   | "representation"
   | "label_generator"
@@ -319,6 +331,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   modify: "Modify",
   replicate: "Replicate",
   drawing_boundary: "Drawing Boundary",
+  boundary_completion: "Boundary Completion",
   color: "Color",
   representation: "Representation",
   label_generator: "Labels",
@@ -347,6 +360,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   modify: "modify",
   replicate: "modify",
   drawing_boundary: "modify",
+  boundary_completion: "modify",
   color: "modify",
   representation: "modify",
   label_generator: "overlay",
@@ -449,6 +463,16 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   drawing_boundary: {
     inputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
     outputs: [{ name: "particle", dataType: "particle", label: "Particle" }],
+  },
+  boundary_completion: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "bond", dataType: "bond", label: "Bond" },
+    ],
+    outputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "bond", dataType: "bond", label: "Bond" },
+    ],
   },
   color: {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
@@ -603,6 +627,13 @@ export interface DrawingBoundaryParams {
   zMax: number;
 }
 
+/** Add periodic display atoms connected to sites selected by Drawing Boundary. */
+export interface BoundaryCompletionParams {
+  type: "boundary_completion";
+  /** Complete one neighbour shell or each finite connected component. */
+  mode: "neighbors" | "components";
+}
+
 /** Center-neighbor search, independent of any particular mesh representation. */
 export interface CoordinationGeneratorParams {
   type: "coordination_generator";
@@ -718,6 +749,7 @@ export type PipelineNodeParams =
   | ModifyParams
   | ReplicateParams
   | DrawingBoundaryParams
+  | BoundaryCompletionParams
   | ColorParams
   | RepresentationParams
   | LabelGeneratorParams
@@ -777,6 +809,8 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         zMin: 0,
         zMax: 1,
       };
+    case "boundary_completion":
+      return { type, mode: "neighbors" };
     case "color":
       return {
         type,

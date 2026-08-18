@@ -22,6 +22,7 @@ const TRANSPARENT_NODE_TYPES: ReadonlySet<string> = new Set([
   "color",
   "representation",
   "drawing_boundary",
+  "boundary_completion",
   "add_bond",
   "label_generator",
 ]);

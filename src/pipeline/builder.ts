@@ -304,6 +304,27 @@ export class DrawingBoundary extends PipelineNode {
 }
 
 /**
+ * Add bond-connected periodic display copies to a Drawing Boundary. Component
+ * mode completes finite molecules but refuses to expand periodic networks.
+ */
+export class BoundaryCompletion extends PipelineNode {
+  readonly nodeType = "boundary_completion";
+  protected readonly _outPorts = { particle: "particle", bond: "bond" };
+  protected readonly _inpPorts = { particle: "particle", bond: "bond" };
+
+  public mode: "neighbors" | "components";
+
+  constructor({ mode = "neighbors" }: { mode?: "neighbors" | "components" } = {}) {
+    super();
+    this.mode = mode;
+  }
+
+  _toSerializedParams() {
+    return { type: this.nodeType, mode: this.mode };
+  }
+}
+
+/**
  * Per-stream coloring (Ovito-style). The Viewport reads color overrides
  * directly off the particle stream, so multiple Color nodes can stack.
  *
