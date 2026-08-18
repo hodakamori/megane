@@ -8,7 +8,9 @@ import {
   Streaming,
   Filter,
   Modify,
+  DrawingBoundary,
   AddBonds,
+  AddCoordination,
   AddLabels,
   AddPolyhedra,
   VectorOverlay,
@@ -208,11 +210,8 @@ describe("AddLabels", () => {
 });
 
 describe("AddPolyhedra", () => {
-  it("serializes all parameters", () => {
+  it("serializes mesh appearance only", () => {
     const node = new AddPolyhedra({
-      excludedCenters: [22],
-      excludedLigands: [8],
-      cutoffTolerance: 1.3,
       opacity: 0.5,
       showEdges: true,
       edgeColor: "#ff0000",
@@ -220,9 +219,6 @@ describe("AddPolyhedra", () => {
     });
     expect(node._toSerializedParams()).toMatchObject({
       type: "polyhedron_generator",
-      excludedCenters: [22],
-      excludedLigands: [8],
-      cutoffTolerance: 1.3,
       opacity: 0.5,
       showEdges: true,
       edgeColor: "#ff0000",
@@ -230,17 +226,53 @@ describe("AddPolyhedra", () => {
     });
   });
 
-  it("uses VESTA-style auto-detect defaults when no params given", () => {
+  it("uses appearance defaults and exposes only coordination -> mesh ports", () => {
     const node = new AddPolyhedra();
     expect(node._toSerializedParams()).toMatchObject({
-      excludedCenters: [],
-      excludedLigands: [],
-      cutoffTolerance: 1.15,
       opacity: 0.5,
       showEdges: false,
       edgeColor: "#dddddd",
       edgeWidth: 3.0,
     });
+    expect(node.inp.coordination.handle).toBe("coordination");
+    expect(node.out.mesh.handle).toBe("mesh");
+    expect(() => node.inp.particle).toThrow();
+    expect(() => node.out.bond).toThrow();
+  });
+});
+
+describe("DrawingBoundary", () => {
+  it("serializes arbitrary fractional bounds", () => {
+    const node = new DrawingBoundary({ xMin: -0.1, xMax: 1.1, zMax: 2 });
+    expect(node._toSerializedParams()).toEqual({
+      type: "drawing_boundary",
+      xMin: -0.1,
+      xMax: 1.1,
+      yMin: 0,
+      yMax: 1,
+      zMin: 0,
+      zMax: 2,
+    });
+  });
+});
+
+describe("AddCoordination", () => {
+  it("owns center-neighbor search and outside-boundary completion parameters", () => {
+    const node = new AddCoordination({
+      excludedCenters: [13],
+      excludedLigands: [7],
+      cutoffTolerance: 1.2,
+      boundaryMode: "inside",
+    });
+    expect(node._toSerializedParams()).toEqual({
+      type: "coordination_generator",
+      excludedCenters: [13],
+      excludedLigands: [7],
+      cutoffTolerance: 1.2,
+      boundaryMode: "inside",
+    });
+    expect(node.out.coordination.handle).toBe("coordination");
+    expect(node.out.bond.handle).toBe("bond");
   });
 });
 

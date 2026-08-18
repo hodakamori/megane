@@ -1,88 +1,27 @@
-import type { PipelineData, ParticleData, MeshData, PolyhedronGeneratorParams } from "../types";
-import { getColor, getCovalentRadius, isMetalLike, isDefaultLigand } from "../../constants";
+import type { CoordinationData, MeshData, PipelineData, PolyhedronGeneratorParams } from "../types";
+import { getColor } from "../../constants";
 import { computeConvexHull } from "../../logic/convexHull";
-import { invert3x3 } from "./mathUtils";
 
 /**
- * Apply minimum-image convention to a displacement vector using cell matrix.
+ * Convert already-resolved center-neighbor relationships into convex-hull
+ * meshes. Periodic atom display and completing neighbors outside the drawing
+ * range are deliberately upstream responsibilities.
  */
-function minimumImage(
-  dx: number,
-  dy: number,
-  dz: number,
-  box: Float32Array,
-  boxInv: Float32Array,
-): [number, number, number] {
-  let sx = boxInv[0] * dx + boxInv[3] * dy + boxInv[6] * dz;
-  let sy = boxInv[1] * dx + boxInv[4] * dy + boxInv[7] * dz;
-  let sz = boxInv[2] * dx + boxInv[5] * dy + boxInv[8] * dz;
-
-  sx -= Math.round(sx);
-  sy -= Math.round(sy);
-  sz -= Math.round(sz);
-
-  return [
-    box[0] * sx + box[3] * sy + box[6] * sz,
-    box[1] * sx + box[4] * sy + box[7] * sz,
-    box[2] * sx + box[5] * sy + box[8] * sz,
-  ];
-}
-
 export function executePolyhedronGenerator(
   params: PolyhedronGeneratorParams,
   inputs: Map<string, PipelineData[]>,
 ): Map<string, PipelineData> {
   const outputs = new Map<string, PipelineData>();
-  const particleData = inputs.get("particle")?.[0] as ParticleData | undefined;
-  if (!particleData) return outputs;
+  const coordination = inputs.get("coordination")?.[0] as CoordinationData | undefined;
+  if (!coordination) return outputs;
 
-  const snapshot = particleData.source;
-  const { positions, elements, nAtoms } = snapshot;
-
-  // Auto-detect candidate centers and ligands from the elements actually
-  // present in the structure, then subtract user opt-outs.
-  const presentZ = new Set<number>();
-  for (let i = 0; i < nAtoms; i++) presentZ.add(elements[i]);
-
-  const excludedCenters = new Set(params.excludedCenters);
-  const excludedLigands = new Set(params.excludedLigands);
-
-  const centerSet = new Set<number>();
-  const ligandSet = new Set<number>();
-  for (const z of presentZ) {
-    if (isMetalLike(z) && !excludedCenters.has(z)) centerSet.add(z);
-    if (isDefaultLigand(z) && !excludedLigands.has(z)) ligandSet.add(z);
-  }
-
-  if (centerSet.size === 0 || ligandSet.size === 0) return outputs;
-
-  const centerIndices: number[] = [];
-  const ligandIndices: number[] = [];
-  for (let i = 0; i < nAtoms; i++) {
-    const z = elements[i];
-    if (centerSet.has(z)) centerIndices.push(i);
-    if (ligandSet.has(z)) ligandIndices.push(i);
-  }
-
-  if (centerIndices.length === 0 || ligandIndices.length === 0) return outputs;
-
-  // Per-pair squared cutoff = ((r_cov[c] + r_cov[l]) * tolerance)^2.
-  const tol = params.cutoffTolerance;
-  const cutoffSq = new Map<number, Map<number, number>>();
-  for (const cz of centerSet) {
-    const inner = new Map<number, number>();
-    const rc = getCovalentRadius(cz);
-    for (const lz of ligandSet) {
-      const d = (rc + getCovalentRadius(lz)) * tol;
-      inner.set(lz, d * d);
-    }
-    cutoffSq.set(cz, inner);
-  }
-
-  const box = snapshot.box;
-  let boxInv: Float32Array | null = null;
-  if (box && box.some((v) => v !== 0)) {
-    boxInv = invert3x3(box);
+  const neighborsByCenter = new Map<number, number[]>();
+  for (let relation = 0; relation < coordination.nBonds; relation++) {
+    const center = coordination.bondIndices[relation * 2];
+    const neighbor = coordination.bondIndices[relation * 2 + 1];
+    const neighbors = neighborsByCenter.get(center) ?? [];
+    if (!neighbors.includes(neighbor)) neighbors.push(neighbor);
+    neighborsByCenter.set(center, neighbors);
   }
 
   const allPositions: number[] = [];
@@ -92,62 +31,41 @@ export function executePolyhedronGenerator(
   const allEdgePositions: number[] = [];
   let vertexOffset = 0;
 
-  for (const ci of centerIndices) {
-    const cz = elements[ci];
-    const cutoffsForCenter = cutoffSq.get(cz)!;
-    const cx = positions[ci * 3];
-    const cy = positions[ci * 3 + 1];
-    const czPos = positions[ci * 3 + 2];
-
-    const ligandPoints: number[] = [];
-    for (const li of ligandIndices) {
-      const lz = elements[li];
-      const cutoffSqVal = cutoffsForCenter.get(lz);
-      if (cutoffSqVal === undefined) continue;
-      let dx = positions[li * 3] - cx;
-      let dy = positions[li * 3 + 1] - cy;
-      let dz = positions[li * 3 + 2] - czPos;
-
-      if (boxInv && box) {
-        [dx, dy, dz] = minimumImage(dx, dy, dz, box, boxInv);
-      }
-
-      const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq <= cutoffSqVal && distSq > 0.01) {
-        ligandPoints.push(cx + dx, cy + dy, czPos + dz);
-      }
+  for (const [center, neighbors] of neighborsByCenter) {
+    if (neighbors.length < 4) continue;
+    const neighborPoints = new Float32Array(neighbors.length * 3);
+    for (let neighbor = 0; neighbor < neighbors.length; neighbor++) {
+      const source3 = neighbors[neighbor] * 3;
+      const target3 = neighbor * 3;
+      neighborPoints[target3] = coordination.positions[source3];
+      neighborPoints[target3 + 1] = coordination.positions[source3 + 1];
+      neighborPoints[target3 + 2] = coordination.positions[source3 + 2];
     }
-
-    const nLigands = ligandPoints.length / 3;
-    if (nLigands < 4) continue;
-
-    const pts = new Float32Array(ligandPoints);
-    const hull = computeConvexHull(pts, nLigands);
+    const hull = computeConvexHull(neighborPoints, neighbors.length);
     if (!hull) continue;
 
-    const [cr, cg, cb] = getColor(cz);
-
-    const nVerts = hull.vertices.length / 3;
-    for (let v = 0; v < nVerts; v++) {
-      allPositions.push(hull.vertices[v * 3], hull.vertices[v * 3 + 1], hull.vertices[v * 3 + 2]);
-      allNormals.push(hull.normals[v * 3], hull.normals[v * 3 + 1], hull.normals[v * 3 + 2]);
-      allColors.push(cr, cg, cb, params.opacity);
+    const [red, green, blue] = getColor(coordination.elements[center]);
+    const nVertices = hull.vertices.length / 3;
+    for (let vertex = 0; vertex < nVertices; vertex++) {
+      allPositions.push(
+        hull.vertices[vertex * 3],
+        hull.vertices[vertex * 3 + 1],
+        hull.vertices[vertex * 3 + 2],
+      );
+      allNormals.push(
+        hull.normals[vertex * 3],
+        hull.normals[vertex * 3 + 1],
+        hull.normals[vertex * 3 + 2],
+      );
+      allColors.push(red, green, blue, params.opacity);
     }
-
-    for (let i = 0; i < hull.indices.length; i++) {
-      allIndices.push(hull.indices[i] + vertexOffset);
-    }
-
-    for (let i = 0; i < hull.edges.length; i++) {
-      allEdgePositions.push(hull.edges[i]);
-    }
-
-    vertexOffset += nVerts;
+    for (const index of hull.indices) allIndices.push(index + vertexOffset);
+    for (const edgePosition of hull.edges) allEdgePositions.push(edgePosition);
+    vertexOffset += nVertices;
   }
 
   if (allIndices.length === 0) return outputs;
-
-  const meshData: MeshData = {
+  const mesh: MeshData = {
     type: "mesh",
     positions: new Float32Array(allPositions),
     indices: new Uint32Array(allIndices),
@@ -159,7 +77,6 @@ export function executePolyhedronGenerator(
     edgeColor: params.edgeColor,
     edgeWidth: params.edgeWidth,
   };
-
-  outputs.set("mesh", meshData);
+  outputs.set("mesh", mesh);
   return outputs;
 }

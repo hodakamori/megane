@@ -127,8 +127,8 @@ function createMoleculeTemplate(): {
 
 /**
  * Solid template: perovskite SrTiO3 with coordination polyhedra.
- * LoadStructure → AddBond → Viewport
- *              → PolyhedronGenerator → Viewport
+ * LoadStructure → DrawingBoundary → Coordination → Polyhedra → Viewport
+ *                                      └──────────→ Viewport (bond)
  */
 function createSolidTemplate(): {
   nodes: Node<PipelineNodeData>[];
@@ -151,13 +151,33 @@ function createSolidTemplate(): {
         },
       },
       {
-        id: "addbond-1",
-        type: "add_bond",
-        position: { x: 170, y: 310 },
+        id: "drawing-boundary-1",
+        type: "drawing_boundary",
+        position: { x: 425, y: 180 },
         data: {
           params: {
-            type: "add_bond",
-            bondSource: "distance",
+            type: "drawing_boundary",
+            xMin: 0,
+            xMax: 1,
+            yMin: 0,
+            yMax: 1,
+            zMin: 0,
+            zMax: 1,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "coordination-1",
+        type: "coordination_generator",
+        position: { x: 425, y: 360 },
+        data: {
+          params: {
+            type: "coordination_generator",
+            excludedCenters: [],
+            excludedLigands: [],
+            cutoffTolerance: 1.15,
+            boundaryMode: "complete",
           },
           enabled: true,
         },
@@ -165,15 +185,10 @@ function createSolidTemplate(): {
       {
         id: "polyhedron-1",
         type: "polyhedron_generator",
-        position: { x: 680, y: 310 },
+        position: { x: 680, y: 535 },
         data: {
           params: {
             type: "polyhedron_generator",
-            // VESTA-style auto-detect: every metal × every anion-former in the
-            // structure. For the perovskite this resolves to Ti–O octahedra.
-            excludedCenters: [],
-            excludedLigands: [],
-            cutoffTolerance: 1.15,
             opacity: 0.5,
             showEdges: false,
             edgeColor: "#dddddd",
@@ -185,7 +200,7 @@ function createSolidTemplate(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 425, y: 615 },
+        position: { x: 425, y: 750 },
         data: {
           params: {
             type: "viewport",
@@ -201,20 +216,20 @@ function createSolidTemplate(): {
       {
         id: "e1",
         source: "loader-1",
-        target: "addbond-1",
+        target: "drawing-boundary-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
         id: "e2",
-        source: "loader-1",
-        target: "polyhedron-1",
+        source: "drawing-boundary-1",
+        target: "coordination-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
         id: "e3",
-        source: "loader-1",
+        source: "drawing-boundary-1",
         target: "viewport-1",
         sourceHandle: "particle",
         targetHandle: "particle",
@@ -228,13 +243,20 @@ function createSolidTemplate(): {
       },
       {
         id: "e5",
-        source: "addbond-1",
+        source: "coordination-1",
         target: "viewport-1",
         sourceHandle: "bond",
         targetHandle: "bond",
       },
       {
         id: "e6",
+        source: "coordination-1",
+        target: "polyhedron-1",
+        sourceHandle: "coordination",
+        targetHandle: "coordination",
+      },
+      {
+        id: "e7",
         source: "polyhedron-1",
         target: "viewport-1",
         sourceHandle: "mesh",

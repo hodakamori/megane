@@ -46,7 +46,7 @@ function renderNodeBlock(type: PipelineNodeType): string {
  */
 export function renderNodeSchemaSection(): string {
   const blocks = PROMPT_NODE_ORDER.map(renderNodeBlock).join("\n\n");
-  return `## Node Types and Parameters\n\n${blocks}`;
+  return `## Node Types and Parameters\n\n${blocks}\n`;
 }
 
 export function buildSystemPrompt(structureSummary?: string | null): string {

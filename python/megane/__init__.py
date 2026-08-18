@@ -19,9 +19,11 @@ from megane.parsers.xtc import load_trajectory
 from megane.parsers.xyz import load_xyz_trajectory
 from megane.pipeline import (
     AddBonds,
+    AddCoordination,
     AddLabels,
     AddPolyhedra,
     Color,
+    DrawingBoundary,
     Filter,
     Isosurface,
     LoadSpectrum,
@@ -45,9 +47,11 @@ from megane.widget import MolecularViewer
 
 __all__ = [
     "AddBonds",
+    "AddCoordination",
     "AddLabels",
     "AddPolyhedra",
     "Color",
+    "DrawingBoundary",
     "Filter",
     "build_pipeline",
     "Isosurface",

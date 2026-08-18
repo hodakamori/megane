@@ -268,6 +268,42 @@ export class Modify extends PipelineNode {
 }
 
 /**
+ * Generate periodic display copies inside an inclusive fractional range.
+ * This changes drawing data only; structural atom indices and the cell remain
+ * unchanged.
+ */
+export class DrawingBoundary extends PipelineNode {
+  readonly nodeType = "drawing_boundary";
+  protected readonly _outPorts = { particle: "particle" };
+  protected readonly _inpPorts = { particle: "particle" };
+
+  constructor(
+    public bounds: {
+      xMin?: number;
+      xMax?: number;
+      yMin?: number;
+      yMax?: number;
+      zMin?: number;
+      zMax?: number;
+    } = {},
+  ) {
+    super();
+  }
+
+  _toSerializedParams() {
+    return {
+      type: this.nodeType,
+      xMin: this.bounds.xMin ?? 0,
+      xMax: this.bounds.xMax ?? 1,
+      yMin: this.bounds.yMin ?? 0,
+      yMax: this.bounds.yMax ?? 1,
+      zMin: this.bounds.zMin ?? 0,
+      zMax: this.bounds.zMax ?? 1,
+    };
+  }
+}
+
+/**
  * Per-stream coloring (Ovito-style). The Viewport reads color overrides
  * directly off the particle stream, so multiple Color nodes can stack.
  *
@@ -368,6 +404,38 @@ export class AddBonds extends PipelineNode {
 }
 
 /**
+ * Resolve directed center-neighbor coordination relationships. With
+ * `boundaryMode: "complete"`, periodic neighbor images just outside Drawing
+ * Boundary are included when needed to complete a visible center.
+ */
+export class AddCoordination extends PipelineNode {
+  readonly nodeType = "coordination_generator";
+  protected readonly _outPorts = { coordination: "coordination", bond: "bond" };
+  protected readonly _inpPorts = { particle: "particle" };
+
+  constructor(
+    public options: {
+      excludedCenters?: number[];
+      excludedLigands?: number[];
+      cutoffTolerance?: number;
+      boundaryMode?: "inside" | "complete";
+    } = {},
+  ) {
+    super();
+  }
+
+  _toSerializedParams() {
+    return {
+      type: this.nodeType,
+      excludedCenters: this.options.excludedCenters ?? [],
+      excludedLigands: this.options.excludedLigands ?? [],
+      cutoffTolerance: this.options.cutoffTolerance ?? 1.15,
+      boundaryMode: this.options.boundaryMode ?? "complete",
+    };
+  }
+}
+
+/**
  * Generate text labels at atom positions.
  *
  * Ports:
@@ -395,43 +463,31 @@ export class AddLabels extends PipelineNode {
  * Generate coordination polyhedra mesh.
  *
  * Ports:
- *   inp.particle — atom data
+ *   inp.coordination — directed center-neighbor coordination data
  *   out.mesh     — polyhedra mesh
  */
 export class AddPolyhedra extends PipelineNode {
   readonly nodeType = "polyhedron_generator";
   protected readonly _outPorts = { mesh: "mesh" };
-  protected readonly _inpPorts = { particle: "particle" };
+  protected readonly _inpPorts = { coordination: "coordination" };
 
-  public excludedCenters: number[];
-  public excludedLigands: number[];
-  public cutoffTolerance: number;
   public opacity: number;
   public showEdges: boolean;
   public edgeColor: string;
   public edgeWidth: number;
 
   constructor({
-    excludedCenters = [],
-    excludedLigands = [],
-    cutoffTolerance = 1.15,
     opacity = 0.5,
     showEdges = false,
     edgeColor = "#dddddd",
     edgeWidth = 3.0,
   }: {
-    excludedCenters?: number[];
-    excludedLigands?: number[];
-    cutoffTolerance?: number;
     opacity?: number;
     showEdges?: boolean;
     edgeColor?: string;
     edgeWidth?: number;
   } = {}) {
     super();
-    this.excludedCenters = excludedCenters;
-    this.excludedLigands = excludedLigands;
-    this.cutoffTolerance = cutoffTolerance;
     this.opacity = opacity;
     this.showEdges = showEdges;
     this.edgeColor = edgeColor;
@@ -441,9 +497,6 @@ export class AddPolyhedra extends PipelineNode {
   _toSerializedParams() {
     return {
       type: this.nodeType,
-      excludedCenters: this.excludedCenters,
-      excludedLigands: this.excludedLigands,
-      cutoffTolerance: this.cutoffTolerance,
       opacity: this.opacity,
       showEdges: this.showEdges,
       edgeColor: this.edgeColor,

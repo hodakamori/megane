@@ -5,9 +5,9 @@ description: Get a base pipeline template for crystalline solid visualization wi
 
 # Solid / Crystal Pipeline Template
 
-A pipeline for crystalline solid visualization with distance-based bonds and coordination polyhedra.
+A pipeline for crystalline solid visualization with periodic images in a fractional-coordinate drawing range and coordination polyhedra.
 
-Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGenerator -> Viewport.
+Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerator -> Viewport.
 
 ```json
 {
@@ -23,19 +23,31 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
       "enabled": true
     },
     {
-      "id": "addbond-1",
-      "type": "add_bond",
-      "position": { "x": 170, "y": 310 },
-      "bondSource": "distance",
+      "id": "drawing-boundary-1",
+      "type": "drawing_boundary",
+      "position": { "x": 425, "y": 180 },
+      "xMin": 0,
+      "xMax": 1,
+      "yMin": 0,
+      "yMax": 1,
+      "zMin": 0,
+      "zMax": 1,
+      "enabled": true
+    },
+    {
+      "id": "coordination-1",
+      "type": "coordination_generator",
+      "position": { "x": 425, "y": 360 },
+      "excludedCenters": [],
+      "excludedLigands": [],
+      "cutoffTolerance": 1.15,
+      "boundaryMode": "complete",
       "enabled": true
     },
     {
       "id": "polyhedron-1",
       "type": "polyhedron_generator",
-      "position": { "x": 680, "y": 310 },
-      "excludedCenters": [],
-      "excludedLigands": [],
-      "cutoffTolerance": 1.15,
+      "position": { "x": 680, "y": 535 },
       "opacity": 0.5,
       "showEdges": false,
       "edgeColor": "#dddddd",
@@ -45,7 +57,7 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
     {
       "id": "viewport-1",
       "type": "viewport",
-      "position": { "x": 425, "y": 615 },
+      "position": { "x": 425, "y": 750 },
       "perspective": false,
       "cellAxesVisible": true,
       "enabled": true
@@ -54,18 +66,18 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
   "edges": [
     {
       "source": "loader-1",
-      "target": "addbond-1",
+      "target": "drawing-boundary-1",
       "sourceHandle": "particle",
       "targetHandle": "particle"
     },
     {
-      "source": "loader-1",
-      "target": "polyhedron-1",
+      "source": "drawing-boundary-1",
+      "target": "coordination-1",
       "sourceHandle": "particle",
       "targetHandle": "particle"
     },
     {
-      "source": "loader-1",
+      "source": "drawing-boundary-1",
       "target": "viewport-1",
       "sourceHandle": "particle",
       "targetHandle": "particle"
@@ -77,10 +89,16 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
       "targetHandle": "cell"
     },
     {
-      "source": "addbond-1",
+      "source": "coordination-1",
       "target": "viewport-1",
       "sourceHandle": "bond",
       "targetHandle": "bond"
+    },
+    {
+      "source": "coordination-1",
+      "target": "polyhedron-1",
+      "sourceHandle": "coordination",
+      "targetHandle": "coordination"
     },
     {
       "source": "polyhedron-1",
@@ -94,8 +112,9 @@ Structure: LoadStructure -> AddBond (distance) -> Viewport, plus PolyhedronGener
 
 ## Customization Notes
 
-- The polyhedron generator auto-detects metal/metalloid centers and typical anion-former ligands (VESTA-style). Use `excludedCenters` / `excludedLigands` to opt out specific atomic numbers.
+- Drawing Boundary owns periodic display copies and accepts arbitrary inclusive fractional bounds.
+- Coordination auto-detects metal/metalloid centers and neighboring anion-former atoms. Use `excludedCenters` / `excludedLigands` to opt out specific atomic numbers.
 - Common atomic numbers: Ti=22, O=8, Sr=38, Fe=26, Al=13, Si=14, Mg=12, Ca=20, Zn=30.
-- Adjust `cutoffTolerance` to widen or narrow the center–ligand contact criterion (multiplier on `r_cov[c] + r_cov[l]`; VESTA default is ~1.15).
-- Use `bondSource: "distance"` for crystal structures (XYZ, GRO) that lack explicit bond info.
+- Adjust Coordination's `cutoffTolerance` to widen or narrow the center-neighbor contact criterion. With `boundaryMode: "complete"`, periodic neighbors just outside the drawing range are included when needed to complete visible centers.
+- PolyhedronGenerator owns mesh appearance only.
 - Set `hasCell: true` and `cellAxesVisible: true` to show the unit cell.

@@ -11,12 +11,7 @@ For real-world examples, see the [Gallery](/gallery).
 ## Overview
 
 ```typescript
-import {
-  Pipeline,
-  LoadStructure,
-  AddBonds,
-  ViewportNode,
-} from "megane-viewer/lib";
+import { Pipeline, LoadStructure, AddBonds, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("protein.pdb"));
@@ -46,12 +41,12 @@ After `addNode()`, each node exposes `.out` and `.inp` accessors for its ports. 
 
 ## Pipeline class
 
-| Method | Description |
-|--------|-------------|
-| `addNode(node)` | Add a node to the pipeline. Returns the same node (with `.out`/`.inp` ports) for use in `addEdge()` |
-| `addEdge(sourcePort, targetPort)` | Connect `node.out.<name>` → `node.inp.<name>` |
-| `toObject()` | Serialize to v3 plain object (`SerializedPipeline`) |
-| `toJSON(indent?)` | Serialize to a JSON string (default indent = 2) |
+| Method                            | Description                                                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `addNode(node)`                   | Add a node to the pipeline. Returns the same node (with `.out`/`.inp` ports) for use in `addEdge()` |
+| `addEdge(sourcePort, targetPort)` | Connect `node.out.<name>` → `node.inp.<name>`                                                       |
+| `toObject()`                      | Serialize to v3 plain object (`SerializedPipeline`)                                                 |
+| `toJSON(indent?)`                 | Serialize to a JSON string (default indent = 2)                                                     |
 
 ## Node classes
 
@@ -65,9 +60,11 @@ import {
   LoadVector,
   Filter,
   Modify,
+  DrawingBoundary,
   Color,
   Representation,
   AddBonds,
+  AddCoordination,
   AddLabels,
   AddPolyhedra,
   VectorOverlay,
@@ -78,19 +75,21 @@ import {
 
 Constructor parameters mirror the Python API (using an options object instead of keyword args):
 
-| Python | JavaScript/TypeScript |
-|--------|----------------------|
-| `LoadStructure("path")` | `new LoadStructure('path')` |
-| `Filter(query="element == 'C'")` | `new Filter({ query: "element == 'C'" })` |
-| `Modify(scale=1.3, opacity=0.8)` | `new Modify({ scale: 1.3, opacity: 0.8 })` |
-| `Color(mode="byElement")` | `new Color({ mode: "byElement" })` |
-| `Representation(mode="cartoon")` | `new Representation({ mode: "cartoon" })` |
-| `AddBonds(source="distance")` | `new AddBonds({ source: 'distance' })` |
-| `AddLabels(source="element")` | `new AddLabels({ source: 'element' })` |
-| `AddPolyhedra(excluded_centers=[38])` | `new AddPolyhedra({ excludedCenters: [38] })` |
-| `VectorOverlay(scale=2.0)` | `new VectorOverlay({ scale: 2.0 })` |
-| `LoadTrajectory(xtc="traj.xtc")` | `new LoadTrajectory({ xtc: 'traj.xtc' })` |
-| `Viewport(perspective=True)` | `new ViewportNode({ perspective: true })` |
+| Python                                   | JavaScript/TypeScript                            |
+| ---------------------------------------- | ------------------------------------------------ |
+| `LoadStructure("path")`                  | `new LoadStructure('path')`                      |
+| `Filter(query="element == 'C'")`         | `new Filter({ query: "element == 'C'" })`        |
+| `Modify(scale=1.3, opacity=0.8)`         | `new Modify({ scale: 1.3, opacity: 0.8 })`       |
+| `Color(mode="byElement")`                | `new Color({ mode: "byElement" })`               |
+| `Representation(mode="cartoon")`         | `new Representation({ mode: "cartoon" })`        |
+| `AddBonds(source="distance")`            | `new AddBonds({ source: 'distance' })`           |
+| `AddLabels(source="element")`            | `new AddLabels({ source: 'element' })`           |
+| `DrawingBoundary(x_min=0, x_max=1)`      | `new DrawingBoundary({ xMin: 0, xMax: 1 })`      |
+| `AddCoordination(excluded_centers=[38])` | `new AddCoordination({ excludedCenters: [38] })` |
+| `AddPolyhedra(opacity=0.5)`              | `new AddPolyhedra({ opacity: 0.5 })`             |
+| `VectorOverlay(scale=2.0)`               | `new VectorOverlay({ scale: 2.0 })`              |
+| `LoadTrajectory(xtc="traj.xtc")`         | `new LoadTrajectory({ xtc: 'traj.xtc' })`        |
+| `Viewport(perspective=True)`             | `new ViewportNode({ perspective: true })`        |
 
 ## Ports
 
@@ -113,11 +112,11 @@ import { PipelineViewer } from "megane-viewer/lib";
 <PipelineViewer pipeline={pipe.toObject()} width="100%" height={500} />;
 ```
 
-| Prop | Type | Description |
-|------|------|-------------|
+| Prop       | Type                 | Description                            |
+| ---------- | -------------------- | -------------------------------------- |
 | `pipeline` | `SerializedPipeline` | Pipeline object from `pipe.toObject()` |
-| `width` | `string \| number` | Container width |
-| `height` | `string \| number` | Container height |
+| `width`    | `string \| number`   | Container width                        |
+| `height`   | `string \| number`   | Container height                       |
 
 ### MeganeViewer
 
@@ -196,26 +195,33 @@ export default function App() {
 ## Example: TiO₆ Coordination Polyhedra
 
 ```typescript
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer/lib";
+import {
+  PipelineViewer, Pipeline, LoadStructure, DrawingBoundary,
+  AddCoordination, AddPolyhedra, ViewportNode,
+} from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("SrTiO3_supercell.pdb"));
-const bonds = pipe.addNode(new AddBonds());
-// All metal centers and anion-forming ligands are included by default (VESTA-style).
-// Exclude Sr (38) so only TiO6 polyhedra are drawn.
+const boundary = pipe.addNode(new DrawingBoundary());
+// Coordination finds center-neighbor pairs and can include periodic neighbors
+// just outside the drawing range to complete visible centers.
+const coordination = pipe.addNode(new AddCoordination({
+  excludedCenters: [38], // exclude Sr; Ti (22) is kept
+  boundaryMode: "complete",
+}));
 const polyhedra = pipe.addNode(
   new AddPolyhedra({
-    excludedCenters: [38], // exclude Sr; Ti (22) is kept
     opacity: 0.5,
     showEdges: true,
   })
 );
 const v = pipe.addNode(new ViewportNode());
 
-pipe.addEdge(s.out.particle, bonds.inp.particle);
-pipe.addEdge(s.out.particle, polyhedra.inp.particle);
-pipe.addEdge(s.out.particle, v.inp.particle);
-pipe.addEdge(bonds.out.bond, v.inp.bond);
+pipe.addEdge(s.out.particle, boundary.inp.particle);
+pipe.addEdge(boundary.out.particle, coordination.inp.particle);
+pipe.addEdge(boundary.out.particle, v.inp.particle);
+pipe.addEdge(coordination.out.coordination, polyhedra.inp.coordination);
+pipe.addEdge(coordination.out.bond, v.inp.bond);
 pipe.addEdge(polyhedra.out.mesh, v.inp.mesh);
 
 export default function App() {

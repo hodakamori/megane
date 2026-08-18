@@ -40,10 +40,8 @@ export interface NodeCatalogEntry {
   /** Structured parameter docs. Drives the inline signature + docs table. */
   params: ParamDoc[];
   /**
-   * Verbatim fenced parameter block for the prompt, used instead of the derived
-   * inline `{ ... }` signature. Only `polyhedron_generator` needs this because
-   * its parameters carry inline `//` comments. The string is the block *body*
-   * (between the ``` fences), already indented.
+   * Optional verbatim fenced parameter block for the prompt, used instead of
+   * the derived inline `{ ... }` signature. The string is the block body.
    */
   promptParamsFenced?: string;
   /**
@@ -196,6 +194,40 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
     inPrompt: true,
     pythonClass: "AddBonds",
   },
+  coordination_generator: {
+    description:
+      "Builds directed relationships between center atoms and their bonded neighbors.\nIt consumes Drawing Boundary copies and can add only the periodic neighbor images\nneeded outside the drawing range to complete each visible center.",
+    params: [
+      {
+        jsonKey: "excludedCenters",
+        tsType: "number[]",
+        default: "[]",
+        doc: "Atomic numbers excluded from auto-detected center atoms.",
+      },
+      {
+        jsonKey: "excludedLigands",
+        tsType: "number[]",
+        default: "[]",
+        doc: "Atomic numbers excluded from auto-detected neighbor atoms.",
+      },
+      {
+        jsonKey: "cutoffTolerance",
+        tsType: "number",
+        default: "1.15",
+        doc: "Multiplier on the sum of covalent radii.",
+      },
+      {
+        jsonKey: "boundaryMode",
+        tsType: '"inside" | "complete"',
+        default: '"complete"',
+        doc: "complete includes outside periodic neighbors needed by visible centers.",
+      },
+    ],
+    promptInputs: "`particle` (normally from Drawing Boundary)",
+    promptOutputs: "`coordination` (directed center-neighbor pairs), `bond`",
+    inPrompt: true,
+    pythonClass: "AddCoordination",
+  },
   filter: {
     description:
       'Filters atoms (and optionally bonds) by a selection query. See the\n"Atom & Bond Selection Query Language" section below for the full, authoritative\ngrammar — only the syntax documented there is supported.',
@@ -268,6 +300,22 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
     promptOutputs: "`particle`, `cell`, `trajectory` (replicated)",
     inPrompt: true,
     pythonClass: "Replicate",
+  },
+  drawing_boundary: {
+    description:
+      "Generates periodic display atoms inside an inclusive fractional range.\nUnlike Replicate it does not alter the structural atom count or unit cell.",
+    params: [
+      { jsonKey: "xMin", tsType: "number", default: "0", doc: "Lower a-coordinate." },
+      { jsonKey: "xMax", tsType: "number", default: "1", doc: "Upper a-coordinate." },
+      { jsonKey: "yMin", tsType: "number", default: "0", doc: "Lower b-coordinate." },
+      { jsonKey: "yMax", tsType: "number", default: "1", doc: "Upper b-coordinate." },
+      { jsonKey: "zMin", tsType: "number", default: "0", doc: "Lower c-coordinate." },
+      { jsonKey: "zMax", tsType: "number", default: "1", doc: "Upper c-coordinate." },
+    ],
+    promptInputs: "`particle`",
+    promptOutputs: "`particle` with Drawing Boundary copies",
+    inPrompt: true,
+    pythonClass: "DrawingBoundary",
   },
   color: {
     description:
@@ -342,43 +390,14 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
   },
   polyhedron_generator: {
     description:
-      "Generates coordination polyhedra automatically (VESTA-style). By default a\npolyhedron is drawn for every metal/metalloid center coordinated to every\nanion-former ligand present in the structure; the user opts OUT specific\nelements via `excludedCenters` / `excludedLigands`.",
+      "Converts directed center-neighbor coordination relationships into convex polyhedron\nmeshes. Periodic atom display and completing neighbors outside the drawing range are\nhandled upstream.",
     params: [
-      {
-        jsonKey: "excludedCenters",
-        tsType: "number[]",
-        default: "[]",
-        doc: "Z numbers excluded from auto-detected centers (e.g. [22] to skip Ti).",
-      },
-      {
-        jsonKey: "excludedLigands",
-        tsType: "number[]",
-        default: "[]",
-        doc: "Z numbers excluded from auto-detected ligands.",
-      },
-      {
-        jsonKey: "cutoffTolerance",
-        tsType: "number",
-        default: "1.15",
-        doc: "Multiplier on (r_cov[c]+r_cov[l]).",
-      },
       { jsonKey: "opacity", tsType: "number", default: "0.5", doc: "Face opacity, 0–1." },
       { jsonKey: "showEdges", tsType: "boolean", default: "false", doc: "Draw polyhedron edges." },
       { jsonKey: "edgeColor", tsType: "string", default: '"#dddddd"', doc: "Hex color for edges." },
       { jsonKey: "edgeWidth", tsType: "number", default: "3", doc: "Edge line width." },
     ],
-    promptParamsFenced:
-      "  {\n" +
-      '    type: "polyhedron_generator",\n' +
-      "    excludedCenters: number[],   // Z numbers to exclude from auto-detected centers (e.g. [22] to skip Ti)\n" +
-      "    excludedLigands: number[],   // Z numbers to exclude from auto-detected ligands\n" +
-      "    cutoffTolerance: number,     // multiplier on (r_cov[c]+r_cov[l]); ~1.15 default\n" +
-      "    opacity: number,             // face opacity 0-1\n" +
-      "    showEdges: boolean,\n" +
-      '    edgeColor: string,           // hex color e.g. "#dddddd"\n' +
-      "    edgeWidth: number\n" +
-      "  }",
-    promptInputs: "`particle` (particle data type)",
+    promptInputs: "`coordination` (coordination data type)",
     promptOutputs: "`mesh` (mesh data type)",
     inPrompt: true,
     pythonClass: "AddPolyhedra",

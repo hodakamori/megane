@@ -6,9 +6,11 @@ import pytest
 
 from megane.pipeline import (
     AddBonds,
+    AddCoordination,
     AddLabels,
     AddPolyhedra,
     Color,
+    DrawingBoundary,
     Filter,
     Isosurface,
     LoadSpectrum,
@@ -120,19 +122,38 @@ class TestNodeClasses:
         assert n._node_type == "label_generator"
 
     def test_add_polyhedra(self):
-        n = AddPolyhedra(excluded_centers=[26], excluded_ligands=[8, 7], cutoff_tolerance=1.3)
-        assert n.excluded_centers == [26]
-        assert n.excluded_ligands == [8, 7]
-        assert n.cutoff_tolerance == 1.3
+        n = AddPolyhedra(opacity=0.7, show_edges=True)
+        assert n.opacity == 0.7
+        assert n.show_edges is True
         assert n._node_type == "polyhedron_generator"
+        assert n.inp.coordination.handle == "coordination"
+        assert n.out.mesh.handle == "mesh"
 
     def test_add_polyhedra_defaults(self):
         n = AddPolyhedra()
-        assert n.excluded_centers == []
-        assert n.excluded_ligands == []
-        assert n.cutoff_tolerance == 1.15
         assert n.opacity == 0.5
         assert n.show_edges is False
+
+    def test_drawing_boundary(self):
+        n = DrawingBoundary(x_min=-0.1, x_max=1.1, z_max=2.0)
+        assert n.x_min == -0.1
+        assert n.x_max == 1.1
+        assert n.z_max == 2.0
+        assert n._node_type == "drawing_boundary"
+
+    def test_add_coordination(self):
+        n = AddCoordination(
+            excluded_centers=[26],
+            excluded_ligands=[8, 7],
+            cutoff_tolerance=1.3,
+            boundary_mode="inside",
+        )
+        assert n.excluded_centers == [26]
+        assert n.excluded_ligands == [8, 7]
+        assert n.cutoff_tolerance == 1.3
+        assert n.boundary_mode == "inside"
+        assert n.out.coordination.handle == "coordination"
+        assert n.out.bond.handle == "bond"
 
     def test_load_vector(self):
         n = LoadVector("vectors.dat")
@@ -645,22 +666,28 @@ class TestPipelineSerialization:
     def test_polyhedra_serialization(self):
         pipe = Pipeline()
         s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
-        p = pipe.add_node(
-            AddPolyhedra(
-                excluded_centers=[26],
-                excluded_ligands=[8],
-                cutoff_tolerance=1.3,
-                opacity=0.7,
+        boundary = pipe.add_node(DrawingBoundary())
+        coordination = pipe.add_node(
+            AddCoordination(
+                excluded_centers=[26], excluded_ligands=[8], cutoff_tolerance=1.3
             )
         )
-        pipe.add_edge(s.out.particle, p.inp.particle)
+        p = pipe.add_node(AddPolyhedra(opacity=0.7))
+        pipe.add_edge(s.out.particle, boundary.inp.particle)
+        pipe.add_edge(boundary.out.particle, coordination.inp.particle)
+        pipe.add_edge(coordination.out.coordination, p.inp.coordination)
         result = pipe.to_dict()
 
+        coordination_node = next(
+            n for n in result["nodes"] if n["type"] == "coordination_generator"
+        )
+        assert coordination_node["excludedCenters"] == [26]
+        assert coordination_node["excludedLigands"] == [8]
+        assert coordination_node["cutoffTolerance"] == 1.3
+        assert coordination_node["boundaryMode"] == "complete"
         poly_node = next(n for n in result["nodes"] if n["type"] == "polyhedron_generator")
-        assert poly_node["excludedCenters"] == [26]
-        assert poly_node["excludedLigands"] == [8]
-        assert poly_node["cutoffTolerance"] == 1.3
         assert poly_node["opacity"] == 0.7
+        assert "excludedCenters" not in poly_node
 
 
 class TestPipelineDataLoading:

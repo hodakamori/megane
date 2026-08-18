@@ -104,20 +104,26 @@ export function deserializePipeline(json: SerializedPipeline): {
       delete legacy.uniformColor;
       delete legacy.colorRange;
     }
-    // Polyhedron generator: include-list (centerElements/ligandElements/
-    // maxDistance) replaced by VESTA-style opt-out (excludedCenters/
-    // excludedLigands/cutoffTolerance). Legacy field values are dropped; the
-    // node falls back to the new "all metals × all anion-formers, tol=1.15"
-    // defaults. Users must redo any custom selections.
+    // Coordination search moved out of Polyhedra. The graph migration below
+    // preserves these values on an injected Coordination node; they must not
+    // remain on Polyhedra itself.
     if (nodeType === "polyhedron_generator") {
       const legacy = paramFields as {
         centerElements?: unknown;
         ligandElements?: unknown;
         maxDistance?: unknown;
+        excludedCenters?: unknown;
+        excludedLigands?: unknown;
+        cutoffTolerance?: unknown;
+        boundaryMode?: unknown;
       };
       delete legacy.centerElements;
       delete legacy.ligandElements;
       delete legacy.maxDistance;
+      delete legacy.excludedCenters;
+      delete legacy.excludedLigands;
+      delete legacy.cutoffTolerance;
+      delete legacy.boundaryMode;
     }
     const params = { ...defaults, ...paramFields, type: nodeType } as typeof defaults;
 
@@ -140,7 +146,123 @@ export function deserializePipeline(json: SerializedPipeline): {
     targetHandle: e.targetHandle || null,
   }));
 
-  return normalizePipeline(nodes, edges);
+  const migrated = migrateLegacyPolyhedra(nodes, edges, json);
+  return normalizePipeline(migrated.nodes, migrated.edges);
+}
+
+/**
+ * Migrate the former `particle -> Polyhedra -> {mesh,bond}` shape to the
+ * responsibility-separated graph:
+ *
+ * `particle -> Drawing Boundary -> Coordination -> Polyhedra`
+ *                                      `-> bond`
+ *
+ * Current graphs already connected through the coordination port are left
+ * untouched. This is deliberately a deserialization concern; the Polyhedra
+ * executor itself only accepts resolved coordination data.
+ */
+function migrateLegacyPolyhedra(
+  nodes: Node<PipelineNodeData>[],
+  edges: Edge[],
+  serialized: SerializedPipeline,
+): { nodes: Node<PipelineNodeData>[]; edges: Edge[] } {
+  const outNodes = [...nodes];
+  const outEdges = [...edges];
+  const usedIds = new Set(outNodes.map((node) => node.id));
+  const uniqueId = (prefix: string): string => {
+    let suffix = 1;
+    while (usedIds.has(`${prefix}-${suffix}`)) suffix++;
+    const id = `${prefix}-${suffix}`;
+    usedIds.add(id);
+    return id;
+  };
+
+  for (const polyhedron of nodes.filter((node) => node.type === "polyhedron_generator")) {
+    const legacyInputs = outEdges.filter(
+      (edge) => edge.target === polyhedron.id && (edge.targetHandle ?? "") === "particle",
+    );
+    if (legacyInputs.length === 0) continue;
+
+    const raw = serialized.nodes.find((node) => node.id === polyhedron.id) as
+      | (Record<string, unknown> & { id: string })
+      | undefined;
+    const coordinationId = uniqueId(`coordination-${polyhedron.id}`);
+    outNodes.push({
+      id: coordinationId,
+      type: "coordination_generator",
+      position: { x: polyhedron.position.x, y: polyhedron.position.y - 170 },
+      data: {
+        params: {
+          ...defaultParams("coordination_generator"),
+          excludedCenters: (raw?.excludedCenters as number[] | undefined) ?? [],
+          excludedLigands: (raw?.excludedLigands as number[] | undefined) ?? [],
+          cutoffTolerance: (raw?.cutoffTolerance as number | undefined) ?? 1.15,
+          boundaryMode: (raw?.boundaryMode as "inside" | "complete" | undefined) ?? "complete",
+        } as ReturnType<typeof defaultParams>,
+        enabled: polyhedron.data.enabled,
+      },
+    });
+
+    for (const input of legacyInputs) {
+      const sourceNode = outNodes.find((node) => node.id === input.source);
+      let periodicSource = input.source;
+      let periodicHandle = input.sourceHandle ?? "particle";
+      if (sourceNode?.type !== "drawing_boundary") {
+        const boundaryId = uniqueId(`drawing-boundary-${polyhedron.id}`);
+        outNodes.push({
+          id: boundaryId,
+          type: "drawing_boundary",
+          position: { x: polyhedron.position.x, y: polyhedron.position.y - 340 },
+          data: { params: defaultParams("drawing_boundary"), enabled: polyhedron.data.enabled },
+        });
+        outEdges.push({
+          id: `e-${input.source}-${boundaryId}-migration`,
+          source: input.source,
+          target: boundaryId,
+          sourceHandle: input.sourceHandle ?? "particle",
+          targetHandle: "particle",
+        });
+        periodicSource = boundaryId;
+        periodicHandle = "particle";
+
+        // If the same particle stream was sent directly to a viewport, route
+        // it through Drawing Boundary so its copies are visible independently
+        // of whether the Polyhedra mesh is connected.
+        for (const viewportEdge of outEdges) {
+          if (
+            viewportEdge !== input &&
+            viewportEdge.source === input.source &&
+            (viewportEdge.sourceHandle ?? "") === (input.sourceHandle ?? "") &&
+            (viewportEdge.targetHandle ?? "") === "particle" &&
+            outNodes.find((node) => node.id === viewportEdge.target)?.type === "viewport"
+          ) {
+            viewportEdge.source = boundaryId;
+            viewportEdge.sourceHandle = "particle";
+          }
+        }
+      }
+      input.source = periodicSource;
+      input.sourceHandle = periodicHandle;
+      input.target = coordinationId;
+      input.targetHandle = "particle";
+    }
+
+    outEdges.push({
+      id: `e-${coordinationId}-${polyhedron.id}-migration`,
+      source: coordinationId,
+      target: polyhedron.id,
+      sourceHandle: "coordination",
+      targetHandle: "coordination",
+    });
+    for (const output of outEdges) {
+      if (output.source === polyhedron.id && (output.sourceHandle ?? "") === "bond") {
+        output.source = coordinationId;
+        output.sourceHandle = "bond";
+      }
+    }
+  }
+
+  return { nodes: outNodes, edges: outEdges };
 }
 
 /**
@@ -210,6 +332,21 @@ function normalizePipeline(
     });
   }
 
+  function isDownstreamOf(startId: string, targetId: string): boolean {
+    const visited = new Set<string>([startId]);
+    const stack = [startId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (id === targetId) return true;
+      for (const edge of outEdges) {
+        if (edge.source !== id || visited.has(edge.target)) continue;
+        visited.add(edge.target);
+        stack.push(edge.target);
+      }
+    }
+    return false;
+  }
+
   for (const loader of loaders) {
     // Match this loader to the first viewport its particle ultimately
     // feeds. We follow filter/modify chains so user-customised graphs
@@ -217,6 +354,16 @@ function normalizePipeline(
     const reach = findReachableViewport(outNodes, outEdges, loader.id, viewports);
     if (!reach) continue;
     const { viewport, particleConnected } = reach;
+
+    // A legacy Polyhedra node can provide its own center-neighbor bond
+    // stream. Preserve that explicit connection instead of injecting a second,
+    // generic distance-based AddBond node beside it.
+    const hasDerivedBondInput = outEdges.some(
+      (edge) =>
+        edge.target === viewport.id &&
+        (edge.targetHandle ?? "") === "bond" &&
+        isDownstreamOf(loader.id, edge.source),
+    );
 
     // Existing AddBond node consuming this loader's particles?
     let addBondId: string | null = null;
@@ -230,7 +377,7 @@ function normalizePipeline(
       }
     }
 
-    if (!addBondId) {
+    if (!addBondId && !hasDerivedBondInput) {
       addBondId = uniqueId("addbond");
       const params = defaultParams("add_bond");
       outNodes.push({
@@ -245,7 +392,9 @@ function normalizePipeline(
       pushEdge(loader.id, "particle", addBondId, "particle");
     }
 
-    pushEdge(addBondId, "bond", viewport.id, "bond");
+    if (addBondId) {
+      pushEdge(addBondId, "bond", viewport.id, "bond");
+    }
     // Only add the direct loader.particle → viewport.particle edge when the
     // loader doesn't already reach the viewport via a particle path
     // (filter / modify chain). Otherwise we'd double-render the unfiltered
@@ -305,7 +454,8 @@ function findReachableViewport(
         tgt.type !== "filter" &&
         tgt.type !== "modify" &&
         tgt.type !== "color" &&
-        tgt.type !== "representation"
+        tgt.type !== "representation" &&
+        tgt.type !== "drawing_boundary"
       )
         continue;
       if (!visited.has(tgt.id)) {

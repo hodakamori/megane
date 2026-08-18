@@ -16,6 +16,162 @@ interface PbcBondResult {
   nAtoms: number;
 }
 
+interface DrawingSite {
+  sourceIndex: number;
+  dataIndex: number;
+  shiftA: number;
+  shiftB: number;
+  shiftC: number;
+}
+
+function drawingSiteKey(source: number, a: number, b: number, c: number): string {
+  return `${source}:${a}:${b}:${c}`;
+}
+
+/** Repeat an existing structural bond table over Drawing Boundary atom copies. */
+function expandTopologyBondsForDrawingBoundary(
+  particle: ParticleData,
+  bondIndices: Uint32Array,
+  bondOrders: Uint8Array | null,
+): PbcBondResult {
+  const boundary = particle.drawingBoundary!;
+  const snapshot = particle.source;
+  const positions = new Float32Array(snapshot.positions.length + boundary.images.positions.length);
+  positions.set(snapshot.positions);
+  positions.set(boundary.images.positions, snapshot.positions.length);
+  const elements = new Uint8Array(snapshot.elements.length + boundary.images.elements.length);
+  elements.set(snapshot.elements);
+  elements.set(boundary.images.elements, snapshot.elements.length);
+
+  const sitesByKey = new Map<string, DrawingSite>();
+  const sitesBySource = new Map<number, DrawingSite[]>();
+  const addSite = (site: DrawingSite) => {
+    sitesByKey.set(drawingSiteKey(site.sourceIndex, site.shiftA, site.shiftB, site.shiftC), site);
+    const sites = sitesBySource.get(site.sourceIndex) ?? [];
+    sites.push(site);
+    sitesBySource.set(site.sourceIndex, sites);
+  };
+  for (let atom = 0; atom < snapshot.nAtoms; atom++) {
+    if (boundary.sourceVisibleMask[atom]) {
+      addSite({ sourceIndex: atom, dataIndex: atom, shiftA: 0, shiftB: 0, shiftC: 0 });
+    }
+  }
+  for (let image = 0; image < boundary.images.sourceIndices.length; image++) {
+    const i3 = image * 3;
+    addSite({
+      sourceIndex: boundary.images.sourceIndices[image],
+      dataIndex: snapshot.nAtoms + image,
+      shiftA: boundary.images.latticeShifts[i3],
+      shiftB: boundary.images.latticeShifts[i3 + 1],
+      shiftC: boundary.images.latticeShifts[i3 + 2],
+    });
+  }
+
+  const box = snapshot.box;
+  const inverse = box ? invert3x3(box) : null;
+  const expanded: number[] = [];
+  const orders: number[] = [];
+  const seen = new Set<string>();
+  for (let bond = 0; bond < bondIndices.length / 2; bond++) {
+    const sourceA = bondIndices[bond * 2];
+    const sourceB = bondIndices[bond * 2 + 1];
+    let relativeA = 0;
+    let relativeB = 0;
+    let relativeC = 0;
+    if (box && inverse) {
+      const dx = snapshot.positions[sourceB * 3] - snapshot.positions[sourceA * 3];
+      const dy = snapshot.positions[sourceB * 3 + 1] - snapshot.positions[sourceA * 3 + 1];
+      const dz = snapshot.positions[sourceB * 3 + 2] - snapshot.positions[sourceA * 3 + 2];
+      const fx = inverse[0] * dx + inverse[3] * dy + inverse[6] * dz;
+      const fy = inverse[1] * dx + inverse[4] * dy + inverse[7] * dz;
+      const fz = inverse[2] * dx + inverse[5] * dy + inverse[8] * dz;
+      relativeA = -Math.round(fx);
+      relativeB = -Math.round(fy);
+      relativeC = -Math.round(fz);
+    }
+    for (const siteA of sitesBySource.get(sourceA) ?? []) {
+      const siteB = sitesByKey.get(
+        drawingSiteKey(
+          sourceB,
+          siteA.shiftA + relativeA,
+          siteA.shiftB + relativeB,
+          siteA.shiftC + relativeC,
+        ),
+      );
+      if (!siteB) continue;
+      const key =
+        siteA.dataIndex < siteB.dataIndex
+          ? `${siteA.dataIndex}:${siteB.dataIndex}`
+          : `${siteB.dataIndex}:${siteA.dataIndex}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      expanded.push(siteA.dataIndex, siteB.dataIndex);
+      if (bondOrders) orders.push(bondOrders[bond]);
+    }
+  }
+  return {
+    bondIndices: new Uint32Array(expanded),
+    bondOrders: bondOrders ? new Uint8Array(orders) : null,
+    nBonds: expanded.length / 2,
+    positions,
+    elements,
+    nAtoms: elements.length,
+  };
+}
+
+/** Infer distance bonds directly among the atoms visible in Drawing Boundary. */
+function inferDrawingBoundaryBonds(particle: ParticleData, vdwScale: number): PbcBondResult {
+  const boundary = particle.drawingBoundary!;
+  const snapshot = particle.source;
+  const compactPositions: number[] = [];
+  const compactElements: number[] = [];
+  const dataIndices: number[] = [];
+  for (let atom = 0; atom < snapshot.nAtoms; atom++) {
+    if (!boundary.sourceVisibleMask[atom]) continue;
+    compactPositions.push(
+      snapshot.positions[atom * 3],
+      snapshot.positions[atom * 3 + 1],
+      snapshot.positions[atom * 3 + 2],
+    );
+    compactElements.push(snapshot.elements[atom]);
+    dataIndices.push(atom);
+  }
+  for (let image = 0; image < boundary.images.sourceIndices.length; image++) {
+    compactPositions.push(
+      boundary.images.positions[image * 3],
+      boundary.images.positions[image * 3 + 1],
+      boundary.images.positions[image * 3 + 2],
+    );
+    compactElements.push(boundary.images.elements[image]);
+    dataIndices.push(snapshot.nAtoms + image);
+  }
+  const inferred = inferBondsVdwJS(
+    new Float32Array(compactPositions),
+    new Uint8Array(compactElements),
+    compactElements.length,
+    vdwScale,
+    null,
+  );
+  const remapped = new Uint32Array(inferred.length);
+  for (let index = 0; index < inferred.length; index++) {
+    remapped[index] = dataIndices[inferred[index]];
+  }
+  const positions = new Float32Array(snapshot.positions.length + boundary.images.positions.length);
+  positions.set(snapshot.positions);
+  positions.set(boundary.images.positions, snapshot.positions.length);
+  const elements = new Uint8Array(snapshot.elements.length + boundary.images.elements.length);
+  elements.set(snapshot.elements);
+  elements.set(boundary.images.elements, snapshot.elements.length);
+  return {
+    bondIndices: remapped,
+    bondOrders: null,
+    nBonds: remapped.length / 2,
+    positions,
+    elements,
+    nAtoms: elements.length,
+  };
+}
+
 /**
  * Process bonds for periodic boundary conditions (OVITO-style).
  *
@@ -202,14 +358,16 @@ export function executeAddBond(
       let extElements: Uint8Array | null = null;
       let extNAtoms = 0;
 
-      const result = processPbcBonds(
-        bondIndices,
-        bondOrders,
-        snapshot.positions,
-        snapshot.elements,
-        snapshot.nAtoms,
-        snapshot.box,
-      );
+      const result = particleData.drawingBoundary
+        ? expandTopologyBondsForDrawingBoundary(particleData, bondIndices, bondOrders)
+        : processPbcBonds(
+            bondIndices,
+            bondOrders,
+            snapshot.positions,
+            snapshot.elements,
+            snapshot.nAtoms,
+            snapshot.box,
+          );
       bondIndices = result.bondIndices;
       bondOrders = result.bondOrders;
       nBonds = result.nBonds;
@@ -257,14 +415,16 @@ export function executeAddBond(
         let extElements: Uint8Array | null = null;
         let extNAtoms = 0;
 
-        const result = processPbcBonds(
-          bondIndices,
-          null,
-          snapshot.positions,
-          snapshot.elements,
-          snapshot.nAtoms,
-          snapshot.box,
-        );
+        const result = particleData.drawingBoundary
+          ? expandTopologyBondsForDrawingBoundary(particleData, bondIndices, null)
+          : processPbcBonds(
+              bondIndices,
+              null,
+              snapshot.positions,
+              snapshot.elements,
+              snapshot.nAtoms,
+              snapshot.box,
+            );
         bondIndices = result.bondIndices;
         nBonds = result.nBonds;
         extPositions = result.positions;
@@ -290,13 +450,18 @@ export function executeAddBond(
       }
     }
   } else if (params.bondSource === "distance") {
-    let bondIndices = inferBondsVdwJS(
-      snapshot.positions,
-      snapshot.elements,
-      snapshot.nAtoms,
-      params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
-      snapshot.box,
-    );
+    const drawingResult = particleData.drawingBoundary
+      ? inferDrawingBoundaryBonds(particleData, params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR)
+      : null;
+    let bondIndices = drawingResult
+      ? drawingResult.bondIndices
+      : inferBondsVdwJS(
+          snapshot.positions,
+          snapshot.elements,
+          snapshot.nAtoms,
+          params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
+          snapshot.box,
+        );
 
     if (bondIndices.length > 0) {
       let nBonds = bondIndices.length / 2;
@@ -304,14 +469,16 @@ export function executeAddBond(
       let extElements: Uint8Array | null = null;
       let extNAtoms = 0;
 
-      const result = processPbcBonds(
-        bondIndices,
-        null,
-        snapshot.positions,
-        snapshot.elements,
-        snapshot.nAtoms,
-        snapshot.box,
-      );
+      const result =
+        drawingResult ??
+        processPbcBonds(
+          bondIndices,
+          null,
+          snapshot.positions,
+          snapshot.elements,
+          snapshot.nAtoms,
+          snapshot.box,
+        );
       bondIndices = result.bondIndices;
       nBonds = result.nBonds;
       extPositions = result.positions;

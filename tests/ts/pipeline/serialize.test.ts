@@ -122,11 +122,7 @@ describe("deserializePipeline", () => {
     expect(nodes[0].position).toEqual({ x: 0, y: 0 });
   });
 
-  it("drops legacy polyhedron_generator fields and applies new defaults", () => {
-    // Pre-VESTA pipelines pinned centerElements/ligandElements/maxDistance.
-    // The new opt-out shape replaces these with excludedCenters/excludedLigands/
-    // cutoffTolerance; loading a legacy file should silently discard the old
-    // fields and adopt the auto-detect defaults.
+  it("keeps Polyhedra appearance-only when legacy search fields are present", () => {
     const json: SerializedPipeline = {
       version: 3,
       nodes: [
@@ -149,9 +145,9 @@ describe("deserializePipeline", () => {
     const { nodes } = deserializePipeline(json);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const params = nodes[0].data.params as any;
-    expect(params.excludedCenters).toEqual([]);
-    expect(params.excludedLigands).toEqual([]);
-    expect(params.cutoffTolerance).toBe(1.15);
+    expect(params.excludedCenters).toBeUndefined();
+    expect(params.excludedLigands).toBeUndefined();
+    expect(params.cutoffTolerance).toBeUndefined();
     // Non-legacy fields the user set should still survive.
     expect(params.opacity).toBe(0.7);
     expect(params.showEdges).toBe(true);
@@ -228,6 +224,78 @@ describe("round-trip serialization", () => {
 });
 
 describe("deserializePipeline normalization", () => {
+  it("migrates legacy Polyhedra wiring to Drawing Boundary and Coordination", () => {
+    const json: SerializedPipeline = {
+      version: 3,
+      nodes: [
+        {
+          id: "load-1",
+          type: "load_structure",
+          fileName: "crystal.xyz",
+          hasTrajectory: false,
+          hasCell: true,
+        } as any,
+        { id: "poly-1", type: "polyhedron_generator", boundaryMode: "complete" } as any,
+        { id: "viewport-1", type: "viewport" } as any,
+      ],
+      edges: [
+        {
+          source: "load-1",
+          target: "poly-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+        {
+          source: "load-1",
+          target: "viewport-1",
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        },
+        {
+          source: "poly-1",
+          target: "viewport-1",
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        },
+      ],
+    };
+
+    const { nodes, edges } = deserializePipeline(json);
+    expect(nodes.some((node) => node.type === "add_bond")).toBe(false);
+    const boundary = nodes.find((node) => node.type === "drawing_boundary")!;
+    const coordination = nodes.find((node) => node.type === "coordination_generator")!;
+    expect(boundary).toBeDefined();
+    expect(coordination).toBeDefined();
+    expect((coordination.data.params as any).boundaryMode).toBe("complete");
+    expect(
+      edges.some(
+        (edge) =>
+          edge.source === coordination.id &&
+          edge.sourceHandle === "bond" &&
+          edge.target === "viewport-1" &&
+          edge.targetHandle === "bond",
+      ),
+    ).toBe(true);
+    expect(
+      edges.some(
+        (edge) =>
+          edge.source === coordination.id &&
+          edge.sourceHandle === "coordination" &&
+          edge.target === "poly-1" &&
+          edge.targetHandle === "coordination",
+      ),
+    ).toBe(true);
+    expect(
+      edges.some(
+        (edge) =>
+          edge.source === boundary.id &&
+          edge.sourceHandle === "particle" &&
+          edge.target === "viewport-1" &&
+          edge.targetHandle === "particle",
+      ),
+    ).toBe(true);
+  });
+
   /**
    * Regression: hand-written or older `.megane.json` files sometimes wired
    * LoadStructure.particle straight to Viewport with no AddBond, so the

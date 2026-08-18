@@ -55,40 +55,40 @@ For real-world examples, see the [Gallery](/gallery).
 
 ## Top-level Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `version` | `number` | Always `3` for the current format |
-| `nodes` | `array` | Array of node objects |
-| `edges` | `array` | Array of edge objects connecting nodes |
+| Field     | Type     | Description                            |
+| --------- | -------- | -------------------------------------- |
+| `version` | `number` | Always `3` for the current format      |
+| `nodes`   | `array`  | Array of node objects                  |
+| `edges`   | `array`  | Array of edge objects connecting nodes |
 
 ## Node Fields
 
 Every node has the following common fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Unique node identifier |
-| `type` | `string` | Node type (see below) |
-| `position` | `{ x, y }` | Position in the pipeline editor canvas |
-| `enabled` | `boolean?` | Optional. Set to `false` to bypass this node (default: `true`) |
+| Field      | Type       | Description                                                    |
+| ---------- | ---------- | -------------------------------------------------------------- |
+| `id`       | `string`   | Unique node identifier                                         |
+| `type`     | `string`   | Node type (see below)                                          |
+| `position` | `{ x, y }` | Position in the pipeline editor canvas                         |
+| `enabled`  | `boolean?` | Optional. Set to `false` to bypass this node (default: `true`) |
 
 ### Node Types and Parameters
 
 #### `load_structure`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `fileName` | `string` | Display name of the file |
-| `fileUrl` | `string` | Path or URL to the structure file |
+| Field           | Type      | Description                               |
+| --------------- | --------- | ----------------------------------------- |
+| `fileName`      | `string`  | Display name of the file                  |
+| `fileUrl`       | `string`  | Path or URL to the structure file         |
 | `hasTrajectory` | `boolean` | Whether the file contains trajectory data |
-| `hasCell` | `boolean` | Whether the file contains unit cell data |
+| `hasCell`       | `boolean` | Whether the file contains unit cell data  |
 
 #### `load_trajectory`
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field      | Type     | Description                         |
+| ---------- | -------- | ----------------------------------- |
 | `fileName` | `string` | Display name of the trajectory file |
-| `fileUrl` | `string` | Path or URL to the trajectory file |
+| `fileUrl`  | `string` | Path or URL to the trajectory file  |
 
 #### `streaming`
 
@@ -96,34 +96,34 @@ No additional parameters.
 
 #### `load_vector`
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field      | Type     | Description              |
+| ---------- | -------- | ------------------------ |
 | `fileName` | `string` | Path to vector data file |
 
 #### `filter`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `query` | `string` | Atom selection query |
+| Field        | Type      | Description          |
+| ------------ | --------- | -------------------- |
+| `query`      | `string`  | Atom selection query |
 | `bond_query` | `string?` | Bond selection query |
 
 #### `modify`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `scale` | `number` | Atom sphere radius multiplier (0.1–2.0) |
-| `opacity` | `number` | Transparency (0–1) |
+| Field     | Type     | Description                             |
+| --------- | -------- | --------------------------------------- |
+| `scale`   | `number` | Atom sphere radius multiplier (0.1–2.0) |
+| `opacity` | `number` | Transparency (0–1)                      |
 
 #### `color`
 
 Per-stream coloring (Ovito-style). Accepts a `particle` input on the `in`
 handle and emits the recolored particle stream on `out`.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `mode` | `string` | `"uniform"`, `"byElement"`, `"byResidue"`, `"byChain"`, `"byBFactor"`, or `"byProperty"` |
-| `uniformColor` | `string` | Hex color used when `mode === "uniform"` |
-| `range` | `[number, number]?` | Optional `[min, max]` for `byBFactor` / `byProperty` |
+| Field          | Type                | Description                                                                              |
+| -------------- | ------------------- | ---------------------------------------------------------------------------------------- |
+| `mode`         | `string`            | `"uniform"`, `"byElement"`, `"byResidue"`, `"byChain"`, `"byBFactor"`, or `"byProperty"` |
+| `uniformColor` | `string`            | Hex color used when `mode === "uniform"`                                                 |
+| `range`        | `[number, number]?` | Optional `[min, max]` for `byBFactor` / `byProperty`                                     |
 
 #### `representation`
 
@@ -132,84 +132,106 @@ mode from the first connected particle stream that carries an override and
 falls back to `"atoms"` otherwise. Accepts a `particle` input on the `in`
 handle and emits the tagged particle stream on `out`.
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field  | Type     | Description                                                                        |
+| ------ | -------- | ---------------------------------------------------------------------------------- |
 | `mode` | `string` | `"atoms"` (default), `"licorice"`, `"cartoon"`, `"both"`, `"surface"`, or `"line"` |
 
 #### `add_bond`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `bondSource` | `string` | `"distance"` or `"structure"` |
-| `vdwScale` | `number` | Optional. Threshold scale for `"distance"` mode: atoms bond when their separation is `≤ (vdw_i + vdw_j) * vdwScale`. Higher loosens (more bonds), lower tightens. Defaults to `0.6`. |
+| Field        | Type     | Description                                                                                                                                                                          |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bondSource` | `string` | `"distance"` or `"structure"`                                                                                                                                                        |
+| `vdwScale`   | `number` | Optional. Threshold scale for `"distance"` mode: atoms bond when their separation is `≤ (vdw_i + vdw_j) * vdwScale`. Higher loosens (more bonds), lower tightens. Defaults to `0.6`. |
 
 #### `label_generator`
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field    | Type     | Description                            |
+| -------- | -------- | -------------------------------------- |
 | `source` | `string` | `"element"`, `"resname"`, or `"index"` |
+
+#### `drawing_boundary`
+
+Creates periodic display copies in an inclusive fractional-coordinate range.
+It does not change structural atom indices or enlarge the unit cell.
+
+| Field          | Type     | Description                                                |
+| -------------- | -------- | ---------------------------------------------------------- |
+| `xMin`, `xMax` | `number` | Inclusive bounds along lattice vector a (default `0`, `1`) |
+| `yMin`, `yMax` | `number` | Inclusive bounds along lattice vector b (default `0`, `1`) |
+| `zMin`, `zMax` | `number` | Inclusive bounds along lattice vector c (default `0`, `1`) |
+
+#### `coordination_generator`
+
+Finds directed relationships between center atoms and their bonded neighbors.
+It consumes Drawing Boundary copies and emits both reusable coordination data
+and a renderable bond stream.
+
+| Field             | Type       | Description                                                                                                                                  |
+| ----------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `excludedCenters` | `number[]` | Atomic numbers excluded from center detection (default `[]`)                                                                                 |
+| `excludedLigands` | `number[]` | Atomic numbers excluded from neighbor detection (default `[]`)                                                                               |
+| `cutoffTolerance` | `number`   | Multiplier applied to the sum of covalent radii (default `1.15`)                                                                             |
+| `boundaryMode`    | `string`   | `"complete"` includes periodic neighbors outside the drawing range when needed by a visible center; `"inside"` searches only displayed atoms |
 
 #### `polyhedron_generator`
 
-Centers and ligands are auto-detected using VESTA-style heuristics. Use
-`excludedCenters` / `excludedLigands` to opt out specific atomic numbers.
+Converts incoming center-neighbor coordination data to convex polyhedron meshes.
+It owns only mesh appearance; periodic atom display and completing neighbors
+outside the drawing range are handled upstream.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `excludedCenters` | `number[]` | Atomic numbers excluded from center detection (default `[]`) |
-| `excludedLigands` | `number[]` | Atomic numbers excluded from ligand detection (default `[]`) |
-| `cutoffTolerance` | `number` | Bond-length tolerance multiplier applied to VDW radii sum (default `1.15`) |
-| `opacity` | `number` | Face transparency (0–1) |
-| `showEdges` | `boolean` | Display wireframe edges |
-| `edgeColor` | `string` | Wireframe edge color (hex) |
-| `edgeWidth` | `number` | Wireframe edge width (px) |
+| Field       | Type      | Description                |
+| ----------- | --------- | -------------------------- |
+| `opacity`   | `number`  | Face transparency (0–1)    |
+| `showEdges` | `boolean` | Display wireframe edges    |
+| `edgeColor` | `string`  | Wireframe edge color (hex) |
+| `edgeWidth` | `number`  | Wireframe edge width (px)  |
 
 #### `surface_mesh`
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field         | Type     | Description                                                                               |
+| ------------- | -------- | ----------------------------------------------------------------------------------------- |
 | `alphaRadius` | `number` | Probe sphere radius in Å (alpha value). Larger = smoother surface, smaller = more detail. |
-| `color` | `string` | Surface color (hex, e.g. `"#4488ff"`) |
-| `opacity` | `number` | Surface transparency (0–1) |
+| `color`       | `string` | Surface color (hex, e.g. `"#4488ff"`)                                                     |
+| `opacity`     | `number` | Surface transparency (0–1)                                                                |
 
 #### `load_volumetric`
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field      | Type             | Description                                                                                        |
+| ---------- | ---------------- | -------------------------------------------------------------------------------------------------- |
 | `fileName` | `string \| null` | Display name of the CUBE file. Volumetric data (`volumetricData`) is ephemeral and not serialized. |
 
 #### `isosurface`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `isoLevel` | `number` | Contour value for the positive isosurface |
-| `color` | `string` | Hex color for the positive isosurface |
-| `opacity` | `number` | Surface transparency (0–1) |
-| `showNegative` | `boolean` | Show a second isosurface at −isoLevel (dual-contour for ESP maps) |
-| `negativeColor` | `string` | Hex color for the negative isosurface |
+| Field           | Type      | Description                                                       |
+| --------------- | --------- | ----------------------------------------------------------------- |
+| `isoLevel`      | `number`  | Contour value for the positive isosurface                         |
+| `color`         | `string`  | Hex color for the positive isosurface                             |
+| `opacity`       | `number`  | Surface transparency (0–1)                                        |
+| `showNegative`  | `boolean` | Show a second isosurface at −isoLevel (dual-contour for ESP maps) |
+| `negativeColor` | `string`  | Hex color for the negative isosurface                             |
 
 #### `vector_overlay`
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field   | Type     | Description                    |
+| ------- | -------- | ------------------------------ |
 | `scale` | `number` | Vector arrow length multiplier |
 
 #### `viewport`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `perspective` | `boolean` | Perspective / orthographic projection |
-| `cellAxesVisible` | `boolean` | Show unit cell axes |
-| `pivotMarkerVisible` | `boolean` | Show rotation pivot marker |
+| Field                | Type      | Description                           |
+| -------------------- | --------- | ------------------------------------- |
+| `perspective`        | `boolean` | Perspective / orthographic projection |
+| `cellAxesVisible`    | `boolean` | Show unit cell axes                   |
+| `pivotMarkerVisible` | `boolean` | Show rotation pivot marker            |
 
 ## Edge Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `source` | `string` | Source node `id` |
-| `target` | `string` | Target node `id` |
+| Field          | Type     | Description                                               |
+| -------------- | -------- | --------------------------------------------------------- |
+| `source`       | `string` | Source node `id`                                          |
+| `target`       | `string` | Target node `id`                                          |
 | `sourceHandle` | `string` | Output port name (e.g., `"particle"`, `"bond"`, `"mesh"`) |
-| `targetHandle` | `string` | Input port name (e.g., `"particle"`, `"bond"`, `"in"`) |
+| `targetHandle` | `string` | Input port name (e.g., `"particle"`, `"bond"`, `"in"`)    |
 
 ## Example: Crystal with Polyhedra
 
@@ -227,18 +249,29 @@ Centers and ligands are auto-detected using VESTA-style heuristics. Use
       "hasCell": true
     },
     {
-      "id": "ab1",
-      "type": "add_bond",
-      "position": { "x": -170, "y": 310 },
-      "bondSource": "distance"
+      "id": "boundary1",
+      "type": "drawing_boundary",
+      "position": { "x": 0, "y": 180 },
+      "xMin": 0,
+      "xMax": 1,
+      "yMin": 0,
+      "yMax": 1,
+      "zMin": 0,
+      "zMax": 1
+    },
+    {
+      "id": "coord1",
+      "type": "coordination_generator",
+      "position": { "x": 0, "y": 360 },
+      "excludedCenters": [38],
+      "excludedLigands": [],
+      "cutoffTolerance": 1.15,
+      "boundaryMode": "complete"
     },
     {
       "id": "poly1",
       "type": "polyhedron_generator",
-      "position": { "x": 170, "y": 310 },
-      "excludedCenters": [38],
-      "excludedLigands": [],
-      "cutoffTolerance": 1.15,
+      "position": { "x": 170, "y": 530 },
       "opacity": 0.5,
       "showEdges": true,
       "edgeColor": "#dddddd",
@@ -254,11 +287,32 @@ Centers and ligands are auto-detected using VESTA-style heuristics. Use
     }
   ],
   "edges": [
-    { "source": "s1", "target": "ab1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "s1", "target": "poly1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "s1", "target": "v1", "sourceHandle": "particle", "targetHandle": "particle" },
+    {
+      "source": "s1",
+      "target": "boundary1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "boundary1",
+      "target": "coord1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "boundary1",
+      "target": "v1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
     { "source": "s1", "target": "v1", "sourceHandle": "cell", "targetHandle": "cell" },
-    { "source": "ab1", "target": "v1", "sourceHandle": "bond", "targetHandle": "bond" },
+    { "source": "coord1", "target": "v1", "sourceHandle": "bond", "targetHandle": "bond" },
+    {
+      "source": "coord1",
+      "target": "poly1",
+      "sourceHandle": "coordination",
+      "targetHandle": "coordination"
+    },
     { "source": "poly1", "target": "v1", "sourceHandle": "mesh", "targetHandle": "mesh" }
   ]
 }

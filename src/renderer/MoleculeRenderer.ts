@@ -31,6 +31,9 @@ import { PivotMarker } from "./PivotMarker";
 import { CartoonRenderer } from "./CartoonRenderer";
 import { SurfaceRenderer } from "./SurfaceRenderer";
 import { LineRenderer } from "./LineRenderer";
+import { DrawingBoundaryAtomRenderer } from "./CellBoundaryAtomRenderer";
+import type { DrawingBoundaryData, PeriodicAtomImageData } from "../pipeline/types";
+import { generateDrawingBoundaryImages } from "../logic/cellBoundaryImages";
 import type { MeshData } from "../pipeline/types";
 import { getRadius, BALL_STICK_ATOM_SCALE, LICORICE_RADIUS } from "../constants";
 import { pickAtPixel, projectToScreen, atomsInRect, type ClientRect } from "./Picking";
@@ -247,10 +250,22 @@ export class MoleculeRenderer {
   private atomRenderer: AtomRenderer | null = null;
   private bondRenderer: BondRenderer | null = null;
   private cellRenderer: CellRenderer | null = null;
+  /** Display-only periodic copies for atoms on inclusive cell boundaries. */
+  private drawingBoundaryAtomRenderer: DrawingBoundaryAtomRenderer | null = null;
+  private currentDrawingBoundary: DrawingBoundaryData | null = null;
+  /** Neighbor images added outside the drawing range to complete visible centers. */
+  private bondPeriodicAtomRenderer: DrawingBoundaryAtomRenderer | null = null;
+  private currentBondPeriodicImages: PeriodicAtomImageData | null = null;
+  private drawingBoundaryHiddenMask: Uint8Array | null = null;
+  private representationHiddenMask: Uint8Array | null = null;
   private cellAxesRenderer: CellAxesRenderer | null = null;
   private labelOverlay: LabelOverlay | null = null;
   private arrowRenderer: ArrowRenderer | null = null;
   private polyhedronRenderer: PolyhedronRenderer | null = null;
+  /** Positions contributed by polyhedron meshes. */
+  private polyhedronFitPositions: Float32Array[] = [];
+  /** Re-fit once when decorations arrive after a newly loaded snapshot. */
+  private needsInitialDecorationFit = false;
   private pivotMarker: PivotMarker | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
@@ -292,6 +307,9 @@ export class MoleculeRenderer {
    * means atoms render with the default CPK palette.
    */
   private currentColorOverrides: Float32Array | null = null;
+  private currentAtomScaleOverrides: Float32Array | null = null;
+  private currentAtomOpacityOverrides: Float32Array | null = null;
+  private currentLabels: string[] | null = null;
   private viewInsetLeft = 0;
   private viewInsetRight = 0;
   private dprMediaQuery: MediaQueryList | null = null;
@@ -482,6 +500,8 @@ export class MoleculeRenderer {
   loadSnapshot(snapshot: Snapshot): void {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
+    this.polyhedronFitPositions = [];
+    this.needsInitialDecorationFit = true;
 
     const _ready = _getTestReady();
     if (_ready) {
@@ -511,11 +531,44 @@ export class MoleculeRenderer {
       this.atomRenderer!.setScale(this.atomScale, snapshot);
     }
 
-    // Update label overlay
-    if (this.labelOverlay) {
-      this.labelOverlay.setAtomData(snapshot.elements, snapshot.nAtoms);
-      this.labelOverlay.setPositions(snapshot.positions);
+    // Drawing ranges are inclusive: a crystallographic atom
+    // on x/y/z=0 is therefore also drawn at the equivalent x/y/z=1 boundary.
+    // Keep these copies in a separate, non-pickable visual layer so atom
+    // indices and molecular topology remain unchanged.
+    if (!this.drawingBoundaryAtomRenderer) {
+      this.drawingBoundaryAtomRenderer = new DrawingBoundaryAtomRenderer();
+      this.scene.add(this.drawingBoundaryAtomRenderer.group);
     }
+    this.drawingBoundaryAtomRenderer.loadSnapshot(snapshot, this.currentDrawingBoundary);
+    this.drawingBoundaryAtomRenderer.setScale(this.atomScale);
+    this.drawingBoundaryAtomRenderer.setOpacity(this.atomOpacity);
+    this.drawingBoundaryAtomRenderer.setScaleOverrides(this.currentAtomScaleOverrides);
+    this.drawingBoundaryAtomRenderer.setOpacityOverrides(this.currentAtomOpacityOverrides);
+    this.drawingBoundaryAtomRenderer.applyColorOverrides(this.currentColorOverrides);
+    this.drawingBoundaryAtomRenderer.setVisible(
+      this.representationType === "atoms" ||
+        this.representationType === "both" ||
+        this.representationType === "licorice",
+    );
+    if (!this.bondPeriodicAtomRenderer) {
+      this.bondPeriodicAtomRenderer = new DrawingBoundaryAtomRenderer();
+      this.scene.add(this.bondPeriodicAtomRenderer.group);
+    }
+    this.bondPeriodicAtomRenderer.loadImages(snapshot, this.currentBondPeriodicImages);
+    this.bondPeriodicAtomRenderer.setScale(this.atomScale);
+    this.bondPeriodicAtomRenderer.setOpacity(this.atomOpacity);
+    this.bondPeriodicAtomRenderer.setScaleOverrides(this.currentAtomScaleOverrides);
+    this.bondPeriodicAtomRenderer.setOpacityOverrides(this.currentAtomOpacityOverrides);
+    this.bondPeriodicAtomRenderer.applyColorOverrides(this.currentColorOverrides);
+    this.bondPeriodicAtomRenderer.setVisible(
+      this.representationType === "atoms" ||
+        this.representationType === "both" ||
+        this.representationType === "licorice",
+    );
+    this.applyCombinedAtomHiddenMask();
+
+    // Update label overlay
+    this.syncLabelOverlay();
 
     // Initialize arrow renderer (lazy)
     if (!this.arrowRenderer) {
@@ -623,6 +676,26 @@ export class MoleculeRenderer {
     if (frame.box) {
       // Per-frame origin when the frame carries one, else reuse the snapshot's.
       this.updateFrameCell(frame.box, frame.boxOrigin ?? this.snapshot?.boxOrigin ?? null);
+    }
+
+    // Boundary membership can change as atoms cross a periodic face, so keep
+    // the display-only copies synchronized with trajectory coordinates too.
+    if (this.currentDrawingBoundary) {
+      const frameSnapshot: Snapshot = {
+        ...this.snapshot,
+        nAtoms: frame.nAtoms,
+        positions: frame.positions,
+        elements: frame.elements ?? this.snapshot.elements,
+        box: frame.box ?? this.snapshot.box,
+        boxOrigin: frame.boxOrigin ?? this.snapshot.boxOrigin,
+      };
+      this.currentDrawingBoundary = generateDrawingBoundaryImages(
+        frameSnapshot,
+        this.currentDrawingBoundary.min,
+        this.currentDrawingBoundary.max,
+      );
+      this.drawingBoundaryAtomRenderer?.loadSnapshot(frameSnapshot, this.currentDrawingBoundary);
+      this.syncLabelOverlay();
     }
 
     this.cartoonRenderer?.updatePositions(frame.positions);
@@ -775,7 +848,125 @@ export class MoleculeRenderer {
 
   /** Set per-atom labels for overlay display. */
   setLabels(labels: string[] | null): void {
-    this.labelOverlay?.setLabels(labels);
+    this.currentLabels = labels;
+    this.syncLabelOverlay();
+  }
+
+  /** Apply the pipeline's Drawing Boundary atom collection. */
+  setDrawingBoundary(boundary: DrawingBoundaryData | null): void {
+    this.currentDrawingBoundary = boundary;
+    if (boundary && this.snapshot) {
+      const hidden = new Uint8Array(this.snapshot.nAtoms);
+      for (let atom = 0; atom < hidden.length; atom++) {
+        hidden[atom] = boundary.sourceVisibleMask[atom] ? 0 : 1;
+      }
+      this.drawingBoundaryHiddenMask = hidden;
+    } else {
+      this.drawingBoundaryHiddenMask = null;
+    }
+    if (this.snapshot) {
+      if (!this.drawingBoundaryAtomRenderer) {
+        this.drawingBoundaryAtomRenderer = new DrawingBoundaryAtomRenderer();
+        this.scene.add(this.drawingBoundaryAtomRenderer.group);
+      }
+      this.drawingBoundaryAtomRenderer.loadSnapshot(this.snapshot, boundary);
+      this.drawingBoundaryAtomRenderer.setVisible(
+        this.representationType === "atoms" ||
+          this.representationType === "both" ||
+          this.representationType === "licorice",
+      );
+      this.applyCombinedAtomHiddenMask();
+      this.syncLabelOverlay();
+      this.fitToView(this.snapshot);
+    }
+  }
+
+  /** Apply outside-boundary neighbor images emitted by a coordination/bond stream. */
+  setBondPeriodicImages(images: PeriodicAtomImageData | null): void {
+    this.currentBondPeriodicImages = images;
+    if (!this.snapshot) return;
+    if (!this.bondPeriodicAtomRenderer) {
+      this.bondPeriodicAtomRenderer = new DrawingBoundaryAtomRenderer();
+      this.scene.add(this.bondPeriodicAtomRenderer.group);
+    }
+    this.bondPeriodicAtomRenderer.loadImages(this.snapshot, images);
+    this.bondPeriodicAtomRenderer.setScale(this.atomScale);
+    this.bondPeriodicAtomRenderer.setOpacity(this.atomOpacity);
+    this.bondPeriodicAtomRenderer.setScaleOverrides(this.currentAtomScaleOverrides);
+    this.bondPeriodicAtomRenderer.setOpacityOverrides(this.currentAtomOpacityOverrides);
+    this.bondPeriodicAtomRenderer.applyColorOverrides(this.currentColorOverrides);
+    this.bondPeriodicAtomRenderer.setHiddenMask(this.representationHiddenMask);
+    this.bondPeriodicAtomRenderer.setVisible(
+      this.representationType === "atoms" ||
+        this.representationType === "both" ||
+        this.representationType === "licorice",
+    );
+    this.syncLabelOverlay();
+    this.fitToView(this.snapshot);
+  }
+
+  private applyCombinedAtomHiddenMask(): void {
+    const nAtoms = this.snapshot?.nAtoms ?? 0;
+    let combined: Uint8Array | null = null;
+    if (this.drawingBoundaryHiddenMask || this.representationHiddenMask) {
+      combined = new Uint8Array(nAtoms);
+      for (let atom = 0; atom < nAtoms; atom++) {
+        combined[atom] =
+          this.drawingBoundaryHiddenMask?.[atom] || this.representationHiddenMask?.[atom] ? 1 : 0;
+      }
+    }
+    this.atomRenderer?.setHiddenMask?.(combined);
+    // Drawing Boundary copies are already range-filtered; only representation
+    // hiding is mapped from their source atom.
+    this.drawingBoundaryAtomRenderer?.setHiddenMask(this.representationHiddenMask);
+    this.bondPeriodicAtomRenderer?.setHiddenMask(this.representationHiddenMask);
+  }
+
+  private syncLabelOverlay(): void {
+    if (!this.labelOverlay || !this.snapshot) return;
+    const basePositions = this.currentPositions ?? this.snapshot.positions;
+    const boundary = this.currentDrawingBoundary;
+    const boundaryImages = boundary?.images ?? null;
+    const bondImages = this.currentBondPeriodicImages;
+    if (!boundaryImages && !bondImages) {
+      this.labelOverlay.setAtomData(this.snapshot.elements, this.snapshot.nAtoms);
+      this.labelOverlay.setPositions(basePositions);
+      this.labelOverlay.setLabels(this.currentLabels);
+      return;
+    }
+
+    const nBoundaryImages = boundaryImages?.sourceIndices.length ?? 0;
+    const nBondImages = bondImages?.sourceIndices.length ?? 0;
+    const nDisplay = this.snapshot.nAtoms + nBoundaryImages + nBondImages;
+    const positions = new Float32Array(nDisplay * 3);
+    positions.set(basePositions.subarray(0, this.snapshot.nAtoms * 3));
+    if (boundaryImages) positions.set(boundaryImages.positions, this.snapshot.nAtoms * 3);
+    if (bondImages) {
+      positions.set(bondImages.positions, (this.snapshot.nAtoms + nBoundaryImages) * 3);
+    }
+    const elements = new Uint8Array(nDisplay);
+    elements.set(this.snapshot.elements);
+    if (boundaryImages) elements.set(boundaryImages.elements, this.snapshot.nAtoms);
+    if (bondImages) elements.set(bondImages.elements, this.snapshot.nAtoms + nBoundaryImages);
+    const labels = new Array<string>(nDisplay).fill("");
+    if (this.currentLabels) {
+      for (let atom = 0; atom < this.snapshot.nAtoms; atom++) {
+        if (!boundary || boundary.sourceVisibleMask[atom]) {
+          labels[atom] = this.currentLabels[atom] ?? "";
+        }
+      }
+      for (let image = 0; image < nBoundaryImages; image++) {
+        labels[this.snapshot.nAtoms + image] =
+          this.currentLabels[boundaryImages!.sourceIndices[image]] ?? "";
+      }
+      for (let image = 0; image < nBondImages; image++) {
+        labels[this.snapshot.nAtoms + nBoundaryImages + image] =
+          this.currentLabels[bondImages!.sourceIndices[image]] ?? "";
+      }
+    }
+    this.labelOverlay.setAtomData(elements, nDisplay);
+    this.labelOverlay.setPositions(positions);
+    this.labelOverlay.setLabels(this.currentLabels ? labels : null);
   }
 
   /** Set per-atom vector data for arrow display. */
@@ -795,6 +986,11 @@ export class MoleculeRenderer {
       this.scene.add(this.polyhedronRenderer.group);
     }
     this.polyhedronRenderer.loadMeshData(data);
+    this.polyhedronFitPositions = [data.positions];
+    if (this.snapshot && this.needsInitialDecorationFit) {
+      this.fitToView(this.snapshot);
+      this.needsInitialDecorationFit = false;
+    }
   }
 
   /** Clear all polyhedra from the scene. */
@@ -802,6 +998,7 @@ export class MoleculeRenderer {
     if (this.polyhedronRenderer) {
       this.polyhedronRenderer.clear();
     }
+    this.polyhedronFitPositions = [];
   }
 
   // ── Structure Layer Management ─────────────────────────────────
@@ -869,27 +1066,41 @@ export class MoleculeRenderer {
     if (this.atomRenderer?.setScale && this.snapshot) {
       this.atomRenderer.setScale(scale, this.snapshot);
     }
+    this.drawingBoundaryAtomRenderer?.setScale(scale);
+    this.bondPeriodicAtomRenderer?.setScale(scale);
   }
 
   /** Set atom opacity (independent of bonds). */
   setAtomOpacity(opacity: number): void {
     this.atomOpacity = opacity;
     this.atomRenderer?.setOpacity?.(opacity);
+    this.drawingBoundaryAtomRenderer?.setOpacity(opacity);
+    this.bondPeriodicAtomRenderer?.setOpacity(opacity);
   }
 
   /** Set per-atom scale overrides from selection pipeline. */
   setAtomScaleOverrides(overrides: Float32Array): void {
+    this.currentAtomScaleOverrides = overrides;
     this.atomRenderer?.setScaleOverrides?.(overrides);
+    this.drawingBoundaryAtomRenderer?.setScaleOverrides(overrides);
+    this.bondPeriodicAtomRenderer?.setScaleOverrides(overrides);
   }
 
   /** Set per-atom opacity overrides from selection pipeline. */
   setAtomOpacityOverrides(overrides: Float32Array): void {
+    this.currentAtomOpacityOverrides = overrides;
     this.atomRenderer?.setOpacityOverrides?.(overrides);
+    this.drawingBoundaryAtomRenderer?.setOpacityOverrides(overrides);
+    this.bondPeriodicAtomRenderer?.setOpacityOverrides(overrides);
   }
 
   /** Clear all per-atom overrides, reverting to global uniforms. */
   clearAtomOverrides(): void {
+    this.currentAtomScaleOverrides = null;
+    this.currentAtomOpacityOverrides = null;
     this.atomRenderer?.clearOverrides?.();
+    this.drawingBoundaryAtomRenderer?.clearOverrides();
+    this.bondPeriodicAtomRenderer?.clearOverrides();
   }
 
   /** Set bond radius scale multiplier. */
@@ -924,6 +1135,8 @@ export class MoleculeRenderer {
     if (overrides) {
       (this.atomRenderer as ImpostorAtomMesh).applyColorOverrides(overrides);
     }
+    this.drawingBoundaryAtomRenderer?.applyColorOverrides(overrides);
+    this.bondPeriodicAtomRenderer?.applyColorOverrides(overrides);
     this.syncBondColorsToAtoms();
   }
 
@@ -956,6 +1169,8 @@ export class MoleculeRenderer {
     if (this.atomRenderer) {
       this.atomRenderer.mesh.visible = visible;
     }
+    this.drawingBoundaryAtomRenderer?.setVisible(visible);
+    this.bondPeriodicAtomRenderer?.setVisible(visible);
   }
 
   /**
@@ -981,9 +1196,13 @@ export class MoleculeRenderer {
       const licoriceRadius = type === "licorice" ? LICORICE_RADIUS : null;
       this.atomRenderer?.setUniformRadius?.(licoriceRadius, this.snapshot);
       this.bondRenderer?.setUniformRadius?.(licoriceRadius, this.snapshot);
+      this.drawingBoundaryAtomRenderer?.setUniformRadius(licoriceRadius);
+      this.bondPeriodicAtomRenderer?.setUniformRadius(licoriceRadius);
     }
 
     if (this.atomRenderer) this.atomRenderer.mesh.visible = showAtoms;
+    this.drawingBoundaryAtomRenderer?.setVisible(showAtoms);
+    this.bondPeriodicAtomRenderer?.setVisible(showAtoms);
     // Bonds also depend on whether the pipeline emits any bonds; otherwise
     // stale geometry from a previous structure would resurface here.
     if (this.bondRenderer) this.bondRenderer.mesh.visible = showAtoms && this.bondsAvailable;
@@ -1018,6 +1237,8 @@ export class MoleculeRenderer {
 
     if (!modes) {
       this.atomRenderer?.setHiddenMask?.(null);
+      this.representationHiddenMask = null;
+      this.applyCombinedAtomHiddenMask();
       this.bondRenderer?.setHiddenMask?.(null);
       if (this.lineRenderer && this.snapshot) {
         this.lineRenderer.loadSnapshot(this.snapshot);
@@ -1039,6 +1260,8 @@ export class MoleculeRenderer {
     // Hide the line atoms (and their bonds) from the mesh renderers; the line
     // renderer draws just that subset instead.
     this.atomRenderer?.setHiddenMask?.(anyLine ? lineMask : null);
+    this.representationHiddenMask = anyLine ? lineMask : null;
+    this.applyCombinedAtomHiddenMask();
     this.bondRenderer?.setHiddenMask?.(anyLine ? lineMask : null);
     if (this.lineRenderer && this.snapshot) {
       this.lineRenderer.loadSnapshot(this.snapshot, anyLine ? lineMask : null);
@@ -1168,7 +1391,14 @@ export class MoleculeRenderer {
 
   /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
-    this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot);
+    const additionalPositions = [...this.polyhedronFitPositions];
+    if (this.currentDrawingBoundary?.images.positions.length) {
+      additionalPositions.push(this.currentDrawingBoundary.images.positions);
+    }
+    if (this.currentBondPeriodicImages?.positions.length) {
+      additionalPositions.push(this.currentBondPeriodicImages.positions);
+    }
+    this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot, additionalPositions);
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.doApplyFrustumInsets();
     }
@@ -1587,6 +1817,8 @@ export class MoleculeRenderer {
       this.atomScale,
       clientX,
       clientY,
+      this.currentDrawingBoundary,
+      this.currentBondPeriodicImages,
     );
   }
 
@@ -1641,6 +1873,8 @@ export class MoleculeRenderer {
       this.snapshot,
       this.getCurrentPositions(),
       rect,
+      this.currentDrawingBoundary,
+      this.currentBondPeriodicImages,
     );
   }
 
@@ -1842,6 +2076,8 @@ export class MoleculeRenderer {
     }
     this.clearSelection();
     if (this.atomRenderer) this.atomRenderer.dispose();
+    if (this.drawingBoundaryAtomRenderer) this.drawingBoundaryAtomRenderer.dispose();
+    if (this.bondPeriodicAtomRenderer) this.bondPeriodicAtomRenderer.dispose();
     if (this.bondRenderer) this.bondRenderer.dispose();
     if (this.cellRenderer) this.cellRenderer.dispose();
     if (this.cellAxesRenderer) this.cellAxesRenderer.dispose();
@@ -1891,7 +2127,19 @@ export class MoleculeRenderer {
   /** Re-fit the camera to the current snapshot's bounding box. */
   resetCamera(): void {
     if (!this.snapshot) return;
-    this.lastExtent = fitCameraToView(this.camera, this.controls, this.snapshot);
+    const additionalPositions = [...this.polyhedronFitPositions];
+    if (this.currentDrawingBoundary?.images.positions.length) {
+      additionalPositions.push(this.currentDrawingBoundary.images.positions);
+    }
+    if (this.currentBondPeriodicImages?.positions.length) {
+      additionalPositions.push(this.currentBondPeriodicImages.positions);
+    }
+    this.lastExtent = fitCameraToView(
+      this.camera,
+      this.controls,
+      this.snapshot,
+      additionalPositions,
+    );
     if (this.camera instanceof THREE.OrthographicCamera && this.container) {
       applyFrustumInsets(
         this.camera,
