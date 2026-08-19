@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **`MeganeViewer` can now hide every tool except the 3D Viewport at construction time.** The new `ui` prop takes a partial `MeganeViewerUiOptions` object — `pipelineEditor`, `resetView`, `perfHud`, `timeline`, `tooltip`, `measurement` — where omitted keys stay visible, so embedders only list what they want gone: `<MeganeViewer ui={{ pipelineEditor: false, resetView: false, perfHud: false }} />`. The option type and the all-visible defaults (`DEFAULT_MEGANE_VIEWER_UI`) are exported from `megane-viewer/lib`. Hiding a tool removes it from the DOM but changes nothing about the scene — the pipeline still executes and the renderer still receives every update. Keys are resolved individually with `??` rather than an object spread, so an explicitly-`undefined` value (which `Partial<…>` permits without `exactOptionalPropertyTypes`) reads as "not specified" instead of hiding the tool. Three layout side effects are handled rather than left broken: with `pipelineEditor: false` the orthographic frustum stops reserving the panel's right inset so the structure centres in the full canvas; with `resetView: false` the perf HUD slides from `left: 92` into the vacated `left: 12` slot; and with `timeline: false` the measurement panels drop from `bottom: 60` to the same corner inset instead of hovering above an empty strip. The shared overlay geometry now lives in `src/components/overlayLayout.ts` so the call sites can name the values. The bundled hosts (webapp, VSCode webview, JupyterLab DocWidget) pass no `ui` prop and are unchanged.
+
 ## [0.13.1] - 2026-08-12
 
 ### Fixed

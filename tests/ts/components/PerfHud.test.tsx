@@ -53,6 +53,16 @@ describe("PerfHud", () => {
     expect(screen.getByTestId("perf-hud-draws")).toHaveTextContent("Draws 3");
   });
 
+  it("defaults its left offset to clear the Reset View button", () => {
+    render(<PerfHud atomCount={1} bondCount={1} getStats={() => null} />);
+    expect(screen.getByTestId("perf-hud")).toHaveStyle({ left: "92px" });
+  });
+
+  it("honours an explicit left offset (Reset View hidden)", () => {
+    render(<PerfHud atomCount={1} bondCount={1} getStats={() => null} left={12} />);
+    expect(screen.getByTestId("perf-hud")).toHaveStyle({ left: "12px" });
+  });
+
   it("stops polling after unmount", () => {
     const getStats = vi.fn(() => ({ fps: 30, drawCalls: 1 }));
     const { unmount } = render(<PerfHud atomCount={1} bondCount={1} getStats={getStats} />);

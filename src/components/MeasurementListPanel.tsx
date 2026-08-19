@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useMeasurementStore } from "../stores/useMeasurementStore";
+import { MEASUREMENT_BOTTOM_DEFAULT } from "./overlayLayout";
 import { exportToCSV, exportToJSON, downloadFile } from "../utils/measurementExport";
 import { getElementSymbol } from "../constants";
 
@@ -15,6 +16,12 @@ const TYPE_ICON: Record<string, string> = {
 
 interface MeasurementListPanelProps {
   elements: Uint8Array | null;
+  /**
+   * Distance from the viewer's bottom edge in px. Defaults to
+   * {@link MEASUREMENT_BOTTOM_DEFAULT}; hosts that hide the Timeline pass a
+   * smaller value so the panel doesn't float above an empty band.
+   */
+  bottom?: number;
 }
 
 interface RowProps {
@@ -133,7 +140,10 @@ function MeasurementRow({ id, name, type, label, atoms, hidden, elements }: RowP
   );
 }
 
-export function MeasurementListPanel({ elements }: MeasurementListPanelProps) {
+export function MeasurementListPanel({
+  elements,
+  bottom = MEASUREMENT_BOTTOM_DEFAULT,
+}: MeasurementListPanelProps) {
   const { measurements, clearAll } = useMeasurementStore();
 
   if (measurements.length === 0) return null;
@@ -151,7 +161,7 @@ export function MeasurementListPanel({ elements }: MeasurementListPanelProps) {
       data-testid="measurement-list-panel"
       style={{
         position: "absolute",
-        bottom: 60,
+        bottom,
         left: 12,
         background: "rgba(255, 255, 255, 0.92)",
         backdropFilter: "blur(16px)",
