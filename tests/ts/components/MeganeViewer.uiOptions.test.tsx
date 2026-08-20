@@ -331,6 +331,33 @@ describe("MeganeViewer ui options", () => {
     expect(tooltipProps.current?.info).toBeNull();
   });
 
+  // Collapsing keeps the panel mounted but shrinks it to its rail, which is a
+  // third geometry alongside "shown" and "switched off".
+  it("reclaims the inset and pulls the tour anchor in when the panel is collapsed", () => {
+    const { container } = render(<MeganeViewer onUploadStructure={() => {}} />);
+    const anchor = container.querySelector<HTMLElement>('[data-tour-anchor="viewport"]');
+    expect(anchor!.style.right).toBe("504px");
+    expect(pipelineEditorProps.current?.collapsed).toBe(false);
+
+    rendererStub.setViewInsets.mockClear();
+    act(() => {
+      (pipelineEditorProps.current?.onToggleCollapse as () => void)();
+    });
+
+    expect(pipelineEditorProps.current?.collapsed).toBe(true);
+    expect(anchor!.style.right).toBe("60px");
+    expect(rendererStub.setViewInsets).toHaveBeenLastCalledWith(0, 0);
+
+    rendererStub.setViewInsets.mockClear();
+    act(() => {
+      (pipelineEditorProps.current?.onToggleCollapse as () => void)();
+    });
+
+    expect(pipelineEditorProps.current?.collapsed).toBe(false);
+    expect(anchor!.style.right).toBe("504px");
+    expect(rendererStub.setViewInsets).toHaveBeenLastCalledWith(0, 492);
+  });
+
   it("re-applies the inset when the pipeline panel is resized", () => {
     render(<MeganeViewer onUploadStructure={() => {}} />);
     const onWidthChange = pipelineEditorProps.current?.onWidthChange as (w: number) => void;
