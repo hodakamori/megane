@@ -4,31 +4,43 @@ name: E2E update baselines
 # container that the E2E workflow compares in, then commits the PNGs back to
 # the branch the workflow was dispatched on.
 #
-# Run this (Actions → "E2E update baselines" → pick your branch) when:
+# Trigger it when:
 #   - a PR intentionally changes rendered pixels, or
 #   - the Playwright version / container tag is bumped.
 #
+# Two triggers:
+#   - Actions → "E2E update baselines" → pick your branch (workflow_dispatch)
+#   - add the `update-e2e-baselines` label to a same-repository PR; the
+#     label can be removed and re-added to re-run.
+#
 # The whole baselines-ci tree is deleted and re-captured from scratch, so a
 # green run always leaves a complete, self-consistent baseline set. If the
-# run fails, nothing is committed — fix the failure and re-dispatch.
+# run fails, nothing is committed — fix the failure and re-trigger.
 #
-# Fork PRs: workflow_dispatch only runs on branches of this repository. For a
+# Fork PRs: the PR token is read-only for forks, so the label trigger skips
+# them, and workflow_dispatch only runs on branches of this repository. For a
 # fork PR, a maintainer pushes the fork branch to an in-repo branch, runs this
 # workflow there, and the contributor picks up the baseline commit.
 
 on:
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 permissions:
   contents: write
 
 concurrency:
-  group: e2e-update-${{ github.ref }}
+  group: e2e-update-${{ github.head_ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
   update-baselines:
     name: Re-record CI pixel baselines
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.label.name == 'update-e2e-baselines' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.56.1-noble
@@ -36,6 +48,10 @@ jobs:
       MEGANE_E2E_BASELINE_DIR: tests/e2e/baselines-ci
     steps:
       - uses: actions/checkout@v4
+        with:
+          # On the label trigger, check out the PR head branch (not the
+          # merge ref) so the baseline commit can be pushed back to it.
+          ref: ${{ github.head_ref || github.ref }}
 
       - uses: ./.github/actions/e2e-setup
         with:
@@ -76,7 +92,9 @@ jobs:
             exit 0
           fi
           git commit -m "test(e2e): re-record CI pixel baselines"
-          git push origin "HEAD:$GITHUB_REF_NAME"
+          git push origin "HEAD:${TARGET_BRANCH}"
+        env:
+          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
 
       - name: Upload report on failure
         if: failure()

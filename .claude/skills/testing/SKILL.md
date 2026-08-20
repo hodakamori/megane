@@ -51,7 +51,7 @@ lot).
 What this means in practice:
 - Every new function / branch / pipeline node / React component / parser
   needs a unit test in the same PR. E2E does not count toward Codecov
-  because E2E is local-only and unmeasured.
+  because E2E coverage is not measured or uploaded.
 - A PR that adds 100 lines of TS but no `tests/ts/` updates will fail the
   TS Codecov patch check, which fails CI, which blocks merge.
 - Adding a Rust parser without `#[test]` cases under that crate's `tests/`
@@ -235,7 +235,7 @@ The expected pre-PR workflow (CRITICAL RULE #9 in `CLAUDE.md`) is:
 3. Sweep neighboring projects for **side effects**. Unexpected pixel diffs, timeouts, or runtime errors are regressions — fix the root cause, do not silently re-baseline. Timeouts and runtime errors are always real regressions.
 4. Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR.
 5. Note in the PR description which projects you ran and which baselines moved.
-6. If the change intentionally shifts pixels on a webapp or JupyterLab host, also dispatch the "E2E update baselines" workflow on the PR branch so `tests/e2e/baselines-ci/` is re-recorded — otherwise the E2E CI check fails on the stale CI baselines. CI does not cover the VSCode hosts; reviewers verify those locally if needed.
+6. If the change intentionally shifts pixels on a webapp or JupyterLab host, also add the `update-e2e-baselines` label to the PR (or dispatch the "E2E update baselines" workflow on the branch) so `tests/e2e/baselines-ci/` is re-recorded — otherwise the E2E CI check fails on the stale CI baselines. CI does not cover the VSCode hosts; reviewers verify those locally if needed.
 
 ### Updating baselines
 
