@@ -211,7 +211,11 @@ export function MeganeViewer({
     useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
 
   // Selection Inspector ⇄ 3D view bridge.
-  const inspectorActive = usePipelineUIStore((s) => s.mode === "inspector");
+  // The Inspector lives inside the pipeline panel, and `mode` is restored from
+  // sessionStorage — so without the panel a previously-saved "inspector" mode
+  // would leave the Viewport in pick mode with no UI to leave it.
+  const inspectorMode = usePipelineUIStore((s) => s.mode === "inspector");
+  const inspectorActive = showPipelineEditor && inspectorMode;
   const previewIndices = useInspectorInteractionStore((s) => s.previewIndices);
   const boxSelectActive = useInspectorInteractionStore((s) => s.boxSelectActive);
   const publishBoxResult = useInspectorInteractionStore((s) => s.publishBoxResult);
@@ -464,6 +468,29 @@ export function MeganeViewer({
     [rightInset],
   );
 
+  // Escape clears the atom selection. Right-click selection stays wired
+  // regardless of `ui.measurement` (hosts consume onSelectionChange /
+  // onMeasurementChange without necessarily showing the panel), and
+  // MeasurementPanel's Clear button is otherwise the only way to drop a
+  // selection — so with `measurement: false` the highlights would be stuck.
+  //
+  // Guarded on a non-empty selection so Escape keeps its usual meaning
+  // (closing a dialog, cancelling a rename) when nothing is selected.
+  const selectionCountRef = useRef(0);
+  selectionCountRef.current = selection.atoms.length;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (selectionCountRef.current === 0) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      handleClearSelection();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleClearSelection]);
+
   const handleTogglePipeline = useCallback(() => {
     setPipelineCollapsed((prev) => !prev);
   }, []);
@@ -505,10 +532,15 @@ export function MeganeViewer({
     useViewStateStore.getState().clearViewState();
   }, []);
 
-  // Measurement panels clear the Timeline strip; with no Timeline they drop
-  // to the same corner inset every other overlay uses, so they don't hover
-  // above an empty band.
-  const measurementBottom = showTimeline ? MEASUREMENT_BOTTOM_DEFAULT : OVERLAY_INSET;
+  // Timeline renders nothing for a single-frame structure (its own
+  // `totalFrames <= 1` guard), so the overlays below it must key on whether the
+  // strip is actually on screen — not just on the `ui.timeline` switch, which
+  // would leave them hovering above an empty band for every static structure.
+  const timelineVisible = showTimeline && totalFrames > 1;
+
+  // Measurement panels clear the Timeline strip; with no strip they drop to the
+  // same corner inset every other overlay uses.
+  const measurementBottom = timelineVisible ? MEASUREMENT_BOTTOM_DEFAULT : OVERLAY_INSET;
 
   const getRenderStats = useCallback(() => rendererRef.current?.getStats() ?? null, []);
   // Freeze the live FPS digits under E2E so screenshot baselines stay
@@ -535,11 +567,17 @@ export function MeganeViewer({
         atomLabels={null}
         atomVectors={null}
         onRendererReady={handleRendererReady}
-        onHover={setHoverInfo}
+        // Skipping the callback entirely (rather than rendering no Tooltip)
+        // avoids a viewer-wide re-render on every mousemove for a component
+        // that is not in the tree.
+        onHover={showTooltip ? setHoverInfo : undefined}
         onAtomRightClick={handleAtomRightClick}
         onFrameUpdated={handleFrameUpdated}
-        previewIndices={previewIndices}
-        boxSelectActive={boxSelectActive}
+        // Gated on the panel, not on `inspectorActive`, so the default
+        // configuration behaves exactly as before: these carry Inspector
+        // state that only the panel can produce or clear.
+        previewIndices={showPipelineEditor ? previewIndices : null}
+        boxSelectActive={showPipelineEditor && boxSelectActive}
         onBoxSelect={publishBoxResult}
         onInspectorPick={handleInspectorPick}
         inspectorActive={inspectorActive}
@@ -553,7 +591,7 @@ export function MeganeViewer({
           top: 24,
           left: 24,
           right: !showPipelineEditor ? 24 : pipelineCollapsed ? 60 : pipelineWidthRef.current + 24,
-          bottom: showTimeline ? 80 : 24,
+          bottom: timelineVisible ? 80 : 24,
           pointerEvents: "none",
           opacity: 0,
         }}
@@ -605,7 +643,7 @@ export function MeganeViewer({
           onSeek={effectiveOnSeek}
         />
       )}
-      {showTimeline && (
+      {timelineVisible && (
         <Timeline
           currentFrame={currentFrame}
           totalFrames={totalFrames}

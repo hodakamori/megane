@@ -160,12 +160,17 @@ export function ShareDialog({ open, url, tooLong, onClose, copy }: ShareDialogPr
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // Capture phase + preventDefault so this Escape is unambiguously ours:
+        // stopPropagation does not stop other listeners on the same target, and
+        // MeganeViewer's selection-clearing listener registers first (at mount),
+        // so ordering alone can't be relied on.
+        e.preventDefault();
         e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
   }, [open, onClose]);
 
   useEffect(() => {

@@ -91,7 +91,7 @@ import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
 | `perfHud` | `true` | Atoms / Bonds / Draws / FPS readout |
 | `timeline` | `true` | Playback timeline along the bottom |
 | `tooltip` | `true` | Hover tooltip over atoms and bonds |
-| `measurement` | `true` | Measurement readout panel and saved-measurement list |
+| `measurement` | `true` | Measurement readout panel and saved-measurement list (selection itself stays active — press <kbd>Esc</kbd> to clear it) |
 
 Hiding a tool removes it from the DOM but changes nothing about the scene — the
 pipeline still executes and the renderer still receives every update. The type

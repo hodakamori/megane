@@ -95,6 +95,30 @@ describe("Viewport — Inspector interactions", () => {
     cleanup();
   });
 
+  // The raycast, not the React re-render, is the expensive half of the hover
+  // pipeline; hosts that hide the Tooltip pass no onHover at all.
+  it("raycasts on mousemove while a hover consumer is attached", async () => {
+    const onHover = vi.fn();
+    render(<Viewport snapshot={null} frame={null} onHover={onHover} />);
+    rendererMock.raycastAtPixel.mockClear();
+
+    pointer("mousemove", 10, 10);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    expect(rendererMock.raycastAtPixel).toHaveBeenCalled();
+    expect(onHover).toHaveBeenCalled();
+  });
+
+  it("skips the raycast entirely when no hover consumer is attached", async () => {
+    render(<Viewport snapshot={null} frame={null} />);
+    rendererMock.raycastAtPixel.mockClear();
+
+    pointer("mousemove", 10, 10);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    expect(rendererMock.raycastAtPixel).not.toHaveBeenCalled();
+  });
+
   it("does not quick-pick when the Inspector is inactive", () => {
     const onInspectorPick = vi.fn();
     render(<Viewport snapshot={null} frame={null} onInspectorPick={onInspectorPick} />);

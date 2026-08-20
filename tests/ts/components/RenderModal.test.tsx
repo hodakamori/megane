@@ -84,6 +84,64 @@ describe("RenderModal", () => {
     expect(screen.getByTestId("render-modal")).toBeTruthy();
   });
 
+  // The modal has to claim Escape, otherwise it falls through to
+  // MeganeViewer's window listener and wipes the selection behind the modal.
+  it("closes on Escape and marks the event handled", () => {
+    const onClose = vi.fn();
+    render(
+      <RenderModal
+        open
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    window.dispatchEvent(ev);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it("ignores keys other than Escape", () => {
+    const onClose = vi.fn();
+    render(
+      <RenderModal
+        open
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not listen for Escape while closed", () => {
+    const onClose = vi.fn();
+    render(
+      <RenderModal
+        open={false}
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    window.dispatchEvent(ev);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
   it("shows PNG, EPS and SVG format buttons in snapshot mode", () => {
     render(
       <RenderModal

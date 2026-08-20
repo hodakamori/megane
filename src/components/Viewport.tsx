@@ -85,6 +85,10 @@ export function Viewport({
     let rafId: number | null = null;
 
     const handleMouseMove = (e: MouseEvent) => {
+      // No consumer → skip the raycast entirely. Bailing out here rather than
+      // inside the rAF matters: raycastAtPixel is the expensive half of the
+      // hover pipeline, and hosts that hide the Tooltip pass no onHover at all.
+      if (!onHoverRef.current) return;
       if (rafId !== null) return;
       rafId = requestAnimationFrame(() => {
         const info = renderer.raycastAtPixel(e.clientX, e.clientY);

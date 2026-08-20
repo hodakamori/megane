@@ -163,6 +163,11 @@ so the structure is centred in the full canvas, and with `timeline: false` the
 measurement panels drop to the bottom corner instead of hovering above an
 empty strip.
 
+Right-click atom selection stays wired whichever way `measurement` is set —
+hosts consume `onSelectionChange` / `onMeasurementChange` without necessarily
+showing the panel — so **Escape clears the current selection**. That is the
+only way out when `measurement: false` removes the panel's Clear button.
+
 :::note Loading files with the editor hidden
 The file-open UI lives inside the pipeline editor (the Load Structure node), so
 `pipelineEditor: false` leaves the required `onUploadStructure` callback with

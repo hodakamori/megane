@@ -77,6 +77,43 @@ describe("PipelineEditor — theme button", () => {
     expect(themeBtn.getAttribute("aria-label")).toContain("Light");
   });
 
+  // The parent mirrors this width to size the renderer's frustum inset. The
+  // panel's own width is local state that resets on unmount, so it has to
+  // announce itself on mount or the mirror goes stale across a remount.
+  it("reports its default width on mount", () => {
+    const onWidthChange = vi.fn();
+    render(
+      <PipelineEditor
+        collapsed={false}
+        onToggleCollapse={() => {}}
+        onWidthChange={onWidthChange}
+      />,
+    );
+    expect(onWidthChange).toHaveBeenCalledWith(480);
+  });
+
+  it("re-announces its width after an unmount/remount cycle", () => {
+    const onWidthChange = vi.fn();
+    const { unmount } = render(
+      <PipelineEditor
+        collapsed={false}
+        onToggleCollapse={() => {}}
+        onWidthChange={onWidthChange}
+      />,
+    );
+    unmount();
+    onWidthChange.mockClear();
+
+    render(
+      <PipelineEditor
+        collapsed={false}
+        onToggleCollapse={() => {}}
+        onWidthChange={onWidthChange}
+      />,
+    );
+    expect(onWidthChange).toHaveBeenCalledWith(480);
+  });
+
   it("cycles light → dark → system → light when clicked", () => {
     useThemeStore.setState({ theme: "light", resolvedTheme: "light" });
 
