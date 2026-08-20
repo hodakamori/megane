@@ -28,6 +28,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Dispatched by the "E2E update baselines" workflow after it pushes a
+  # baseline commit: pushes made with GITHUB_TOKEN never fire push/PR
+  # events (recursion guard), so the verification run on the new head has
+  # to be triggered explicitly. workflow_dispatch is exempt from the guard.
+  workflow_dispatch:
 
 permissions:
   contents: read

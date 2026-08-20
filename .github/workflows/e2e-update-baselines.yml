@@ -29,6 +29,9 @@ on:
 
 permissions:
   contents: write
+  # Needed to dispatch the E2E workflow on the baseline commit (see the
+  # final step): GITHUB_TOKEN pushes don't fire push/PR events themselves.
+  actions: write
 
 concurrency:
   group: e2e-update-${{ github.head_ref || github.ref }}
@@ -95,7 +98,24 @@ jobs:
           fi
           git commit -m "test(e2e): re-record CI pixel baselines"
           git push origin "HEAD:${TARGET_BRANCH}"
+          echo "pushed=1" >> "$GITHUB_OUTPUT"
+        id: push_baselines
         env:
+          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+      - name: Trigger E2E verification on the baseline commit
+        if: steps.push_baselines.outputs.pushed == '1'
+        # The push above was made with GITHUB_TOKEN, which never fires
+        # push/pull_request events, so the E2E check would stay missing on
+        # the new head. workflow_dispatch is exempt from that guard.
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/e2e.yml/dispatches" \
+            -d "{\"ref\":\"${TARGET_BRANCH}\"}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
           TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
 
       - name: Upload report on failure
