@@ -46,6 +46,10 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.56.1-noble
     env:
       MEGANE_E2E_BASELINE_DIR: tests/e2e/baselines-ci
+      # The static server is started explicitly below and stays up across
+      # steps; without this, Playwright's webServer manager would try to
+      # start it again for the JupyterLab step and die on the taken port.
+      MEGANE_E2E_NO_WEBSERVER: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,8 +78,6 @@ jobs:
           exit 1
 
       - name: Record webapp-host baselines
-        env:
-          MEGANE_E2E_NO_WEBSERVER: "1"
         run: npm run test:e2e:ci:webapp
 
       - name: Record JupyterLab-host baselines

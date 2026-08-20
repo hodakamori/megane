@@ -88,6 +88,10 @@ jobs:
     env:
       MEGANE_E2E_BASELINE_DIR: tests/e2e/baselines-ci
       MEGANE_E2E_REQUIRE_BASELINE: "1"
+      # The JupyterLab projects boot their own Jupyter servers and never
+      # touch the webapp port; skip Playwright's webServer manager (whose
+      # port handling is the historical CI flake) entirely.
+      MEGANE_E2E_NO_WEBSERVER: "1"
     steps:
       - uses: actions/checkout@v4
 
