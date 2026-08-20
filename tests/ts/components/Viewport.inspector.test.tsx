@@ -109,6 +109,19 @@ describe("Viewport — Inspector interactions", () => {
     expect(onHover).toHaveBeenCalled();
   });
 
+  it("coalesces several mousemoves in one frame into a single raycast", async () => {
+    const onHover = vi.fn();
+    render(<Viewport snapshot={null} frame={null} onHover={onHover} />);
+    rendererMock.raycastAtPixel.mockClear();
+
+    pointer("mousemove", 10, 10);
+    pointer("mousemove", 20, 20);
+    pointer("mousemove", 30, 30);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    expect(rendererMock.raycastAtPixel).toHaveBeenCalledTimes(1);
+  });
+
   it("skips the raycast entirely when no hover consumer is attached", async () => {
     render(<Viewport snapshot={null} frame={null} />);
     rendererMock.raycastAtPixel.mockClear();

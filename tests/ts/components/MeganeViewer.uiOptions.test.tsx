@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup, act, fireEvent } from "@testing-library/react";
 
 // The renderer is stubbed so we can assert the frustum insets MeganeViewer
 // reserves for the pipeline panel — they must collapse to 0 when the panel is
@@ -333,6 +333,18 @@ describe("MeganeViewer ui options", () => {
 
   // Collapsing keeps the panel mounted but shrinks it to its rail, which is a
   // third geometry alongside "shown" and "switched off".
+  // The button `ui.resetView` hides is the only entry point to this handler,
+  // so its behaviour is worth pinning before anyone reaches for the flag.
+  it("resets the camera and drops the persisted view state from the Reset View button", () => {
+    useViewStateStore.setState({ camera: { position: [9, 9, 9] } as never });
+    render(<MeganeViewer onUploadStructure={() => {}} />);
+
+    fireEvent.click(screen.getByTestId("reset-view-btn"));
+
+    expect(rendererStub.resetCamera).toHaveBeenCalledTimes(1);
+    expect(useViewStateStore.getState().camera).toBeNull();
+  });
+
   it("reclaims the inset and pulls the tour anchor in when the panel is collapsed", () => {
     const { container } = render(<MeganeViewer onUploadStructure={() => {}} />);
     const anchor = container.querySelector<HTMLElement>('[data-tour-anchor="viewport"]');
@@ -458,6 +470,24 @@ describe("MeganeViewer selection clearing", () => {
 
     pressEscape();
     expect(rendererStub.clearSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores Escape typed into a contenteditable region", () => {
+    render(<MeganeViewer onUploadStructure={() => {}} />);
+    selectAnAtom();
+
+    const editable = document.createElement("div");
+    // jsdom does not derive `isContentEditable` from the attribute, so set it
+    // directly — the handler reads that property, not the attribute.
+    editable.setAttribute("contenteditable", "true");
+    Object.defineProperty(editable, "isContentEditable", { value: true });
+    document.body.appendChild(editable);
+
+    act(() => {
+      editable.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(rendererStub.clearSelection).not.toHaveBeenCalled();
+    editable.remove();
   });
 
   it("ignores an Escape another handler already consumed", () => {
