@@ -1,0 +1,89 @@
+name: E2E update baselines
+
+# Re-records tests/e2e/baselines-ci/ inside the SAME pinned Playwright
+# container that the E2E workflow compares in, then commits the PNGs back to
+# the branch the workflow was dispatched on.
+#
+# Run this (Actions → "E2E update baselines" → pick your branch) when:
+#   - a PR intentionally changes rendered pixels, or
+#   - the Playwright version / container tag is bumped.
+#
+# The whole baselines-ci tree is deleted and re-captured from scratch, so a
+# green run always leaves a complete, self-consistent baseline set. If the
+# run fails, nothing is committed — fix the failure and re-dispatch.
+#
+# Fork PRs: workflow_dispatch only runs on branches of this repository. For a
+# fork PR, a maintainer pushes the fork branch to an in-repo branch, runs this
+# workflow there, and the contributor picks up the baseline commit.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: e2e-update-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-baselines:
+    name: Re-record CI pixel baselines
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      MEGANE_E2E_BASELINE_DIR: tests/e2e/baselines-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/e2e-setup
+        with:
+          jupyterlab: "true"
+
+      - name: Clear existing CI baselines
+        run: rm -rf tests/e2e/baselines-ci
+
+      - name: Start static webapp server
+        run: |
+          node tests/e2e/lib/serve-static.mjs python/megane/static/app 15173 127.0.0.1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:15173/ >/dev/null 2>&1; then
+              echo "static server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::static server never became ready on :15173"
+          exit 1
+
+      - name: Record webapp-host baselines
+        env:
+          MEGANE_E2E_NO_WEBSERVER: "1"
+        run: npm run test:e2e:ci:webapp
+
+      - name: Record JupyterLab-host baselines
+        run: PATH="$PWD/.venv/bin:$PATH" npm run test:e2e:ci:jupyterlab
+
+      - name: Commit and push updated baselines
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A tests/e2e/baselines-ci
+          if git diff --cached --quiet; then
+            echo "Baselines unchanged — nothing to commit."
+            exit 0
+          fi
+          git commit -m "test(e2e): re-record CI pixel baselines"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-update-baselines-failure
+          retention-days: 7
+          path: |
+            playwright-report/
+            test-results/

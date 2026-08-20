@@ -1,0 +1,69 @@
+name: E2E container setup
+description: >
+  Shared setup for the pixel E2E jobs that run inside the pinned Playwright
+  container (mcr.microsoft.com/playwright). Installs the Rust/wasm toolchain,
+  Node 22, npm dependencies, and builds the webapp bundle. With
+  `jupyterlab: "true"` it additionally builds the widget bundle and the
+  JupyterLab labextension and provisions the Python venv via uv.
+
+inputs:
+  jupyterlab:
+    description: Also set up the JupyterLab hosts (widget bundle, labextension, uv venv)
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+
+    - name: Install wasm-pack
+      shell: bash
+      run: |
+        # Retry transient network failures from rustwasm.github.io (~once a week on GH-hosted runners).
+        for i in 1 2 3; do
+          curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh && break
+          echo "wasm-pack install attempt $i failed; retrying in $((i*5))s"
+          sleep $((i*5))
+        done
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: "npm"
+
+    - name: Install npm dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Build webapp bundle (WASM + tsc + Vite)
+      shell: bash
+      run: npm run build:app
+
+    - name: Set up uv
+      if: ${{ inputs.jupyterlab == 'true' }}
+      uses: astral-sh/setup-uv@v5
+
+    - name: Build widget bundle and JupyterLab labextension
+      if: ${{ inputs.jupyterlab == 'true' }}
+      shell: bash
+      run: |
+        npm run build:widget
+        npm run build:lab
+
+    - name: Provision Python venv (uv sync)
+      if: ${{ inputs.jupyterlab == 'true' }}
+      shell: bash
+      run: uv sync --extra dev
+
+    - name: Install labextension into the Jupyter data dir
+      if: ${{ inputs.jupyterlab == 'true' }}
+      shell: bash
+      run: |
+        DATA_DIR="$(.venv/bin/jupyter --data-dir)"
+        mkdir -p "$DATA_DIR/labextensions"
+        cp -r wheel-share/data/share/jupyter/labextensions/megane-jupyterlab \
+              "$DATA_DIR/labextensions/"
+        .venv/bin/jupyter labextension list

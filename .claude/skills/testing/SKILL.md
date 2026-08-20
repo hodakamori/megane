@@ -201,17 +201,32 @@ npx playwright test          # all projects
 
 ### CI vs. local split
 
-**All E2E projects are local-only.** We attempted to run them on
-GH-hosted ubuntu-latest runners but ran into two
-CI-environment-specific issues we don't want to maintain workarounds
-for:
+**CI runs the webapp-host and JupyterLab-host projects; the VSCode hosts
+are local-only.** `.github/workflows/e2e.yml` runs
+`npm run test:e2e:ci:webapp` and `npm run test:e2e:ci:jupyterlab` inside
+the pinned Playwright container image against a CI-specific baseline set,
+`tests/e2e/baselines-ci/` (`MEGANE_E2E_BASELINE_DIR`). Those baselines
+are re-recorded in the same container by the "E2E update baselines"
+`workflow_dispatch` workflow, which commits the PNGs to the branch it is
+dispatched on. A missing CI baseline is a hard failure
+(`MEGANE_E2E_REQUIRE_BASELINE=1`) — never a silent auto-create.
 
-  - `webapp` / `contract`: Playwright's webServer manager hits a
-    non-deterministic port-bind race against the Node static server,
-    failing within 5 seconds before any spec runs.
+This design exists because of two historical CI blockers:
+
+  - `webapp` / `contract`: Playwright's webServer manager hit a
+    non-deterministic port-bind race against the Node static server.
+    CI now bypasses it (`MEGANE_E2E_NO_WEBSERVER=1`) and starts
+    `tests/e2e/lib/serve-static.mjs` explicitly with a health check.
   - `widget-jupyterlab` / `jupyterlab-doc`: pixel-diff baseline drift
     between the dev-container Chromium and the CI Chromium
-    fonts/fontconfig (small but enough to exceed our 2 % tolerance).
+    fonts/fontconfig. Record and compare now both happen inside the
+    same pinned container image, so the drift cannot occur — which is
+    also why `baselines-ci` PNGs must never be captured locally.
+
+`tests/e2e/baselines/` (no `-ci`) remains the local dev baseline set and
+is untouched by CI. The VSCode-hosted projects (`vscode`,
+`widget-vscode`) still run only locally (they need a code-server
+install).
 
 The expected pre-PR workflow (CRITICAL RULE #9 in `CLAUDE.md`) is:
 
@@ -220,7 +235,7 @@ The expected pre-PR workflow (CRITICAL RULE #9 in `CLAUDE.md`) is:
 3. Sweep neighboring projects for **side effects**. Unexpected pixel diffs, timeouts, or runtime errors are regressions — fix the root cause, do not silently re-baseline. Timeouts and runtime errors are always real regressions.
 4. Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR.
 5. Note in the PR description which projects you ran and which baselines moved.
-6. CI does NOT re-run E2E. Reviewers verify locally if needed.
+6. If the change intentionally shifts pixels on a webapp or JupyterLab host, also dispatch the "E2E update baselines" workflow on the PR branch so `tests/e2e/baselines-ci/` is re-recorded — otherwise the E2E CI check fails on the stale CI baselines. CI does not cover the VSCode hosts; reviewers verify those locally if needed.
 
 ### Updating baselines
 
@@ -292,6 +307,8 @@ git remote set-url origin "$ORIG_REMOTE"
 - If CI is still running, wait and re-check.
 - If CI has failed, inspect with `gh run view <run-id> --log-failed`, fix the issue, and push again.
 - Only report success after CI passes.
-- Note: **All E2E projects are local-only**; CI does not run any of
-  them. Verify locally before pushing changes that touch
-  WebApp / Viewport / MoleculeRenderer / Widget / DocWidget paths.
+- Note: CI runs the webapp-host and JupyterLab-host E2E projects (the
+  `E2E` workflow); the VSCode-hosted projects are local-only. Still
+  verify locally before pushing changes that touch
+  WebApp / Viewport / MoleculeRenderer / Widget / DocWidget paths —
+  local runs cover the hosts CI cannot, and are faster to iterate on.

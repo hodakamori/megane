@@ -18,7 +18,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
+import { dirname, isAbsolute, join } from "path";
 import type { Frame, Locator, Page } from "playwright/test";
 import { expect } from "playwright/test";
 
@@ -294,6 +294,12 @@ export async function compareToBaseline(
   mkdirSync(dirname(baselinePath), { recursive: true });
 
   if (!existsSync(baselinePath)) {
+    // In CI check mode a missing baseline is a hard failure — silently
+    // recording a fresh one would make any un-baselined capture pass.
+    if (process.env.MEGANE_E2E_REQUIRE_BASELINE === "1") {
+      writeFileSync(baselinePath.replace(/\.png$/, ".new.png"), current);
+      return { isNew: true, diffPixels: 0, totalPixels: 0, diffPercent: 100, ok: false };
+    }
     writeFileSync(baselinePath, current);
     return { isNew: true, diffPixels: 0, totalPixels: 0, diffPercent: 0, ok: true };
   }
@@ -358,9 +364,11 @@ export async function expectFullPageMatch(
   const r = await compareToBaseline(baseline, buf, { maxDiffPercent: opts.maxDiffPercent });
   expect(
     r.ok,
-    r.sizeMismatch
-      ? `${platform}/${name}: full-page size mismatch with baseline`
-      : `${platform}/${name}: full-page diff ${r.diffPercent.toFixed(2)}% > ${opts.maxDiffPercent ?? DEFAULT_MAX_DIFF_PERCENT}%`,
+    r.isNew && !r.ok
+      ? `${platform}/${name}: baseline missing under ${dirname(baseline)} (MEGANE_E2E_REQUIRE_BASELINE=1 — record it via the "E2E update baselines" workflow)`
+      : r.sizeMismatch
+        ? `${platform}/${name}: full-page size mismatch with baseline`
+        : `${platform}/${name}: full-page diff ${r.diffPercent.toFixed(2)}% > ${opts.maxDiffPercent ?? DEFAULT_MAX_DIFF_PERCENT}%`,
   ).toBe(true);
 }
 
@@ -385,15 +393,27 @@ export async function expectViewerRegionMatch(
   const r = await compareToBaseline(baseline, buf, { maxDiffPercent: opts.maxDiffPercent });
   expect(
     r.ok,
-    r.sizeMismatch
-      ? `${platform}/${name}: viewer-region size mismatch`
-      : `${platform}/${name}: viewer-region diff ${r.diffPercent.toFixed(2)}%`,
+    r.isNew && !r.ok
+      ? `${platform}/${name}: baseline missing under ${dirname(baseline)} (MEGANE_E2E_REQUIRE_BASELINE=1 — record it via the "E2E update baselines" workflow)`
+      : r.sizeMismatch
+        ? `${platform}/${name}: viewer-region size mismatch`
+        : `${platform}/${name}: viewer-region diff ${r.diffPercent.toFixed(2)}%`,
   ).toBe(true);
 }
 
 export function baselinePath(platform: string, name: string): string {
   const repo = repoRoot();
-  return join(repo, "tests", "e2e", "baselines", platform, `${name}.png`);
+  // MEGANE_E2E_BASELINE_DIR switches the baseline root (repo-relative or
+  // absolute). CI uses tests/e2e/baselines-ci, captured inside the pinned
+  // Playwright container so fonts/Chromium match between record and compare;
+  // the default tests/e2e/baselines set stays owned by the local dev flow.
+  const override = process.env.MEGANE_E2E_BASELINE_DIR;
+  const root = override
+    ? isAbsolute(override)
+      ? override
+      : join(repo, override)
+    : join(repo, "tests", "e2e", "baselines");
+  return join(root, platform, `${name}.png`);
 }
 
 function repoRoot(): string {

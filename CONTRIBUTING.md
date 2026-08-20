@@ -72,6 +72,15 @@ cp -r wheel-share/data/share/jupyter/labextensions/megane-jupyterlab \
 
 Please run `make test-all` before submitting a pull request.
 
+### E2E tests and pixel baselines
+
+UI-affecting changes are covered by a Playwright E2E suite with pixel-diff baselines. It runs in two places:
+
+- **CI** runs the webapp-host and JupyterLab-host projects inside a pinned Playwright container (`.github/workflows/e2e.yml`), comparing against `tests/e2e/baselines-ci/`. If your change intentionally alters rendered pixels, re-record those baselines by dispatching the **"E2E update baselines"** workflow on your branch (Actions tab) — it re-captures them in the same container and commits the PNGs. Do not capture `baselines-ci` PNGs on your own machine; they only match when recorded inside the container. For fork PRs, a maintainer will run the workflow for you.
+- **Locally** you can run the full matrix, including the VSCode-hosted projects that CI does not cover (`npm run test:e2e`, or per-project scripts like `npm run test:e2e:webapp`). Local runs use the separate `tests/e2e/baselines/` set; re-baseline with `MEGANE_E2E_UPDATE=1` when a pixel change is intended.
+
+Codecov measures unit-test coverage only (patch coverage ≥ 70 % is required on every PR); E2E does not count toward it, so new code still needs unit tests.
+
 ## Code Style
 
 - **TypeScript** -- Strict mode enabled. Use the `@/` import alias for paths under `src/`.
