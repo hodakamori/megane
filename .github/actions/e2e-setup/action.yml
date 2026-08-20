@@ -54,17 +54,19 @@ runs:
       if: ${{ inputs.jupyterlab == 'true' }}
       uses: astral-sh/setup-uv@v5
 
-    - name: Build widget bundle and JupyterLab labextension
-      if: ${{ inputs.jupyterlab == 'true' }}
-      shell: bash
-      run: |
-        npm run build:widget
-        npm run build:lab
-
     - name: Provision Python venv (uv sync)
       if: ${{ inputs.jupyterlab == 'true' }}
       shell: bash
       run: uv sync --extra dev
+
+    - name: Build widget bundle and JupyterLab labextension
+      if: ${{ inputs.jupyterlab == 'true' }}
+      shell: bash
+      # build:lab invokes `jupyter labextension build`, so the venv (which
+      # provides `jupyter`) must exist and be on PATH first.
+      run: |
+        npm run build:widget
+        PATH="$PWD/.venv/bin:$PATH" npm run build:lab
 
     - name: Install labextension into the Jupyter data dir
       if: ${{ inputs.jupyterlab == 'true' }}
