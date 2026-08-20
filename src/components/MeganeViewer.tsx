@@ -71,15 +71,23 @@ export interface MeganeViewerUiOptions {
   measurement: boolean;
 }
 
-/** Every tool visible — the layout all bundled hosts ship today. */
-export const DEFAULT_MEGANE_VIEWER_UI: MeganeViewerUiOptions = {
+/**
+ * Every tool visible — the layout all bundled hosts ship today.
+ *
+ * Frozen because it is public API and is read on every render as the fallback
+ * for each unset `ui` key: a consumer mutating it (easy to do by accident given
+ * the `{ ...DEFAULT_MEGANE_VIEWER_UI, pipelineEditor: false }` idiom) would
+ * otherwise change the default for every viewer in the process, including ones
+ * that pass no `ui` prop at all.
+ */
+export const DEFAULT_MEGANE_VIEWER_UI: Readonly<MeganeViewerUiOptions> = Object.freeze({
   pipelineEditor: true,
   resetView: true,
   perfHud: true,
   timeline: true,
   tooltip: true,
   measurement: true,
-};
+});
 
 interface MeganeViewerProps {
   playing?: boolean;
@@ -191,24 +199,35 @@ export function MeganeViewer({
   const showTooltip = ui?.tooltip ?? DEFAULT_MEGANE_VIEWER_UI.tooltip;
   const showMeasurement = ui?.measurement ?? DEFAULT_MEGANE_VIEWER_UI.measurement;
 
-  // Mirrored into a ref for the imperative inset/tour-anchor callbacks, which
-  // are intentionally identity-stable ([] deps) and must not re-subscribe.
-  const pipelineVisibleRef = useRef(showPipelineEditor);
-  pipelineVisibleRef.current = showPipelineEditor;
-
   // Right-edge inset the orthographic frustum leaves free for the pipeline
   // panel: zero when the panel is collapsed *or* switched off entirely.
+  //
+  // Depends on `showPipelineEditor` for real rather than reading it through a
+  // ref: with a ref the callback never changes identity, which makes every dep
+  // array listing it decorative and leaves correctness resting on hand-added
+  // deps that exhaustive-deps cannot defend. Consumers only re-run on a
+  // visibility change, and Viewport's mount effect ignores prop identity.
   const rightInset = useCallback(
-    () =>
-      pipelineVisibleRef.current && !pipelineCollapsedRef.current
-        ? pipelineWidthRef.current + 12
-        : 0,
-    [],
+    () => (showPipelineEditor && !pipelineCollapsedRef.current ? pipelineWidthRef.current + 12 : 0),
+    [showPipelineEditor],
   );
 
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
     useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
+
+  const viewerRootRef = useRef<HTMLDivElement | null>(null);
+
+  // Selecting an atom takes keyboard focus, which is what lets the Escape
+  // handler below tell whether an Escape was aimed at this viewer: a page can
+  // host several, and the host's own dialogs also answer to the key.
+  const handleAtomRightClickFocused = useCallback(
+    (atomIndex: number) => {
+      viewerRootRef.current?.focus({ preventScroll: true });
+      handleAtomRightClick(atomIndex);
+    },
+    [handleAtomRightClick],
+  );
 
   // Selection Inspector ⇄ 3D view bridge.
   // The Inspector lives inside the pipeline panel, and `mode` is restored from
@@ -485,11 +504,26 @@ export function MeganeViewer({
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable) return;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // Something outside this viewer holds keyboard focus — a host dialog, a
+      // dropdown, or a sibling viewer. That Escape was aimed at it, not at us.
+      // `body` means nothing is focused, which we still answer to so a
+      // programmatic selection remains clearable.
+      const active = document.activeElement;
+      const root = viewerRootRef.current;
+      if (active && active !== document.body && root && !root.contains(active)) return;
       handleClearSelection();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleClearSelection]);
+
+  // With `tooltip: false` the Viewport stops reporting hover, so `hoverInfo`
+  // would stay frozen at whatever was last under the cursor and reappear the
+  // moment the tooltip is switched back on — at coordinates the cursor left
+  // long ago.
+  useEffect(() => {
+    if (!showTooltip) setHoverInfo(null);
+  }, [showTooltip]);
 
   const handleTogglePipeline = useCallback(() => {
     setPipelineCollapsed((prev) => !prev);
@@ -503,13 +537,13 @@ export function MeganeViewer({
   const updateTourAnchor = useCallback(() => {
     const el = tourAnchorRef.current;
     if (!el) return;
-    const right = !pipelineVisibleRef.current
+    const right = !showPipelineEditor
       ? 24
       : pipelineCollapsedRef.current
         ? 60
         : pipelineWidthRef.current + 24;
     el.style.right = `${right}px`;
-  }, []);
+  }, [showPipelineEditor]);
 
   const handlePipelineWidthChange = useCallback(
     (w: number) => {
@@ -523,7 +557,7 @@ export function MeganeViewer({
   useEffect(() => {
     rendererRef.current?.setViewInsets(0, rightInset());
     updateTourAnchor();
-  }, [pipelineCollapsed, showPipelineEditor, rightInset, updateTourAnchor]);
+  }, [pipelineCollapsed, rightInset, updateTourAnchor]);
 
   const handleResetView = useCallback(() => {
     const renderer = rendererRef.current;
@@ -549,6 +583,10 @@ export function MeganeViewer({
 
   return (
     <div
+      ref={viewerRootRef}
+      // Focusable (programmatically only) so the Escape handler above can scope
+      // itself to the viewer the user last interacted with.
+      tabIndex={-1}
       data-testid="megane-viewer"
       data-megane-context={testContext}
       data-atom-count={snapshot?.nAtoms ?? 0}
@@ -559,7 +597,7 @@ export function MeganeViewer({
       data-bond-count={bondCount}
       data-total-frames={totalFrames}
       data-current-frame={currentFrame}
-      style={{ width, height, position: "relative", overflow: "hidden" }}
+      style={{ width, height, position: "relative", overflow: "hidden", outline: "none" }}
     >
       <Viewport
         snapshot={snapshot}
@@ -571,7 +609,7 @@ export function MeganeViewer({
         // avoids a viewer-wide re-render on every mousemove for a component
         // that is not in the tree.
         onHover={showTooltip ? setHoverInfo : undefined}
-        onAtomRightClick={handleAtomRightClick}
+        onAtomRightClick={handleAtomRightClickFocused}
         onFrameUpdated={handleFrameUpdated}
         // Gated on the panel, not on `inspectorActive`, so the default
         // configuration behaves exactly as before: these carry Inspector

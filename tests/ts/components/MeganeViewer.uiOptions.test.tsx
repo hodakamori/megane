@@ -4,29 +4,37 @@ import { render, screen, cleanup, act } from "@testing-library/react";
 // The renderer is stubbed so we can assert the frustum insets MeganeViewer
 // reserves for the pipeline panel — they must collapse to 0 when the panel is
 // switched off, not just when it is collapsed.
-const { rendererStub, pipelineEditorProps, measurementProps, measurementListProps, viewportProps } =
-  vi.hoisted(() => ({
-    rendererStub: {
-      setBackgroundColor: vi.fn(),
-      setViewInsets: vi.fn(),
-      setCameraChangeCallback: vi.fn<(cb: () => void) => void>(),
-      applyCameraState: vi.fn(),
-      resetCamera: vi.fn(),
-      updateBondsExt: vi.fn(),
-      getStats: vi.fn(() => ({ fps: 60, drawCalls: 3 })),
-      getCameraState: vi.fn<() => unknown>(() => null),
-      toggleAtomSelection: vi.fn<(i: number) => { atoms: number[] }>(() => ({ atoms: [0] })),
-      clearSelection: vi.fn(),
-      getMeasurement: vi.fn<() => unknown>(() => null),
-    },
-    /** Last props the stubbed PipelineEditor received, for callback round-trips. */
-    pipelineEditorProps: { current: null as Record<string, unknown> | null },
-    /** Last props the stubbed measurement panels received, for layout assertions. */
-    measurementProps: { current: null as Record<string, unknown> | null },
-    measurementListProps: { current: null as Record<string, unknown> | null },
-    /** Last props the stubbed Viewport received, for wiring assertions. */
-    viewportProps: { current: null as Record<string, unknown> | null },
-  }));
+const {
+  rendererStub,
+  pipelineEditorProps,
+  measurementProps,
+  measurementListProps,
+  viewportProps,
+  tooltipProps,
+} = vi.hoisted(() => ({
+  rendererStub: {
+    setBackgroundColor: vi.fn(),
+    setViewInsets: vi.fn(),
+    setCameraChangeCallback: vi.fn<(cb: () => void) => void>(),
+    applyCameraState: vi.fn(),
+    resetCamera: vi.fn(),
+    updateBondsExt: vi.fn(),
+    getStats: vi.fn(() => ({ fps: 60, drawCalls: 3 })),
+    getCameraState: vi.fn<() => unknown>(() => null),
+    toggleAtomSelection: vi.fn<(i: number) => { atoms: number[] }>(() => ({ atoms: [0] })),
+    clearSelection: vi.fn(),
+    getMeasurement: vi.fn<() => unknown>(() => null),
+  },
+  /** Last props the stubbed PipelineEditor received, for callback round-trips. */
+  pipelineEditorProps: { current: null as Record<string, unknown> | null },
+  /** Last props the stubbed measurement panels received, for layout assertions. */
+  measurementProps: { current: null as Record<string, unknown> | null },
+  measurementListProps: { current: null as Record<string, unknown> | null },
+  /** Last props the stubbed Viewport received, for wiring assertions. */
+  viewportProps: { current: null as Record<string, unknown> | null },
+  /** Last props the stubbed Tooltip received, for stale-hover assertions. */
+  tooltipProps: { current: null as Record<string, unknown> | null },
+}));
 
 vi.mock("@/components/Viewport", async () => {
   const { useEffect } = await import("react");
@@ -46,7 +54,10 @@ vi.mock("@/components/Viewport", async () => {
 // have no data, so stub them with always-visible markers to tell "switched
 // off" apart from "nothing to show".
 vi.mock("@/components/Tooltip", () => ({
-  Tooltip: () => <div data-testid="mock-tooltip" />,
+  Tooltip: (props: Record<string, unknown>) => {
+    tooltipProps.current = props;
+    return <div data-testid="mock-tooltip" />;
+  },
 }));
 vi.mock("@/components/MeasurementPanel", () => ({
   MeasurementPanel: (props: Record<string, unknown>) => {
@@ -103,6 +114,7 @@ afterEach(() => {
   usePlaybackStore.setState({ totalFrames: 0 });
   usePipelineUIStore.setState({ mode: "chat" });
   viewportProps.current = null;
+  tooltipProps.current = null;
 });
 
 describe("MeganeViewer ui options", () => {
@@ -117,6 +129,12 @@ describe("MeganeViewer ui options", () => {
     rendererStub.toggleAtomSelection.mockReturnValue({ atoms: [0] });
     rendererStub.getMeasurement.mockReturnValue(null);
     usePipelineUIStore.setState({ mode: "chat" });
+  });
+
+  // Public API read on every render as the fallback for each unset key: a
+  // stray assignment must not be able to retune every viewer in the process.
+  it("exposes frozen defaults", () => {
+    expect(Object.isFrozen(DEFAULT_MEGANE_VIEWER_UI)).toBe(true);
   });
 
   it("defaults every tool to visible", () => {
@@ -279,6 +297,40 @@ describe("MeganeViewer ui options", () => {
     expect(viewportProps.current?.previewIndices).toBeNull();
   });
 
+  // `rightInset` takes `showPipelineEditor` as a real dependency, so a runtime
+  // toggle has to move the frustum inset in both directions.
+  it("re-applies the inset when the pipeline panel is toggled at runtime", () => {
+    const { rerender } = render(<MeganeViewer onUploadStructure={() => {}} />);
+    expect(rendererStub.setViewInsets).toHaveBeenCalledWith(0, 492);
+
+    rendererStub.setViewInsets.mockClear();
+    rerender(<MeganeViewer onUploadStructure={() => {}} ui={{ pipelineEditor: false }} />);
+    expect(rendererStub.setViewInsets).toHaveBeenLastCalledWith(0, 0);
+
+    rendererStub.setViewInsets.mockClear();
+    rerender(<MeganeViewer onUploadStructure={() => {}} ui={{ pipelineEditor: true }} />);
+    expect(rendererStub.setViewInsets).toHaveBeenLastCalledWith(0, 492);
+  });
+
+  // Hover state freezes once onHover is dropped; re-enabling must not flash the
+  // last label at coordinates the cursor left long ago.
+  it("clears stale hover state when the tooltip is switched off", () => {
+    const { rerender } = render(<MeganeViewer onUploadStructure={() => {}} />);
+    act(() => {
+      (viewportProps.current?.onHover as (i: unknown) => void)({
+        kind: "atom",
+        atomIndex: 42,
+        screenX: 10,
+        screenY: 20,
+      });
+    });
+    expect(tooltipProps.current?.info).toMatchObject({ atomIndex: 42 });
+
+    rerender(<MeganeViewer onUploadStructure={() => {}} ui={{ tooltip: false }} />);
+    rerender(<MeganeViewer onUploadStructure={() => {}} ui={{ tooltip: true }} />);
+    expect(tooltipProps.current?.info).toBeNull();
+  });
+
   it("re-applies the inset when the pipeline panel is resized", () => {
     render(<MeganeViewer onUploadStructure={() => {}} />);
     const onWidthChange = pipelineEditorProps.current?.onWidthChange as (w: number) => void;
@@ -347,6 +399,38 @@ describe("MeganeViewer selection clearing", () => {
     });
     expect(rendererStub.clearSelection).not.toHaveBeenCalled();
     input.remove();
+  });
+
+  // A page can host several viewers, and the host's own dialogs answer to
+  // Escape too — so the viewer only claims the key when it holds focus (or
+  // nothing does).
+  it("takes focus when an atom is selected", () => {
+    render(<MeganeViewer onUploadStructure={() => {}} />);
+    selectAnAtom();
+    expect(document.activeElement).toBe(screen.getByTestId("megane-viewer"));
+  });
+
+  it("ignores Escape while focus sits outside the viewer", () => {
+    render(<MeganeViewer onUploadStructure={() => {}} />);
+    selectAnAtom();
+
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    outside.focus();
+    expect(document.activeElement).toBe(outside);
+
+    pressEscape();
+    expect(rendererStub.clearSelection).not.toHaveBeenCalled();
+    outside.remove();
+  });
+
+  it("still answers Escape when nothing on the page holds focus", () => {
+    render(<MeganeViewer onUploadStructure={() => {}} />);
+    selectAnAtom();
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    pressEscape();
+    expect(rendererStub.clearSelection).toHaveBeenCalledTimes(1);
   });
 
   it("ignores an Escape another handler already consumed", () => {
