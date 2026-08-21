@@ -287,6 +287,15 @@ python/megane/           Python backend
 tests/                   Tests (Python, TypeScript, E2E)
 ```
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+development setup, test commands, and project design rules. Fork PRs run the
+full CI and E2E pixel checks automatically — no tokens or setup needed on
+your side. This project follows the
+[Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md); security issues
+should be reported privately per [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT](LICENSE)

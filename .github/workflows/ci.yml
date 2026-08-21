@@ -41,6 +41,15 @@ jobs:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@cargo-llvm-cov
       - run: cargo llvm-cov --package megane-core --lcov --output-path lcov.info
+      # Fork PRs: secrets are not passed to fork-triggered runs, so
+      # CODECOV_TOKEN resolves to an empty string there. That is expected
+      # and fine — codecov-action v5 falls back to a tokenless upload for
+      # PRs from forks of public repos, so the patch-coverage gate still
+      # works for external contributors. Do NOT "fix" the empty token by
+      # gating this step on the secret; that would silently skip the gate
+      # for forks. If a tokenless upload fails transiently (rate limit),
+      # re-run the job. The same applies to the test-ts and test-python
+      # upload steps below.
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info

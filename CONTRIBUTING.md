@@ -81,6 +81,15 @@ UI-affecting changes are covered by a Playwright E2E suite with pixel-diff basel
 
 Codecov measures unit-test coverage only (patch coverage ≥ 70 % is required on every PR); E2E does not count toward it, so new code still needs unit tests.
 
+### CI on fork pull requests
+
+Everything you need runs automatically on PRs from forks — no secrets or special setup required on your side:
+
+- The full CI suite (lint, Rust/TS/Python tests, builds) and the E2E pixel checks run on fork PRs; the E2E jobs compare against the `tests/e2e/baselines-ci/` PNGs committed in the repository.
+- Coverage uploads work without a token: this is a public repository, so codecov-action falls back to a tokenless upload for fork PRs. If the upload step itself fails transiently (e.g. a rate limit), ask a maintainer to re-run the job — do not try to work around the coverage gate.
+- The **"E2E update baselines"** flow (the `update-e2e-baselines` label) cannot push to fork branches, so if your change intentionally shifts pixels, say so in the PR description and a maintainer will re-record `baselines-ci/` for you.
+- The `llm-eval` label is maintainer-only (it triggers paid API calls) and is a no-op for other users.
+
 ## Code Style
 
 - **TypeScript** -- Strict mode enabled. Use the `@/` import alias for paths under `src/`.
@@ -88,6 +97,37 @@ Codecov measures unit-test coverage only (patch coverage ≥ 70 % is required on
 - **Python** -- Target Python 3.10+. Follow PEP 8 conventions.
 
 Commit messages must be written in English.
+
+## Design Rules
+
+A few project-wide rules come up in almost every review — knowing them up
+front saves a round trip:
+
+- **Parsers read files as-is.** A parser must return exactly what the file
+  asserts — nothing added, dropped, reordered, or restyled. Anything that
+  changes what the user *sees* (symmetry expansion, unwrapping, filtering,
+  supercells, bond rewrites, coloring, …) belongs in a pipeline node, so the
+  user can see and disable it in the editor. The only transformations allowed
+  inside a parser are lossless canonicalizations (unit conversion declared by
+  the file/format, element resolution, bond inference *only* when the format
+  carries no connectivity, identity-preserving reindexing). Known existing
+  violations are catalogued in
+  [`docs/docs/dev/parser-purity-audit.md`](docs/docs/dev/parser-purity-audit.md)
+  — please do not add new ones.
+- **New file formats and pipeline nodes must work on every host.** megane
+  ships as a webapp, Jupyter widget, JupyterLab extension, VSCode extension,
+  and Python API. When you add a format or node, register it on all of them
+  (the walkthroughs in
+  [`docs/docs/dev/architecture.md`](docs/docs/dev/architecture.md) and
+  [`docs/docs/dev/custom-nodes.md`](docs/docs/dev/custom-nodes.md) list every
+  registration point) and update the tables in
+  [`docs/docs/platform-support.md`](docs/docs/platform-support.md) in the same
+  PR. Host drift is the #1 source of "works in the webapp but not in VSCode"
+  bugs.
+- **Performance changes must be measured.** A change justified as "faster"
+  needs a before/after A/B measurement (see `scripts/profile-loading.mjs` and
+  `scripts/profile-streaming.mjs`), and is only merged if the numbers show a
+  win. Include the before/after table in the PR description.
 
 ## Submitting a Pull Request
 
