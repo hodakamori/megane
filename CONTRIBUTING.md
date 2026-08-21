@@ -98,6 +98,37 @@ Everything you need runs automatically on PRs from forks — no secrets or speci
 
 Commit messages must be written in English.
 
+## Design Rules
+
+A few project-wide rules come up in almost every review — knowing them up
+front saves a round trip:
+
+- **Parsers read files as-is.** A parser must return exactly what the file
+  asserts — nothing added, dropped, reordered, or restyled. Anything that
+  changes what the user *sees* (symmetry expansion, unwrapping, filtering,
+  supercells, bond rewrites, coloring, …) belongs in a pipeline node, so the
+  user can see and disable it in the editor. The only transformations allowed
+  inside a parser are lossless canonicalizations (unit conversion declared by
+  the file/format, element resolution, bond inference *only* when the format
+  carries no connectivity, identity-preserving reindexing). Known existing
+  violations are catalogued in
+  [`docs/docs/dev/parser-purity-audit.md`](docs/docs/dev/parser-purity-audit.md)
+  — please do not add new ones.
+- **New file formats and pipeline nodes must work on every host.** megane
+  ships as a webapp, Jupyter widget, JupyterLab extension, VSCode extension,
+  and Python API. When you add a format or node, register it on all of them
+  (the walkthroughs in
+  [`docs/docs/dev/architecture.md`](docs/docs/dev/architecture.md) and
+  [`docs/docs/dev/custom-nodes.md`](docs/docs/dev/custom-nodes.md) list every
+  registration point) and update the tables in
+  [`docs/docs/platform-support.md`](docs/docs/platform-support.md) in the same
+  PR. Host drift is the #1 source of "works in the webapp but not in VSCode"
+  bugs.
+- **Performance changes must be measured.** A change justified as "faster"
+  needs a before/after A/B measurement (see `scripts/profile-loading.mjs` and
+  `scripts/profile-streaming.mjs`), and is only merged if the numbers show a
+  win. Include the before/after table in the PR description.
+
 ## Submitting a Pull Request
 
 1. Fork the repository and create a feature branch from `main`.
