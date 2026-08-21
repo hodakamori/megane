@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+
+- **`MeganeViewer` can hide every tool except the 3D Viewport.** The new `ui` prop takes a partial `MeganeViewerUiOptions` — `pipelineEditor`, `resetView`, `perfHud`, `timeline`, `tooltip`, `measurement` — where omitted keys stay visible, so you only list what you want gone: `<MeganeViewer ui={{ pipelineEditor: false }} />`. The type and the frozen all-visible defaults (`DEFAULT_MEGANE_VIEWER_UI`) are exported from `megane-viewer/lib`. Hiding a tool removes it from the DOM but not from the scene: the pipeline still executes, and the layout closes the gap — the camera frustum stops reserving the pipeline panel's width, the perf HUD takes the vacated Reset View slot, and the measurement panels drop to the corner whenever no timeline strip is on screen. The bundled hosts (webapp, VSCode webview, JupyterLab DocWidget) pass no `ui` prop and are unchanged.
+- **<kbd>Esc</kbd> clears the atom selection, and closes the Render dialog.** A selection could previously only be cleared from the measurement panel — which `ui` can now hide. The shortcut is scoped to the viewer holding keyboard focus, and the Render and Share dialogs claim the key first, so dismissing a dialog leaves the selection alone. The Render dialog had no Escape handling before.
+
 ## [0.13.1] - 2026-08-12
 
 ### Fixed

@@ -5,12 +5,19 @@
 import type { SelectionState, Measurement } from "../types";
 import { getElementSymbol } from "../constants";
 import { useMeasurementStore } from "../stores/useMeasurementStore";
+import { MEASUREMENT_BOTTOM_DEFAULT } from "./overlayLayout";
 
 interface MeasurementPanelProps {
   selection: SelectionState;
   measurement: Measurement | null;
   elements: Uint8Array | null;
   onClear: () => void;
+  /**
+   * Distance from the viewer's bottom edge in px. Defaults to
+   * {@link MEASUREMENT_BOTTOM_DEFAULT}; hosts that hide the Timeline pass a
+   * smaller value so the panel doesn't float above an empty band.
+   */
+  bottom?: number;
 }
 
 const MEASUREMENT_LABELS: Record<string, string> = {
@@ -24,6 +31,7 @@ export function MeasurementPanel({
   measurement,
   elements,
   onClear,
+  bottom = MEASUREMENT_BOTTOM_DEFAULT,
 }: MeasurementPanelProps) {
   const addMeasurement = useMeasurementStore((s) => s.addMeasurement);
 
@@ -39,7 +47,7 @@ export function MeasurementPanel({
       data-selection-count={selection.atoms.length}
       style={{
         position: "absolute",
-        bottom: 60,
+        bottom,
         right: 12,
         background: "rgba(255, 255, 255, 0.92)",
         backdropFilter: "blur(16px)",

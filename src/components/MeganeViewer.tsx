@@ -6,6 +6,9 @@
  * appearance — so the viewer is fully governed by the pipeline graph that the
  * user sees. Hosts (webapp / VSCode webview / JupyterLab DocWidget) supply
  * only the file-ingestion callbacks; viewer state is derived internally.
+ *
+ * Every tool except the Viewport can be switched off at construction time via
+ * the `ui` prop — see {@link MeganeViewerUiOptions}.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,6 +19,7 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MeasurementListPanel } from "./MeasurementListPanel";
 import { PerfHud } from "./PerfHud";
+import { OVERLAY_INSET, PERF_HUD_LEFT_DEFAULT, MEASUREMENT_BOTTOM_DEFAULT } from "./overlayLayout";
 import { MoleculeRenderer, isMeganeTestMode } from "../renderer/MoleculeRenderer";
 import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
 import type { StructureParseResult } from "../parsers/structure";
@@ -40,6 +44,50 @@ import type {
 } from "../types";
 import type { ViewportState, AddBondParams } from "../pipeline/types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
+
+/**
+ * Visibility switches for every piece of viewer UI that is *not* the 3D
+ * Viewport. Supplied to {@link MeganeViewer} through its `ui` prop as a
+ * partial object; omitted keys fall back to {@link DEFAULT_MEGANE_VIEWER_UI}
+ * (everything visible), so embedders only list what they want to hide.
+ *
+ * Hiding a tool removes it from the DOM entirely — the pipeline still
+ * executes and the renderer still receives every update, so a viewer with
+ * `pipelineEditor: false` renders exactly the same scene, just without the
+ * editing chrome.
+ */
+export interface MeganeViewerUiOptions {
+  /** Pipeline editor panel on the right, with its toolbar and node graph. */
+  pipelineEditor: boolean;
+  /** "Reset View" button in the top-left corner. */
+  resetView: boolean;
+  /** Perf HUD readout — atom count, bond count, draw calls, FPS. */
+  perfHud: boolean;
+  /** Playback timeline (scrubber, play/pause, fps) along the bottom. */
+  timeline: boolean;
+  /** Hover tooltip that follows the cursor over atoms and bonds. */
+  tooltip: boolean;
+  /** Measurement readout panel plus the saved-measurement list. */
+  measurement: boolean;
+}
+
+/**
+ * Every tool visible — the layout all bundled hosts ship today.
+ *
+ * Frozen because it is public API and is read on every render as the fallback
+ * for each unset `ui` key: a consumer mutating it (easy to do by accident given
+ * the `{ ...DEFAULT_MEGANE_VIEWER_UI, pipelineEditor: false }` idiom) would
+ * otherwise change the default for every viewer in the process, including ones
+ * that pass no `ui` prop at all.
+ */
+export const DEFAULT_MEGANE_VIEWER_UI: Readonly<MeganeViewerUiOptions> = Object.freeze({
+  pipelineEditor: true,
+  resetView: true,
+  perfHud: true,
+  timeline: true,
+  tooltip: true,
+  measurement: true,
+});
 
 interface MeganeViewerProps {
   playing?: boolean;
@@ -75,6 +123,15 @@ interface MeganeViewerProps {
    * Data: `{ atoms, type, value, label }` or `null` when selection is cleared.
    */
   onMeasurementChange?: (measurement: Measurement | null) => void;
+  /**
+   * Toggles for the non-Viewport tools. Omitted keys stay visible — see
+   * {@link MeganeViewerUiOptions}. The Viewport itself is always rendered.
+   *
+   * @example
+   * // 3D view only, no editing chrome
+   * <MeganeViewer ui={{ pipelineEditor: false, resetView: false, perfHud: false }} … />
+   */
+  ui?: Partial<MeganeViewerUiOptions>;
   width?: string | number;
   height?: string | number;
   /** Host context tag for E2E tests: "webapp" | "jupyterlab-doc" | "vscode". Defaults to "webapp". */
@@ -110,6 +167,7 @@ export function MeganeViewer({
   onFrameChange,
   onSelectionChange,
   onMeasurementChange,
+  ui,
   width = "100%",
   height = "100%",
   testContext = "webapp",
@@ -126,12 +184,57 @@ export function MeganeViewer({
   const prevViewportStateRef = useRef<ViewportState | null>(null);
   const hasRestoredCameraRef = useRef(false);
 
+  // Resolve the `ui` prop down to plain booleans so a fresh object literal
+  // from the caller never destabilises hook deps.
+  //
+  // Resolved key by key with `??` rather than `{ ...DEFAULT, ...ui }`: the
+  // prop is `Partial<…>` and the project does not enable
+  // `exactOptionalPropertyTypes`, so `ui={{ timeline: maybeUndefined }}`
+  // typechecks. A spread would copy that `undefined` over the `true` default
+  // and hide a tool the documented contract keeps visible.
+  const showPipelineEditor = ui?.pipelineEditor ?? DEFAULT_MEGANE_VIEWER_UI.pipelineEditor;
+  const showResetView = ui?.resetView ?? DEFAULT_MEGANE_VIEWER_UI.resetView;
+  const showPerfHud = ui?.perfHud ?? DEFAULT_MEGANE_VIEWER_UI.perfHud;
+  const showTimeline = ui?.timeline ?? DEFAULT_MEGANE_VIEWER_UI.timeline;
+  const showTooltip = ui?.tooltip ?? DEFAULT_MEGANE_VIEWER_UI.tooltip;
+  const showMeasurement = ui?.measurement ?? DEFAULT_MEGANE_VIEWER_UI.measurement;
+
+  // Right-edge inset the orthographic frustum leaves free for the pipeline
+  // panel: zero when the panel is collapsed *or* switched off entirely.
+  //
+  // Depends on `showPipelineEditor` for real rather than reading it through a
+  // ref: with a ref the callback never changes identity, which makes every dep
+  // array listing it decorative and leaves correctness resting on hand-added
+  // deps that exhaustive-deps cannot defend. Consumers only re-run on a
+  // visibility change, and Viewport's mount effect ignores prop identity.
+  const rightInset = useCallback(
+    () => (showPipelineEditor && !pipelineCollapsedRef.current ? pipelineWidthRef.current + 12 : 0),
+    [showPipelineEditor],
+  );
+
   // Shared atom selection & measurement
   const { selection, measurement, handleAtomRightClick, handleClearSelection, handleFrameUpdated } =
     useAtomSelection(rendererRef, onMeasurementChange, onSelectionChange);
 
+  const viewerRootRef = useRef<HTMLDivElement | null>(null);
+
+  // Selecting an atom takes keyboard focus, which is what lets the Escape
+  // handler below tell whether an Escape was aimed at this viewer: a page can
+  // host several, and the host's own dialogs also answer to the key.
+  const handleAtomRightClickFocused = useCallback(
+    (atomIndex: number) => {
+      viewerRootRef.current?.focus({ preventScroll: true });
+      handleAtomRightClick(atomIndex);
+    },
+    [handleAtomRightClick],
+  );
+
   // Selection Inspector ⇄ 3D view bridge.
-  const inspectorActive = usePipelineUIStore((s) => s.mode === "inspector");
+  // The Inspector lives inside the pipeline panel, and `mode` is restored from
+  // sessionStorage — so without the panel a previously-saved "inspector" mode
+  // would leave the Viewport in pick mode with no UI to leave it.
+  const inspectorMode = usePipelineUIStore((s) => s.mode === "inspector");
+  const inspectorActive = showPipelineEditor && inspectorMode;
   const previewIndices = useInspectorInteractionStore((s) => s.previewIndices);
   const boxSelectActive = useInspectorInteractionStore((s) => s.boxSelectActive);
   const publishBoxResult = useInspectorInteractionStore((s) => s.publishBoxResult);
@@ -355,31 +458,72 @@ export function MeganeViewer({
   const onCameraStateChangeRef = useRef(onCameraStateChange);
   onCameraStateChangeRef.current = onCameraStateChange;
 
-  const handleRendererReady = useCallback((renderer: MoleculeRenderer) => {
-    rendererRef.current = renderer;
-    renderer.setBackgroundColor(themeToHex(useThemeStore.getState().resolvedTheme));
-    renderer.setViewInsets(0, pipelineCollapsedRef.current ? 0 : pipelineWidthRef.current + 12);
-    const storeState = usePipelineStore.getState();
-    applyViewportState(
-      renderer,
-      storeState.viewportState,
-      null,
-      primaryNodeIdRef.current,
-      storeState.atomLabels,
-    );
-    prevViewportStateRef.current = storeState.viewportState;
+  const handleRendererReady = useCallback(
+    (renderer: MoleculeRenderer) => {
+      rendererRef.current = renderer;
+      renderer.setBackgroundColor(themeToHex(useThemeStore.getState().resolvedTheme));
+      renderer.setViewInsets(0, rightInset());
+      const storeState = usePipelineStore.getState();
+      applyViewportState(
+        renderer,
+        storeState.viewportState,
+        null,
+        primaryNodeIdRef.current,
+        storeState.atomLabels,
+      );
+      prevViewportStateRef.current = storeState.viewportState;
 
-    // Register camera change callback for persistence
-    renderer.setCameraChangeCallback(() => {
-      const state = renderer.getCameraState();
-      if (!state) return;
-      if (onCameraStateChangeRef.current) {
-        onCameraStateChangeRef.current(state);
-      } else {
-        useViewStateStore.getState().updateCamera(state);
-      }
-    });
-  }, []);
+      // Register camera change callback for persistence
+      renderer.setCameraChangeCallback(() => {
+        const state = renderer.getCameraState();
+        if (!state) return;
+        if (onCameraStateChangeRef.current) {
+          onCameraStateChangeRef.current(state);
+        } else {
+          useViewStateStore.getState().updateCamera(state);
+        }
+      });
+    },
+    [rightInset],
+  );
+
+  // Escape clears the atom selection. Right-click selection stays wired
+  // regardless of `ui.measurement` (hosts consume onSelectionChange /
+  // onMeasurementChange without necessarily showing the panel), and
+  // MeasurementPanel's Clear button is otherwise the only way to drop a
+  // selection — so with `measurement: false` the highlights would be stuck.
+  //
+  // Guarded on a non-empty selection so Escape keeps its usual meaning
+  // (closing a dialog, cancelling a rename) when nothing is selected.
+  const selectionCountRef = useRef(0);
+  selectionCountRef.current = selection.atoms.length;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (selectionCountRef.current === 0) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // Something outside this viewer holds keyboard focus — a host dialog, a
+      // dropdown, or a sibling viewer. That Escape was aimed at it, not at us.
+      // `body` means nothing is focused, which we still answer to so a
+      // programmatic selection remains clearable.
+      const active = document.activeElement;
+      const root = viewerRootRef.current;
+      if (active && active !== document.body && root && !root.contains(active)) return;
+      handleClearSelection();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleClearSelection]);
+
+  // With `tooltip: false` the Viewport stops reporting hover, so `hoverInfo`
+  // would stay frozen at whatever was last under the cursor and reappear the
+  // moment the tooltip is switched back on — at coordinates the cursor left
+  // long ago.
+  useEffect(() => {
+    if (!showTooltip) setHoverInfo(null);
+  }, [showTooltip]);
 
   const handleTogglePipeline = useCallback(() => {
     setPipelineCollapsed((prev) => !prev);
@@ -393,25 +537,27 @@ export function MeganeViewer({
   const updateTourAnchor = useCallback(() => {
     const el = tourAnchorRef.current;
     if (!el) return;
-    const right = pipelineCollapsedRef.current ? 60 : pipelineWidthRef.current + 24;
+    const right = !showPipelineEditor
+      ? 24
+      : pipelineCollapsedRef.current
+        ? 60
+        : pipelineWidthRef.current + 24;
     el.style.right = `${right}px`;
-  }, []);
+  }, [showPipelineEditor]);
 
   const handlePipelineWidthChange = useCallback(
     (w: number) => {
       pipelineWidthRef.current = w;
-      if (!pipelineCollapsedRef.current) {
-        rendererRef.current?.setViewInsets(0, w + 12);
-      }
+      rendererRef.current?.setViewInsets(0, rightInset());
       updateTourAnchor();
     },
-    [updateTourAnchor],
+    [rightInset, updateTourAnchor],
   );
 
   useEffect(() => {
-    rendererRef.current?.setViewInsets(0, pipelineCollapsed ? 0 : pipelineWidthRef.current + 12);
+    rendererRef.current?.setViewInsets(0, rightInset());
     updateTourAnchor();
-  }, [pipelineCollapsed, updateTourAnchor]);
+  }, [pipelineCollapsed, rightInset, updateTourAnchor]);
 
   const handleResetView = useCallback(() => {
     const renderer = rendererRef.current;
@@ -420,6 +566,16 @@ export function MeganeViewer({
     useViewStateStore.getState().clearViewState();
   }, []);
 
+  // Timeline renders nothing for a single-frame structure (its own
+  // `totalFrames <= 1` guard), so the overlays below it must key on whether the
+  // strip is actually on screen — not just on the `ui.timeline` switch, which
+  // would leave them hovering above an empty band for every static structure.
+  const timelineVisible = showTimeline && totalFrames > 1;
+
+  // Measurement panels clear the Timeline strip; with no strip they drop to the
+  // same corner inset every other overlay uses.
+  const measurementBottom = timelineVisible ? MEASUREMENT_BOTTOM_DEFAULT : OVERLAY_INSET;
+
   const getRenderStats = useCallback(() => rendererRef.current?.getStats() ?? null, []);
   // Freeze the live FPS digits under E2E so screenshot baselines stay
   // deterministic; the feature is fully live in production.
@@ -427,6 +583,10 @@ export function MeganeViewer({
 
   return (
     <div
+      ref={viewerRootRef}
+      // Focusable (programmatically only) so the Escape handler above can scope
+      // itself to the viewer the user last interacted with.
+      tabIndex={-1}
       data-testid="megane-viewer"
       data-megane-context={testContext}
       data-atom-count={snapshot?.nAtoms ?? 0}
@@ -437,7 +597,7 @@ export function MeganeViewer({
       data-bond-count={bondCount}
       data-total-frames={totalFrames}
       data-current-frame={currentFrame}
-      style={{ width, height, position: "relative", overflow: "hidden" }}
+      style={{ width, height, position: "relative", overflow: "hidden", outline: "none" }}
     >
       <Viewport
         snapshot={snapshot}
@@ -445,11 +605,17 @@ export function MeganeViewer({
         atomLabels={null}
         atomVectors={null}
         onRendererReady={handleRendererReady}
-        onHover={setHoverInfo}
-        onAtomRightClick={handleAtomRightClick}
+        // Skipping the callback entirely (rather than rendering no Tooltip)
+        // avoids a viewer-wide re-render on every mousemove for a component
+        // that is not in the tree.
+        onHover={showTooltip ? setHoverInfo : undefined}
+        onAtomRightClick={handleAtomRightClickFocused}
         onFrameUpdated={handleFrameUpdated}
-        previewIndices={previewIndices}
-        boxSelectActive={boxSelectActive}
+        // Gated on the panel, not on `inspectorActive`, so the default
+        // configuration behaves exactly as before: these carry Inspector
+        // state that only the panel can produce or clear.
+        previewIndices={showPipelineEditor ? previewIndices : null}
+        boxSelectActive={showPipelineEditor && boxSelectActive}
         onBoxSelect={publishBoxResult}
         onInspectorPick={handleInspectorPick}
         inspectorActive={inspectorActive}
@@ -462,74 +628,90 @@ export function MeganeViewer({
           position: "absolute",
           top: 24,
           left: 24,
-          right: pipelineCollapsed ? 60 : pipelineWidthRef.current + 24,
-          bottom: 80,
+          right: !showPipelineEditor ? 24 : pipelineCollapsed ? 60 : pipelineWidthRef.current + 24,
+          bottom: timelineVisible ? 80 : 24,
           pointerEvents: "none",
           opacity: 0,
         }}
       />
-      <button
-        data-testid="reset-view-btn"
-        title="Reset view (fit to structure)"
-        onClick={handleResetView}
-        style={{
-          position: "absolute",
-          top: 12,
-          left: 12,
-          padding: "4px 8px",
-          fontSize: 11,
-          lineHeight: 1,
-          background: "rgba(255,255,255,0.85)",
-          border: "1px solid rgba(0,0,0,0.15)",
-          borderRadius: 4,
-          cursor: "pointer",
-          color: "#374151",
-          backdropFilter: "blur(4px)",
-          zIndex: 10,
-          userSelect: "none",
-        }}
-      >
-        Reset View
-      </button>
-      <PerfHud
-        atomCount={snapshot?.nAtoms ?? 0}
-        bondCount={bondCount}
-        getStats={getRenderStats}
-        stable={hudStable}
-      />
-      <PipelineEditor
-        collapsed={pipelineCollapsed}
-        onToggleCollapse={handleTogglePipeline}
-        onWidthChange={handlePipelineWidthChange}
-        rendererRef={rendererRef}
-        totalFrames={totalFrames}
-        currentFrame={currentFrame}
-        onSeek={effectiveOnSeek}
-      />
-      <Timeline
-        currentFrame={currentFrame}
-        totalFrames={totalFrames}
-        playing={effectivePlaying}
-        fps={effectiveFps}
-        speedMultiplier={storeSpeedMultiplier}
-        loopStart={storeLoopStart}
-        loopEnd={storeLoopEnd}
-        onSeek={effectiveOnSeek}
-        onPlayPause={effectiveOnPlayPause}
-        onFpsChange={effectiveOnFpsChange}
-        onSpeedChange={storeSetSpeedMultiplier}
-        onLoopRangeChange={storeSetLoopRange}
-        onStepBackward={storeStepBackward}
-        onStepForward={storeStepForward}
-      />
-      <Tooltip info={hoverInfo} />
-      <MeasurementPanel
-        selection={selection}
-        measurement={measurement}
-        elements={snapshot?.elements ?? null}
-        onClear={handleClearSelection}
-      />
-      <MeasurementListPanel elements={snapshot?.elements ?? null} />
+      {showResetView && (
+        <button
+          data-testid="reset-view-btn"
+          title="Reset view (fit to structure)"
+          onClick={handleResetView}
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            padding: "4px 8px",
+            fontSize: 11,
+            lineHeight: 1,
+            background: "rgba(255,255,255,0.85)",
+            border: "1px solid rgba(0,0,0,0.15)",
+            borderRadius: 4,
+            cursor: "pointer",
+            color: "#374151",
+            backdropFilter: "blur(4px)",
+            zIndex: 10,
+            userSelect: "none",
+          }}
+        >
+          Reset View
+        </button>
+      )}
+      {showPerfHud && (
+        <PerfHud
+          atomCount={snapshot?.nAtoms ?? 0}
+          bondCount={bondCount}
+          getStats={getRenderStats}
+          stable={hudStable}
+          // Slide into the Reset View slot when that button is hidden so the
+          // HUD never floats with a gap on its left.
+          left={showResetView ? PERF_HUD_LEFT_DEFAULT : OVERLAY_INSET}
+        />
+      )}
+      {showPipelineEditor && (
+        <PipelineEditor
+          collapsed={pipelineCollapsed}
+          onToggleCollapse={handleTogglePipeline}
+          onWidthChange={handlePipelineWidthChange}
+          rendererRef={rendererRef}
+          totalFrames={totalFrames}
+          currentFrame={currentFrame}
+          onSeek={effectiveOnSeek}
+        />
+      )}
+      {timelineVisible && (
+        <Timeline
+          currentFrame={currentFrame}
+          totalFrames={totalFrames}
+          playing={effectivePlaying}
+          fps={effectiveFps}
+          speedMultiplier={storeSpeedMultiplier}
+          loopStart={storeLoopStart}
+          loopEnd={storeLoopEnd}
+          onSeek={effectiveOnSeek}
+          onPlayPause={effectiveOnPlayPause}
+          onFpsChange={effectiveOnFpsChange}
+          onSpeedChange={storeSetSpeedMultiplier}
+          onLoopRangeChange={storeSetLoopRange}
+          onStepBackward={storeStepBackward}
+          onStepForward={storeStepForward}
+        />
+      )}
+      {showTooltip && <Tooltip info={hoverInfo} />}
+      {showMeasurement && (
+        <>
+          <MeasurementPanel
+            selection={selection}
+            measurement={measurement}
+            elements={snapshot?.elements ?? null}
+            onClear={handleClearSelection}
+            bottom={measurementBottom}
+          />
+          <MeasurementListPanel elements={snapshot?.elements ?? null} bottom={measurementBottom} />
+        </>
+      )}
     </div>
   );
 }

@@ -163,6 +163,22 @@ export function RenderModal({
     }
   }, [open, totalFrames]);
 
+  // Escape closes the modal, matching the backdrop click (both are disabled
+  // mid-export). Registered in the capture phase and always marked handled so
+  // it can't fall through to MeganeViewer's selection-clearing listener and
+  // wipe the selection behind an open modal.
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!exporting) onClose();
+    };
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
+  }, [open, exporting, onClose]);
+
   const handleWidthChange = useCallback(
     (newW: number) => {
       setWidth(newW);

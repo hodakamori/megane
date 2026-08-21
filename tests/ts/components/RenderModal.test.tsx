@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import * as React from "react";
 
 // Mock exporters before importing the component
@@ -22,7 +22,15 @@ vi.mock("three/examples/jsm/exporters/OBJExporter.js", () => ({
 // Mock gif.js dynamic import used by captureGif
 vi.mock("gif.js", () => ({ default: class {} }));
 
+// Real implementations except captureSnapshot / downloadBlob, so a test can
+// hold an export open (`exporting === true`) and assert what Escape does then.
+vi.mock("@/renderer/RenderCapture", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/renderer/RenderCapture")>();
+  return { ...actual, captureSnapshot: vi.fn(actual.captureSnapshot), downloadBlob: vi.fn() };
+});
+
 import { RenderModal } from "@/components/RenderModal";
+import { captureSnapshot } from "@/renderer/RenderCapture";
 import type { MoleculeRenderer } from "@/renderer/MoleculeRenderer";
 
 function makeCanvas(w = 800, h = 600): HTMLCanvasElement {
@@ -82,6 +90,94 @@ describe("RenderModal", () => {
       />,
     );
     expect(screen.getByTestId("render-modal")).toBeTruthy();
+  });
+
+  // The modal has to claim Escape, otherwise it falls through to
+  // MeganeViewer's window listener and wipes the selection behind the modal.
+  it("closes on Escape and marks the event handled", () => {
+    const onClose = vi.fn();
+    render(
+      <RenderModal
+        open
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    window.dispatchEvent(ev);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  // Mid-export Escape must still be swallowed — otherwise it falls through to
+  // MeganeViewer and clears the selection behind a modal that stays open.
+  it("swallows Escape without closing while an export is running", async () => {
+    const onClose = vi.fn();
+    // Never resolves: the modal stays in its exporting state.
+    vi.mocked(captureSnapshot).mockReturnValue(new Promise(() => {}) as never);
+
+    render(
+      <RenderModal
+        open
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("render-modal-export"));
+    await waitFor(() =>
+      expect((screen.getByTestId("render-modal-export") as HTMLButtonElement).disabled).toBe(true),
+    );
+
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    window.dispatchEvent(ev);
+
+    expect(ev.defaultPrevented).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("ignores keys other than Escape", () => {
+    const onClose = vi.fn();
+    render(
+      <RenderModal
+        open
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not listen for Escape while closed", () => {
+    const onClose = vi.fn();
+    render(
+      <RenderModal
+        open={false}
+        onClose={onClose}
+        rendererRef={makeRendererRef()}
+        totalFrames={1}
+        currentFrame={0}
+        onSeek={() => {}}
+      />,
+    );
+
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    window.dispatchEvent(ev);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
   });
 
   it("shows PNG, EPS and SVG format buttons in snapshot mode", () => {

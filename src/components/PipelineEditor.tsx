@@ -562,6 +562,14 @@ function PipelineEditorInner({
   } | null>(null);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  // The parent mirrors this width to size the renderer's frustum inset, but
+  // `panelWidth` is local state that resets whenever the panel unmounts (e.g.
+  // `ui.pipelineEditor` toggled off and back on) while the parent's mirror
+  // keeps the last dragged value. Reporting on mount keeps the two in sync.
+  useEffect(() => {
+    onWidthChange?.(panelWidth);
+  }, [panelWidth, onWidthChange]);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 

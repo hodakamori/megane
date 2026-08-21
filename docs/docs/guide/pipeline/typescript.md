@@ -129,6 +129,62 @@ import { MeganeViewer } from "megane-viewer/lib";
 <MeganeViewer />;
 ```
 
+#### Switching tools off (`ui`)
+
+Every tool except the 3D Viewport can be hidden at construction time through
+the `ui` prop. Omitted keys stay visible, so you only list what you want gone:
+
+```tsx
+import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
+
+// Read-only embed: 3D view and playback only.
+<MeganeViewer
+  ui={{ pipelineEditor: false, resetView: false, perfHud: false }}
+  onUploadStructure={(file) => usePipelineStore.getState().openFile(file)}
+/>;
+```
+
+`onUploadStructure` is required even when the editor is hidden — see the note
+under the table.
+
+| Key | Default | Hides |
+|------|---------|-------|
+| `pipelineEditor` | `true` | Pipeline editor panel on the right (toolbar, node graph, share/render dialogs, **and the viewer's only file-open UI**) |
+| `resetView` | `true` | "Reset View" button in the top-left corner |
+| `perfHud` | `true` | Atoms / Bonds / Draws / FPS readout |
+| `timeline` | `true` | Playback timeline along the bottom |
+| `tooltip` | `true` | Hover tooltip over atoms and bonds |
+| `measurement` | `true` | Measurement readout panel and saved-measurement list |
+
+Hiding a tool removes it from the DOM but changes nothing about the scene: the
+pipeline still executes and the renderer still receives every update. With
+`pipelineEditor: false` the viewer also reclaims the width the panel reserved,
+so the structure is centred in the full canvas, and with `timeline: false` the
+measurement panels drop to the bottom corner instead of hovering above an
+empty strip.
+
+Right-click atom selection stays wired whichever way `measurement` is set —
+hosts consume `onSelectionChange` / `onMeasurementChange` without necessarily
+showing the panel — so **Escape clears the current selection**. That is the
+only way out when `measurement: false` removes the panel's Clear button.
+
+:::note Loading files with the editor hidden
+The file-open UI lives inside the pipeline editor (the Load Structure node), so
+`pipelineEditor: false` leaves the required `onUploadStructure` callback with
+nothing to trigger it. Drive the pipeline yourself instead — for example
+`usePipelineStore.getState().openFile(file)` from your own drop target or
+fetch — and keep passing `onUploadStructure` to satisfy the prop type.
+:::
+
+The option type and the all-visible defaults are exported for typed configs:
+
+```ts
+import type { MeganeViewerUiOptions } from "megane-viewer/lib";
+import { DEFAULT_MEGANE_VIEWER_UI } from "megane-viewer/lib";
+
+const embedUi: MeganeViewerUiOptions = { ...DEFAULT_MEGANE_VIEWER_UI, pipelineEditor: false };
+```
+
 ## Example: Basic Structure with Bonds
 
 ```typescript
