@@ -361,7 +361,7 @@ fn parse_text(text: &str) -> Result<Raw, String> {
                 tokens.extend(line.split_whitespace());
             }
             if tokens.len() > n_atoms {
-                for tri in tokens[n_atoms..].chunks_exact(3) {
+                for tri in tokens[n_atoms..].as_chunks::<3>().0 {
                     let (Ok(a), Ok(b), Ok(order)) = (
                         tri[0].parse::<usize>(),
                         tri[1].parse::<usize>(),
