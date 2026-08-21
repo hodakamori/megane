@@ -22,6 +22,9 @@ tests/e2e/diffs/
 tests/e2e/baselines/**/*.diff.png
 tests/e2e/baselines/**/*.new.png
 tests/e2e/baselines/**/*.current.png
+tests/e2e/baselines-ci/**/*.diff.png
+tests/e2e/baselines-ci/**/*.new.png
+tests/e2e/baselines-ci/**/*.current.png
 tests/e2e/notebooks/
 playwright-report/
 test-results/

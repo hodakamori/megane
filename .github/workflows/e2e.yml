@@ -1,0 +1,120 @@
+name: E2E
+
+# Pixel E2E in CI.
+#
+# Runs the webapp-host and JupyterLab-host Playwright projects inside the
+# pinned Playwright container image, so the Chromium build and the system
+# fonts/fontconfig are identical between the run that RECORDED the baselines
+# and the run that COMPARES against them. This is what makes pixel diffs
+# stable on hosted runners — the historical drift came from comparing
+# dev-container captures against runner-rendered pages.
+#
+# The two historical CI blockers and their fixes:
+#   - webapp/contract port-bind race: Playwright's webServer manager is
+#     bypassed entirely (MEGANE_E2E_NO_WEBSERVER=1); the static server is
+#     started explicitly and health-checked before the suite runs.
+#   - fonts/fontconfig baseline drift: baselines live in
+#     tests/e2e/baselines-ci/ and are captured inside this same container
+#     by the "E2E update baselines" workflow (workflow_dispatch).
+#
+# The container tag MUST match the `playwright` version in package.json —
+# bump them together.
+#
+# The VSCode-hosted projects (vscode, widget-vscode) remain local-only:
+# they need a full code-server install and are not run here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Dispatched by the "E2E update baselines" workflow after it pushes a
+  # baseline commit: pushes made with GITHUB_TOKEN never fire push/PR
+  # events (recursion guard), so the verification run on the new head has
+  # to be triggered explicitly. workflow_dispatch is exempt from the guard.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-webapp:
+    name: E2E webapp host (pixel)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      MEGANE_E2E_BASELINE_DIR: tests/e2e/baselines-ci
+      MEGANE_E2E_REQUIRE_BASELINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/e2e-setup
+
+      - name: Start static webapp server
+        run: |
+          node tests/e2e/lib/serve-static.mjs python/megane/static/app 15173 127.0.0.1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:15173/ >/dev/null 2>&1; then
+              echo "static server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::static server never became ready on :15173"
+          exit 1
+
+      - name: Run webapp-host Playwright projects
+        env:
+          MEGANE_E2E_NO_WEBSERVER: "1"
+        run: npm run test:e2e:ci:webapp
+
+      - name: Upload report and pixel diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-webapp-failure
+          retention-days: 7
+          path: |
+            playwright-report/
+            test-results/
+            tests/e2e/baselines-ci/**/*.diff.png
+            tests/e2e/baselines-ci/**/*.new.png
+
+  e2e-jupyterlab:
+    name: E2E JupyterLab hosts (pixel)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+    env:
+      MEGANE_E2E_BASELINE_DIR: tests/e2e/baselines-ci
+      MEGANE_E2E_REQUIRE_BASELINE: "1"
+      # The JupyterLab projects boot their own Jupyter servers and never
+      # touch the webapp port; skip Playwright's webServer manager (whose
+      # port handling is the historical CI flake) entirely.
+      MEGANE_E2E_NO_WEBSERVER: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/e2e-setup
+        with:
+          jupyterlab: "true"
+
+      - name: Run JupyterLab-host Playwright projects
+        run: PATH="$PWD/.venv/bin:$PATH" npm run test:e2e:ci:jupyterlab
+
+      - name: Upload report and pixel diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-jupyterlab-failure
+          retention-days: 7
+          path: |
+            playwright-report/
+            test-results/
+            tests/e2e/baselines-ci/**/*.diff.png
+            tests/e2e/baselines-ci/**/*.new.png

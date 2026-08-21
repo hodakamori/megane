@@ -1,8 +1,12 @@
 # Baseline images for cross-platform E2E
 
 Each subdirectory holds the reference PNGs for one Playwright project.
-Baselines are committed to the repository so CI can compare against
-them on every run.
+
+This directory is the **local** baseline set, used when
+`MEGANE_E2E_BASELINE_DIR` is unset. CI compares against a separate set,
+`tests/e2e/baselines-ci/`, recorded inside the pinned Playwright
+container by the "E2E update baselines" workflow — never capture those
+PNGs locally; dispatch that workflow instead.
 
 ## First-run behaviour
 
@@ -30,15 +34,19 @@ the working tree.
 
 ## Environment determinism
 
-CI runs on `ubuntu-latest`. Locally the dev container is also Ubuntu +
-Chromium installed via `npx playwright install chromium`, so the
-rendered pixels match within the diff tolerance configured in
-`tests/e2e/lib/setup.ts` (DEFAULT_MAX_DIFF_PERCENT = 2.0% within a
-project, 4.0% for cross-platform parity). The launchOption
-`--disable-dev-shm-usage` is set in `playwright.config.ts` because GH
-Actions runners ship a 64MB `/dev/shm` that the WASM bundle + Three.js
-can exhaust, silently aborting WebGL.
+Pixel output depends on the Chromium build and the system fonts, so a
+baseline only reproduces in the environment class that recorded it.
+That is why the sets are split: this directory is recorded by the local
+dev environment (Ubuntu + Chromium via `npx playwright install
+chromium`), while `baselines-ci/` is recorded inside the pinned
+`mcr.microsoft.com/playwright` container that CI also compares in. Diff
+tolerance is configured in `tests/e2e/lib/setup.ts`
+(DEFAULT_MAX_DIFF_PERCENT = 2.0% within a project, 4.0% for
+cross-platform parity). The launchOption `--disable-dev-shm-usage` is
+set in `playwright.config.ts` because GH Actions runners ship a 64MB
+`/dev/shm` that the WASM bundle + Three.js can exhaust, silently
+aborting WebGL.
 
-If a future hardware/font upgrade pushes baselines past tolerance,
-either tighten the test (mask the noisy region) or regenerate the
-baselines on the same `ubuntu-latest` image and commit the new PNGs.
+If a hardware/font upgrade pushes local baselines past tolerance,
+either tighten the test (mask the noisy region) or regenerate them in
+the current dev environment and commit the new PNGs.
