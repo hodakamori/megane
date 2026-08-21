@@ -81,6 +81,15 @@ UI-affecting changes are covered by a Playwright E2E suite with pixel-diff basel
 
 Codecov measures unit-test coverage only (patch coverage ≥ 70 % is required on every PR); E2E does not count toward it, so new code still needs unit tests.
 
+### CI on fork pull requests
+
+Everything you need runs automatically on PRs from forks — no secrets or special setup required on your side:
+
+- The full CI suite (lint, Rust/TS/Python tests, builds) and the E2E pixel checks run on fork PRs; the E2E jobs compare against the `tests/e2e/baselines-ci/` PNGs committed in the repository.
+- Coverage uploads work without a token: this is a public repository, so codecov-action falls back to a tokenless upload for fork PRs. If the upload step itself fails transiently (e.g. a rate limit), ask a maintainer to re-run the job — do not try to work around the coverage gate.
+- The **"E2E update baselines"** flow (the `update-e2e-baselines` label) cannot push to fork branches, so if your change intentionally shifts pixels, say so in the PR description and a maintainer will re-record `baselines-ci/` for you.
+- The `llm-eval` label is maintainer-only (it triggers paid API calls) and is a no-op for other users.
+
 ## Code Style
 
 - **TypeScript** -- Strict mode enabled. Use the `@/` import alias for paths under `src/`.
