@@ -22,7 +22,11 @@ import { PerfHud } from "./PerfHud";
 import { OVERLAY_INSET, PERF_HUD_LEFT_DEFAULT, MEASUREMENT_BOTTOM_DEFAULT } from "./overlayLayout";
 import { MoleculeRenderer, isMeganeTestMode } from "../renderer/MoleculeRenderer";
 import type { StructureParseResult } from "../parsers/structure";
-import { computeFrameDistanceBonds } from "../pipeline/executors/addBond";
+import {
+  useFrameDistanceBonds,
+  hasDistanceBondNode,
+  distanceBondVdwScale,
+} from "../hooks/useFrameDistanceBonds";
 import { usePipelineStore } from "../pipeline/store";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 import { useInspectorInteractionStore } from "../stores/useInspectorInteractionStore";
@@ -41,7 +45,7 @@ import type {
   SelectionState,
   Measurement,
 } from "../types";
-import type { ViewportState, AddBondParams } from "../pipeline/types";
+import type { ViewportState } from "../pipeline/types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
 /**
@@ -401,32 +405,16 @@ export function MeganeViewer({
   const effectiveOnFpsChange = onFpsChange ?? storeSetFps;
 
   // Per-frame bond recalculation for distance mode
-  useEffect(() => {
-    const nodes = usePipelineStore.getState().nodes;
-    const bondNode = nodes.find((n) => n.type === "add_bond");
-    if (!bondNode) return;
-    const params = bondNode.data.params;
-    if (params.type !== "add_bond" || (params as AddBondParams).bondSource !== "distance") return;
-    if (!snapshot || !frame) return;
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-
-    const result = computeFrameDistanceBonds(
-      frame.positions,
-      snapshot.elements,
-      snapshot.nAtoms,
-      snapshot.box,
-      (params as AddBondParams).vdwScale,
-    );
-    renderer.updateBondsExt(
-      result.bondIndices,
-      result.bondOrders,
-      result.positions,
-      result.elements,
-      result.nAtoms,
-    );
-    setBondCount(result.bondIndices.length / 2);
-  }, [frame, snapshot]);
+  const hasDistanceBond = usePipelineStore((s) => hasDistanceBondNode(s.nodes));
+  const distanceBondScale = usePipelineStore((s) => distanceBondVdwScale(s.nodes));
+  useFrameDistanceBonds({
+    rendererRef,
+    snapshot,
+    frame,
+    enabled: hasDistanceBond,
+    vdwScale: distanceBondScale,
+    onBondCount: setBondCount,
+  });
 
   // Per-frame vector update
   useEffect(() => {
