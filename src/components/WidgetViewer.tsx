@@ -16,12 +16,15 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer, type MeganeCameraState } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
-import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
-import { processPbcBonds } from "../pipeline/executors/addBond";
+import {
+  useFrameDistanceBonds,
+  hasDistanceBondNode,
+  distanceBondVdwScale,
+} from "../hooks/useFrameDistanceBonds";
 import { createPipelineStore, type PipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
-import type { ViewportState, AddBondParams } from "../pipeline/types";
+import type { ViewportState } from "../pipeline/types";
 import type { Snapshot, Frame, Measurement, HoverInfo } from "../types";
 import { useThemeStore, themeToHex } from "../stores/useThemeStore";
 
@@ -217,46 +220,20 @@ export function WidgetViewer({
     prevViewportStateRef.current = viewportState;
   }, [viewportState, pipelineStore]);
 
-  // Per-frame bond recalculation for distance mode
-  useEffect(() => {
-    const nodes = pipelineStore.getState().nodes;
-    const bondNode = nodes.find((n) => n.type === "add_bond");
-    if (!bondNode) return;
-    const params = bondNode.data.params;
-    if (params.type !== "add_bond" || (params as AddBondParams).bondSource !== "distance") return;
-    // In pipeline mode the `snapshot` prop is null (set_pipeline only populates
-    // `_node_snapshots_data`), so fall back to the store snapshot — same
-    // pattern as Viewport and MeasurementPanel below.
-    const effectiveSnapshot = storeSnapshot ?? snapshot;
-    if (!effectiveSnapshot || !frame) return;
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-
-    const newBonds = inferBondsVdwJS(
-      frame.positions,
-      effectiveSnapshot.elements,
-      effectiveSnapshot.nAtoms,
-      (params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
-      effectiveSnapshot.box,
-    );
-
-    const result = processPbcBonds(
-      newBonds,
-      null,
-      frame.positions,
-      effectiveSnapshot.elements,
-      effectiveSnapshot.nAtoms,
-      effectiveSnapshot.box,
-    );
-    renderer.updateBondsExt(
-      result.bondIndices,
-      result.bondOrders,
-      result.positions,
-      result.elements,
-      result.nAtoms,
-    );
-    setBondCount(result.bondIndices.length / 2);
-  }, [frame, storeSnapshot, snapshot, pipelineStore]);
+  // Per-frame bond recalculation for distance mode. In pipeline mode the
+  // `snapshot` prop is null (set_pipeline only populates
+  // `_node_snapshots_data`), so fall back to the store snapshot — same
+  // pattern as Viewport and MeasurementPanel below.
+  const hasDistanceBond = useStore(pipelineStore, (s) => hasDistanceBondNode(s.nodes));
+  const distanceBondScale = useStore(pipelineStore, (s) => distanceBondVdwScale(s.nodes));
+  useFrameDistanceBonds({
+    rendererRef,
+    snapshot: storeSnapshot ?? snapshot,
+    frame,
+    enabled: hasDistanceBond,
+    vdwScale: distanceBondScale,
+    onBondCount: setBondCount,
+  });
 
   // Track pipeline-driven bond updates (initial load, bondSource flips,
   // file-mode bonds). Mirrors MeganeViewer's pattern.

@@ -8,25 +8,11 @@ import type {
 } from "../types";
 import { getCovalentRadius, isDefaultLigand, isMetalLike } from "../../constants";
 import { invert3x3 } from "./mathUtils";
+import { collectDisplaySites, displaySiteKey, type DisplaySite } from "./displaySites";
 import {
   periodicDisplacementsWithinCutoff,
   type PeriodicDisplacement,
 } from "./periodicDisplacements";
-
-interface DisplaySite {
-  sourceIndex: number;
-  dataIndex: number;
-  x: number;
-  y: number;
-  z: number;
-  imageA: number;
-  imageB: number;
-  imageC: number;
-}
-
-function siteKey(sourceIndex: number, a: number, b: number, c: number): string {
-  return `${sourceIndex}:${a}:${b}:${c}`;
-}
 
 /** Convert directed coordination relationships to the normal bond stream. */
 export function coordinationToBondData(coordination: CoordinationData): BondData {
@@ -94,46 +80,15 @@ export function executeCoordinationGenerator(
 
   const extendedPositions = Array.from(positions);
   const extendedElements = Array.from(elements);
-  const drawingSites = new Map<string, DisplaySite>();
-  const allDisplaySites: DisplaySite[] = [];
-  const sourceVisible = particle.drawingBoundary?.sourceVisibleMask;
-
-  for (let atom = 0; atom < nAtoms; atom++) {
-    if (sourceVisible && sourceVisible[atom] === 0) continue;
-    const site: DisplaySite = {
-      sourceIndex: atom,
-      dataIndex: atom,
-      x: positions[atom * 3],
-      y: positions[atom * 3 + 1],
-      z: positions[atom * 3 + 2],
-      imageA: 0,
-      imageB: 0,
-      imageC: 0,
-    };
-    drawingSites.set(siteKey(atom, 0, 0, 0), site);
-    allDisplaySites.push(site);
-  }
-
-  const images = particle.drawingBoundary?.images;
-  if (images) {
-    for (let image = 0; image < images.sourceIndices.length; image++) {
-      const i3 = image * 3;
-      const dataIndex = extendedElements.length;
-      const site: DisplaySite = {
-        sourceIndex: images.sourceIndices[image],
-        dataIndex,
-        x: images.positions[i3],
-        y: images.positions[i3 + 1],
-        z: images.positions[i3 + 2],
-        imageA: images.latticeShifts[i3],
-        imageB: images.latticeShifts[i3 + 1],
-        imageC: images.latticeShifts[i3 + 2],
-      };
-      extendedPositions.push(site.x, site.y, site.z);
-      extendedElements.push(elements[site.sourceIndex]);
-      drawingSites.set(siteKey(site.sourceIndex, site.imageA, site.imageB, site.imageC), site);
-      allDisplaySites.push(site);
-    }
+  const { sites: allDisplaySites, byKey: drawingSites } = collectDisplaySites(
+    positions,
+    nAtoms,
+    particle.drawingBoundary,
+  );
+  for (const site of allDisplaySites) {
+    if (site.dataIndex < nAtoms) continue;
+    extendedPositions.push(site.x, site.y, site.z);
+    extendedElements.push(elements[site.sourceIndex]);
   }
 
   const centers = allDisplaySites.filter((site) => centerElements.has(elements[site.sourceIndex]));
@@ -152,14 +107,14 @@ export function executeCoordinationGenerator(
 
   const appendOutsideSite = (
     sourceIndex: number,
-    imageA: number,
-    imageB: number,
-    imageC: number,
+    shiftA: number,
+    shiftB: number,
+    shiftC: number,
     x: number,
     y: number,
     z: number,
   ): DisplaySite => {
-    const key = siteKey(sourceIndex, imageA, imageB, imageC);
+    const key = displaySiteKey(sourceIndex, shiftA, shiftB, shiftC);
     const drawing = drawingSites.get(key);
     if (drawing) return drawing;
     const existing = outsideSites.get(key);
@@ -170,9 +125,9 @@ export function executeCoordinationGenerator(
       x,
       y,
       z,
-      imageA,
-      imageB,
-      imageC,
+      shiftA,
+      shiftB,
+      shiftC,
     };
     outsideSites.set(key, site);
     extendedPositions.push(x, y, z);
@@ -180,7 +135,7 @@ export function executeCoordinationGenerator(
     outsidePositions.push(x, y, z);
     outsideElements.push(elements[sourceIndex]);
     outsideSourceIndices.push(sourceIndex);
-    outsideLatticeShifts.push(imageA, imageB, imageC);
+    outsideLatticeShifts.push(shiftA, shiftB, shiftC);
     return site;
   };
 
@@ -222,13 +177,13 @@ export function executeCoordinationGenerator(
       }
 
       for (const [imageDx, imageDy, imageDz, relativeA, relativeB, relativeC] of displacements) {
-        const imageA = center.imageA + relativeA;
-        const imageB = center.imageB + relativeB;
-        const imageC = center.imageC + relativeC;
+        const shiftA = center.shiftA + relativeA;
+        const shiftB = center.shiftB + relativeB;
+        const shiftC = center.shiftC + relativeC;
         const x = center.x + imageDx;
         const y = center.y + imageDy;
         const z = center.z + imageDz;
-        const ligand = appendOutsideSite(ligandSource, imageA, imageB, imageC, x, y, z);
+        const ligand = appendOutsideSite(ligandSource, shiftA, shiftB, shiftC, x, y, z);
         relationships.push(center.dataIndex, ligand.dataIndex);
       }
     }

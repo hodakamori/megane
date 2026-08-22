@@ -38,15 +38,17 @@ import { deserializePipeline } from "../pipeline/serialize";
 import { executePipeline } from "../pipeline/execute";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { parseStructureFile } from "../parsers/structure";
-import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
-import { processPbcBonds } from "../pipeline/executors/addBond";
+import {
+  useFrameDistanceBonds,
+  hasDistanceBondNode,
+  distanceBondVdwScale,
+} from "../hooks/useFrameDistanceBonds";
 import type { PipelineNodeData, NodeSnapshotData } from "../pipeline/execute";
 import type {
   SerializedPipeline,
   ViewportState,
   LoadStructureParams,
   FrameProvider,
-  AddBondParams,
 } from "../pipeline/types";
 import { DEFAULT_VIEWPORT_STATE } from "../pipeline/types";
 import type { Snapshot, Frame, HoverInfo } from "../types";
@@ -241,55 +243,17 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
 
   // ─── Per-frame bond recalculation (distance mode) ────────────────
 
-  // Memoized so effect below does not refire on unrelated node edits
+  // Memoized so the hook's effect does not refire on unrelated node edits
   // (position, colour, other params) — only when distance-bond mode toggles.
-  const hasDistanceBond = useMemo(
-    () =>
-      nodes.some(
-        (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
-      ),
-    [nodes],
-  );
-
-  // VDW threshold scale for the active distance-bond node (default 0.6).
-  const distanceBondScale = useMemo(() => {
-    const node = nodes.find(
-      (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
-    );
-    return node
-      ? ((node.data.params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR)
-      : DEFAULT_VDW_BOND_FACTOR;
-  }, [nodes]);
-
-  useEffect(() => {
-    if (!hasDistanceBond) return;
-    if (!currentFrameData || !primarySnapshot) return;
-    const renderer = rendererRef.current;
-    if (!renderer) return;
-
-    const newBonds = inferBondsVdwJS(
-      currentFrameData.positions,
-      primarySnapshot.elements,
-      primarySnapshot.nAtoms,
-      distanceBondScale,
-      primarySnapshot.box,
-    );
-    const result = processPbcBonds(
-      newBonds,
-      null,
-      currentFrameData.positions,
-      primarySnapshot.elements,
-      primarySnapshot.nAtoms,
-      primarySnapshot.box,
-    );
-    renderer.updateBondsExt(
-      result.bondIndices,
-      result.bondOrders,
-      result.positions,
-      result.elements,
-      result.nAtoms,
-    );
-  }, [currentFrameData, primarySnapshot, hasDistanceBond, distanceBondScale]);
+  const hasDistanceBond = useMemo(() => hasDistanceBondNode(nodes), [nodes]);
+  const distanceBondScale = useMemo(() => distanceBondVdwScale(nodes), [nodes]);
+  useFrameDistanceBonds({
+    rendererRef,
+    snapshot: primarySnapshot,
+    frame: currentFrameData,
+    enabled: hasDistanceBond,
+    vdwScale: distanceBondScale,
+  });
 
   // ─── Playback ────────────────────────────────────────────────────
 
