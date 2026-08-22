@@ -48,14 +48,9 @@ describe("NODE_CATALOG", () => {
     }
   });
 
-  it("gives fenced-only rendering to nodes with inline param comments", () => {
-    // Only polyhedron_generator uses the multi-line fenced parameter block.
+  it("does not use special-case fenced parameter rendering", () => {
     for (const type of ALL_TYPES) {
-      if (type === "polyhedron_generator") {
-        expect(NODE_CATALOG[type].promptParamsFenced).toBeTruthy();
-      } else {
-        expect(NODE_CATALOG[type].promptParamsFenced).toBeUndefined();
-      }
+      expect(NODE_CATALOG[type].promptParamsFenced).toBeUndefined();
     }
   });
 });

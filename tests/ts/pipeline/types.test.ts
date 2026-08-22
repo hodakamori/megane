@@ -68,6 +68,15 @@ describe("canConnect", () => {
     expect(canConnect("polyhedron_generator", "mesh", "viewport", "mesh")).toBe(true);
   });
 
+  it("requires Coordination data for Polyhedra", () => {
+    expect(
+      canConnect("coordination_generator", "coordination", "polyhedron_generator", "coordination"),
+    ).toBe(true);
+    expect(canConnect("load_structure", "particle", "polyhedron_generator", "coordination")).toBe(
+      false,
+    );
+  });
+
   it("allows particle → add_bond particle", () => {
     expect(canConnect("load_structure", "particle", "add_bond", "particle")).toBe(true);
   });
@@ -143,13 +152,29 @@ describe("defaultParams", () => {
     const params = defaultParams("polyhedron_generator");
     expect(params).toEqual({
       type: "polyhedron_generator",
-      excludedCenters: [],
-      excludedLigands: [],
-      cutoffTolerance: 1.15,
       opacity: 0.5,
       showEdges: false,
       edgeColor: "#dddddd",
       edgeWidth: 3,
+    });
+  });
+
+  it("keeps Drawing Boundary and Coordination defaults separate", () => {
+    expect(defaultParams("drawing_boundary")).toEqual({
+      type: "drawing_boundary",
+      xMin: 0,
+      xMax: 1,
+      yMin: 0,
+      yMax: 1,
+      zMin: 0,
+      zMax: 1,
+    });
+    expect(defaultParams("coordination_generator")).toEqual({
+      type: "coordination_generator",
+      excludedCenters: [],
+      excludedLigands: [],
+      cutoffTolerance: 1.15,
+      boundaryMode: "complete",
     });
   });
 

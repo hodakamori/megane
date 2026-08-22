@@ -42,6 +42,9 @@ import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
 import { WrapNode } from "./nodes/WrapNode";
 import { ReplicateNode } from "./nodes/ReplicateNode";
+import { DrawingBoundaryNode } from "./nodes/DrawingBoundaryNode";
+import { BoundaryCompletionNode } from "./nodes/BoundaryCompletionNode";
+import { CoordinationGeneratorNode } from "./nodes/CoordinationGeneratorNode";
 import { ColorNode } from "./nodes/ColorNode";
 import { RepresentationNode } from "./nodes/RepresentationNode";
 import { LabelGeneratorNode } from "./nodes/LabelGeneratorNode";
@@ -67,11 +70,14 @@ const nodeTypes = {
   load_vector: LoadVectorNode,
   streaming: StreamingNode,
   add_bond: AddBondNode,
+  coordination_generator: CoordinationGeneratorNode,
   viewport: ViewportNode,
   filter: FilterNode,
   modify: ModifyNode,
   wrap: WrapNode,
   replicate: ReplicateNode,
+  drawing_boundary: DrawingBoundaryNode,
+  boundary_completion: BoundaryCompletionNode,
   color: ColorNode,
   representation: RepresentationNode,
   label_generator: LabelGeneratorNode,
@@ -100,12 +106,20 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
     label: "Spectrum",
     types: ["load_spectrum", "spectrum_plot"],
   },
-  { category: "bond", label: "Bond", types: ["add_bond"] },
+  { category: "bond", label: "Bond", types: ["add_bond", "coordination_generator"] },
   { category: "filter", label: "Filter", types: ["filter"] },
   {
     category: "modify",
     label: "Modify",
-    types: ["modify", "color", "representation", "wrap", "replicate"],
+    types: [
+      "modify",
+      "color",
+      "representation",
+      "wrap",
+      "replicate",
+      "drawing_boundary",
+      "boundary_completion",
+    ],
   },
   {
     category: "overlay",

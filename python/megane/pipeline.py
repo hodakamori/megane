@@ -317,6 +317,62 @@ class Replicate(PipelineNode):
         self.nz = nz
 
 
+class DrawingBoundary(PipelineNode):
+    """Generate periodic display copies inside fractional drawing bounds.
+
+    Unlike :class:`Replicate`, this does not change structural atom indices or
+    enlarge the cell. Bounds are inclusive, so a site on 0 is repeated on 1.
+
+    Ports:
+        inp.particle — atom data in
+        out.particle — atom data carrying periodic display copies
+    """
+
+    _node_type = "drawing_boundary"
+    _out_ports = {"particle": "particle"}
+    _inp_ports = {"particle": "particle"}
+
+    def __init__(
+        self,
+        *,
+        x_min: float = 0.0,
+        x_max: float = 1.0,
+        y_min: float = 0.0,
+        y_max: float = 1.0,
+        z_min: float = 0.0,
+        z_max: float = 1.0,
+    ) -> None:
+        super().__init__()
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = y_min
+        self.y_max = y_max
+        self.z_min = z_min
+        self.z_max = z_max
+
+
+class BoundaryCompletion(PipelineNode):
+    """Add bond-connected periodic copies to a Drawing Boundary.
+
+    ``neighbors`` completes one bond shell. ``components`` completes finite
+    connected components while leaving infinite periodic networks unchanged.
+
+    Ports:
+        inp.particle — atom data carrying a Drawing Boundary
+        inp.bond     — periodic bond topology
+        out.particle — atom data carrying completed display copies
+        out.bond     — bonds repeated over the completed copies
+    """
+
+    _node_type = "boundary_completion"
+    _out_ports = {"particle": "particle", "bond": "bond"}
+    _inp_ports = {"particle": "particle", "bond": "bond"}
+
+    def __init__(self, *, mode: Literal["neighbors", "components"] = "neighbors") -> None:
+        super().__init__()
+        self.mode = mode
+
+
 class Color(PipelineNode):
     """Recolor the upstream particle stream by a chosen scheme.
 
@@ -436,21 +492,21 @@ class AddLabels(PipelineNode):
         self.source = source
 
 
-class AddPolyhedra(PipelineNode):
-    """Generate coordination polyhedra mesh (VESTA-style auto-detection).
+class AddCoordination(PipelineNode):
+    """Generate directed center-neighbor coordination relationships.
 
-    By default a polyhedron is drawn for every metal/metalloid center
-    coordinated to every typical anion-former ligand present in the input
-    structure. Use ``excluded_centers`` / ``excluded_ligands`` to opt out
-    specific atomic numbers, mirroring VESTA's checkbox UI.
+    With ``boundary_mode="complete"``, center atoms remain inside Drawing
+    Boundary while bonded periodic images of their neighbors may be appended
+    outside it to complete the visible coordination environment.
 
     Ports:
-        inp.particle — atom data
-        out.mesh     — polyhedra mesh
+        inp.particle — atom data, normally from :class:`DrawingBoundary`
+        out.coordination — directed center-neighbor relationships
+        out.bond — the same relationships as renderable bonds
     """
 
-    _node_type = "polyhedron_generator"
-    _out_ports = {"mesh": "mesh"}
+    _node_type = "coordination_generator"
+    _out_ports = {"coordination": "coordination", "bond": "bond"}
     _inp_ports = {"particle": "particle"}
 
     def __init__(
@@ -459,15 +515,36 @@ class AddPolyhedra(PipelineNode):
         excluded_centers: list[int] | None = None,
         excluded_ligands: list[int] | None = None,
         cutoff_tolerance: float = 1.15,
+        boundary_mode: Literal["inside", "complete"] = "complete",
+    ) -> None:
+        super().__init__()
+        self.excluded_centers = list(excluded_centers) if excluded_centers else []
+        self.excluded_ligands = list(excluded_ligands) if excluded_ligands else []
+        self.cutoff_tolerance = cutoff_tolerance
+        self.boundary_mode = boundary_mode
+
+
+class AddPolyhedra(PipelineNode):
+    """Convert directed coordination relationships to polyhedron meshes.
+
+    Ports:
+        inp.coordination — directed center-neighbor coordination data
+        out.mesh     — polyhedra mesh
+    """
+
+    _node_type = "polyhedron_generator"
+    _out_ports = {"mesh": "mesh"}
+    _inp_ports = {"coordination": "coordination"}
+
+    def __init__(
+        self,
+        *,
         opacity: float = 0.5,
         show_edges: bool = False,
         edge_color: str = "#dddddd",
         edge_width: float = 3.0,
     ) -> None:
         super().__init__()
-        self.excluded_centers = list(excluded_centers) if excluded_centers else []
-        self.excluded_ligands = list(excluded_ligands) if excluded_ligands else []
-        self.cutoff_tolerance = cutoff_tolerance
         self.opacity = opacity
         self.show_edges = show_edges
         self.edge_color = edge_color
@@ -828,6 +905,17 @@ class Pipeline:
             return Wrap(mode=nd.get("mode", "none"))
         elif ntype == "replicate":
             return Replicate(nx=nd.get("nx", 1), ny=nd.get("ny", 1), nz=nd.get("nz", 1))
+        elif ntype == "drawing_boundary":
+            return DrawingBoundary(
+                x_min=nd.get("xMin", 0.0),
+                x_max=nd.get("xMax", 1.0),
+                y_min=nd.get("yMin", 0.0),
+                y_max=nd.get("yMax", 1.0),
+                z_min=nd.get("zMin", 0.0),
+                z_max=nd.get("zMax", 1.0),
+            )
+        elif ntype == "boundary_completion":
+            return BoundaryCompletion(mode=nd.get("mode", "neighbors"))
         elif ntype == "add_bond":
             bond_source = nd.get("bondSource", "distance")
             if bond_source == "file":
@@ -835,14 +923,15 @@ class Pipeline:
             return AddBonds(source=bond_source)
         elif ntype == "label_generator":
             return AddLabels(source=nd.get("source", "element"))
-        elif ntype == "polyhedron_generator":
-            # Legacy keys (centerElements/ligandElements/maxDistance) from the
-            # pre-VESTA include-list shape are silently dropped — old pipelines
-            # adopt the new "all auto" defaults.
-            return AddPolyhedra(
+        elif ntype == "coordination_generator":
+            return AddCoordination(
                 excluded_centers=nd.get("excludedCenters", []),
                 excluded_ligands=nd.get("excludedLigands", []),
                 cutoff_tolerance=nd.get("cutoffTolerance", 1.15),
+                boundary_mode=nd.get("boundaryMode", "complete"),
+            )
+        elif ntype == "polyhedron_generator":
+            return AddPolyhedra(
                 opacity=nd.get("opacity", 0.5),
                 show_edges=nd.get("showEdges", False),
                 edge_color=nd.get("edgeColor", "#dddddd"),
@@ -1014,6 +1103,15 @@ class Pipeline:
             base["nx"] = node.nx
             base["ny"] = node.ny
             base["nz"] = node.nz
+        elif isinstance(node, DrawingBoundary):
+            base["xMin"] = node.x_min
+            base["xMax"] = node.x_max
+            base["yMin"] = node.y_min
+            base["yMax"] = node.y_max
+            base["zMin"] = node.z_min
+            base["zMax"] = node.z_max
+        elif isinstance(node, BoundaryCompletion):
+            base["mode"] = node.mode
         elif isinstance(node, AddBonds):
             if node.top is not None:
                 base["bondSource"] = "file"
@@ -1023,10 +1121,12 @@ class Pipeline:
                 base["bondSource"] = node.source
         elif isinstance(node, AddLabels):
             base["source"] = node.source
-        elif isinstance(node, AddPolyhedra):
+        elif isinstance(node, AddCoordination):
             base["excludedCenters"] = node.excluded_centers
             base["excludedLigands"] = node.excluded_ligands
             base["cutoffTolerance"] = node.cutoff_tolerance
+            base["boundaryMode"] = node.boundary_mode
+        elif isinstance(node, AddPolyhedra):
             base["opacity"] = node.opacity
             base["showEdges"] = node.show_edges
             base["edgeColor"] = node.edge_color

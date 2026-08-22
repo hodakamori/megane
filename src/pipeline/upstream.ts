@@ -7,7 +7,7 @@
  * elements exist" is the `load_structure` node's snapshot stored in
  * `state.nodeSnapshots`. This module walks the graph backwards from a target
  * node, transparently traversing filter / modify / color / representation /
- * add_bond nodes that don't change the underlying element list, and returns
+ * drawing-boundary nodes that don't change the underlying element list, and returns
  * the upstream load_structure (or its element set).
  */
 
@@ -21,9 +21,10 @@ const TRANSPARENT_NODE_TYPES: ReadonlySet<string> = new Set([
   "modify",
   "color",
   "representation",
+  "drawing_boundary",
+  "boundary_completion",
   "add_bond",
   "label_generator",
-  "polyhedron_generator",
 ]);
 
 /**

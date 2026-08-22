@@ -19,6 +19,9 @@ import type {
   ModifyParams,
   WrapParams,
   ReplicateParams,
+  DrawingBoundaryParams,
+  BoundaryCompletionParams,
+  CoordinationGeneratorParams,
   ColorParams,
   RepresentationParams,
   LabelGeneratorParams,
@@ -44,6 +47,9 @@ import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
 import { executeWrap } from "./executors/wrap";
 import { executeReplicate } from "./executors/replicate";
+import { executeDrawingBoundary } from "./executors/drawingBoundary";
+import { executeBoundaryCompletion } from "./executors/boundaryCompletion";
+import { executeCoordinationGenerator } from "./executors/coordinationGenerator";
 import { executeColor } from "./executors/color";
 import { executeRepresentation } from "./executors/representation";
 import { executeLabelGenerator } from "./executors/labelGenerator";
@@ -232,6 +238,30 @@ export function executePipeline(
         }
         break;
       }
+      case "coordination_generator": {
+        const outputs = executeCoordinationGenerator(
+          data.params as CoordinationGeneratorParams,
+          inputs,
+        );
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (!outputs.has("coordination")) {
+          addError(id, { message: "No coordination pairs found", severity: "warning" });
+        }
+        break;
+      }
+      case "boundary_completion": {
+        const outputs = executeBoundaryCompletion(data.params as BoundaryCompletionParams, inputs);
+        edgeOutputs.set(id, outputs);
+        if (!inputs.get("particle")?.length || !inputs.get("bond")?.length) {
+          addError(id, {
+            message: "Particle and bond inputs are both required",
+            severity: "warning",
+          });
+        }
+        break;
+      }
       case "filter": {
         const labels = resolveEffectiveLabels(ctx, particleSourceNodeId(inputs));
         const outputs = executeFilter(data.params as FilterParams, inputs, labels);
@@ -281,6 +311,17 @@ export function executePipeline(
         }
         break;
       }
+      case "drawing_boundary": {
+        const outputs = executeDrawingBoundary(data.params as DrawingBoundaryParams, inputs);
+        edgeOutputs.set(id, outputs);
+        const particle = inputs.get("particle")?.[0] as ParticleData | undefined;
+        if (!particle) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (!particle.source.box) {
+          addError(id, { message: "Drawing Boundary requires a unit cell", severity: "warning" });
+        }
+        break;
+      }
       case "color": {
         const labels = resolveEffectiveLabels(ctx, particleSourceNodeId(inputs));
         const outputs = executeColor(data.params as ColorParams, inputs, labels);
@@ -316,10 +357,13 @@ export function executePipeline(
           inputs,
         );
         edgeOutputs.set(id, outputs);
-        if (!inputs.get("particle")?.length) {
+        if (!inputs.get("coordination")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
         } else if (!outputs.has("mesh")) {
-          addError(id, { message: "No polyhedra matched the criteria", severity: "warning" });
+          addError(id, {
+            message: "Coordination has no hull with at least four neighbor sites",
+            severity: "warning",
+          });
         }
         break;
       }

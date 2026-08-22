@@ -1,6 +1,17 @@
-import type { PipelineData, ParticleData, BondData, AddBondParams } from "../types";
+import type {
+  PipelineData,
+  ParticleData,
+  BondData,
+  AddBondParams,
+  PeriodicBondTopologyData,
+} from "../types";
 import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../../parsers/inferBondsJS";
+import { DEFAULT_RADIUS, VDW_RADII } from "../../constants";
 import { invert3x3 } from "./mathUtils";
+import {
+  minimumImageTargetShift,
+  periodicDisplacementsWithinCutoff,
+} from "./periodicDisplacements";
 
 /**
  * Result of PBC bond processing: normal bonds kept as-is,
@@ -14,6 +25,257 @@ interface PbcBondResult {
   positions: Float32Array | null;
   elements: Uint8Array | null;
   nAtoms: number;
+}
+
+interface DrawingSite {
+  sourceIndex: number;
+  dataIndex: number;
+  shiftA: number;
+  shiftB: number;
+  shiftC: number;
+}
+
+function drawingSiteKey(source: number, a: number, b: number, c: number): string {
+  return `${source}:${a}:${b}:${c}`;
+}
+
+/** Attach one minimum-image lattice shift to each explicit structural bond. */
+function topologyFromPairs(
+  bondIndices: Uint32Array,
+  bondOrders: Uint8Array | null,
+  particle: ParticleData,
+): PeriodicBondTopologyData {
+  const snapshot = particle.source;
+  const box = snapshot.box;
+  const inverse = box && box.some((value) => value !== 0) ? invert3x3(box) : null;
+  const targetLatticeShifts = new Int32Array((bondIndices.length / 2) * 3);
+  if (inverse) {
+    for (let bond = 0; bond < bondIndices.length / 2; bond++) {
+      const source = bondIndices[bond * 2];
+      const target = bondIndices[bond * 2 + 1];
+      const dx = snapshot.positions[target * 3] - snapshot.positions[source * 3];
+      const dy = snapshot.positions[target * 3 + 1] - snapshot.positions[source * 3 + 1];
+      const dz = snapshot.positions[target * 3 + 2] - snapshot.positions[source * 3 + 2];
+      const [a, b, c] = minimumImageTargetShift(dx, dy, dz, inverse);
+      targetLatticeShifts[bond * 3] = a;
+      targetLatticeShifts[bond * 3 + 1] = b;
+      targetLatticeShifts[bond * 3 + 2] = c;
+    }
+  }
+  return { bondIndices, targetLatticeShifts, bondOrders };
+}
+
+/**
+ * Infer a periodic bond topology without moving structural coordinates.
+ * Multiple valid images of the same atom pair remain distinct topology edges.
+ */
+function inferDistancePeriodicTopology(
+  particle: ParticleData,
+  vdwScale: number,
+): PeriodicBondTopologyData {
+  const snapshot = particle.source;
+  const pairs = inferBondsVdwJS(
+    snapshot.positions,
+    snapshot.elements,
+    snapshot.nAtoms,
+    vdwScale,
+    snapshot.box,
+  );
+  const box = snapshot.box;
+  const inverse = box && box.some((value) => value !== 0) ? invert3x3(box) : null;
+  if (!box || !inverse) return topologyFromPairs(pairs, null, particle);
+
+  const bondIndices: number[] = [];
+  const shifts: number[] = [];
+  const seen = new Set<string>();
+  for (let bond = 0; bond < pairs.length / 2; bond++) {
+    const source = pairs[bond * 2];
+    const target = pairs[bond * 2 + 1];
+    const dx = snapshot.positions[target * 3] - snapshot.positions[source * 3];
+    const dy = snapshot.positions[target * 3 + 1] - snapshot.positions[source * 3 + 1];
+    const dz = snapshot.positions[target * 3 + 2] - snapshot.positions[source * 3 + 2];
+    const sourceRadius = VDW_RADII[snapshot.elements[source]] ?? DEFAULT_RADIUS;
+    const targetRadius = VDW_RADII[snapshot.elements[target]] ?? DEFAULT_RADIUS;
+    const cutoff = (sourceRadius + targetRadius) * vdwScale;
+    for (const [, , , a, b, c] of periodicDisplacementsWithinCutoff(
+      dx,
+      dy,
+      dz,
+      box,
+      inverse,
+      cutoff * cutoff,
+    )) {
+      const key = `${source}:${target}:${a}:${b}:${c}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      bondIndices.push(source, target);
+      shifts.push(a, b, c);
+    }
+  }
+
+  return {
+    bondIndices: new Uint32Array(bondIndices),
+    targetLatticeShifts: new Int32Array(shifts),
+    bondOrders: null,
+  };
+}
+
+/** Materialize exact periodic topology as ordinary bonds plus ghost endpoints. */
+function renderPeriodicTopology(
+  particle: ParticleData,
+  topology: PeriodicBondTopologyData,
+): PbcBondResult {
+  const snapshot = particle.source;
+  const box = snapshot.box;
+  if (!box || !box.some((value) => value !== 0)) {
+    return {
+      bondIndices: topology.bondIndices,
+      bondOrders: topology.bondOrders,
+      nBonds: topology.bondIndices.length / 2,
+      positions: null,
+      elements: null,
+      nAtoms: 0,
+    };
+  }
+
+  const bonds: number[] = [];
+  const orders: number[] = [];
+  const ghostPositions: number[] = [];
+  const ghostElements: number[] = [];
+  let ghostIndex = snapshot.nAtoms;
+  for (let bond = 0; bond < topology.bondIndices.length / 2; bond++) {
+    const source = topology.bondIndices[bond * 2];
+    const target = topology.bondIndices[bond * 2 + 1];
+    const a = topology.targetLatticeShifts[bond * 3];
+    const b = topology.targetLatticeShifts[bond * 3 + 1];
+    const c = topology.targetLatticeShifts[bond * 3 + 2];
+    if (a === 0 && b === 0 && c === 0) {
+      bonds.push(source, target);
+      if (topology.bondOrders) orders.push(topology.bondOrders[bond]);
+      continue;
+    }
+
+    ghostPositions.push(
+      snapshot.positions[target * 3] + a * box[0] + b * box[3] + c * box[6],
+      snapshot.positions[target * 3 + 1] + a * box[1] + b * box[4] + c * box[7],
+      snapshot.positions[target * 3 + 2] + a * box[2] + b * box[5] + c * box[8],
+    );
+    ghostElements.push(snapshot.elements[target]);
+    bonds.push(source, ghostIndex++);
+    if (topology.bondOrders) orders.push(topology.bondOrders[bond]);
+
+    ghostPositions.push(
+      snapshot.positions[source * 3] - a * box[0] - b * box[3] - c * box[6],
+      snapshot.positions[source * 3 + 1] - a * box[1] - b * box[4] - c * box[7],
+      snapshot.positions[source * 3 + 2] - a * box[2] - b * box[5] - c * box[8],
+    );
+    ghostElements.push(snapshot.elements[source]);
+    bonds.push(target, ghostIndex++);
+    if (topology.bondOrders) orders.push(topology.bondOrders[bond]);
+  }
+
+  if (ghostPositions.length === 0) {
+    return {
+      bondIndices: new Uint32Array(bonds),
+      bondOrders: topology.bondOrders ? new Uint8Array(orders) : null,
+      nBonds: bonds.length / 2,
+      positions: null,
+      elements: null,
+      nAtoms: 0,
+    };
+  }
+
+  const positions = new Float32Array(snapshot.positions.length + ghostPositions.length);
+  positions.set(snapshot.positions);
+  positions.set(ghostPositions, snapshot.positions.length);
+  const elements = new Uint8Array(snapshot.elements.length + ghostElements.length);
+  elements.set(snapshot.elements);
+  elements.set(ghostElements, snapshot.elements.length);
+  return {
+    bondIndices: new Uint32Array(bonds),
+    bondOrders: topology.bondOrders ? new Uint8Array(orders) : null,
+    nBonds: bonds.length / 2,
+    positions,
+    elements,
+    nAtoms: elements.length,
+  };
+}
+
+/** Repeat a periodic structural topology over Drawing Boundary atom copies. */
+export function expandPeriodicTopologyForDrawingBoundary(
+  particle: ParticleData,
+  topology: PeriodicBondTopologyData,
+): PbcBondResult {
+  const boundary = particle.drawingBoundary!;
+  const snapshot = particle.source;
+  const positions = new Float32Array(snapshot.positions.length + boundary.images.positions.length);
+  positions.set(snapshot.positions);
+  positions.set(boundary.images.positions, snapshot.positions.length);
+  const elements = new Uint8Array(snapshot.elements.length + boundary.images.elements.length);
+  elements.set(snapshot.elements);
+  elements.set(boundary.images.elements, snapshot.elements.length);
+
+  const sitesByKey = new Map<string, DrawingSite>();
+  const sitesBySource = new Map<number, DrawingSite[]>();
+  const addSite = (site: DrawingSite) => {
+    sitesByKey.set(drawingSiteKey(site.sourceIndex, site.shiftA, site.shiftB, site.shiftC), site);
+    const sites = sitesBySource.get(site.sourceIndex) ?? [];
+    sites.push(site);
+    sitesBySource.set(site.sourceIndex, sites);
+  };
+  for (let atom = 0; atom < snapshot.nAtoms; atom++) {
+    if (boundary.sourceVisibleMask[atom]) {
+      addSite({ sourceIndex: atom, dataIndex: atom, shiftA: 0, shiftB: 0, shiftC: 0 });
+    }
+  }
+  for (let image = 0; image < boundary.images.sourceIndices.length; image++) {
+    const i3 = image * 3;
+    addSite({
+      sourceIndex: boundary.images.sourceIndices[image],
+      dataIndex: snapshot.nAtoms + image,
+      shiftA: boundary.images.latticeShifts[i3],
+      shiftB: boundary.images.latticeShifts[i3 + 1],
+      shiftC: boundary.images.latticeShifts[i3 + 2],
+    });
+  }
+
+  const expanded: number[] = [];
+  const orders: number[] = [];
+  const seen = new Set<string>();
+  for (let bond = 0; bond < topology.bondIndices.length / 2; bond++) {
+    const sourceA = topology.bondIndices[bond * 2];
+    const sourceB = topology.bondIndices[bond * 2 + 1];
+    const relativeA = topology.targetLatticeShifts[bond * 3];
+    const relativeB = topology.targetLatticeShifts[bond * 3 + 1];
+    const relativeC = topology.targetLatticeShifts[bond * 3 + 2];
+    for (const siteA of sitesBySource.get(sourceA) ?? []) {
+      const siteB = sitesByKey.get(
+        drawingSiteKey(
+          sourceB,
+          siteA.shiftA + relativeA,
+          siteA.shiftB + relativeB,
+          siteA.shiftC + relativeC,
+        ),
+      );
+      if (!siteB) continue;
+      const key =
+        siteA.dataIndex < siteB.dataIndex
+          ? `${siteA.dataIndex}:${siteB.dataIndex}`
+          : `${siteB.dataIndex}:${siteA.dataIndex}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      expanded.push(siteA.dataIndex, siteB.dataIndex);
+      if (topology.bondOrders) orders.push(topology.bondOrders[bond]);
+    }
+  }
+  return {
+    bondIndices: new Uint32Array(expanded),
+    bondOrders: topology.bondOrders ? new Uint8Array(orders) : null,
+    nBonds: expanded.length / 2,
+    positions,
+    elements,
+    nAtoms: elements.length,
+  };
 }
 
 /**
@@ -192,152 +454,49 @@ export function executeAddBond(
   if (!particleData) return outputs;
 
   const snapshot = particleData.source;
-
-  if (params.bondSource === "structure") {
-    if (snapshot.nFileBonds > 0) {
-      let bondIndices = snapshot.bonds;
-      let bondOrders = snapshot.bondOrders;
-      let nBonds = snapshot.nBonds;
-      let extPositions: Float32Array | null = null;
-      let extElements: Uint8Array | null = null;
-      let extNAtoms = 0;
-
-      const result = processPbcBonds(
-        bondIndices,
-        bondOrders,
-        snapshot.positions,
-        snapshot.elements,
-        snapshot.nAtoms,
-        snapshot.box,
-      );
-      bondIndices = result.bondIndices;
-      bondOrders = result.bondOrders;
-      nBonds = result.nBonds;
-      extPositions = result.positions;
-      extElements = result.elements;
-      extNAtoms = result.nAtoms;
-
-      if (nBonds > 0) {
-        const bond: BondData = {
-          type: "bond",
-          sourceNodeId: particleData.sourceNodeId,
-          bondIndices,
-          bondOrders,
-          nBonds,
-          scale: 1.0,
-          opacity: 1.0,
-          positions: extPositions,
-          elements: extElements,
-          nAtoms: extNAtoms,
-          atomElements: snapshot.elements,
-          selectedBondIndices: null,
-          bondOpacityOverrides: null,
-        };
-        outputs.set("bond", bond);
-      }
-    }
+  let topology: PeriodicBondTopologyData | null = null;
+  if (params.bondSource === "structure" && snapshot.nFileBonds > 0) {
+    topology = topologyFromPairs(snapshot.bonds, snapshot.bondOrders, particleData);
   } else if (params.bondSource === "file") {
     const raw = params.bondFileData;
     if (raw && raw.length >= 2) {
-      // Filter bond indices to valid atom range
-      const nAtoms = snapshot.nAtoms;
       const validPairs: number[] = [];
       for (let i = 0; i < raw.length; i += 2) {
         const a = raw[i];
         const b = raw[i + 1];
-        if (a < nAtoms && b < nAtoms) {
-          validPairs.push(a, b);
-        }
+        if (a < snapshot.nAtoms && b < snapshot.nAtoms) validPairs.push(a, b);
       }
-      let bondIndices: Uint32Array = new Uint32Array(validPairs);
-      let nBonds = bondIndices.length / 2;
-
-      if (nBonds > 0) {
-        let extPositions: Float32Array | null = null;
-        let extElements: Uint8Array | null = null;
-        let extNAtoms = 0;
-
-        const result = processPbcBonds(
-          bondIndices,
-          null,
-          snapshot.positions,
-          snapshot.elements,
-          snapshot.nAtoms,
-          snapshot.box,
-        );
-        bondIndices = result.bondIndices;
-        nBonds = result.nBonds;
-        extPositions = result.positions;
-        extElements = result.elements;
-        extNAtoms = result.nAtoms;
-
-        const bond: BondData = {
-          type: "bond",
-          sourceNodeId: particleData.sourceNodeId,
-          bondIndices,
-          bondOrders: null,
-          nBonds,
-          scale: 1.0,
-          opacity: 1.0,
-          positions: extPositions,
-          elements: extElements,
-          nAtoms: extNAtoms,
-          atomElements: snapshot.elements,
-          selectedBondIndices: null,
-          bondOpacityOverrides: null,
-        };
-        outputs.set("bond", bond);
-      }
+      topology = topologyFromPairs(new Uint32Array(validPairs), null, particleData);
     }
   } else if (params.bondSource === "distance") {
-    let bondIndices = inferBondsVdwJS(
-      snapshot.positions,
-      snapshot.elements,
-      snapshot.nAtoms,
+    topology = inferDistancePeriodicTopology(
+      particleData,
       params.vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
-      snapshot.box,
     );
-
-    if (bondIndices.length > 0) {
-      let nBonds = bondIndices.length / 2;
-      let extPositions: Float32Array | null = null;
-      let extElements: Uint8Array | null = null;
-      let extNAtoms = 0;
-
-      const result = processPbcBonds(
-        bondIndices,
-        null,
-        snapshot.positions,
-        snapshot.elements,
-        snapshot.nAtoms,
-        snapshot.box,
-      );
-      bondIndices = result.bondIndices;
-      nBonds = result.nBonds;
-      extPositions = result.positions;
-      extElements = result.elements;
-      extNAtoms = result.nAtoms;
-
-      if (nBonds > 0) {
-        const bond: BondData = {
-          type: "bond",
-          sourceNodeId: particleData.sourceNodeId,
-          bondIndices,
-          bondOrders: null,
-          nBonds,
-          scale: 1.0,
-          opacity: 1.0,
-          positions: extPositions,
-          elements: extElements,
-          nAtoms: extNAtoms,
-          atomElements: snapshot.elements,
-          selectedBondIndices: null,
-          bondOpacityOverrides: null,
-        };
-        outputs.set("bond", bond);
-      }
-    }
   }
+
+  if (!topology || topology.bondIndices.length === 0) return outputs;
+  const rendered = particleData.drawingBoundary
+    ? expandPeriodicTopologyForDrawingBoundary(particleData, topology)
+    : renderPeriodicTopology(particleData, topology);
+
+  const bond: BondData = {
+    type: "bond",
+    sourceNodeId: particleData.sourceNodeId,
+    bondIndices: rendered.bondIndices,
+    bondOrders: rendered.bondOrders,
+    nBonds: rendered.nBonds,
+    scale: 1,
+    opacity: 1,
+    positions: rendered.positions,
+    elements: rendered.elements,
+    nAtoms: rendered.nAtoms,
+    atomElements: snapshot.elements,
+    selectedBondIndices: null,
+    bondOpacityOverrides: null,
+    periodicTopology: topology,
+  };
+  outputs.set("bond", bond);
 
   return outputs;
 }

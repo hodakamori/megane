@@ -277,6 +277,18 @@ export class ImpostorAtomMesh {
   }
 
   private grow(needed: number): void {
+    // Three.js caches `_maxInstanceCount` the first time an instanced geometry
+    // is bound. Replacing the instance attributes alone does not invalidate
+    // that cache, so a mesh that started with capacity 1 would keep drawing at
+    // most one instance after growing. Dispose the GPU-side geometry before
+    // replacing its attributes; the CPU-side index/vertex data remains valid
+    // and is uploaded again on the next render. Clear the cache explicitly as
+    // well so growth is correct before a renderer has attached its dispose
+    // listener (for example, in headless use).
+    this.geo.dispose();
+    delete (this.geo as THREE.InstancedBufferGeometry & { _maxInstanceCount?: number })
+      ._maxInstanceCount;
+
     this.capacity = Math.max(needed, this.capacity * 2);
 
     const newCenter = new Float32Array(this.capacity * 3);

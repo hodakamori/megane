@@ -6,6 +6,7 @@
 
 import * as THREE from "three";
 import type { Snapshot, HoverInfo } from "../types";
+import type { DrawingBoundaryData, PeriodicAtomImageData } from "../pipeline/types";
 import { getElementSymbol, getRadius, BALL_STICK_ATOM_SCALE } from "../constants";
 
 // Temporary vector for screen-space projection (avoids allocation per atom)
@@ -57,6 +58,8 @@ export function pickAtPixel(
   atomScale: number,
   clientX: number,
   clientY: number,
+  drawingBoundary: DrawingBoundaryData | null = null,
+  periodicImages: PeriodicAtomImageData | null = null,
 ): HoverInfo {
   const rect = container.getBoundingClientRect();
   const mx = clientX - rect.left; // mouse in pixels relative to container
@@ -71,8 +74,10 @@ export function pickAtPixel(
   // --- Atom picking ---
   let bestAtomIdx = -1;
   let bestAtomDepth = Infinity;
+  let bestAtomPosition: [number, number, number] | null = null;
 
   for (let i = 0; i < nAtoms; i++) {
+    if (drawingBoundary && !drawingBoundary.sourceVisibleMask[i]) continue;
     const { sx, sy, depth } = projectToScreen(
       camera,
       pos[i * 3],
@@ -92,6 +97,37 @@ export function pickAtPixel(
     if (distSq <= screenR * screenR && depth < bestAtomDepth) {
       bestAtomIdx = i;
       bestAtomDepth = depth;
+      bestAtomPosition = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
+    }
+  }
+
+  for (const images of [drawingBoundary?.images, periodicImages]) {
+    if (!images) continue;
+    for (let image = 0; image < images.sourceIndices.length; image++) {
+      const source = images.sourceIndices[image];
+      const i3 = image * 3;
+      const { sx, sy, depth } = projectToScreen(
+        camera,
+        images.positions[i3],
+        images.positions[i3 + 1],
+        images.positions[i3 + 2],
+        w,
+        h,
+      );
+      if (depth <= 0) continue;
+      const worldR = getRadius(elements[source]) * BALL_STICK_ATOM_SCALE * atomScale;
+      const screenR = screenRadius(camera, worldR, depth, h);
+      const dx = mx - sx;
+      const dy = my - sy;
+      if (dx * dx + dy * dy <= screenR * screenR && depth < bestAtomDepth) {
+        bestAtomIdx = source;
+        bestAtomDepth = depth;
+        bestAtomPosition = [
+          images.positions[i3],
+          images.positions[i3 + 1],
+          images.positions[i3 + 2],
+        ];
+      }
     }
   }
 
@@ -103,7 +139,7 @@ export function pickAtPixel(
       atomIndex: idx,
       elementSymbol: getElementSymbol(atomicNum),
       atomicNumber: atomicNum,
-      position: [pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2]],
+      position: bestAtomPosition ?? [pos[idx * 3], pos[idx * 3 + 1], pos[idx * 3 + 2]],
       screenX: clientX,
       screenY: clientY,
     };
@@ -177,6 +213,8 @@ export function atomsInRect(
   snapshot: Snapshot,
   currentPositions: Float32Array,
   rect: ClientRect,
+  drawingBoundary: DrawingBoundaryData | null = null,
+  periodicImages: PeriodicAtomImageData | null = null,
 ): number[] {
   const bounds = container.getBoundingClientRect();
   const w = bounds.width;
@@ -188,7 +226,9 @@ export function atomsInRect(
 
   const pos = currentPositions;
   const result: number[] = [];
+  const selected = new Set<number>();
   for (let i = 0; i < snapshot.nAtoms; i++) {
+    if (drawingBoundary && !drawingBoundary.sourceVisibleMask[i]) continue;
     const { sx, sy, depth } = projectToScreen(
       camera,
       pos[i * 3],
@@ -198,7 +238,31 @@ export function atomsInRect(
       h,
     );
     if (depth <= 0) continue; // behind camera
-    if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) result.push(i);
+    if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) {
+      result.push(i);
+      selected.add(i);
+    }
+  }
+  for (const images of [drawingBoundary?.images, periodicImages]) {
+    if (!images) continue;
+    for (let image = 0; image < images.sourceIndices.length; image++) {
+      const source = images.sourceIndices[image];
+      if (selected.has(source)) continue;
+      const i3 = image * 3;
+      const { sx, sy, depth } = projectToScreen(
+        camera,
+        images.positions[i3],
+        images.positions[i3 + 1],
+        images.positions[i3 + 2],
+        w,
+        h,
+      );
+      if (depth <= 0) continue;
+      if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) {
+        result.push(source);
+        selected.add(source);
+      }
+    }
   }
   return result;
 }

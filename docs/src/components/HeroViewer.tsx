@@ -82,9 +82,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
 
     async function init() {
       if (unmounted || !container) return;
-      const { MoleculeRenderer } = await import(
-        "../../../src/renderer/MoleculeRenderer"
-      );
+      const { MoleculeRenderer } = await import("../../../src/renderer/MoleculeRenderer");
       if (unmounted || !container) return;
 
       renderer = new MoleculeRenderer();
@@ -137,7 +135,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
   }, []);
 
   // Load / swap the structure whenever the mode changes (once mounted). The
-  // crystal additionally renders VESTA-style coordination polyhedra (TiO6
+  // crystal additionally renders coordination polyhedra (TiO6
   // octahedra); the molecular view clears them.
   useEffect(() => {
     if (!mounted) return;
@@ -154,9 +152,12 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
 
         if (kind === "polyhedra") {
           renderer.setRepresentationType?.("atoms");
-          const { executePolyhedronGenerator } = await import(
-            "../../../src/pipeline/executors/polyhedronGenerator"
-          );
+          const { executePolyhedronGenerator } =
+            await import("../../../src/pipeline/executors/polyhedronGenerator");
+          const { executeCoordinationGenerator } =
+            await import("../../../src/pipeline/executors/coordinationGenerator");
+          const { generateDrawingBoundaryImages } =
+            await import("../../../src/logic/cellBoundaryImages");
           if (cancelled || !rendererRef.current) return;
           const particle: any = {
             type: "particle",
@@ -166,22 +167,49 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
             scaleOverrides: null,
             opacityOverrides: null,
             colorOverrides: null,
+            representationOverride: null,
+            drawingBoundary: generateDrawingBoundaryImages(snapshot),
           };
-          const inputs: any = new Map([["particle", [particle]]]);
-          const params: any = {
-            type: "polyhedron_generator",
+          const coordinationParams: any = {
+            type: "coordination_generator",
             // Exclude Sr (Z=38) so perovskite shows the classic corner-sharing
             // TiO6 octahedra, not SrO12 cuboctahedra. Harmless for quartz
             // (no Sr present) where Si centers give SiO4 tetrahedra.
             excludedCenters: [38],
             excludedLigands: [],
             cutoffTolerance: 1.15,
+            boundaryMode: "complete",
+          };
+          const coordinationResult = executeCoordinationGenerator(
+            coordinationParams,
+            new Map([["particle", [particle]]]) as any,
+          );
+          const coordination = coordinationResult.get("coordination");
+          const coordinationBond = coordinationResult.get("bond") as any;
+          renderer.setDrawingBoundary(particle.drawingBoundary);
+          if (coordinationBond) {
+            renderer.setBondPeriodicImages(coordinationBond.periodicImages ?? null);
+            renderer.updateBondsExt(
+              coordinationBond.bondIndices,
+              coordinationBond.bondOrders,
+              coordinationBond.positions,
+              coordinationBond.elements,
+              coordinationBond.nAtoms,
+            );
+          }
+          const params: any = {
+            type: "polyhedron_generator",
             opacity: 0.72,
             showEdges: true,
             edgeColor: "#cfd6df",
             edgeWidth: 2,
           };
-          const mesh = executePolyhedronGenerator(params, inputs).get("mesh");
+          const mesh = coordination
+            ? executePolyhedronGenerator(
+                params,
+                new Map([["coordination", [coordination]]]) as any,
+              ).get("mesh")
+            : null;
           if (mesh && !cancelled && rendererRef.current) {
             renderer.loadPolyhedra(mesh);
           }
@@ -189,9 +217,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
           // Ribbon backbone + a translucent molecular-surface mesh overlay
           // (reuses the polyhedra overlay slot, which renders any MeshData).
           renderer.setRepresentationType?.("cartoon");
-          const { buildSurfaceMeshData } = await import(
-            "../../../src/renderer/alphaSurface"
-          );
+          const { buildSurfaceMeshData } = await import("../../../src/renderer/alphaSurface");
           if (cancelled || !rendererRef.current) return;
           const surface = buildSurfaceMeshData(
             snapshot.positions,

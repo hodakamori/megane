@@ -145,6 +145,7 @@ export function syncAddBondSourceForLoader(
     "modify",
     "color",
     "representation",
+    "drawing_boundary",
   ]);
   const visited = new Set<string>([loaderId]);
   const stack: string[] = [loaderId];
@@ -420,6 +421,7 @@ export async function applyTopologyFile(
     "modify",
     "color",
     "representation",
+    "drawing_boundary",
   ]);
   const visited = new Set<string>([loaderId]);
   const stack: string[] = [loaderId];

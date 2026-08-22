@@ -50,6 +50,14 @@ Detects or infers bonds between atoms.
 - Inputs: `particle` (particle data type)
 - Outputs: `bond` (bond data type)
 
+### coordination_generator
+Builds directed relationships between center atoms and their bonded neighbors.
+It consumes Drawing Boundary copies and can add only the periodic neighbor images
+needed outside the drawing range to complete each visible center.
+- Parameters: `{ type: "coordination_generator", excludedCenters: number[], excludedLigands: number[], cutoffTolerance: number, boundaryMode: "inside" | "complete" }`
+- Inputs: `particle` (normally from Drawing Boundary)
+- Outputs: `coordination` (directed center-neighbor pairs), `bond`
+
 ### filter
 Filters atoms (and optionally bonds) by a selection query. See the
 "Atom & Bond Selection Query Language" section below for the full, authoritative
@@ -91,6 +99,21 @@ to match. Requires a unit cell on the input.
 - Inputs: `particle`, `cell`, `trajectory`
 - Outputs: `particle`, `cell`, `trajectory` (replicated)
 
+### drawing_boundary
+Generates periodic display atoms inside an inclusive fractional range.
+Unlike Replicate it does not alter the structural atom count or unit cell.
+- Parameters: `{ type: "drawing_boundary", xMin: number, xMax: number, yMin: number, yMax: number, zMin: number, zMax: number }`
+- Inputs: `particle`
+- Outputs: `particle` with Drawing Boundary copies
+
+### boundary_completion
+Adds bond-connected periodic display atoms outside Drawing Boundary without
+changing crystallographic coordinates. Finite-component mode deliberately leaves
+infinite periodic networks unexpanded.
+- Parameters: `{ type: "boundary_completion", mode: "neighbors" | "components" }`
+- Inputs: `particle` from Drawing Boundary and periodic `bond` data
+- Outputs: completed `particle` and `bond`
+
 ### color
 Recolors atoms using a palette mode, overriding the default per-element coloring.
 - Parameters: `{ type: "color", mode: "uniform" | "byElement" | "byResidue" | "byChain" | "byBFactor" | "byProperty", uniformColor: string, range?: [number, number] }`
@@ -119,24 +142,11 @@ Generates text labels for atoms.
 - Outputs: `label` (label data type)
 
 ### polyhedron_generator
-Generates coordination polyhedra automatically (VESTA-style). By default a
-polyhedron is drawn for every metal/metalloid center coordinated to every
-anion-former ligand present in the structure; the user opts OUT specific
-elements via `excludedCenters` / `excludedLigands`.
-- Parameters:
-  ```
-  {
-    type: "polyhedron_generator",
-    excludedCenters: number[],   // Z numbers to exclude from auto-detected centers (e.g. [22] to skip Ti)
-    excludedLigands: number[],   // Z numbers to exclude from auto-detected ligands
-    cutoffTolerance: number,     // multiplier on (r_cov[c]+r_cov[l]); ~1.15 default
-    opacity: number,             // face opacity 0-1
-    showEdges: boolean,
-    edgeColor: string,           // hex color e.g. "#dddddd"
-    edgeWidth: number
-  }
-  ```
-- Inputs: `particle` (particle data type)
+Converts directed center-neighbor coordination relationships into convex polyhedron
+meshes. Periodic atom display and completing neighbors outside the drawing range are
+handled upstream.
+- Parameters: `{ type: "polyhedron_generator", opacity: number, showEdges: boolean, edgeColor: string, edgeWidth: number }`
+- Inputs: `coordination` (coordination data type)
 - Outputs: `mesh` (mesh data type)
 
 ### surface_mesh

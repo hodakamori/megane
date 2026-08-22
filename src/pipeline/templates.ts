@@ -154,10 +154,170 @@ function createMoleculeTemplate(): {
 }
 
 /**
+ * Molecular crystal template: glycine molecules completed across periodic
+ * boundaries.
+ *
+ *                         ┌→ AddBond ───────────────┐
+ * LoadStructure → Wrap ───┤                         ├→ BoundaryCompletion → Viewport
+ *                         └→ DrawingBoundary ──────┘
+ *
+ * Wrapping first gives Drawing Boundary a normalized home-cell structure.
+ * Boundary Completion then follows the periodic bond topology and adds whole
+ * finite molecules that intersect the selected drawing range.
+ */
+function createMolecularCrystalTemplate(): {
+  nodes: Node<PipelineNodeData>[];
+  edges: Edge[];
+} {
+  return {
+    nodes: [
+      {
+        id: "loader-1",
+        type: "load_structure",
+        position: { x: 425, y: 0 },
+        data: {
+          params: {
+            type: "load_structure",
+            fileName: "glycine_csd.cif",
+            hasTrajectory: false,
+            hasCell: true,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "wrap-1",
+        type: "wrap",
+        position: { x: 425, y: 155 },
+        data: {
+          params: {
+            type: "wrap",
+            mode: "wrap",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "addbond-1",
+        type: "add_bond",
+        position: { x: 170, y: 340 },
+        data: {
+          params: {
+            type: "add_bond",
+            bondSource: "distance",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "drawing-boundary-1",
+        type: "drawing_boundary",
+        position: { x: 680, y: 340 },
+        data: {
+          params: {
+            type: "drawing_boundary",
+            xMin: 0,
+            xMax: 1,
+            yMin: 0,
+            yMax: 1,
+            zMin: 0,
+            zMax: 1,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "boundary-completion-1",
+        type: "boundary_completion",
+        position: { x: 425, y: 550 },
+        data: {
+          params: {
+            type: "boundary_completion",
+            mode: "components",
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "viewport-1",
+        type: "viewport",
+        position: { x: 425, y: 795 },
+        data: {
+          params: {
+            type: "viewport",
+            perspective: false,
+            cellAxesVisible: true,
+            pivotMarkerVisible: true,
+          },
+          enabled: true,
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        source: "loader-1",
+        target: "wrap-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e2",
+        source: "wrap-1",
+        target: "addbond-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e3",
+        source: "wrap-1",
+        target: "drawing-boundary-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e4",
+        source: "drawing-boundary-1",
+        target: "boundary-completion-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e5",
+        source: "addbond-1",
+        target: "boundary-completion-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e6",
+        source: "boundary-completion-1",
+        target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e7",
+        source: "boundary-completion-1",
+        target: "viewport-1",
+        sourceHandle: "bond",
+        targetHandle: "bond",
+      },
+      {
+        id: "e8",
+        source: "loader-1",
+        target: "viewport-1",
+        sourceHandle: "cell",
+        targetHandle: "cell",
+      },
+    ],
+  };
+}
+
+/**
  * Solid template: perovskite SrTiO3 with coordination polyhedra.
- * LoadStructure → Wrap → AddBond → Viewport
- *             → Wrap → PolyhedronGenerator → Viewport
- * The Wrap node defaults to mode "none" (pass-through).
+ * LoadStructure → Wrap → DrawingBoundary → Coordination → Polyhedra → Viewport
+ *                                             └──────────→ Viewport (bond)
  */
 function createSolidTemplate(): {
   nodes: Node<PipelineNodeData>[];
@@ -192,13 +352,33 @@ function createSolidTemplate(): {
         },
       },
       {
-        id: "addbond-1",
-        type: "add_bond",
-        position: { x: 170, y: 410 },
+        id: "drawing-boundary-1",
+        type: "drawing_boundary",
+        position: { x: 425, y: 330 },
         data: {
           params: {
-            type: "add_bond",
-            bondSource: "distance",
+            type: "drawing_boundary",
+            xMin: 0,
+            xMax: 1,
+            yMin: 0,
+            yMax: 1,
+            zMin: 0,
+            zMax: 1,
+          },
+          enabled: true,
+        },
+      },
+      {
+        id: "coordination-1",
+        type: "coordination_generator",
+        position: { x: 425, y: 510 },
+        data: {
+          params: {
+            type: "coordination_generator",
+            excludedCenters: [],
+            excludedLigands: [],
+            cutoffTolerance: 1.15,
+            boundaryMode: "complete",
           },
           enabled: true,
         },
@@ -206,15 +386,10 @@ function createSolidTemplate(): {
       {
         id: "polyhedron-1",
         type: "polyhedron_generator",
-        position: { x: 680, y: 410 },
+        position: { x: 680, y: 685 },
         data: {
           params: {
             type: "polyhedron_generator",
-            // VESTA-style auto-detect: every metal × every anion-former in the
-            // structure. For the perovskite this resolves to Ti–O octahedra.
-            excludedCenters: [],
-            excludedLigands: [],
-            cutoffTolerance: 1.15,
             opacity: 0.5,
             showEdges: false,
             edgeColor: "#dddddd",
@@ -226,7 +401,7 @@ function createSolidTemplate(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 425, y: 715 },
+        position: { x: 425, y: 900 },
         data: {
           params: {
             type: "viewport",
@@ -249,20 +424,20 @@ function createSolidTemplate(): {
       {
         id: "e2",
         source: "wrap-1",
-        target: "addbond-1",
+        target: "drawing-boundary-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
         id: "e3",
-        source: "wrap-1",
-        target: "polyhedron-1",
+        source: "drawing-boundary-1",
+        target: "coordination-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
         id: "e4",
-        source: "wrap-1",
+        source: "drawing-boundary-1",
         target: "viewport-1",
         sourceHandle: "particle",
         targetHandle: "particle",
@@ -276,13 +451,20 @@ function createSolidTemplate(): {
       },
       {
         id: "e6",
-        source: "addbond-1",
+        source: "coordination-1",
         target: "viewport-1",
         sourceHandle: "bond",
         targetHandle: "bond",
       },
       {
         id: "e7",
+        source: "coordination-1",
+        target: "polyhedron-1",
+        sourceHandle: "coordination",
+        targetHandle: "coordination",
+      },
+      {
+        id: "e8",
         source: "polyhedron-1",
         target: "viewport-1",
         sourceHandle: "mesh",
@@ -669,6 +851,12 @@ export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
     label: "Molecule",
     description: "Caffeine with bonds and trajectory",
     create: createMoleculeTemplate,
+  },
+  {
+    id: "molecular_crystal",
+    label: "Molecular Crystal",
+    description: "Glycine crystal with complete molecules across cell boundaries",
+    create: createMolecularCrystalTemplate,
   },
   {
     id: "solid",

@@ -3,6 +3,7 @@ import { applyViewportState } from "@/pipeline/apply";
 import {
   DEFAULT_VIEWPORT_STATE,
   type ParticleData,
+  type BondData,
   type MeshData,
   type LabelData,
   type VectorData,
@@ -25,6 +26,8 @@ function makeSnapshot(nAtoms: number): Snapshot {
 function makeRendererStub() {
   return {
     setAtomsVisible: vi.fn(),
+    setDrawingBoundary: vi.fn(),
+    setBondPeriodicImages: vi.fn(),
     setCellVisible: vi.fn(),
     setBondsVisible: vi.fn(),
     getOrCreateLayer: vi.fn(),
@@ -121,6 +124,43 @@ describe("applyViewportState — idempotent cleanup on empty current state", () 
     );
     expect(renderer.loadPolyhedra).toHaveBeenCalledWith(mesh);
     expect(renderer.clearPolyhedra).not.toHaveBeenCalled();
+  });
+
+  it("renders outside-boundary neighbor atoms from the bond stream without a mesh", () => {
+    const renderer = makeRendererStub();
+    const particle = makeParticle("load", 1);
+    const periodicImages = {
+      positions: new Float32Array([-0.25, 0, 0]),
+      elements: new Uint8Array([8]),
+      sourceIndices: new Uint32Array([0]),
+      latticeShifts: new Int32Array([-1, 0, 0]),
+    };
+    const bond: BondData = {
+      type: "bond",
+      sourceNodeId: "load",
+      bondIndices: new Uint32Array([0, 1]),
+      bondOrders: null,
+      nBonds: 1,
+      scale: 1,
+      opacity: 1,
+      positions: new Float32Array([0, 0, 0, -0.25, 0, 0]),
+      elements: new Uint8Array([22, 8]),
+      nAtoms: 2,
+      atomElements: particle.source.elements,
+      selectedBondIndices: null,
+      bondOpacityOverrides: null,
+      periodicImages,
+    };
+
+    applyViewportState(
+      renderer as unknown as MoleculeRenderer,
+      { ...DEFAULT_VIEWPORT_STATE, particles: [particle], bonds: [bond] },
+      null,
+      "load",
+    );
+
+    expect(renderer.setBondPeriodicImages).toHaveBeenCalledWith(periodicImages);
+    expect(renderer.clearPolyhedra).toHaveBeenCalled();
   });
 
   it("resets per-atom overrides when particles is empty even if previous is null", () => {

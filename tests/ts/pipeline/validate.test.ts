@@ -158,20 +158,20 @@ describe("validatePipeline", () => {
     expect(filterErrors.some((e) => e.message.includes("Query syntax error"))).toBe(true);
   });
 
-  it("does not raise config errors for polyhedron_generator (auto-detected)", () => {
-    // The VESTA-style auto-detect node has no user-misconfigurable input
-    // surface; centers and ligands are derived from the upstream structure
-    // at execute time, so empty exclude lists are always valid.
+  it("does not raise config errors for a Coordination -> Polyhedra graph", () => {
     const nodes = [
       makeNode("ls", "load_structure", {
         fileName: "test.pdb",
         hasTrajectory: false,
         hasCell: false,
       }),
-      makeNode("pg", "polyhedron_generator", {
+      makeNode("coord", "coordination_generator", {
         excludedCenters: [],
         excludedLigands: [],
         cutoffTolerance: 1.15,
+        boundaryMode: "complete",
+      }),
+      makeNode("pg", "polyhedron_generator", {
         opacity: 0.5,
         showEdges: false,
         edgeColor: "#dddddd",
@@ -180,7 +180,8 @@ describe("validatePipeline", () => {
       makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
     ];
     const edges = [
-      makeEdge("ls", "particle", "pg", "particle"),
+      makeEdge("ls", "particle", "coord", "particle"),
+      makeEdge("coord", "coordination", "pg", "coordination"),
       makeEdge("pg", "mesh", "vp", "mesh"),
     ];
     const errors = validatePipeline(nodes, edges);

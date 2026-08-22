@@ -36,16 +36,16 @@ After `add_node()`, each node exposes `.out` and `.inp` namespaces for its ports
 
 ## Pipeline class
 
-| Method | Description |
-|--------|-------------|
-| `add_node(node)` | Add a node to the pipeline. Returns the node (with `.out`/`.inp` ports) for use in `add_edge()` |
-| `add_edge(source_port, target_port)` | Connect `source.out.<name>` → `target.inp.<name>` |
-| `to_dict()` | Serialize to v3 JSON dict |
-| `to_json(indent=2)` | Serialize to a JSON string |
-| `save(path)` | Save the pipeline to a JSON file |
-| `Pipeline.from_dict(d)` | Reconstruct a Pipeline from a v3 dict |
-| `Pipeline.from_json(s)` | Reconstruct a Pipeline from a JSON string |
-| `Pipeline.load(path)` | Load a Pipeline from a JSON file |
+| Method                               | Description                                                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `add_node(node)`                     | Add a node to the pipeline. Returns the node (with `.out`/`.inp` ports) for use in `add_edge()` |
+| `add_edge(source_port, target_port)` | Connect `source.out.<name>` → `target.inp.<name>`                                               |
+| `to_dict()`                          | Serialize to v3 JSON dict                                                                       |
+| `to_json(indent=2)`                  | Serialize to a JSON string                                                                      |
+| `save(path)`                         | Save the pipeline to a JSON file                                                                |
+| `Pipeline.from_dict(d)`              | Reconstruct a Pipeline from a v3 dict                                                           |
+| `Pipeline.from_json(s)`              | Reconstruct a Pipeline from a JSON string                                                       |
+| `Pipeline.load(path)`                | Load a Pipeline from a JSON file                                                                |
 
 ## Node classes
 
@@ -60,9 +60,12 @@ from megane import (
     LoadVolumetric,
     Filter,
     Modify,
+    DrawingBoundary,
+    BoundaryCompletion,
     Color,
     Representation,
     AddBonds,
+    AddCoordination,
     AddLabels,
     AddPolyhedra,
     Isosurface,
@@ -84,9 +87,9 @@ Load a molecular structure file.
 LoadStructure(path: str)
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `str` | File path. Auto-detected by extension. Supported by the Python-side parser: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). The browser-side (WASM) parser additionally accepts `.mmcif` and `.prmtop` (AMBER topology) when the pipeline runs inside `MolecularViewer`. |
+| Parameter | Type  | Description                                                                                                                                                                                                                                                                                                                                                 |
+| --------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`    | `str` | File path. Auto-detected by extension. Supported by the Python-side parser: `.pdb`, `.gro`, `.xyz`, `.mol`, `.sdf` (routed through the MOL parser), `.mol2`, `.cif`, `.data`, `.lammps`, `.traj` (ASE binary). The browser-side (WASM) parser additionally accepts `.mmcif` and `.prmtop` (AMBER topology) when the pipeline runs inside `MolecularViewer`. |
 
 **Ports:** `out.particle`, `out.traj`, `out.cell`
 
@@ -106,14 +109,14 @@ LoadTrajectory(
 )
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `xtc` | `str \| None` | `None` | Path to XTC trajectory file |
-| `dcd` | `str \| None` | `None` | Path to DCD trajectory file (CHARMM/NAMD/X-PLOR) |
-| `nc` | `str \| None` | `None` | Path to AMBER NetCDF trajectory file |
-| `traj` | `str \| None` | `None` | Path to ASE `.traj` trajectory file |
-| `xyz` | `str \| None` | `None` | Path to a multi-frame XYZ trajectory file |
-| `lammpstrj` | `str \| None` | `None` | Path to LAMMPS dump trajectory (`.lammpstrj` / `.dump`) |
+| Parameter   | Type          | Default | Description                                             |
+| ----------- | ------------- | ------- | ------------------------------------------------------- |
+| `xtc`       | `str \| None` | `None`  | Path to XTC trajectory file                             |
+| `dcd`       | `str \| None` | `None`  | Path to DCD trajectory file (CHARMM/NAMD/X-PLOR)        |
+| `nc`        | `str \| None` | `None`  | Path to AMBER NetCDF trajectory file                    |
+| `traj`      | `str \| None` | `None`  | Path to ASE `.traj` trajectory file                     |
+| `xyz`       | `str \| None` | `None`  | Path to a multi-frame XYZ trajectory file               |
+| `lammpstrj` | `str \| None` | `None`  | Path to LAMMPS dump trajectory (`.lammpstrj` / `.dump`) |
 
 Pass exactly one. **Ports:** `inp.particle`, `out.traj`
 
@@ -135,9 +138,9 @@ Load per-atom vector data from a file.
 LoadVector(path: str)
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `str` | Path to vector data file |
+| Parameter | Type  | Description              |
+| --------- | ----- | ------------------------ |
+| `path`    | `str` | Path to vector data file |
 
 **Ports:** `out.vector`
 
@@ -149,9 +152,9 @@ Load a Gaussian CUBE file and output volumetric data for isosurface rendering.
 LoadVolumetric(path: str = "")
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `path` | `str` | File path to a Gaussian CUBE file (`.cube`). Parsed in the browser; the Python object only tracks the filename. |
+| Parameter | Type  | Description                                                                                                     |
+| --------- | ----- | --------------------------------------------------------------------------------------------------------------- |
+| `path`    | `str` | File path to a Gaussian CUBE file (`.cube`). Parsed in the browser; the Python object only tracks the filename. |
 
 **Ports:** `out.volumetric`
 
@@ -170,13 +173,13 @@ Isosurface(
 )
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `iso_level` | `float` | `0.05` | Contour value for the positive isosurface |
-| `color` | `str` | `"#4488ff"` | Hex color for the positive isosurface |
-| `opacity` | `float` | `0.7` | Surface transparency (0–1) |
-| `show_negative` | `bool` | `False` | Show a second isosurface at −iso_level (dual-contour for ESP maps) |
-| `negative_color` | `str` | `"#ff4444"` | Hex color for the negative isosurface |
+| Parameter        | Type    | Default     | Description                                                        |
+| ---------------- | ------- | ----------- | ------------------------------------------------------------------ |
+| `iso_level`      | `float` | `0.05`      | Contour value for the positive isosurface                          |
+| `color`          | `str`   | `"#4488ff"` | Hex color for the positive isosurface                              |
+| `opacity`        | `float` | `0.7`       | Surface transparency (0–1)                                         |
+| `show_negative`  | `bool`  | `False`     | Show a second isosurface at −iso_level (dual-contour for ESP maps) |
+| `negative_color` | `str`   | `"#ff4444"` | Hex color for the negative isosurface                              |
 
 **Ports:** `inp.volumetric`, `out.mesh`
 
@@ -188,10 +191,10 @@ Select atoms by a query expression.
 Filter(*, query: str = "all", bond_query: str = "")
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `query` | `str` | `"all"` | Atom selection expression (see [Filter DSL](./index.md#filter-dsl)) |
-| `bond_query` | `str` | `""` | Bond selection expression (see [Bond Selection DSL](./index.md#bond-selection-dsl)). Empty string means no bond filtering. |
+| Parameter    | Type  | Default | Description                                                                                                                |
+| ------------ | ----- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `query`      | `str` | `"all"` | Atom selection expression (see [Filter DSL](./index.md#filter-dsl))                                                        |
+| `bond_query` | `str` | `""`    | Bond selection expression (see [Bond Selection DSL](./index.md#bond-selection-dsl)). Empty string means no bond filtering. |
 
 **Ports:** `inp.particle`, `out.particle`
 
@@ -203,10 +206,10 @@ Override per-atom visual properties.
 Modify(*, scale: float = 1.0, opacity: float = 1.0)
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `scale` | `float` | `1.0` | Atom sphere radius multiplier (0.1–2.0) |
-| `opacity` | `float` | `1.0` | Transparency (0 = invisible, 1 = opaque) |
+| Parameter | Type    | Default | Description                              |
+| --------- | ------- | ------- | ---------------------------------------- |
+| `scale`   | `float` | `1.0`   | Atom sphere radius multiplier (0.1–2.0)  |
+| `opacity` | `float` | `1.0`   | Transparency (0 = invisible, 1 = opaque) |
 
 **Ports:** `inp.particle`, `out.particle`
 
@@ -225,11 +228,11 @@ Color(
 )
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `mode` | `str` | `"uniform"` | Coloring scheme |
-| `uniform_color` | `str` | `"#ff8800"` | Hex color used when `mode == "uniform"` |
-| `range` | `tuple[float, float] \| None` | `None` | Optional explicit range for `byBFactor` / `byProperty` |
+| Parameter       | Type                          | Default     | Description                                            |
+| --------------- | ----------------------------- | ----------- | ------------------------------------------------------ |
+| `mode`          | `str`                         | `"uniform"` | Coloring scheme                                        |
+| `uniform_color` | `str`                         | `"#ff8800"` | Hex color used when `mode == "uniform"`                |
+| `range`         | `tuple[float, float] \| None` | `None`      | Optional explicit range for `byBFactor` / `byProperty` |
 
 **Ports:** `inp.particle`, `out.particle`
 
@@ -245,9 +248,9 @@ the Viewport falls back to `"atoms"`.
 Representation(*, mode: Literal["atoms", "licorice", "cartoon", "both", "surface", "line"] = "atoms")
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `mode` | `str` | `"atoms"` | Visual representation: `"atoms"` (ball-and-stick), `"licorice"` (equal-radius continuous sticks), `"cartoon"`, `"both"`, `"surface"`, or `"line"` (thin wireframe) |
+| Parameter | Type  | Default   | Description                                                                                                                                                        |
+| --------- | ----- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mode`    | `str` | `"atoms"` | Visual representation: `"atoms"` (ball-and-stick), `"licorice"` (equal-radius continuous sticks), `"cartoon"`, `"both"`, `"surface"`, or `"line"` (thin wireframe) |
 
 **Ports:** `inp.particle`, `out.particle`
 
@@ -259,10 +262,10 @@ Compute and display bonds.
 AddBonds(*, source: Literal["distance", "structure", "file"] = "distance", top: str | None = None)
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `source` | `str` | `"distance"` | `"distance"` for VDW-based inference; `"structure"` (alias `"file"`) to read bonds from the structure file (e.g. CONECT records in PDB) |
-| `top` | `str \| None` | `None` | Path to a topology file (GROMACS `.top` or CHARMM/NAMD `.psf`). When provided, `source` is ignored and bonds are read from the topology file. |
+| Parameter | Type          | Default      | Description                                                                                                                                   |
+| --------- | ------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `source`  | `str`         | `"distance"` | `"distance"` for VDW-based inference; `"structure"` (alias `"file"`) to read bonds from the structure file (e.g. CONECT records in PDB)       |
+| `top`     | `str \| None` | `None`       | Path to a topology file (GROMACS `.top` or CHARMM/NAMD `.psf`). When provided, `source` is ignored and bonds are read from the topology file. |
 
 **Ports:** `inp.particle`, `out.bond`
 
@@ -274,27 +277,68 @@ Generate text labels at atom positions.
 AddLabels(*, source: Literal["element", "resname", "index"] = "element")
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `source` | `str` | `"element"` | Label source: `"element"`, `"resname"`, or `"index"` |
+| Parameter | Type  | Default     | Description                                          |
+| --------- | ----- | ----------- | ---------------------------------------------------- |
+| `source`  | `str` | `"element"` | Label source: `"element"`, `"resname"`, or `"index"` |
 
 **Ports:** `inp.particle`, `out.label`
 
-### AddPolyhedra
-
-Generate coordination polyhedra mesh (VESTA-style auto-detection).
-
-By default, a polyhedron is drawn for every metal/metalloid center coordinated
-to every typical anion-forming ligand present in the structure. Use
-`excluded_centers` / `excluded_ligands` to opt out specific elements, mirroring
-VESTA's checkbox UI.
+### DrawingBoundary
 
 ```python
-AddPolyhedra(
+DrawingBoundary(
+    *, x_min: float = 0.0, x_max: float = 1.0,
+    y_min: float = 0.0, y_max: float = 1.0,
+    z_min: float = 0.0, z_max: float = 1.0,
+)
+```
+
+Drawing Boundary creates periodic display copies inside inclusive fractional
+bounds without changing structural atom indices or enlarging the cell.
+
+**Ports:** `inp.particle`, `out.particle`
+
+### BoundaryCompletion
+
+```python
+BoundaryCompletion(*, mode: Literal["neighbors", "components"] = "neighbors")
+```
+
+Adds bond-connected periodic display copies without changing crystallographic
+coordinates. `"neighbors"` completes one bond shell. `"components"` completes
+finite connected components, but deliberately leaves infinite periodic
+networks unexpanded.
+
+**Ports:** `inp.particle`, `inp.bond`, `out.particle`, `out.bond`
+
+### AddCoordination
+
+```python
+AddCoordination(
     *,
     excluded_centers: list[int] | None = None,
     excluded_ligands: list[int] | None = None,
     cutoff_tolerance: float = 1.15,
+    boundary_mode: Literal["inside", "complete"] = "complete",
+)
+```
+
+Coordination detects relationships between center atoms and their bonded
+neighbors. With `boundary_mode="complete"`, center atoms stay inside Drawing
+Boundary while missing periodic images of their neighbors may be added outside
+it to complete the visible coordination environment.
+
+**Ports:** `inp.particle`, `out.coordination`, `out.bond`
+
+### AddPolyhedra
+
+Convert directed center-neighbor coordination data to convex polyhedron meshes.
+Periodic atom display and completing neighbors outside the drawing range belong
+to the two upstream nodes.
+
+```python
+AddPolyhedra(
+    *,
     opacity: float = 0.5,
     show_edges: bool = False,
     edge_color: str = "#dddddd",
@@ -302,17 +346,14 @@ AddPolyhedra(
 )
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `excluded_centers` | `list[int] \| None` | `[]` | Atomic numbers to exclude from center detection (e.g., `[38]` to skip Sr) |
-| `excluded_ligands` | `list[int] \| None` | `[]` | Atomic numbers to exclude from ligand detection |
-| `cutoff_tolerance` | `float` | `1.15` | Bond-length tolerance multiplier applied to VDW radii sum for center–ligand detection |
-| `opacity` | `float` | `0.5` | Face transparency (0–1) |
-| `show_edges` | `bool` | `False` | Display wireframe edges |
-| `edge_color` | `str` | `"#dddddd"` | Wireframe edge color (hex) |
-| `edge_width` | `float` | `3.0` | Wireframe edge width (px) |
+| Parameter    | Type    | Default     | Description                |
+| ------------ | ------- | ----------- | -------------------------- |
+| `opacity`    | `float` | `0.5`       | Face transparency (0–1)    |
+| `show_edges` | `bool`  | `False`     | Display wireframe edges    |
+| `edge_color` | `str`   | `"#dddddd"` | Wireframe edge color (hex) |
+| `edge_width` | `float` | `3.0`       | Wireframe edge width (px)  |
 
-**Ports:** `inp.particle`, `out.mesh`
+**Ports:** `inp.coordination`, `out.mesh`
 
 ### VectorOverlay
 
@@ -322,9 +363,9 @@ Configure per-atom vector visualization (e.g. forces, velocities).
 VectorOverlay(*, scale: float = 1.0)
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `scale` | `float` | `1.0` | Vector arrow length multiplier |
+| Parameter | Type    | Default | Description                    |
+| --------- | ------- | ------- | ------------------------------ |
+| `scale`   | `float` | `1.0`   | Vector arrow length multiplier |
 
 **Ports:** `inp.vector`, `out.vector`
 
@@ -336,11 +377,11 @@ VectorOverlay(*, scale: float = 1.0)
 Viewport(*, perspective: bool = False, cell_axes_visible: bool = True, pivot_marker_visible: bool = True)
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `perspective` | `bool` | `False` | Toggle perspective / orthographic projection |
-| `cell_axes_visible` | `bool` | `True` | Show simulation cell axes with labels |
-| `pivot_marker_visible` | `bool` | `True` | Show the rotation pivot marker at the camera target |
+| Parameter              | Type   | Default | Description                                         |
+| ---------------------- | ------ | ------- | --------------------------------------------------- |
+| `perspective`          | `bool` | `False` | Toggle perspective / orthographic projection        |
+| `cell_axes_visible`    | `bool` | `True`  | Show simulation cell axes with labels               |
+| `pivot_marker_visible` | `bool` | `True`  | Show the rotation pivot marker at the camera target |
 
 **Ports:** `inp.particle`, `inp.bond`, `inp.cell`, `inp.traj`, `inp.label`, `inp.mesh`, `inp.vector`
 
@@ -447,24 +488,26 @@ viewer
 ## Example: TiO₆ Coordination Polyhedra
 
 ```python
-from megane import Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewport, MolecularViewer
+from megane import (
+    Pipeline, LoadStructure, DrawingBoundary, AddCoordination,
+    AddPolyhedra, Viewport, MolecularViewer,
+)
 
 pipe = Pipeline()
 s = pipe.add_node(LoadStructure("SrTiO3_supercell.pdb"))
-bonds = pipe.add_node(AddBonds(source="distance"))
-# All metal centers and anion-forming ligands are included by default (VESTA-style).
-# Exclude Sr (38) so only TiO6 polyhedra are drawn.
-polyhedra = pipe.add_node(AddPolyhedra(
-    excluded_centers=[38],    # exclude Sr; Ti (22) is kept
-    opacity=0.5,
-    show_edges=True,
+boundary = pipe.add_node(DrawingBoundary())
+coordination = pipe.add_node(AddCoordination(
+    excluded_centers=[38],  # exclude Sr; Ti (22) is kept
+    boundary_mode="complete",
 ))
+polyhedra = pipe.add_node(AddPolyhedra(opacity=0.5, show_edges=True))
 v = pipe.add_node(Viewport())
 
-pipe.add_edge(s.out.particle, bonds.inp.particle)
-pipe.add_edge(s.out.particle, polyhedra.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
-pipe.add_edge(bonds.out.bond, v.inp.bond)
+pipe.add_edge(s.out.particle, boundary.inp.particle)
+pipe.add_edge(boundary.out.particle, coordination.inp.particle)
+pipe.add_edge(boundary.out.particle, v.inp.particle)
+pipe.add_edge(coordination.out.coordination, polyhedra.inp.coordination)
+pipe.add_edge(coordination.out.bond, v.inp.bond)
 pipe.add_edge(polyhedra.out.mesh, v.inp.mesh)
 
 viewer = MolecularViewer()

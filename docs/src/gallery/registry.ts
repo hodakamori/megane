@@ -33,8 +33,7 @@ export const galleryExamples: GalleryExample[] = [
   {
     id: "small-molecule",
     title: "Small Molecule System",
-    description:
-      "Visualize a solvated small molecule system with distance-based bond detection.",
+    description: "Visualize a solvated small molecule system with distance-based bond detection.",
     tags: ["small-molecule", "pdb", "basic"],
     snapshotUrl: "/megane/data/caffeine_water.json",
     code: {
@@ -125,26 +124,21 @@ export default function App() {
     code: {
       jupyter: `\
 import megane
-from megane import Pipeline, LoadStructure, AddBonds, AddPolyhedra, Viewport
+from megane import Pipeline, LoadStructure, DrawingBoundary, AddCoordination, AddPolyhedra, Viewport
 
 pipe = Pipeline()
 s = pipe.add_node(LoadStructure("perovskite_srtio3_3x3x3.xyz"))
-ab = pipe.add_node(AddBonds(source="distance"))
-# TiO6 octahedra: center = Ti (22), ligand = O (8)
-poly = pipe.add_node(AddPolyhedra(
-    center_elements=[22],
-    ligand_elements=[8],
-    max_distance=2.5,
-    opacity=0.5,
-    show_edges=True,
-))
+boundary = pipe.add_node(DrawingBoundary())
+coordination = pipe.add_node(AddCoordination(excluded_centers=[38]))
+poly = pipe.add_node(AddPolyhedra(opacity=0.5, show_edges=True))
 v = pipe.add_node(Viewport(cell_axes_visible=True))
 
-pipe.add_edge(s.out.particle, ab.inp.particle)
-pipe.add_edge(s.out.particle, poly.inp.particle)
-pipe.add_edge(s.out.particle, v.inp.particle)
+pipe.add_edge(s.out.particle, boundary.inp.particle)
+pipe.add_edge(boundary.out.particle, coordination.inp.particle)
+pipe.add_edge(boundary.out.particle, v.inp.particle)
 pipe.add_edge(s.out.cell,     v.inp.cell)
-pipe.add_edge(ab.out.bond,    v.inp.bond)
+pipe.add_edge(coordination.out.bond, v.inp.bond)
+pipe.add_edge(coordination.out.coordination, poly.inp.coordination)
 pipe.add_edge(poly.out.mesh,  v.inp.mesh)
 
 viewer = megane.MolecularViewer()
@@ -152,15 +146,13 @@ viewer.set_pipeline(pipe)
 viewer`,
 
       react: `\
-import { PipelineViewer, Pipeline, LoadStructure, AddBonds, AddPolyhedra, ViewportNode } from "megane-viewer/lib";
+import { PipelineViewer, Pipeline, LoadStructure, DrawingBoundary, AddCoordination, AddPolyhedra, ViewportNode } from "megane-viewer/lib";
 
 const pipe = new Pipeline();
 const s = pipe.addNode(new LoadStructure("/megane/structures/perovskite_srtio3_3x3x3.xyz"));
-const bonds = pipe.addNode(new AddBonds());
+const boundary = pipe.addNode(new DrawingBoundary());
+const coordination = pipe.addNode(new AddCoordination({ excludedCenters: [38] }));
 const poly = pipe.addNode(new AddPolyhedra({
-  centerElements: [22], // Ti
-  ligandElements: [8],  // O
-  maxDistance: 2.5,
   opacity: 0.5,
   showEdges: true,
   edgeColor: "#dddddd",
@@ -172,11 +164,12 @@ const v = pipe.addNode(new ViewportNode({
   pivotMarkerVisible: true,
 }));
 
-pipe.addEdge(s.out.particle, bonds.inp.particle);
-pipe.addEdge(s.out.particle, poly.inp.particle);
-pipe.addEdge(s.out.particle, v.inp.particle);
+pipe.addEdge(s.out.particle, boundary.inp.particle);
+pipe.addEdge(boundary.out.particle, coordination.inp.particle);
+pipe.addEdge(boundary.out.particle, v.inp.particle);
 pipe.addEdge(s.out.cell,     v.inp.cell);
-pipe.addEdge(bonds.out.bond, v.inp.bond);
+pipe.addEdge(coordination.out.bond, v.inp.bond);
+pipe.addEdge(coordination.out.coordination, poly.inp.coordination);
 pipe.addEdge(poly.out.mesh,  v.inp.mesh);
 
 export default function App() {
@@ -197,18 +190,26 @@ export default function App() {
       "hasCell": true
     },
     {
-      "id": "ab1",
-      "type": "add_bond",
-      "position": { "x": -170, "y": 310 },
-      "bondSource": "distance"
+      "id": "boundary1",
+      "type": "drawing_boundary",
+      "position": { "x": 0, "y": 180 },
+      "xMin": 0, "xMax": 1,
+      "yMin": 0, "yMax": 1,
+      "zMin": 0, "zMax": 1
+    },
+    {
+      "id": "coord1",
+      "type": "coordination_generator",
+      "position": { "x": 0, "y": 360 },
+      "excludedCenters": [38],
+      "excludedLigands": [],
+      "cutoffTolerance": 1.15,
+      "boundaryMode": "complete"
     },
     {
       "id": "poly1",
       "type": "polyhedron_generator",
       "position": { "x": 170, "y": 310 },
-      "centerElements": [22],
-      "ligandElements": [8],
-      "maxDistance": 2.5,
       "opacity": 0.5,
       "showEdges": true,
       "edgeColor": "#dddddd",
@@ -224,11 +225,12 @@ export default function App() {
     }
   ],
   "edges": [
-    { "source": "s1",    "target": "ab1",   "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "s1",    "target": "poly1", "sourceHandle": "particle", "targetHandle": "particle" },
-    { "source": "s1",    "target": "v1",    "sourceHandle": "particle", "targetHandle": "particle" },
+    { "source": "s1",        "target": "boundary1", "sourceHandle": "particle",     "targetHandle": "particle"     },
+    { "source": "boundary1", "target": "coord1",    "sourceHandle": "particle",     "targetHandle": "particle"     },
+    { "source": "boundary1", "target": "v1",        "sourceHandle": "particle",     "targetHandle": "particle"     },
     { "source": "s1",    "target": "v1",    "sourceHandle": "cell",     "targetHandle": "cell"     },
-    { "source": "ab1",   "target": "v1",    "sourceHandle": "bond",     "targetHandle": "bond"     },
+    { "source": "coord1", "target": "v1",    "sourceHandle": "bond",     "targetHandle": "bond"     },
+    { "source": "coord1", "target": "poly1", "sourceHandle": "coordination", "targetHandle": "coordination" },
     { "source": "poly1", "target": "v1",    "sourceHandle": "mesh",     "targetHandle": "mesh"     }
   ]
 }`,
@@ -518,8 +520,7 @@ export default function App() {
   {
     id: "atom-labels",
     title: "Atom Labels",
-    description:
-      "Generate per-atom text labels (element symbols) on a filtered subset of atoms.",
+    description: "Generate per-atom text labels (element symbols) on a filtered subset of atoms.",
     tags: ["labels", "filter", "small-molecule"],
     snapshotUrl: "/megane/data/caffeine_water.json",
     code: {

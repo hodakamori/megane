@@ -78,6 +78,21 @@ describe("ImpostorAtomMesh.setHiddenMask", () => {
     expect(s[2]).toBe(0);
   });
 
+  it("invalidates Three.js's cached instance limit when capacity grows", () => {
+    const mesh = new ImpostorAtomMesh(1);
+    const geometry = mesh.mesh.geometry as typeof mesh.mesh.geometry & {
+      _maxInstanceCount?: number;
+    };
+
+    // WebGLBindingStates records the original attribute capacity here after
+    // the first render. Reproduce that state without requiring a WebGL context.
+    geometry._maxInstanceCount = 1;
+    mesh.loadSnapshot(makeSnapshot());
+
+    expect(geometry._maxInstanceCount).toBeUndefined();
+    expect(geometry.instanceCount).toBe(3);
+  });
+
   it("treats a short mask as 'hide only the listed atoms'", () => {
     const mesh = new ImpostorAtomMesh(8);
     mesh.loadSnapshot(makeSnapshot());

@@ -57,6 +57,14 @@ export function applyViewportState(
     renderer.setAtomsVisible(hasParticles);
   }
 
+  const drawingBoundary =
+    primaryParticles.find((particle) => particle.drawingBoundary)?.drawingBoundary ?? null;
+  const previousDrawingBoundary =
+    prevPrimaryParticles?.find((particle) => particle.drawingBoundary)?.drawingBoundary ?? null;
+  if (!previous || drawingBoundary !== previousDrawingBoundary) {
+    renderer.setDrawingBoundary?.(drawingBoundary);
+  }
+
   applyParticleOverrides(renderer, primaryParticles, prevPrimaryParticles);
   applyBondSettings(renderer, primaryBonds, prevPrimaryBonds);
 
@@ -103,6 +111,9 @@ export function applyViewportState(
     if (firstParticle && layer.snapshot !== firstParticle.source) {
       layer.loadSnapshot(firstParticle.source);
     }
+    layer.setDrawingBoundary(
+      particles.find((particle) => particle.drawingBoundary)?.drawingBoundary ?? null,
+    );
 
     // Apply overrides
     applyLayerParticleOverrides(layer, particles);
@@ -111,6 +122,7 @@ export function applyViewportState(
     const bonds = layerBondsByNode.get(nodeId);
     if (bonds && bonds.length > 0) {
       const bond = bonds[0];
+      layer.setBondPeriodicImages(bond.periodicImages ?? null);
       layer.updateBondsExt(
         bond.bondIndices,
         bond.bondOrders,
@@ -127,6 +139,7 @@ export function applyViewportState(
       }
       layer.setBondsVisible(true);
     } else {
+      layer.setBondPeriodicImages(null);
       layer.setBondsVisible(false);
     }
 
@@ -340,10 +353,17 @@ function applyBondSettings(
   bonds: BondData[],
   prevBonds: BondData[] | null,
 ): void {
-  if (bonds.length === 0) return;
+  if (bonds.length === 0) {
+    renderer.setBondPeriodicImages?.(null);
+    return;
+  }
 
   const bond = bonds[0];
   const prevBond = prevBonds?.[0];
+
+  if (!prevBond || bond.periodicImages !== prevBond.periodicImages) {
+    renderer.setBondPeriodicImages?.(bond.periodicImages ?? null);
+  }
 
   if (!prevBond || bond.bondIndices !== prevBond.bondIndices) {
     renderer.updateBondsExt(
