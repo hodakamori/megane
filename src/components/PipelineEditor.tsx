@@ -40,6 +40,7 @@ import { AddBondNode } from "./nodes/AddBondNode";
 import { ViewportNode } from "./nodes/ViewportNode";
 import { FilterNode } from "./nodes/FilterNode";
 import { ModifyNode } from "./nodes/ModifyNode";
+import { WrapNode } from "./nodes/WrapNode";
 import { ReplicateNode } from "./nodes/ReplicateNode";
 import { ColorNode } from "./nodes/ColorNode";
 import { RepresentationNode } from "./nodes/RepresentationNode";
@@ -69,6 +70,7 @@ const nodeTypes = {
   viewport: ViewportNode,
   filter: FilterNode,
   modify: ModifyNode,
+  wrap: WrapNode,
   replicate: ReplicateNode,
   color: ColorNode,
   representation: RepresentationNode,
@@ -103,7 +105,7 @@ const ADD_NODE_GROUPS: { category: NodeCategory; label: string; types: PipelineN
   {
     category: "modify",
     label: "Modify",
-    types: ["modify", "color", "representation", "replicate"],
+    types: ["modify", "color", "representation", "wrap", "replicate"],
   },
   {
     category: "overlay",

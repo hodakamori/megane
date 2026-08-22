@@ -134,18 +134,28 @@ describe("usePipelineStore.openFile — single structure file", () => {
     // node itself, so the seed LoadTrajectory node should be removed and
     // its downstream consumers rewired to LoadStructure.trajectory.
     expect(state.nodes.find((n) => n.type === "load_trajectory")).toBeUndefined();
-    // The trajectory routes through the replicate node so replicated copies
-    // animate: LoadStructure.trajectory → Replicate.trajectory → Viewport.
+    // The trajectory routes through the wrap and replicate nodes so remapped
+    // and replicated copies animate:
+    // LoadStructure.trajectory → Wrap.trajectory → Replicate.trajectory → Viewport.
+    const wrap = state.nodes.find((n) => n.type === "wrap")!;
     const replicate = state.nodes.find((n) => n.type === "replicate")!;
     const viewport = state.nodes.find((n) => n.type === "viewport")!;
     const rewiredEdge = state.edges.find(
       (e) =>
         e.source === loader.id &&
         e.sourceHandle === "trajectory" &&
-        e.target === replicate.id &&
+        e.target === wrap.id &&
         e.targetHandle === "trajectory",
     );
     expect(rewiredEdge).toBeDefined();
+    const wrapEdge = state.edges.find(
+      (e) =>
+        e.source === wrap.id &&
+        e.sourceHandle === "trajectory" &&
+        e.target === replicate.id &&
+        e.targetHandle === "trajectory",
+    );
+    expect(wrapEdge).toBeDefined();
     const trajEdge = state.edges.find(
       (e) =>
         e.source === replicate.id &&
@@ -212,7 +222,7 @@ describe("usePipelineStore.openFile — AddBond default by file format", () => {
     const state = usePipelineStore.getState();
     // The default pipeline routes loader.particle through a replicate node
     // before reaching AddBond, so follow particle-carrying edges forward.
-    const passThrough = new Set(["replicate", "filter", "modify", "color", "representation"]);
+    const passThrough = new Set(["wrap", "replicate", "filter", "modify", "color", "representation"]);
     const visited = new Set<string>([loaderId]);
     const stack: string[] = [loaderId];
     while (stack.length > 0) {
@@ -519,7 +529,7 @@ describe("usePipelineStore.openFile — error cases", () => {
 describe("applyTopologyFile", () => {
   function findAddBondParams(loaderId: string): Record<string, unknown> | undefined {
     const state = usePipelineStore.getState();
-    const passThrough = new Set(["replicate", "filter", "modify", "color", "representation"]);
+    const passThrough = new Set(["wrap", "replicate", "filter", "modify", "color", "representation"]);
     const visited = new Set<string>([loaderId]);
     const stack: string[] = [loaderId];
     while (stack.length > 0) {

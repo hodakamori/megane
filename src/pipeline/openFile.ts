@@ -135,10 +135,17 @@ export function syncAddBondSourceForLoader(
   const desired = defaultBondSourceForFile(filename);
   const targets = new Set<string>();
   // Walk forward along particle-carrying edges. AddBond may sit downstream of
-  // particle pass-through nodes (replicate / filter / modify / color /
+  // particle pass-through nodes (wrap / replicate / filter / modify / color /
   // representation), so we traverse through those to find it rather than only
   // looking at the loader's direct neighbours.
-  const PASS_THROUGH = new Set(["replicate", "filter", "modify", "color", "representation"]);
+  const PASS_THROUGH = new Set([
+    "wrap",
+    "replicate",
+    "filter",
+    "modify",
+    "color",
+    "representation",
+  ]);
   const visited = new Set<string>([loaderId]);
   const stack: string[] = [loaderId];
   while (stack.length > 0) {
@@ -406,7 +413,14 @@ export async function applyTopologyFile(
     ? await parsePsfBonds(text, 0xffffffff)
     : await parseTopBonds(text, 0xffffffff);
 
-  const PASS_THROUGH = new Set(["replicate", "filter", "modify", "color", "representation"]);
+  const PASS_THROUGH = new Set([
+    "wrap",
+    "replicate",
+    "filter",
+    "modify",
+    "color",
+    "representation",
+  ]);
   const visited = new Set<string>([loaderId]);
   const stack: string[] = [loaderId];
   while (stack.length > 0) {
