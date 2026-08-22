@@ -21,9 +21,8 @@ import { MeasurementListPanel } from "./MeasurementListPanel";
 import { PerfHud } from "./PerfHud";
 import { OVERLAY_INSET, PERF_HUD_LEFT_DEFAULT, MEASUREMENT_BOTTOM_DEFAULT } from "./overlayLayout";
 import { MoleculeRenderer, isMeganeTestMode } from "../renderer/MoleculeRenderer";
-import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
 import type { StructureParseResult } from "../parsers/structure";
-import { processPbcBonds } from "../pipeline/executors/addBond";
+import { computeFrameDistanceBonds } from "../pipeline/executors/addBond";
 import { usePipelineStore } from "../pipeline/store";
 import { usePipelineUIStore } from "../stores/usePipelineUIStore";
 import { useInspectorInteractionStore } from "../stores/useInspectorInteractionStore";
@@ -412,21 +411,12 @@ export function MeganeViewer({
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const newBonds = inferBondsVdwJS(
-      frame.positions,
-      snapshot.elements,
-      snapshot.nAtoms,
-      (params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
-      snapshot.box,
-    );
-
-    const result = processPbcBonds(
-      newBonds,
-      null,
+    const result = computeFrameDistanceBonds(
       frame.positions,
       snapshot.elements,
       snapshot.nAtoms,
       snapshot.box,
+      (params as AddBondParams).vdwScale,
     );
     renderer.updateBondsExt(
       result.bondIndices,

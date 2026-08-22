@@ -38,8 +38,7 @@ import { deserializePipeline } from "../pipeline/serialize";
 import { executePipeline } from "../pipeline/execute";
 import { applyViewportState, applyVectorsForFrame } from "../pipeline/apply";
 import { parseStructureFile } from "../parsers/structure";
-import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
-import { processPbcBonds } from "../pipeline/executors/addBond";
+import { computeFrameDistanceBonds } from "../pipeline/executors/addBond";
 import type { PipelineNodeData, NodeSnapshotData } from "../pipeline/execute";
 import type {
   SerializedPipeline,
@@ -251,14 +250,13 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     [nodes],
   );
 
-  // VDW threshold scale for the active distance-bond node (default 0.6).
+  // VDW threshold scale for the active distance-bond node
+  // (undefined → the executor's default).
   const distanceBondScale = useMemo(() => {
     const node = nodes.find(
       (n) => n.type === "add_bond" && (n.data.params as AddBondParams).bondSource === "distance",
     );
-    return node
-      ? ((node.data.params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR)
-      : DEFAULT_VDW_BOND_FACTOR;
+    return node ? (node.data.params as AddBondParams).vdwScale : undefined;
   }, [nodes]);
 
   useEffect(() => {
@@ -267,20 +265,12 @@ export function PipelineViewer({ pipeline, width = "100%", height = 500 }: Pipel
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const newBonds = inferBondsVdwJS(
+    const result = computeFrameDistanceBonds(
       currentFrameData.positions,
       primarySnapshot.elements,
       primarySnapshot.nAtoms,
+      primarySnapshot.box,
       distanceBondScale,
-      primarySnapshot.box,
-    );
-    const result = processPbcBonds(
-      newBonds,
-      null,
-      currentFrameData.positions,
-      primarySnapshot.elements,
-      primarySnapshot.nAtoms,
-      primarySnapshot.box,
     );
     renderer.updateBondsExt(
       result.bondIndices,

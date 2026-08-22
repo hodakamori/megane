@@ -19,10 +19,8 @@ silently discarded that another host/tool renders.
 
 | Where | What happens | What rule #11 wants instead |
 | --- | --- | --- |
-| `crates/megane-core/src/cif.rs` (`parse`, ~430) | `bonds::unwrap_molecules` mutates atom coordinates to make molecules whole before bond inference. | Coordinate surgery is a node transform (or an opt-in flag surfaced in the pipeline); the parser should return the file's coordinates. |
-| `crates/megane-core/src/cif.rs` (`parse`, ~448) | `crystal::expand_symmetry` applies space-group operations and **adds atoms** (VESTA-style cell packing) inside the parser. This directly contradicts the `ParsedStructure::symmetry_ops` doc in `parser.rs`, which promises "the parser does NOT apply these — it always returns the asymmetric unit; symmetry expansion is a downstream feature". | Return the asymmetric unit + `symmetry_ops`; expansion becomes a node (a symmetry sibling of `replicate`) so the user can toggle it. |
+| `crates/megane-core/src/cif.rs` (`parse`, ~476) | `crystal::expand_symmetry` applies space-group operations and **adds atoms** (VESTA-style cell packing) inside the parser. This directly contradicts the `ParsedStructure::symmetry_ops` doc in `parser.rs`, which promises "the parser does NOT apply these — it always returns the asymmetric unit; symmetry expansion is a downstream feature". (The `bonds::unwrap_molecules` coordinate surgery that used to run here has been removed — the parser now keeps the file's atom sites.) | Return the asymmetric unit + `symmetry_ops`; expansion becomes a node (a symmetry sibling of `replicate`) so the user can toggle it. |
 | `crates/megane-core/src/odydata.rs` (~429) | All atom positions are shifted by `+box/2` so the cell draws from the world origin. | Use the `box_origin` channel that exists for exactly this (`lammps_data.rs` does it right); never translate atoms. |
-| `src/components/MeganeViewer.tsx` (~301), `src/components/PipelineViewer.tsx` (~263), `src/components/WidgetViewer.tsx` (~220) | Three copies of the `add_bond` executor's work — `inferBondsVdwJS` + `processPbcBonds` incl. **ghost-atom generation** — run per playback frame directly in viewer components, bypassing `executeAddBond`. | Host components call the node executor; they never reimplement its transform (rule #11 corollary). |
 | `src/parsers/parseCore.ts` (`remapTrajectoryTypesToElements`, ~610) | Mutates each frame's `elements` in place at load time (LAMMPS type ids → atomic numbers via frame 0; unmatched types silently become 0). | Do the mapping without mutating parser output, or move it into the pipeline where it is visible. |
 | `src/pipeline/openFile.ts` (`removeLoadTrajectoryAndRewire`, ~273) and `src/hooks/useMeganeLocal.ts` (~276) | Load path deletes a pipeline node and rewires edges depending on whether the file carried frames. | Graph surgery driven by file content should be an explicit, visible pipeline-template decision, not a silent load side effect. |
 
@@ -83,3 +81,9 @@ silently discarded that another host/tool renders.
 - **Camera-only centering:** `src/renderer/CameraManager.ts` centers the
   *camera target*, never the coordinates; the renderer never drops atoms
   (unknown elements get a fallback color).
+- **Hosts call the executor:** the per-playback-frame distance-bond refresh in
+  `MeganeViewer` / `PipelineViewer` / `WidgetViewer` goes through
+  `computeFrameDistanceBonds` in `src/pipeline/executors/addBond.ts` — the
+  transform lives in the node executor module only. Likewise `add_bond` and
+  `coordination_generator` share one Drawing-Boundary site collector
+  (`src/pipeline/executors/displaySites.ts`) instead of duplicating it.

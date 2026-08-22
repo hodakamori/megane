@@ -8,6 +8,7 @@ import type {
 import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../../parsers/inferBondsJS";
 import { DEFAULT_RADIUS, VDW_RADII } from "../../constants";
 import { invert3x3 } from "./mathUtils";
+import { collectDisplaySites, displaySiteKey, type DisplaySite } from "./displaySites";
 import {
   minimumImageTargetShift,
   periodicDisplacementsWithinCutoff,
@@ -17,7 +18,7 @@ import {
  * Result of PBC bond processing: normal bonds kept as-is,
  * PBC-crossing bonds replaced with half-bonds to ghost atoms.
  */
-interface PbcBondResult {
+export interface PbcBondResult {
   bondIndices: Uint32Array;
   bondOrders: Uint8Array | null;
   nBonds: number;
@@ -25,18 +26,6 @@ interface PbcBondResult {
   positions: Float32Array | null;
   elements: Uint8Array | null;
   nAtoms: number;
-}
-
-interface DrawingSite {
-  sourceIndex: number;
-  dataIndex: number;
-  shiftA: number;
-  shiftB: number;
-  shiftC: number;
-}
-
-function drawingSiteKey(source: number, a: number, b: number, c: number): string {
-  return `${source}:${a}:${b}:${c}`;
 }
 
 /** Attach one minimum-image lattice shift to each explicit structural bond. */
@@ -215,28 +204,16 @@ export function expandPeriodicTopologyForDrawingBoundary(
   elements.set(snapshot.elements);
   elements.set(boundary.images.elements, snapshot.elements.length);
 
-  const sitesByKey = new Map<string, DrawingSite>();
-  const sitesBySource = new Map<number, DrawingSite[]>();
-  const addSite = (site: DrawingSite) => {
-    sitesByKey.set(drawingSiteKey(site.sourceIndex, site.shiftA, site.shiftB, site.shiftC), site);
-    const sites = sitesBySource.get(site.sourceIndex) ?? [];
-    sites.push(site);
-    sitesBySource.set(site.sourceIndex, sites);
-  };
-  for (let atom = 0; atom < snapshot.nAtoms; atom++) {
-    if (boundary.sourceVisibleMask[atom]) {
-      addSite({ sourceIndex: atom, dataIndex: atom, shiftA: 0, shiftB: 0, shiftC: 0 });
-    }
-  }
-  for (let image = 0; image < boundary.images.sourceIndices.length; image++) {
-    const i3 = image * 3;
-    addSite({
-      sourceIndex: boundary.images.sourceIndices[image],
-      dataIndex: snapshot.nAtoms + image,
-      shiftA: boundary.images.latticeShifts[i3],
-      shiftB: boundary.images.latticeShifts[i3 + 1],
-      shiftC: boundary.images.latticeShifts[i3 + 2],
-    });
+  const { sites, byKey: sitesByKey } = collectDisplaySites(
+    snapshot.positions,
+    snapshot.nAtoms,
+    boundary,
+  );
+  const sitesBySource = new Map<number, DisplaySite[]>();
+  for (const site of sites) {
+    const bySource = sitesBySource.get(site.sourceIndex) ?? [];
+    bySource.push(site);
+    sitesBySource.set(site.sourceIndex, bySource);
   }
 
   const expanded: number[] = [];
@@ -250,7 +227,7 @@ export function expandPeriodicTopologyForDrawingBoundary(
     const relativeC = topology.targetLatticeShifts[bond * 3 + 2];
     for (const siteA of sitesBySource.get(sourceA) ?? []) {
       const siteB = sitesByKey.get(
-        drawingSiteKey(
+        displaySiteKey(
           sourceB,
           siteA.shiftA + relativeA,
           siteA.shiftB + relativeB,
@@ -443,6 +420,29 @@ export function processPbcBonds(
     elements: extElements,
     nAtoms: ghostIdx,
   };
+}
+
+/**
+ * Distance-mode bonds for a single playback frame: the per-frame counterpart
+ * of `executeAddBond`'s distance path. Host viewers must call this during
+ * trajectory playback instead of reimplementing the transform (CRITICAL RULE
+ * #11 corollary: hosts call the node executor, they never fork it).
+ */
+export function computeFrameDistanceBonds(
+  framePositions: Float32Array,
+  elements: Uint8Array,
+  nAtoms: number,
+  box: Float32Array | null,
+  vdwScale?: number,
+): PbcBondResult {
+  const pairs = inferBondsVdwJS(
+    framePositions,
+    elements,
+    nAtoms,
+    vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
+    box,
+  );
+  return processPbcBonds(pairs, null, framePositions, elements, nAtoms, box);
 }
 
 export function executeAddBond(

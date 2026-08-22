@@ -16,8 +16,7 @@ import { Tooltip } from "./Tooltip";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { MoleculeRenderer, type MeganeCameraState } from "../renderer/MoleculeRenderer";
 import { useAtomSelection } from "../hooks/useAtomSelection";
-import { inferBondsVdwJS, DEFAULT_VDW_BOND_FACTOR } from "../parsers/inferBondsJS";
-import { processPbcBonds } from "../pipeline/executors/addBond";
+import { computeFrameDistanceBonds } from "../pipeline/executors/addBond";
 import { createPipelineStore, type PipelineStore } from "../pipeline/store";
 import { applyViewportState } from "../pipeline/apply";
 import { decodeSnapshot, decodeHeader, MSG_SNAPSHOT } from "../protocol/protocol";
@@ -232,21 +231,12 @@ export function WidgetViewer({
     const renderer = rendererRef.current;
     if (!renderer) return;
 
-    const newBonds = inferBondsVdwJS(
-      frame.positions,
-      effectiveSnapshot.elements,
-      effectiveSnapshot.nAtoms,
-      (params as AddBondParams).vdwScale ?? DEFAULT_VDW_BOND_FACTOR,
-      effectiveSnapshot.box,
-    );
-
-    const result = processPbcBonds(
-      newBonds,
-      null,
+    const result = computeFrameDistanceBonds(
       frame.positions,
       effectiveSnapshot.elements,
       effectiveSnapshot.nAtoms,
       effectiveSnapshot.box,
+      (params as AddBondParams).vdwScale,
     );
     renderer.updateBondsExt(
       result.bondIndices,
