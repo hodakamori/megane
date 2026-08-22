@@ -1,11 +1,19 @@
 # Copy this file to .dev.vars (gitignored) for local `wrangler dev` testing.
 # .dev.vars overrides [vars] in wrangler.toml during local development only.
 
-# Get a key at https://plamo.preferredai.jp/ (Preferred Networks PLaMo API).
+# Set at least one provider key; a provider without a key is skipped.
+# Get a PLaMo key at https://plamo.preferredai.jp/ (Preferred Networks) and
+# an OpenRouter key at https://openrouter.ai/keys.
 PLAMO_API_KEY=plamo-xxxxxxxxxxxxxxxxxxxxxxxx
+# OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx
 
 # Match the origin the Vite dev server runs on (default http://localhost:5173)
 ALLOWED_ORIGIN=http://localhost:5173
+
+# Optional: provider order (comma-separated). Providers after the first are
+# cross-provider fallbacks. Leave unset to use DEFAULT_PROVIDERS
+# ("plamo,openrouter") in src/proxy.ts.
+# LLM_PROVIDERS=plamo,openrouter
 
 # Optional: override the PLaMo model id. Valid ids are listed at
 # https://docs.plamo.preferredai.jp/en/api (e.g. plamo-3.0-prime,
@@ -13,6 +21,16 @@ ALLOWED_ORIGIN=http://localhost:5173
 # key. Leave unset to use the default in src/proxy.ts.
 # PLAMO_MODEL=plamo-3.0-prime
 
-# Optional: comma-separated fallback models, tried in order if the primary
-# errors. Leave unset to use DEFAULT_FALLBACK_MODELS.
+# Optional: comma-separated PLaMo fallback models, tried in order if the
+# primary errors. Leave unset to use DEFAULT_PLAMO_FALLBACK_MODELS.
 # PLAMO_FALLBACK_MODELS=plamo-2.2-prime
+
+# Optional: override the OpenRouter model slug (vendor-prefixed, dot
+# version — e.g. anthropic/claude-sonnet-4.6). Leave unset to use the
+# default in src/proxy.ts.
+# OPENROUTER_MODEL=anthropic/claude-sonnet-4.6
+
+# Optional: comma-separated OpenRouter fallback models (max 2 alongside the
+# primary — OpenRouter caps its routing list at 3). Leave unset to use
+# DEFAULT_OPENROUTER_FALLBACK_MODELS.
+# OPENROUTER_FALLBACK_MODELS=anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70b-instruct:free

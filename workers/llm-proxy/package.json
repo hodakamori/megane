@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Cloudflare Worker that proxies the megane docs demo chat to the PLaMo API",
+  "description": "Cloudflare Worker that proxies the megane docs demo chat to the PLaMo API or OpenRouter",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

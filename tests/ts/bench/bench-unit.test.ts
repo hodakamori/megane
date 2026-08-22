@@ -27,6 +27,8 @@ import {
   generatePipelineLive,
   DEFAULT_PLAMO_MODEL,
   PLAMO_API_URL,
+  DEFAULT_OPENROUTER_MODEL,
+  OPENROUTER_API_URL,
 } from "../../../bench/llm/providers";
 import { runDataset } from "../../../bench/llm/runner";
 import { aggregate, toMarkdown, toJSON } from "../../../bench/llm/report";
@@ -466,6 +468,27 @@ describe("providers", () => {
       expect(config.model).toBe("plamo-2.2-prime");
     });
 
+    it("reads OPENROUTER_API_KEY and defaults to the OpenRouter bench model", () => {
+      const config = configFromEnv({
+        MEGANE_LLM_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "sk-or-x",
+      });
+      expect(config).toEqual({
+        provider: "openrouter",
+        model: DEFAULT_OPENROUTER_MODEL,
+        apiKey: "sk-or-x",
+      });
+    });
+
+    it("lets MEGANE_LLM_MODEL override the OpenRouter model", () => {
+      const config = configFromEnv({
+        MEGANE_LLM_PROVIDER: "openrouter",
+        MEGANE_LLM_MODEL: "anthropic/claude-sonnet-4.6",
+        OPENROUTER_API_KEY: "sk-or-x",
+      });
+      expect(config.model).toBe("anthropic/claude-sonnet-4.6");
+    });
+
     it("resolves the demo proxy from MEGANE_LLM_PROXY_URL", () => {
       const config = configFromEnv({
         MEGANE_LLM_PROVIDER: "demo",
@@ -492,6 +515,22 @@ describe("providers", () => {
       ).not.toThrow();
     });
 
+    it("throws a named error when the OpenRouter key is missing", () => {
+      expect(() =>
+        assertConfig({ provider: "openrouter", model: DEFAULT_OPENROUTER_MODEL }),
+      ).toThrow("OPENROUTER_API_KEY is not set");
+    });
+
+    it("accepts a complete OpenRouter config", () => {
+      expect(() =>
+        assertConfig({
+          provider: "openrouter",
+          model: DEFAULT_OPENROUTER_MODEL,
+          apiKey: "sk-or-x",
+        }),
+      ).not.toThrow();
+    });
+
     it("throws for every other provider missing its credential", () => {
       expect(() => assertConfig({ provider: "anthropic", model: "m" })).toThrow(
         "ANTHROPIC_API_KEY is not set",
@@ -505,7 +544,7 @@ describe("providers", () => {
     });
   });
 
-  describe("generatePipelineLive (plamo)", () => {
+  describe("generatePipelineLive (OpenAI-compatible providers)", () => {
     /** Minimal OpenAI-shaped non-streaming completion. */
     function completion(content: string, finishReason = "stop") {
       return new Response(
@@ -608,6 +647,25 @@ describe("providers", () => {
           fetchImpl,
         ),
       ).rejects.toThrow(/plamo request failed \(400\): unknown model/);
+    });
+
+    it("posts to the OpenRouter endpoint with bearer auth for provider=openrouter", async () => {
+      const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+      const fetchImpl = (async (url: string, init: RequestInit) => {
+        calls.push({ url, headers: init.headers as Record<string, string> });
+        return completion("done");
+      }) as unknown as typeof fetch;
+
+      const text = await generatePipelineLive(
+        { provider: "openrouter", model: DEFAULT_OPENROUTER_MODEL, apiKey: "sk-or-x" },
+        "show bonds",
+        fetchImpl,
+      );
+
+      expect(text).toBe("done");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toBe(OPENROUTER_API_URL);
+      expect(calls[0].headers.Authorization).toBe("Bearer sk-or-x");
     });
   });
 });

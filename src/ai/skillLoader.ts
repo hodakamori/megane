@@ -30,7 +30,7 @@ export interface ToolDefinition {
   input_schema: { type: "object"; properties: Record<string, never> };
 }
 
-/** OpenAI-compatible function tool definition shape (also used by PLaMo). */
+/** OpenAI-compatible function tool definition shape (also used by PLaMo and OpenRouter). */
 export interface OpenAITool {
   type: "function";
   function: {
@@ -128,7 +128,7 @@ export function executeSkill(skills: PipelineSkill[], toolName: string): string 
 
 /**
  * Build OpenAI-compatible function tool definitions from loaded skills.
- * Used for the OpenAI API and the PLaMo-backed demo proxy, which both
+ * Used for the OpenAI API and the PLaMo/OpenRouter-backed demo proxy, which both
  * speak the OpenAI tool-calling protocol. Each skill becomes a parameterless
  * function the model can call on demand to fetch the template.
  */

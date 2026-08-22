@@ -10,11 +10,17 @@ import {
   isRateLimited,
   PER_MINUTE_LIMIT,
   PER_DAY_LIMIT,
-  DEFAULT_MODEL,
-  DEFAULT_FALLBACK_MODELS,
+  DEFAULT_PLAMO_MODEL,
+  DEFAULT_PLAMO_FALLBACK_MODELS,
+  DEFAULT_OPENROUTER_MODEL,
+  DEFAULT_OPENROUTER_FALLBACK_MODELS,
+  DEFAULT_PROVIDERS,
   MAX_MODELS,
   PLAMO_API_URL,
+  OPENROUTER_API_URL,
   buildModelList,
+  buildProviderList,
+  buildAttempts,
   type Env,
 } from "../src/proxy";
 
@@ -33,12 +39,19 @@ class FakeKV {
   }
 }
 
+/** Env with both provider keys set — the fully-configured deployment. */
 function makeEnv(kv: FakeKV = new FakeKV()): Env {
   return {
     PLAMO_API_KEY: "plamo-test-key",
+    OPENROUTER_API_KEY: "openrouter-test-key",
     ALLOWED_ORIGIN,
     RATE_LIMIT_KV: kv as unknown as Env["RATE_LIMIT_KV"],
   };
+}
+
+/** Env with only the PLaMo key — OpenRouter must be skipped. */
+function makePlamoOnlyEnv(): Env {
+  return { ...makeEnv(), OPENROUTER_API_KEY: undefined };
 }
 
 /** An env whose ALLOWED_ORIGIN lists two comma-separated origins. */
@@ -382,56 +395,159 @@ function makeRequest(init: { method?: string; origin?: string | null; body?: unk
 }
 
 describe("buildModelList", () => {
-  it("defaults to the primary model followed by the default fallbacks", () => {
-    const list = buildModelList(makeEnv());
-    expect(list[0]).toBe(DEFAULT_MODEL);
-    expect(list.slice(1)).toEqual(DEFAULT_FALLBACK_MODELS);
+  it("defaults each provider to its primary model followed by its default fallbacks", () => {
+    const plamo = buildModelList(makeEnv(), "plamo");
+    expect(plamo[0]).toBe(DEFAULT_PLAMO_MODEL);
+    expect(plamo.slice(1)).toEqual(DEFAULT_PLAMO_FALLBACK_MODELS);
+
+    const openrouter = buildModelList(makeEnv(), "openrouter");
+    expect(openrouter[0]).toBe(DEFAULT_OPENROUTER_MODEL);
+    expect(openrouter.slice(1)).toEqual(DEFAULT_OPENROUTER_FALLBACK_MODELS);
   });
 
-  it("puts the PLAMO_MODEL override first", () => {
-    const list = buildModelList({ ...makeEnv(), PLAMO_MODEL: "plamo-2.2-prime" });
-    expect(list[0]).toBe("plamo-2.2-prime");
+  it("puts the per-provider model override first", () => {
+    const env = {
+      ...makeEnv(),
+      PLAMO_MODEL: "plamo-2.2-prime",
+      OPENROUTER_MODEL: "anthropic/claude-3.5-haiku",
+    };
+    expect(buildModelList(env, "plamo")[0]).toBe("plamo-2.2-prime");
+    expect(buildModelList(env, "openrouter")[0]).toBe("anthropic/claude-3.5-haiku");
+  });
+
+  it("keeps the two providers' overrides independent", () => {
+    const env = { ...makeEnv(), OPENROUTER_MODEL: "vendor/model-x" };
+    expect(buildModelList(env, "plamo")[0]).toBe(DEFAULT_PLAMO_MODEL);
+    expect(buildModelList(env, "openrouter")[0]).toBe("vendor/model-x");
   });
 
   it("de-duplicates when the primary also appears in the fallback list", () => {
-    const list = buildModelList({
-      ...makeEnv(),
-      PLAMO_MODEL: "model-a",
-      PLAMO_FALLBACK_MODELS: "model-a, model-b",
-    });
+    const list = buildModelList(
+      {
+        ...makeEnv(),
+        PLAMO_MODEL: "model-a",
+        PLAMO_FALLBACK_MODELS: "model-a, model-b",
+      },
+      "plamo",
+    );
     expect(list).toEqual(["model-a", "model-b"]);
   });
 
-  it("ignores blank entries in PLAMO_FALLBACK_MODELS", () => {
-    const list = buildModelList({
-      ...makeEnv(),
-      PLAMO_MODEL: "model-p",
-      PLAMO_FALLBACK_MODELS: " , model-a ,, ",
-    });
+  it("ignores blank entries in the fallback list", () => {
+    const list = buildModelList(
+      {
+        ...makeEnv(),
+        PLAMO_MODEL: "model-p",
+        PLAMO_FALLBACK_MODELS: " , model-a ,, ",
+      },
+      "plamo",
+    );
     expect(list).toEqual(["model-p", "model-a"]);
   });
 
   it("returns only the primary when fallbacks are explicitly empty", () => {
-    const list = buildModelList({
-      ...makeEnv(),
-      PLAMO_MODEL: "model-p",
-      PLAMO_FALLBACK_MODELS: "",
-    });
+    const list = buildModelList(
+      {
+        ...makeEnv(),
+        PLAMO_MODEL: "model-p",
+        PLAMO_FALLBACK_MODELS: "",
+      },
+      "plamo",
+    );
     expect(list).toEqual(["model-p"]);
   });
 
   it("caps the list at MAX_MODELS so one request can't fan out unboundedly", () => {
-    const list = buildModelList({
-      ...makeEnv(),
-      PLAMO_MODEL: "model-p",
-      PLAMO_FALLBACK_MODELS: "model-a, model-b, model-c, model-d",
-    });
+    const list = buildModelList(
+      {
+        ...makeEnv(),
+        PLAMO_MODEL: "model-p",
+        PLAMO_FALLBACK_MODELS: "model-a, model-b, model-c, model-d",
+      },
+      "plamo",
+    );
     expect(list).toEqual(["model-p", "model-a", "model-b"]);
     expect(list.length).toBe(MAX_MODELS);
   });
 
-  it("keeps the default list within the MAX_MODELS cap", () => {
-    expect(buildModelList(makeEnv()).length).toBeLessThanOrEqual(MAX_MODELS);
+  it("keeps both default lists within the MAX_MODELS cap", () => {
+    expect(buildModelList(makeEnv(), "plamo").length).toBeLessThanOrEqual(MAX_MODELS);
+    expect(buildModelList(makeEnv(), "openrouter").length).toBeLessThanOrEqual(MAX_MODELS);
+  });
+});
+
+describe("buildProviderList", () => {
+  it("defaults to PLaMo first with OpenRouter as the cross-provider fallback", () => {
+    expect(buildProviderList(makeEnv())).toEqual(DEFAULT_PROVIDERS);
+    expect(buildProviderList(makeEnv())).toEqual(["plamo", "openrouter"]);
+  });
+
+  it("respects the LLM_PROVIDERS order", () => {
+    const env = { ...makeEnv(), LLM_PROVIDERS: "openrouter, plamo" };
+    expect(buildProviderList(env)).toEqual(["openrouter", "plamo"]);
+  });
+
+  it("allows restricting to a single provider", () => {
+    expect(buildProviderList({ ...makeEnv(), LLM_PROVIDERS: "openrouter" })).toEqual([
+      "openrouter",
+    ]);
+    expect(buildProviderList({ ...makeEnv(), LLM_PROVIDERS: "plamo" })).toEqual(["plamo"]);
+  });
+
+  it("drops unknown provider names and de-duplicates", () => {
+    const env = { ...makeEnv(), LLM_PROVIDERS: "gemini, plamo, plamo, openrouter" };
+    expect(buildProviderList(env)).toEqual(["plamo", "openrouter"]);
+  });
+
+  it("skips a provider whose API key is unset", () => {
+    expect(buildProviderList(makePlamoOnlyEnv())).toEqual(["plamo"]);
+    expect(buildProviderList({ ...makeEnv(), PLAMO_API_KEY: undefined })).toEqual(["openrouter"]);
+  });
+
+  it("returns an empty list when no provider has a key", () => {
+    const env = { ...makeEnv(), PLAMO_API_KEY: undefined, OPENROUTER_API_KEY: undefined };
+    expect(buildProviderList(env)).toEqual([]);
+  });
+});
+
+describe("buildAttempts", () => {
+  const baseBody = { messages: [{ role: "user", content: "hi" }], max_tokens: 4096, stream: true };
+
+  it("expands PLaMo into one attempt per model and OpenRouter into one routed attempt", () => {
+    const attempts = buildAttempts(makeEnv(), ALLOWED_ORIGIN, baseBody);
+    // PLaMo walks its models client-side; OpenRouter routes server-side.
+    expect(attempts.map((a) => a.provider)).toEqual(["plamo", "plamo", "openrouter"]);
+    expect(attempts[0].url).toBe(PLAMO_API_URL);
+    expect(attempts[0].body.model).toBe(DEFAULT_PLAMO_MODEL);
+    expect(attempts[0].body.models).toBeUndefined();
+    expect(attempts[1].body.model).toBe(DEFAULT_PLAMO_FALLBACK_MODELS[0]);
+
+    const openrouter = attempts[2];
+    expect(openrouter.url).toBe(OPENROUTER_API_URL);
+    expect(openrouter.body.model).toBeUndefined();
+    expect(openrouter.body.models).toEqual([
+      DEFAULT_OPENROUTER_MODEL,
+      ...DEFAULT_OPENROUTER_FALLBACK_MODELS,
+    ]);
+  });
+
+  it("sends each provider its own API key and gives only OpenRouter attribution headers", () => {
+    const env = makeEnv();
+    const attempts = buildAttempts(env, ALLOWED_ORIGIN, baseBody);
+    const plamo = attempts[0];
+    expect(plamo.headers.Authorization).toBe(`Bearer ${env.PLAMO_API_KEY}`);
+    expect(plamo.headers["HTTP-Referer"]).toBeUndefined();
+    expect(plamo.headers["X-Title"]).toBeUndefined();
+
+    const openrouter = attempts[attempts.length - 1];
+    expect(openrouter.headers.Authorization).toBe(`Bearer ${env.OPENROUTER_API_KEY}`);
+    expect(openrouter.headers["HTTP-Referer"]).toBe(ALLOWED_ORIGIN);
+    expect(openrouter.headers["X-Title"]).toBe("megane demo");
+  });
+
+  it("returns no attempts when no provider is configured", () => {
+    const env = { ...makeEnv(), PLAMO_API_KEY: undefined, OPENROUTER_API_KEY: undefined };
+    expect(buildAttempts(env, ALLOWED_ORIGIN, baseBody)).toEqual([]);
   });
 });
 
@@ -503,7 +619,7 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(429);
   });
 
-  it("forwards sanitized messages to PLaMo and streams the response back", async () => {
+  it("forwards sanitized messages to PLaMo first and streams the response back", async () => {
     const env = makeEnv();
     const upstreamBody = "data: hello\n\n";
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
@@ -511,7 +627,7 @@ describe("worker fetch handler", () => {
       const sentBody = JSON.parse(init.body as string);
       // PLaMo takes a single `model`; the OpenRouter-only `models` routing
       // array must not be sent (it would be rejected as an unknown field).
-      expect(sentBody.model).toBe(DEFAULT_MODEL);
+      expect(sentBody.model).toBe(DEFAULT_PLAMO_MODEL);
       expect(sentBody.models).toBeUndefined();
       expect(sentBody.stream).toBe(true);
       // The completion cap must match the direct-provider client (4096); a
@@ -521,7 +637,7 @@ describe("worker fetch handler", () => {
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe(`Bearer ${env.PLAMO_API_KEY}`);
       expect(headers["Content-Type"]).toBe("application/json");
-      // OpenRouter-only attribution headers must be gone.
+      // OpenRouter-only attribution headers must not go to PLaMo.
       expect(headers["HTTP-Referer"]).toBeUndefined();
       expect(headers["X-Title"]).toBeUndefined();
       return new Response(upstreamBody, { status: 200 });
@@ -649,7 +765,104 @@ describe("worker fetch handler", () => {
     expect(tried).toEqual(["primary-model", "fallback-a"]);
   });
 
-  it("propagates upstream errors as JSON once every model has failed", async () => {
+  it("falls back to OpenRouter once every PLaMo model has failed", async () => {
+    const env = makeEnv();
+    const urls: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      urls.push(url);
+      if (url === PLAMO_API_URL) return new Response("plamo down", { status: 503 });
+      const sentBody = JSON.parse(init.body as string);
+      // The OpenRouter attempt carries the server-side `models` routing
+      // array (no single `model`) plus its attribution headers.
+      expect(sentBody.model).toBeUndefined();
+      expect(sentBody.models).toEqual([
+        DEFAULT_OPENROUTER_MODEL,
+        ...DEFAULT_OPENROUTER_FALLBACK_MODELS,
+      ]);
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe(`Bearer ${env.OPENROUTER_API_KEY}`);
+      expect(headers["HTTP-Referer"]).toBe(ALLOWED_ORIGIN);
+      expect(headers["X-Title"]).toBe("megane demo");
+      return new Response("data: rescued\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("data: rescued\n\n");
+    expect(urls).toEqual([PLAMO_API_URL, PLAMO_API_URL, OPENROUTER_API_URL]);
+  });
+
+  it("goes straight to OpenRouter when LLM_PROVIDERS selects only it", async () => {
+    const env = { ...makeEnv(), LLM_PROVIDERS: "openrouter" };
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe(OPENROUTER_API_URL);
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("tries OpenRouter before PLaMo when LLM_PROVIDERS reverses the order", async () => {
+    const env = { ...makeEnv(), LLM_PROVIDERS: "openrouter,plamo" };
+    const urls: string[] = [];
+    const fetchMock = vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url === OPENROUTER_API_URL) return new Response("router down", { status: 503 });
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(urls[0]).toBe(OPENROUTER_API_URL);
+    expect(urls[1]).toBe(PLAMO_API_URL);
+  });
+
+  it("returns 500 when no provider API key is configured", async () => {
+    const env = { ...makeEnv(), PLAMO_API_KEY: undefined, OPENROUTER_API_KEY: undefined };
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(500);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toBe("No LLM provider is configured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("propagates upstream errors as JSON once every attempt has failed", async () => {
     const env = makeEnv();
     const fetchMock = vi.fn(async () => new Response("boom", { status: 503 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -665,7 +878,8 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(503);
     const json = (await res.json()) as { error: string };
     expect(json.error).toContain("boom");
-    expect(fetchMock).toHaveBeenCalledTimes(buildModelList(env).length);
+    // Every attempt across both providers is tried before giving up.
+    expect(fetchMock).toHaveBeenCalledTimes(buildAttempts(env, ALLOWED_ORIGIN, {}).length);
   });
 
   it("returns 502 when every upstream fetch throws", async () => {
@@ -686,14 +900,14 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(502);
     const json = (await res.json()) as { error: string };
     expect(json.error).toBe("Upstream request failed");
-    expect(fetchMock).toHaveBeenCalledTimes(buildModelList(env).length);
+    expect(fetchMock).toHaveBeenCalledTimes(buildAttempts(env, ALLOWED_ORIGIN, {}).length);
   });
 
   it("recovers when the primary throws but a fallback answers", async () => {
-    const env = makeEnv();
+    const env = makePlamoOnlyEnv();
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const model = JSON.parse(init.body as string).model as string;
-      if (model === DEFAULT_MODEL) throw new Error("network down");
+      if (model === DEFAULT_PLAMO_MODEL) throw new Error("network down");
       return new Response("data: ok\n\n", { status: 200 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -724,6 +938,13 @@ describe("wrangler.toml model configuration", () => {
     return m ? m[1] : null;
   }
 
+  function tomlList(name: string): string[] {
+    return (tomlVar(name) ?? "")
+      .split(",")
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0);
+  }
+
   /**
    * PLaMo model ids are bare (`plamo-3.0-prime`) — unlike OpenRouter slugs
    * they carry no `vendor/` prefix and no `:free` suffix, and they spell the
@@ -741,29 +962,63 @@ describe("wrangler.toml model configuration", () => {
     ).toBe(true);
   }
 
+  /**
+   * OpenRouter slugs are vendor-prefixed (`anthropic/claude-sonnet-4.6`,
+   * optionally `:free`-suffixed) and spell minor versions with a DOT — a
+   * hyphenated version like "claude-sonnet-4-6" is an unknown model id
+   * that OpenRouter rejects with a 400, breaking every demo prompt.
+   */
+  function assertValidOpenRouterModel(slug: string) {
+    expect(slug.includes("/"), `slug "${slug}" must carry a vendor prefix`).toBe(true);
+    expect(
+      /-\d+-\d+(:|$)/.test(slug),
+      `slug "${slug}" spells the version with a hyphen; OpenRouter uses a DOT ` +
+        `(e.g. "anthropic/claude-sonnet-4.6") — verify at https://openrouter.ai/<id>`,
+    ).toBe(false);
+  }
+
+  it("configures both providers, PLaMo first", () => {
+    const providers = tomlList("LLM_PROVIDERS");
+    expect(providers).toEqual(["plamo", "openrouter"]);
+  });
+
   it("sets the primary PLaMo model to a valid id", () => {
     const model = tomlVar("PLAMO_MODEL");
     expect(model).toBeTruthy();
     assertValidPlamoModel(model!);
   });
 
-  it("uses valid ids for every configured fallback model", () => {
-    const fallbacks = (tomlVar("PLAMO_FALLBACK_MODELS") ?? "")
-      .split(",")
-      .map((m) => m.trim())
-      .filter((m) => m.length > 0);
+  it("uses valid ids for every configured PLaMo fallback model", () => {
+    const fallbacks = tomlList("PLAMO_FALLBACK_MODELS");
     expect(fallbacks.length).toBeGreaterThan(0);
     for (const id of fallbacks) {
       assertValidPlamoModel(id);
     }
   });
 
-  it("keeps the shipped model list within the MAX_MODELS cap", () => {
+  it("sets the primary OpenRouter model to a valid slug", () => {
+    const model = tomlVar("OPENROUTER_MODEL");
+    expect(model).toBeTruthy();
+    assertValidOpenRouterModel(model!);
+  });
+
+  it("uses valid slugs for every configured OpenRouter fallback model", () => {
+    const fallbacks = tomlList("OPENROUTER_FALLBACK_MODELS");
+    expect(fallbacks.length).toBeGreaterThan(0);
+    for (const slug of fallbacks) {
+      assertValidOpenRouterModel(slug);
+    }
+  });
+
+  it("keeps both shipped model lists within the MAX_MODELS cap", () => {
     const env = {
       ...makeEnv(),
       PLAMO_MODEL: tomlVar("PLAMO_MODEL") ?? undefined,
       PLAMO_FALLBACK_MODELS: tomlVar("PLAMO_FALLBACK_MODELS") ?? undefined,
+      OPENROUTER_MODEL: tomlVar("OPENROUTER_MODEL") ?? undefined,
+      OPENROUTER_FALLBACK_MODELS: tomlVar("OPENROUTER_FALLBACK_MODELS") ?? undefined,
     };
-    expect(buildModelList(env).length).toBeLessThanOrEqual(MAX_MODELS);
+    expect(buildModelList(env, "plamo").length).toBeLessThanOrEqual(MAX_MODELS);
+    expect(buildModelList(env, "openrouter").length).toBeLessThanOrEqual(MAX_MODELS);
   });
 });
