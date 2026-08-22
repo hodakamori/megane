@@ -210,6 +210,28 @@ Molecule 0 (the component containing atom 0) stays fully opaque, while every
 other molecule's atoms and bonds fade together — both Filter nodes derive
 `molecule_id` from the same underlying bond connectivity.
 
+### Wrap / Unwrap a Periodic Structure
+
+The **Wrap / Unwrap** node toggles periodic-image coordinate mapping without
+changing the file. Every default pipeline and structure template already
+carries one between `LoadStructure` and the rest of the graph in its
+pass-through mode (`none`), so the toggle is a single dropdown click:
+
+1. Load a periodic structure (a unit cell is required)
+2. Select the `Wrap / Unwrap` node in the graph
+3. Pick a mode:
+   - **Wrap** folds every atom back into the home unit cell (useful for
+     trajectories whose coordinates drift out of the box)
+   - **Unwrap** shifts atoms by whole lattice vectors so molecules split
+     across a periodic face become whole again, VESTA/Mercury-style —
+     connectivity comes from the file's bonds, or the same distance-based
+     inference the `AddBond` node uses when the file has none
+   - **None** passes coordinates through untouched (the default)
+
+A connected trajectory is remapped frame by frame with the same convention,
+so playback follows the chosen mapping too. The unit cell itself never
+changes — unwrapped molecules may poke outside the cell wireframe.
+
 ### Multiple Structure Layers
 
 You can load multiple structure files simultaneously, with each file rendered as a separate layer in the viewport. Each `LoadStructure` node connected to a `Viewport` creates an independent rendering layer, allowing you to combine different molecules in a single view.

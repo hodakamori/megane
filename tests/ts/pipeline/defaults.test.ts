@@ -44,13 +44,20 @@ describe("createDefaultPipeline", () => {
 });
 
 describe("createEmptyPipeline", () => {
-  it("returns 4 nodes: LoadStructure, Replicate, AddBond, Viewport", () => {
+  it("returns 5 nodes: LoadStructure, Wrap, Replicate, AddBond, Viewport", () => {
     const { nodes } = createEmptyPipeline();
-    expect(nodes.length).toBe(4);
+    expect(nodes.length).toBe(5);
     expect(nodes[0].type).toBe("load_structure");
-    expect(nodes[1].type).toBe("replicate");
-    expect(nodes[2].type).toBe("add_bond");
-    expect(nodes[3].type).toBe("viewport");
+    expect(nodes[1].type).toBe("wrap");
+    expect(nodes[2].type).toBe("replicate");
+    expect(nodes[3].type).toBe("add_bond");
+    expect(nodes[4].type).toBe("viewport");
+  });
+
+  it("keeps the wrap node in pass-through mode by default", () => {
+    const { nodes } = createEmptyPipeline();
+    const wrap = nodes.find((n) => n.type === "wrap")!;
+    expect(wrap.data.params).toEqual({ type: "wrap", mode: "none" });
   });
 
   it("all edges reference valid node IDs", () => {

@@ -8,6 +8,7 @@ import {
   Streaming,
   Filter,
   Modify,
+  Wrap,
   AddBonds,
   AddLabels,
   AddPolyhedra,
@@ -173,6 +174,44 @@ describe("Modify", () => {
   it("accepts custom values", () => {
     const node = new Modify({ scale: 1.5, opacity: 0.3 });
     expect(node._toSerializedParams()).toMatchObject({ scale: 1.5, opacity: 0.3 });
+  });
+});
+
+describe("Wrap", () => {
+  it("uses default mode 'none'", () => {
+    const node = new Wrap();
+    expect(node._toSerializedParams()).toMatchObject({ type: "wrap", mode: "none" });
+  });
+
+  it("accepts custom mode", () => {
+    const node = new Wrap({ mode: "unwrap" });
+    expect(node._toSerializedParams()).toMatchObject({ mode: "unwrap" });
+  });
+
+  it("maps inp/out particle and traj aliases to static handles", () => {
+    const node = new Wrap();
+    expect(node.inp.particle.handle).toBe("particle");
+    expect(node.inp.traj.handle).toBe("trajectory");
+    expect(node.out.particle.handle).toBe("particle");
+    expect(node.out.traj.handle).toBe("trajectory");
+  });
+
+  it("round-trips through Pipeline serialization", () => {
+    const pipe = new Pipeline();
+    const s = pipe.addNode(new LoadStructure("water.pdb"));
+    const w = pipe.addNode(new Wrap({ mode: "wrap" }));
+    const v = pipe.addNode(new Viewport());
+    pipe.addEdge(s.out.particle, w.inp.particle);
+    pipe.addEdge(w.out.particle, v.inp.particle);
+    const obj = pipe.toObject();
+    const wrapNode = obj.nodes.find((n) => n.type === "wrap")!;
+    expect(wrapNode).toMatchObject({ type: "wrap", mode: "wrap" });
+    expect(obj.edges).toContainEqual({
+      source: s._id,
+      target: w._id,
+      sourceHandle: "particle",
+      targetHandle: "particle",
+    });
   });
 });
 
