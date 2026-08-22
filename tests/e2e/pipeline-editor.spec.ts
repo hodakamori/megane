@@ -9,7 +9,8 @@
  */
 
 import { test, expect } from "playwright/test";
-import { defaultViewerContract, assertDomContract, waitForReady } from "./lib/setup";
+import { defaultViewerContract, assertDomContract, waitForReady, getReadyState } from "./lib/setup";
+import { getCameraState } from "./lib/render-utils";
 
 const ATOM_COUNT_CAFFEINE = 3024;
 
@@ -87,6 +88,46 @@ test.describe("pipeline-editor: webapp default graph", () => {
     await expect(mode).toHaveValue("unwrap");
     await mode.selectOption("wrap");
     await expect(mode).toHaveValue("wrap");
+  });
+
+  test("toggling wrap/unwrap preserves the user's camera (no re-fit)", async ({ page }) => {
+    // Zoom in first so a camera re-fit would be observable (a fit resets
+    // orthographic zoom to 1).
+    const viewer = page.locator('[data-testid="viewer-root"]');
+    const box = (await viewer.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -400);
+    await page.waitForFunction(() => {
+      const w = window as unknown as {
+        __megane_test?: { getCameraState: () => { zoom: number } | null };
+      };
+      const s = w.__megane_test?.getCameraState();
+      return !!s && s.zoom !== 1;
+    });
+    const before = await getCameraState(page);
+
+    // Toggle the seeded Wrap node to unwrap and wait for the re-execute to
+    // reach the renderer.
+    await page.locator('[data-testid="pipeline-editor-tab-editor"]').click();
+    const epoch = (await getReadyState(page)).renderEpoch;
+    await page.locator('[data-testid="wrap-node-mode"]').first().selectOption("unwrap");
+    await waitForReady(page, { untilEpoch: epoch + 1, timeout: 10_000 });
+
+    // The camera must be exactly where the user left it — the re-mapped
+    // snapshot reloads geometry but must not re-fit.
+    const after = await getCameraState(page);
+    expect(after!.mode).toBe(before!.mode);
+    expect(after!.zoom).toBeCloseTo(before!.zoom, 5);
+    for (let axis = 0; axis < 3; axis++) {
+      expect(after!.position[axis]).toBeCloseTo(before!.position[axis], 4);
+      expect(after!.target[axis]).toBeCloseTo(before!.target[axis], 4);
+    }
+
+    // And back to none — still no re-fit.
+    await page.locator('[data-testid="wrap-node-mode"]').first().selectOption("none");
+    await waitForReady(page, { untilEpoch: epoch + 2, timeout: 10_000 });
+    const restored = await getCameraState(page);
+    expect(restored!.zoom).toBeCloseTo(before!.zoom, 5);
   });
 
   test("Add Node menu adds a Wrap / Unwrap node with its mode selector", async ({ page }) => {

@@ -38,6 +38,7 @@ import { computeMeasurement } from "./Selection";
 import { FpsCounter } from "./FpsCounter";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
 import {
+  computeViewBounds,
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,
@@ -487,8 +488,15 @@ export class MoleculeRenderer {
     _setActiveRenderer(this);
   }
 
-  /** Load a molecular snapshot (topology + positions). */
-  loadSnapshot(snapshot: Snapshot): void {
+  /**
+   * Load a molecular snapshot (topology + positions).
+   *
+   * `opts.fit` (default true) controls the closing fitToView. Pass false when
+   * the snapshot is a re-mapping of the one already on screen (same topology,
+   * new positions — e.g. the wrap node toggling wrap/unwrap): the camera then
+   * keeps its current zoom/target instead of re-fitting to the new bounds.
+   */
+  loadSnapshot(snapshot: Snapshot, opts: { fit?: boolean } = {}): void {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
 
@@ -597,7 +605,13 @@ export class MoleculeRenderer {
       this.setRepresentationByAtom(this.representationByAtom);
     }
 
-    this.fitToView(snapshot);
+    if (opts.fit !== false) {
+      this.fitToView(snapshot);
+    } else {
+      // Camera untouched, but the extent drives zoom clamping elsewhere —
+      // keep it in sync with the new positions.
+      this.lastExtent = computeViewBounds(snapshot).extent;
+    }
   }
 
   /** Update positions from a trajectory frame.

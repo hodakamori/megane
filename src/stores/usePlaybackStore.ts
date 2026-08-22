@@ -63,17 +63,31 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
     const state = get();
     state._stopInterval();
     const totalFrames = p ? p.meta.nFrames : 0;
-    const frame0 = p ? p.getFrame(0) : null;
+
+    // A provider swap with identical frame/atom counts is a re-mapping of the
+    // trajectory already loaded — a modifier node (wrap, replicate) re-ran and
+    // wrapped the same underlying frames. Keep the playhead, loop range, and
+    // play state so toggling the modifier doesn't yank the user back to frame
+    // 0. A different shape means a genuinely new trajectory: start over.
+    const isRemap =
+      p !== null &&
+      state.provider !== null &&
+      totalFrames === state.totalFrames &&
+      p.meta.nAtoms === state.provider.meta.nAtoms;
+
+    const frameIndex = isRemap ? Math.min(state._currentFrameRef.current, totalFrames - 1) : 0;
+    const wasPlaying = isRemap && state.playing;
     set({
       provider: p,
       totalFrames,
-      currentFrame: 0,
-      currentFrameData: frame0,
-      playing: false,
-      loopStart: 0,
-      loopEnd: totalFrames > 0 ? totalFrames - 1 : 0,
+      currentFrame: frameIndex,
+      currentFrameData: p ? p.getFrame(frameIndex) : null,
+      playing: wasPlaying,
+      loopStart: isRemap ? state.loopStart : 0,
+      loopEnd: isRemap ? state.loopEnd : totalFrames > 0 ? totalFrames - 1 : 0,
     });
-    state._currentFrameRef.current = 0;
+    state._currentFrameRef.current = frameIndex;
+    if (wasPlaying) get()._startInterval();
   },
 
   seekFrame: (index) => {
@@ -148,10 +162,16 @@ export const usePlaybackStore = create<PlaybackStore>((set, get) => ({
   },
 
   _onAsyncFrame: (frame) => {
-    const { currentFrame } = get();
-    if (frame.frameId === currentFrame) {
-      set({ currentFrameData: frame });
-    }
+    const { currentFrame, provider } = get();
+    if (frame.frameId !== currentFrame) return;
+    // The async callback is registered on the UNDERLYING decoder (the lazy
+    // XTC / stream provider), so `frame` carries raw, un-remapped positions.
+    // The store's provider may be a wrapper chain on top of that decoder
+    // (wrap node, replicate node) — re-fetch through it so the mapping is
+    // applied. The decoded frame is cached by now, so this is synchronous;
+    // fall back to the raw frame only if the chain cannot serve it.
+    const mapped = provider ? (provider.getFrame(frame.frameId) ?? frame) : frame;
+    set({ currentFrameData: mapped });
   },
 
   _startInterval: () => {

@@ -260,9 +260,26 @@ export function Viewport({
     };
   }, [boxSelectActive]);
 
+  // The previously loaded snapshot, used to detect position-only re-mappings.
+  const loadedSnapshotRef = useRef<Snapshot | null>(null);
+
   useEffect(() => {
     if (snapshot && rendererRef.current) {
-      rendererRef.current.loadSnapshot(snapshot);
+      // A snapshot that shares its topology arrays with the previous one and
+      // differs only in `positions` is a coordinate re-mapping of the scene
+      // already on screen (the wrap node toggling wrap/unwrap). Skip the
+      // camera re-fit so the user's zoom/orbit survives the toggle; a truly
+      // new structure (new element/bond arrays or atom count) still re-fits.
+      const prev = loadedSnapshotRef.current;
+      const positionsOnly =
+        prev !== null &&
+        prev !== snapshot &&
+        prev.nAtoms === snapshot.nAtoms &&
+        prev.elements === snapshot.elements &&
+        prev.bonds === snapshot.bonds &&
+        prev.box === snapshot.box;
+      rendererRef.current.loadSnapshot(snapshot, { fit: !positionsOnly });
+      loadedSnapshotRef.current = snapshot;
     }
   }, [snapshot]);
 
