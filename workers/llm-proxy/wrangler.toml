@@ -3,8 +3,8 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 # Persist runtime logs (console.log/error from src/proxy.ts) to Workers Logs
-# so past upstream errors — e.g. an OpenRouter 400 for a bad model slug — can
-# be inspected in the dashboard, not just via a live `wrangler tail`. This
+# so past upstream errors — e.g. a PLaMo 400 for a bad model id — can be
+# inspected in the dashboard, not just via a live `wrangler tail`. This
 # demo is rate-limited to 30 requests/IP/day, so log volume sits far under
 # the free allowance (200k events/day); head_sampling_rate=1 keeps 100% of
 # the handful of events for full visibility.
@@ -19,24 +19,20 @@ head_sampling_rate = 1
 [vars]
 ALLOWED_ORIGIN = "https://hodakamori.github.io,https://megane.tech-office-mori.com"
 
-# OpenRouter model slug. Set to Anthropic Claude Sonnet 4.6 (latest) for
-# strong instruction-following and pipeline generation quality.
-# IMPORTANT: OpenRouter spells minor versions with a DOT, not a hyphen
-# (e.g. "anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.8"). A
-# hyphenated slug like "...-4-6" is an unknown model id and OpenRouter
-# rejects the whole request with a 400, breaking *every* demo prompt
-# regardless of length. Verify the exact slug at https://openrouter.ai/<id>.
-# To downgrade to claude-3.5-haiku (~0.5c) or a free model, just change
-# this value — no code change needed. Leave unset to use the default in
-# src/proxy.ts.
-OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"
+# PLaMo model id (Preferred Networks' OpenAI-compatible API). PLaMo ids are
+# bare — no vendor prefix and no ":free" suffix — and spell the version with
+# a DOT ("plamo-3.0-prime", not "plamo-3-0-prime"); an unknown id is
+# rejected with a 400, breaking *every* demo prompt regardless of length.
+# Verify against https://docs.plamo.preferredai.jp/en/api. 3.0 Prime has the
+# largest context (262k) and supports tool calling, which the skill round
+# trip needs. Leave unset to use the default in src/proxy.ts.
+PLAMO_MODEL = "plamo-3.0-prime"
 
-# Comma-separated fallback models, used only if the primary errors. Falls
-# back to Haiku (cheap but reliable) then a free model as a last resort.
-# OpenRouter caps the total routing list at 3, so keep this to 2 entries
-# alongside the primary. Unset = the DEFAULT_FALLBACK_MODELS list in
+# Comma-separated fallback models, tried in order only if the primary
+# errors. Unlike OpenRouter there is no server-side routing, so the Worker
+# retries these itself. Unset = the DEFAULT_FALLBACK_MODELS list in
 # src/proxy.ts.
-OPENROUTER_FALLBACK_MODELS = "anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70b-instruct:free"
+PLAMO_FALLBACK_MODELS = "plamo-2.2-prime"
 
 # Created via `wrangler kv namespace create RATE_LIMIT_KV`. The id is not a
 # secret, so it is committed here directly.
@@ -44,6 +40,7 @@ OPENROUTER_FALLBACK_MODELS = "anthropic/claude-3.5-haiku,meta-llama/llama-3.3-70
 binding = "RATE_LIMIT_KV"
 id = "e40298c13f7b46db89436cb67390fd86"
 
-# OPENROUTER_API_KEY is a secret — set it with:
-#   wrangler secret put OPENROUTER_API_KEY
-# Never commit it to wrangler.toml or [vars].
+# PLAMO_API_KEY is a secret — set it with:
+#   wrangler secret put PLAMO_API_KEY
+# Get a key from https://plamo.preferredai.jp/ . Never commit it to
+# wrangler.toml or [vars].

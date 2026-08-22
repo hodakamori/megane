@@ -11,7 +11,8 @@
  *     npx vitest run tests/ts/bench/llm.bench.test.ts
  *
  * Providers: anthropic (ANTHROPIC_API_KEY), openai (OPENAI_API_KEY),
- * demo (MEGANE_LLM_PROXY_URL). Results are written to bench/llm/results/.
+ * plamo (PLAMO_API_KEY), demo (MEGANE_LLM_PROXY_URL). Results are written to
+ * bench/llm/results/.
  */
 
 import { describe, it, expect } from "vitest";

@@ -1,13 +1,14 @@
 name: LLM Prompt Eval
 
-# Opt-in benchmark: makes real, paid LLM API calls (via OpenRouter) to score
+# Opt-in benchmark: makes real, paid LLM API calls (via the PLaMo API) to score
 # the LLM pipeline-generator (`bench/llm/`) on the PR branch ("after") and the
 # PR's base branch ("before"), then posts a before/after comparison as a PR
 # comment. Add the `llm-eval` label to a PR to run it.
 #
-# Requires the `OPENROUTER_API_KEY` repository secret. Note: GitHub does not
-# expose repository secrets to `pull_request` workflows triggered from forks,
-# so this only runs for PRs from branches within this repository.
+# Requires the `PLAMO_API_KEY` repository secret (get a key at
+# https://plamo.preferredai.jp/). Note: GitHub does not expose repository
+# secrets to `pull_request` workflows triggered from forks, so this only
+# runs for PRs from branches within this repository.
 #
 # Because every run makes paid API calls, the job also checks the actor who
 # triggered it (whoever applied the label, or opened/pushed the PR while the
@@ -62,9 +63,9 @@ jobs:
         working-directory: after
         env:
           MEGANE_LLM_BENCH: "1"
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MEGANE_LLM_PROVIDER: openrouter
-          MEGANE_LLM_MODEL: ${{ vars.MEGANE_LLM_BENCH_MODEL || 'anthropic/claude-haiku-4.5' }}
+          PLAMO_API_KEY: ${{ secrets.PLAMO_API_KEY }}
+          MEGANE_LLM_PROVIDER: plamo
+          MEGANE_LLM_MODEL: ${{ vars.MEGANE_LLM_BENCH_MODEL || 'plamo-3.0-prime' }}
         run: |
           npx vitest run tests/ts/bench/llm.bench.test.ts
           cp "$(ls -t bench/llm/results/*.json | head -1)" "$GITHUB_WORKSPACE/after.json"
@@ -73,9 +74,9 @@ jobs:
         working-directory: before
         env:
           MEGANE_LLM_BENCH: "1"
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MEGANE_LLM_PROVIDER: openrouter
-          MEGANE_LLM_MODEL: ${{ vars.MEGANE_LLM_BENCH_MODEL || 'anthropic/claude-haiku-4.5' }}
+          PLAMO_API_KEY: ${{ secrets.PLAMO_API_KEY }}
+          MEGANE_LLM_PROVIDER: plamo
+          MEGANE_LLM_MODEL: ${{ vars.MEGANE_LLM_BENCH_MODEL || 'plamo-3.0-prime' }}
         run: |
           npx vitest run tests/ts/bench/llm.bench.test.ts
           cp "$(ls -t bench/llm/results/*.json | head -1)" "$GITHUB_WORKSPACE/before.json"

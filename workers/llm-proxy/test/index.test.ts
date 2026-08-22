@@ -12,6 +12,8 @@ import {
   PER_DAY_LIMIT,
   DEFAULT_MODEL,
   DEFAULT_FALLBACK_MODELS,
+  MAX_MODELS,
+  PLAMO_API_URL,
   buildModelList,
   type Env,
 } from "../src/proxy";
@@ -33,7 +35,7 @@ class FakeKV {
 
 function makeEnv(kv: FakeKV = new FakeKV()): Env {
   return {
-    OPENROUTER_API_KEY: "or-test-key",
+    PLAMO_API_KEY: "plamo-test-key",
     ALLOWED_ORIGIN,
     RATE_LIMIT_KV: kv as unknown as Env["RATE_LIMIT_KV"],
   };
@@ -170,7 +172,8 @@ describe("sanitizeMessages", () => {
     // made sanitizeMessages reject every demo-proxy request with "Missing or
     // invalid 'messages' array". A ~24k system message plus a structure
     // summary must stay under the limit.
-    const realisticSystem = "s".repeat(24108) + "\n## Currently Loaded Structure\n" + "x".repeat(2000);
+    const realisticSystem =
+      "s".repeat(24108) + "\n## Currently Loaded Structure\n" + "x".repeat(2000);
     const ok = sanitizeMessages({
       messages: [
         { role: "system", content: realisticSystem },
@@ -385,49 +388,50 @@ describe("buildModelList", () => {
     expect(list.slice(1)).toEqual(DEFAULT_FALLBACK_MODELS);
   });
 
-  it("puts the OPENROUTER_MODEL override first", () => {
-    const list = buildModelList({ ...makeEnv(), OPENROUTER_MODEL: "x/y" });
-    expect(list[0]).toBe("x/y");
+  it("puts the PLAMO_MODEL override first", () => {
+    const list = buildModelList({ ...makeEnv(), PLAMO_MODEL: "plamo-2.2-prime" });
+    expect(list[0]).toBe("plamo-2.2-prime");
   });
 
   it("de-duplicates when the primary also appears in the fallback list", () => {
     const list = buildModelList({
       ...makeEnv(),
-      OPENROUTER_MODEL: "a/one",
-      OPENROUTER_FALLBACK_MODELS: "a/one, b/two",
+      PLAMO_MODEL: "model-a",
+      PLAMO_FALLBACK_MODELS: "model-a, model-b",
     });
-    expect(list).toEqual(["a/one", "b/two"]);
+    expect(list).toEqual(["model-a", "model-b"]);
   });
 
-  it("ignores blank entries in OPENROUTER_FALLBACK_MODELS", () => {
+  it("ignores blank entries in PLAMO_FALLBACK_MODELS", () => {
     const list = buildModelList({
       ...makeEnv(),
-      OPENROUTER_MODEL: "p/m",
-      OPENROUTER_FALLBACK_MODELS: " , a/one ,, ",
+      PLAMO_MODEL: "model-p",
+      PLAMO_FALLBACK_MODELS: " , model-a ,, ",
     });
-    expect(list).toEqual(["p/m", "a/one"]);
+    expect(list).toEqual(["model-p", "model-a"]);
   });
 
   it("returns only the primary when fallbacks are explicitly empty", () => {
     const list = buildModelList({
       ...makeEnv(),
-      OPENROUTER_MODEL: "p/m",
-      OPENROUTER_FALLBACK_MODELS: "",
+      PLAMO_MODEL: "model-p",
+      PLAMO_FALLBACK_MODELS: "",
     });
-    expect(list).toEqual(["p/m"]);
+    expect(list).toEqual(["model-p"]);
   });
 
-  it("caps the list at MAX_MODELS (3) — OpenRouter rejects a 4th entry", () => {
+  it("caps the list at MAX_MODELS so one request can't fan out unboundedly", () => {
     const list = buildModelList({
       ...makeEnv(),
-      OPENROUTER_MODEL: "p/m",
-      OPENROUTER_FALLBACK_MODELS: "a/one, b/two, c/three, d/four",
+      PLAMO_MODEL: "model-p",
+      PLAMO_FALLBACK_MODELS: "model-a, model-b, model-c, model-d",
     });
-    expect(list).toEqual(["p/m", "a/one", "b/two"]);
+    expect(list).toEqual(["model-p", "model-a", "model-b"]);
+    expect(list.length).toBe(MAX_MODELS);
   });
 
-  it("keeps the default list within the OpenRouter 3-item cap", () => {
-    expect(buildModelList(makeEnv()).length).toBeLessThanOrEqual(3);
+  it("keeps the default list within the MAX_MODELS cap", () => {
+    expect(buildModelList(makeEnv()).length).toBeLessThanOrEqual(MAX_MODELS);
   });
 });
 
@@ -499,22 +503,27 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(429);
   });
 
-  it("forwards sanitized messages to OpenRouter and streams the response back", async () => {
+  it("forwards sanitized messages to PLaMo and streams the response back", async () => {
     const env = makeEnv();
     const upstreamBody = "data: hello\n\n";
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+      expect(url).toBe(PLAMO_API_URL);
       const sentBody = JSON.parse(init.body as string);
-      expect(sentBody.models[0]).toBe(DEFAULT_MODEL);
-      expect(sentBody.models.length).toBeGreaterThan(1);
-      expect(sentBody.model).toBeUndefined();
+      // PLaMo takes a single `model`; the OpenRouter-only `models` routing
+      // array must not be sent (it would be rejected as an unknown field).
+      expect(sentBody.model).toBe(DEFAULT_MODEL);
+      expect(sentBody.models).toBeUndefined();
       expect(sentBody.stream).toBe(true);
       // The completion cap must match the direct-provider client (4096); a
       // smaller value truncated larger multi-branch pipelines mid-JSON.
       expect(sentBody.max_tokens).toBe(4096);
       expect(sentBody.messages).toEqual([{ role: "user", content: "hi" }]);
       const headers = init.headers as Record<string, string>;
-      expect(headers.Authorization).toBe(`Bearer ${env.OPENROUTER_API_KEY}`);
+      expect(headers.Authorization).toBe(`Bearer ${env.PLAMO_API_KEY}`);
+      expect(headers["Content-Type"]).toBe("application/json");
+      // OpenRouter-only attribution headers must be gone.
+      expect(headers["HTTP-Referer"]).toBeUndefined();
+      expect(headers["X-Title"]).toBeUndefined();
       return new Response(upstreamBody, { status: 200 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -531,17 +540,13 @@ describe("worker fetch handler", () => {
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
     expect(await res.text()).toBe(upstreamBody);
+    // Only the primary model is tried when it succeeds.
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("accepts a request from a second allowed origin and echoes it in CORS", async () => {
     const env = makeMultiOriginEnv();
-    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
-      const headers = init.headers as Record<string, string>;
-      // HTTP-Referer should carry the actual caller's origin.
-      expect(headers["HTTP-Referer"]).toBe(SECOND_ORIGIN);
-      return new Response("data: ok\n\n", { status: 200 });
-    });
+    const fetchMock = vi.fn(async () => new Response("data: ok\n\n", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const res = await worker.fetch(
@@ -554,7 +559,7 @@ describe("worker fetch handler", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("forwards a valid tools array to OpenRouter", async () => {
+  it("forwards a valid tools array to PLaMo", async () => {
     const env = makeEnv();
     const tool = {
       type: "function",
@@ -594,11 +599,11 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(400);
   });
 
-  it("uses the OPENROUTER_MODEL override as the primary model", async () => {
-    const env = { ...makeEnv(), OPENROUTER_MODEL: "anthropic/claude-3.5-sonnet" };
+  it("uses the PLAMO_MODEL override as the model", async () => {
+    const env = { ...makeEnv(), PLAMO_MODEL: "plamo-2.2-prime" };
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const sentBody = JSON.parse(init.body as string);
-      expect(sentBody.models[0]).toBe("anthropic/claude-3.5-sonnet");
+      expect(sentBody.model).toBe("plamo-2.2-prime");
       return new Response("data: ok\n\n", { status: 200 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -615,15 +620,17 @@ describe("worker fetch handler", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it("sends only the configured fallback models when OPENROUTER_FALLBACK_MODELS is set", async () => {
+  it("falls back to the next model when the primary errors, and streams that one", async () => {
     const env = {
       ...makeEnv(),
-      OPENROUTER_MODEL: "primary/model",
-      OPENROUTER_FALLBACK_MODELS: "a/one, b/two",
+      PLAMO_MODEL: "primary-model",
+      PLAMO_FALLBACK_MODELS: "fallback-a, fallback-b",
     };
+    const tried: string[] = [];
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
-      const sentBody = JSON.parse(init.body as string);
-      expect(sentBody.models).toEqual(["primary/model", "a/one", "b/two"]);
+      const model = JSON.parse(init.body as string).model as string;
+      tried.push(model);
+      if (model === "primary-model") return new Response("model unavailable", { status: 404 });
       return new Response("data: ok\n\n", { status: 200 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -637,15 +644,15 @@ describe("worker fetch handler", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(await res.text()).toBe("data: ok\n\n");
+    // Stops at the first model that works — "fallback-b" is never tried.
+    expect(tried).toEqual(["primary-model", "fallback-a"]);
   });
 
-  it("propagates upstream errors as JSON", async () => {
+  it("propagates upstream errors as JSON once every model has failed", async () => {
     const env = makeEnv();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("boom", { status: 503 })),
-    );
+    const fetchMock = vi.fn(async () => new Response("boom", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
 
     const res = await worker.fetch(
       makeRequest({
@@ -658,11 +665,54 @@ describe("worker fetch handler", () => {
     expect(res.status).toBe(503);
     const json = (await res.json()) as { error: string };
     expect(json.error).toContain("boom");
+    expect(fetchMock).toHaveBeenCalledTimes(buildModelList(env).length);
+  });
+
+  it("returns 502 when every upstream fetch throws", async () => {
+    const env = makeEnv();
+    const fetchMock = vi.fn(async () => {
+      throw new Error("network down");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(502);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toBe("Upstream request failed");
+    expect(fetchMock).toHaveBeenCalledTimes(buildModelList(env).length);
+  });
+
+  it("recovers when the primary throws but a fallback answers", async () => {
+    const env = makeEnv();
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const model = JSON.parse(init.body as string).model as string;
+      if (model === DEFAULT_MODEL) throw new Error("network down");
+      return new Response("data: ok\n\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await worker.fetch(
+      makeRequest({
+        origin: ALLOWED_ORIGIN,
+        body: { messages: [{ role: "user", content: "hi" }] },
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("data: ok\n\n");
   });
 });
 
 describe("wrangler.toml model configuration", () => {
-  // Read the deployed config the Worker ships with so a bad model slug can't
+  // Read the deployed config the Worker ships with so a bad model id can't
   // pass CI and silently break every demo prompt once deployed.
   // vitest runs with cwd at the worker package root (where vitest.config.ts
   // and wrangler.toml live), so a cwd-relative read keeps this independent of
@@ -675,34 +725,45 @@ describe("wrangler.toml model configuration", () => {
   }
 
   /**
-   * Every Anthropic slug carrying a version must spell its minor version with
-   * a DOT (claude-sonnet-4.6), never a hyphen (claude-sonnet-4-6). A
-   * hyphenated version is an unknown OpenRouter model id and gets the whole
-   * request rejected with a 400 — the root cause of the demo failing on even
-   * the shortest prompt. Guard against that exact regression.
+   * PLaMo model ids are bare (`plamo-3.0-prime`) — unlike OpenRouter slugs
+   * they carry no `vendor/` prefix and no `:free` suffix, and they spell the
+   * version with a DOT, never a hyphen. Any of those mistakes is an unknown
+   * model id that PLaMo rejects with a 400, which used to break the demo on
+   * even the shortest prompt. Guard against that exact class of regression.
    */
-  function assertNoHyphenatedVersion(slug: string) {
+  function assertValidPlamoModel(id: string) {
+    expect(id.includes("/"), `model id "${id}" must not carry a vendor prefix`).toBe(false);
+    expect(id.includes(":"), `model id "${id}" must not carry a ":" suffix`).toBe(false);
     expect(
-      /-\d+-\d+(?:$|:)/.test(slug),
-      `model slug "${slug}" uses a hyphenated version; OpenRouter expects a dotted minor version (e.g. claude-sonnet-4.6)`,
-    ).toBe(false);
+      /^plamo-\d+\.\d+-prime(-[a-z]+)?$/.test(id),
+      `model id "${id}" does not look like a PLaMo model (expected e.g. "plamo-3.0-prime"); ` +
+        `verify it at https://docs.plamo.preferredai.jp/en/api`,
+    ).toBe(true);
   }
 
-  it("sets the primary OpenRouter model to a valid dotted slug", () => {
-    const model = tomlVar("OPENROUTER_MODEL");
+  it("sets the primary PLaMo model to a valid id", () => {
+    const model = tomlVar("PLAMO_MODEL");
     expect(model).toBeTruthy();
-    expect(model!.startsWith("anthropic/")).toBe(true);
-    assertNoHyphenatedVersion(model!);
+    assertValidPlamoModel(model!);
   });
 
-  it("uses valid slugs for every configured fallback model", () => {
-    const fallbacks = (tomlVar("OPENROUTER_FALLBACK_MODELS") ?? "")
+  it("uses valid ids for every configured fallback model", () => {
+    const fallbacks = (tomlVar("PLAMO_FALLBACK_MODELS") ?? "")
       .split(",")
       .map((m) => m.trim())
       .filter((m) => m.length > 0);
     expect(fallbacks.length).toBeGreaterThan(0);
-    for (const slug of fallbacks) {
-      assertNoHyphenatedVersion(slug);
+    for (const id of fallbacks) {
+      assertValidPlamoModel(id);
     }
+  });
+
+  it("keeps the shipped model list within the MAX_MODELS cap", () => {
+    const env = {
+      ...makeEnv(),
+      PLAMO_MODEL: tomlVar("PLAMO_MODEL") ?? undefined,
+      PLAMO_FALLBACK_MODELS: tomlVar("PLAMO_FALLBACK_MODELS") ?? undefined,
+    };
+    expect(buildModelList(env).length).toBeLessThanOrEqual(MAX_MODELS);
   });
 });

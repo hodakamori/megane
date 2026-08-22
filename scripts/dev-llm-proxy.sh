@@ -10,9 +10,9 @@
 # Both processes run in the foreground of this script; Ctrl-C stops both.
 #
 # Prerequisites:
-#   - workers/llm-proxy/.dev.vars must exist with a real OPENROUTER_API_KEY
-#     (copy workers/llm-proxy/.dev.vars.example and fill it in — see
-#     https://openrouter.ai/keys for a free key)
+#   - workers/llm-proxy/.dev.vars must exist with a real PLAMO_API_KEY
+#     (copy workers/llm-proxy/.dev.vars.example and fill it in — get a key
+#     at https://plamo.preferredai.jp/)
 #
 # Usage:
 #   scripts/dev-llm-proxy.sh
@@ -57,7 +57,7 @@ DEV_VARS="$PROXY_DIR/.dev.vars"
 if [[ ! -f "$DEV_VARS" ]]; then
   echo "error: $DEV_VARS not found." >&2
   echo "       Copy workers/llm-proxy/.dev.vars.example to .dev.vars and fill in" >&2
-  echo "       a real OPENROUTER_API_KEY (free key: https://openrouter.ai/keys)." >&2
+  echo "       a real PLAMO_API_KEY (get one at https://plamo.preferredai.jp/)." >&2
   exit 1
 fi
 
