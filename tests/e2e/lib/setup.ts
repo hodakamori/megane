@@ -504,6 +504,27 @@ export async function pinFrame(scope: Page | Frame, frame = 0): Promise<void> {
       { timeout: 5_000 },
     )
     .catch(() => {});
+  // The frame *counter* settling is not enough: lazily decoded trajectories
+  // (the XTC worker path) apply the seeked frame's positions asynchronously
+  // after the decode lands, so a capture can still race between the base
+  // snapshot and the frame data. `framesApplied` is bumped by
+  // MoleculeRenderer.updateFrame() in test mode; waiting for >= 1 guarantees
+  // the displayed geometry is trajectory-frame data, whichever side of the
+  // decode the capture would otherwise have landed on.
+  await scope
+    .waitForFunction(
+      () => {
+        const total = document
+          .querySelector('[data-testid="megane-viewer"]')
+          ?.getAttribute("data-total-frames");
+        if (total === null || total === undefined || Number(total) <= 1) return true;
+        const w = window as unknown as { __megane_test_ready?: { framesApplied?: number } };
+        return (w.__megane_test_ready?.framesApplied ?? 0) >= 1;
+      },
+      null,
+      { timeout: 15_000 },
+    )
+    .catch(() => {});
 }
 
 /* ─── Cross-platform Parity ─────────────────────────────────────── */

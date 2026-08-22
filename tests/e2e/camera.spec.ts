@@ -23,6 +23,7 @@ import {
   assertDomContract,
   defaultViewerContract,
   expectFullPageMatch,
+  pinFrame,
   stabilizeUi,
   waitForReady,
   getReadyState,
@@ -45,6 +46,12 @@ test.beforeAll(async ({ browser }, info) => {
   await assertDomContract(boot.scope, [
     ...defaultViewerContract({ expectedAtoms: FIXTURE_ATOMS, context: boot.context }),
   ]);
+  // Pin the displayed trajectory frame before any capture: the webapp host
+  // attaches the default 100-frame vibration XTC, whose frame 0 is decoded
+  // lazily and applied asynchronously — without the pin the full-page
+  // baselines race between base-snapshot and frame-0 positions (the
+  // camera__webapp CI flake).
+  await pinFrame(boot.scope, 0);
 });
 
 test.afterAll(async () => {
