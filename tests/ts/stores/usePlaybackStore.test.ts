@@ -96,6 +96,35 @@ describe("usePlaybackStore", () => {
       store.setProvider(makeProvider(5));
       expect(usePlaybackStore.getState().playing).toBe(false);
     });
+
+    it("preserves playhead, loop range and play state on a same-shape swap", () => {
+      // A provider swap with identical frame/atom counts is a re-mapping of
+      // the loaded trajectory (a wrap/replicate node re-ran) — the playhead
+      // must survive the toggle.
+      const store = usePlaybackStore.getState();
+      store.setProvider(makeProvider(10));
+      store.seekFrame(6);
+      store.setLoopRange(2, 8);
+      store.play();
+      store.setProvider(makeProvider(10));
+      const state = usePlaybackStore.getState();
+      expect(state.currentFrame).toBe(6);
+      expect(state.currentFrameData?.frameId).toBe(6);
+      expect(state.loopStart).toBe(2);
+      expect(state.loopEnd).toBe(8);
+      expect(state.playing).toBe(true);
+      expect(state._intervalId).not.toBeNull();
+    });
+
+    it("resets the playhead when the new provider has a different shape", () => {
+      const store = usePlaybackStore.getState();
+      store.setProvider(makeProvider(10));
+      store.seekFrame(6);
+      store.setProvider(makeProvider(5));
+      const state = usePlaybackStore.getState();
+      expect(state.currentFrame).toBe(0);
+      expect(state.loopEnd).toBe(4);
+    });
   });
 
   describe("seekFrame", () => {
@@ -281,9 +310,8 @@ describe("usePlaybackStore", () => {
     it("updates frame data when frameId matches", () => {
       usePlaybackStore.getState().setProvider(makeProvider(10));
       usePlaybackStore.getState().seekFrame(3);
-      const frame = makeFrame(3);
-      usePlaybackStore.getState()._onAsyncFrame(frame);
-      expect(usePlaybackStore.getState().currentFrameData).toBe(frame);
+      usePlaybackStore.getState()._onAsyncFrame(makeFrame(3));
+      expect(usePlaybackStore.getState().currentFrameData?.frameId).toBe(3);
     });
 
     it("ignores frame when frameId does not match", () => {
@@ -292,6 +320,35 @@ describe("usePlaybackStore", () => {
       const existing = usePlaybackStore.getState().currentFrameData;
       usePlaybackStore.getState()._onAsyncFrame(makeFrame(5));
       expect(usePlaybackStore.getState().currentFrameData).toBe(existing);
+    });
+
+    it("re-fetches through the store's provider so wrapper mappings apply", () => {
+      // The async callback delivers the raw decoder frame; when a wrapper
+      // provider (wrap / replicate node) sits on top, the store must serve
+      // the wrapper's mapping, not the raw positions.
+      const mapped = makeFrame(3);
+      mapped.positions = new Float32Array([99, 0, 0, 99, 0, 0]);
+      const wrapper: FrameProvider = {
+        kind: "stream",
+        meta: makeMeta(10),
+        getFrame: (index: number) => (index === 3 ? mapped : makeFrame(index)),
+      };
+      usePlaybackStore.getState().setProvider(wrapper);
+      usePlaybackStore.getState().seekFrame(3);
+      usePlaybackStore.getState()._onAsyncFrame(makeFrame(3));
+      expect(usePlaybackStore.getState().currentFrameData).toBe(mapped);
+    });
+
+    it("falls back to the pushed frame when the provider cannot serve it", () => {
+      const nullProvider: FrameProvider = {
+        kind: "stream",
+        meta: makeMeta(10),
+        getFrame: () => null,
+      };
+      usePlaybackStore.getState().setProvider(nullProvider);
+      const pushed = makeFrame(0);
+      usePlaybackStore.getState()._onAsyncFrame(pushed);
+      expect(usePlaybackStore.getState().currentFrameData).toBe(pushed);
     });
   });
 });
