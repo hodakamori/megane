@@ -156,6 +156,60 @@ describe("executePipeline", () => {
       expect(nodeErrors.get("rep")?.[0].message).toContain("unit cell");
     });
 
+    it("wraps particles into the cell through a wrap node", () => {
+      const boxSnapshot = makeSnapshot({
+        nAtoms: 1,
+        positions: [11, 1, 1],
+        elements: [6],
+        box: [10, 0, 0, 0, 10, 0, 0, 0, 10],
+      });
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: true }),
+        makeNode("wrap", "wrap", { mode: "wrap" }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "wrap", "particle"),
+        makeEdge("wrap", "particle", "vp", "particle"),
+      ];
+
+      const { viewportState: result, nodeErrors } = executePipeline(nodes, edges, {
+        snapshot: boxSnapshot,
+      });
+      expect(result.particles[0].source.positions[0]).toBeCloseTo(1, 5);
+      expect(nodeErrors.get("wrap")).toBeUndefined();
+    });
+
+    it("warns when an active wrap node has no unit cell", () => {
+      const nodes = [
+        makeNode("ls", "load_structure", { fileName: null, hasTrajectory: false, hasCell: false }),
+        makeNode("wrap", "wrap", { mode: "unwrap" }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [
+        makeEdge("ls", "particle", "wrap", "particle"),
+        makeEdge("wrap", "particle", "vp", "particle"),
+      ];
+
+      const { viewportState: result, nodeErrors } = executePipeline(nodes, edges, {
+        snapshot: waterSnapshot,
+      });
+      expect(nodeErrors.get("wrap")?.[0].message).toContain("unit cell");
+      // Pass-through: the particles still reach the viewport unchanged.
+      expect(result.particles).toHaveLength(1);
+    });
+
+    it("warns when a wrap node has no input", () => {
+      const nodes = [
+        makeNode("wrap", "wrap", { mode: "none" }),
+        makeNode("vp", "viewport", { perspective: false, cellAxesVisible: true }),
+      ];
+      const edges = [makeEdge("wrap", "particle", "vp", "particle")];
+
+      const { nodeErrors } = executePipeline(nodes, edges, {});
+      expect(nodeErrors.get("wrap")?.[0].message).toContain("No input data");
+    });
+
     it("produces trajectory output when frames exist", () => {
       const frames: Frame[] = [{ frameId: 0, nAtoms: 3, positions: new Float32Array(9) }];
       const meta: TrajectoryMeta = { nFrames: 1, timestepPs: 1.0, nAtoms: 3 };

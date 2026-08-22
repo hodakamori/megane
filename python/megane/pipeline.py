@@ -255,6 +255,36 @@ class Modify(PipelineNode):
         self.opacity = opacity
 
 
+class Wrap(PipelineNode):
+    """Toggle periodic-image coordinate mapping for the particle stream.
+
+    ``"wrap"`` folds every atom back into the home unit cell (fractional
+    ``[0,1)``); ``"unwrap"`` shifts atoms by whole lattice vectors so bonded
+    molecules that straddle a periodic face become spatially contiguous
+    (VESTA/Mercury-style whole molecules). ``"none"`` (the default) passes
+    coordinates through untouched. Requires the upstream structure to carry a
+    unit cell; without one the input is passed through unchanged. A connected
+    trajectory is remapped per frame with the same convention.
+
+    Args:
+        mode: One of ``"none"``, ``"wrap"``, ``"unwrap"``.
+
+    Ports:
+        inp.particle — atom data in
+        inp.traj     — trajectory in
+        out.particle — remapped atom data
+        out.traj     — remapped trajectory
+    """
+
+    _node_type = "wrap"
+    _out_ports = {"particle": "particle", "traj": "trajectory"}
+    _inp_ports = {"particle": "particle", "traj": "trajectory"}
+
+    def __init__(self, *, mode: Literal["none", "wrap", "unwrap"] = "none") -> None:
+        super().__init__()
+        self.mode = mode
+
+
 class Replicate(PipelineNode):
     """Replicate the structure into an ``nx × ny × nz`` supercell.
 
@@ -794,6 +824,8 @@ class Pipeline:
             )
         elif ntype == "representation":
             return Representation(mode=nd.get("mode", "atoms"))
+        elif ntype == "wrap":
+            return Wrap(mode=nd.get("mode", "none"))
         elif ntype == "replicate":
             return Replicate(nx=nd.get("nx", 1), ny=nd.get("ny", 1), nz=nd.get("nz", 1))
         elif ntype == "add_bond":
@@ -975,6 +1007,8 @@ class Pipeline:
             if node.range is not None:
                 base["range"] = list(node.range)
         elif isinstance(node, Representation):
+            base["mode"] = node.mode
+        elif isinstance(node, Wrap):
             base["mode"] = node.mode
         elif isinstance(node, Replicate):
             base["nx"] = node.nx

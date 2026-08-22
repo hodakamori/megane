@@ -7,8 +7,10 @@ import type { PipelineNodeData } from "./execute";
 
 /**
  * Create the default pipeline: caffeine with bonds and trajectory.
- * LoadStructure → AddBond → Viewport
- *              → LoadTrajectory → Viewport
+ * LoadStructure → Wrap → Replicate → AddBond → Viewport
+ *              → LoadTrajectory → Wrap → Replicate → Viewport
+ * The Wrap node defaults to mode "none" (pass-through) so wrap/unwrap is a
+ * one-click toggle without changing what renders by default.
  */
 export function createDefaultPipeline(): {
   nodes: Node<PipelineNodeData>[];
@@ -33,7 +35,7 @@ export function createDefaultPipeline(): {
       {
         id: "traj-1",
         type: "load_trajectory",
-        position: { x: 85, y: 310 },
+        position: { x: 85, y: 155 },
         data: {
           params: {
             type: "load_trajectory",
@@ -43,9 +45,21 @@ export function createDefaultPipeline(): {
         },
       },
       {
+        id: "wrap-1",
+        type: "wrap",
+        position: { x: 425, y: 155 },
+        data: {
+          params: {
+            type: "wrap",
+            mode: "none",
+          },
+          enabled: true,
+        },
+      },
+      {
         id: "replicate-1",
         type: "replicate",
-        position: { x: 425, y: 155 },
+        position: { x: 425, y: 360 },
         data: {
           params: {
             type: "replicate",
@@ -59,7 +73,7 @@ export function createDefaultPipeline(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 425, y: 360 },
+        position: { x: 425, y: 565 },
         data: {
           params: {
             type: "add_bond",
@@ -71,7 +85,7 @@ export function createDefaultPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 425, y: 615 },
+        position: { x: 425, y: 820 },
         data: {
           params: {
             type: "viewport",
@@ -87,7 +101,7 @@ export function createDefaultPipeline(): {
       {
         id: "e1",
         source: "loader-1",
-        target: "replicate-1",
+        target: "wrap-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
@@ -107,15 +121,15 @@ export function createDefaultPipeline(): {
       },
       {
         id: "e4",
-        source: "replicate-1",
-        target: "addbond-1",
+        source: "wrap-1",
+        target: "replicate-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
         id: "e5",
         source: "replicate-1",
-        target: "viewport-1",
+        target: "addbond-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
@@ -123,25 +137,39 @@ export function createDefaultPipeline(): {
         id: "e6",
         source: "replicate-1",
         target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e7",
+        source: "replicate-1",
+        target: "viewport-1",
         sourceHandle: "cell",
         targetHandle: "cell",
       },
       {
-        id: "e7",
+        id: "e8",
         source: "addbond-1",
         target: "viewport-1",
         sourceHandle: "bond",
         targetHandle: "bond",
       },
       {
-        id: "e8",
+        id: "e9",
         source: "traj-1",
+        target: "wrap-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e10",
+        source: "wrap-1",
         target: "replicate-1",
         sourceHandle: "trajectory",
         targetHandle: "trajectory",
       },
       {
-        id: "e9",
+        id: "e11",
         source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "trajectory",
@@ -154,8 +182,9 @@ export function createDefaultPipeline(): {
 /**
  * Create a minimal pipeline for hosting an externally-loaded structure file.
  *
- * The shape mirrors `createDefaultPipeline` (LoadStructure → AddBond → Viewport
- * with a LoadTrajectory branch), but every `fileName` is left empty so that
+ * The shape mirrors `createDefaultPipeline` (LoadStructure → Wrap → Replicate
+ * → AddBond → Viewport with a LoadTrajectory branch), but every `fileName` is
+ * left empty so that
  * `usePipelineStore.openFile` (or another caller) can populate it from the
  * actually-clicked file. Used as the seed graph by `openFile` whenever the
  * current pipeline has no `load_structure` node or `mode: "replace"` is
@@ -184,7 +213,7 @@ export function createMinimalStructurePipeline(): {
       {
         id: "traj-1",
         type: "load_trajectory",
-        position: { x: 85, y: 310 },
+        position: { x: 85, y: 155 },
         data: {
           params: {
             type: "load_trajectory",
@@ -194,9 +223,21 @@ export function createMinimalStructurePipeline(): {
         },
       },
       {
+        id: "wrap-1",
+        type: "wrap",
+        position: { x: 425, y: 155 },
+        data: {
+          params: {
+            type: "wrap",
+            mode: "none",
+          },
+          enabled: true,
+        },
+      },
+      {
         id: "replicate-1",
         type: "replicate",
-        position: { x: 425, y: 155 },
+        position: { x: 425, y: 360 },
         data: {
           params: {
             type: "replicate",
@@ -210,7 +251,7 @@ export function createMinimalStructurePipeline(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 425, y: 360 },
+        position: { x: 425, y: 565 },
         data: {
           params: {
             type: "add_bond",
@@ -222,7 +263,7 @@ export function createMinimalStructurePipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 425, y: 615 },
+        position: { x: 425, y: 820 },
         data: {
           params: {
             type: "viewport",
@@ -238,7 +279,7 @@ export function createMinimalStructurePipeline(): {
       {
         id: "e1",
         source: "loader-1",
-        target: "replicate-1",
+        target: "wrap-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
@@ -258,15 +299,15 @@ export function createMinimalStructurePipeline(): {
       },
       {
         id: "e4",
-        source: "replicate-1",
-        target: "addbond-1",
+        source: "wrap-1",
+        target: "replicate-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
         id: "e5",
         source: "replicate-1",
-        target: "viewport-1",
+        target: "addbond-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
@@ -274,25 +315,39 @@ export function createMinimalStructurePipeline(): {
         id: "e6",
         source: "replicate-1",
         target: "viewport-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e7",
+        source: "replicate-1",
+        target: "viewport-1",
         sourceHandle: "cell",
         targetHandle: "cell",
       },
       {
-        id: "e7",
+        id: "e8",
         source: "addbond-1",
         target: "viewport-1",
         sourceHandle: "bond",
         targetHandle: "bond",
       },
       {
-        id: "e8",
+        id: "e9",
         source: "traj-1",
+        target: "wrap-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e10",
+        source: "wrap-1",
         target: "replicate-1",
         sourceHandle: "trajectory",
         targetHandle: "trajectory",
       },
       {
-        id: "e9",
+        id: "e11",
         source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "trajectory",
@@ -303,10 +358,13 @@ export function createMinimalStructurePipeline(): {
 }
 
 /**
- * Create a basic pipeline with LoadStructure → AddBond → Viewport.
+ * Create a basic pipeline with LoadStructure → Wrap → Replicate → AddBond →
+ * Viewport.
  * Used as the default in the VSCode extension where files are loaded externally.
  * The LoadStructure node reads from the pipeline store's snapshot (set by the
  * webview after parsing), so the molecule renders with bonds automatically.
+ * The Wrap node defaults to mode "none" (pass-through) so wrap/unwrap is a
+ * one-click toggle without changing what renders by default.
  */
 export function createEmptyPipeline(): {
   nodes: Node<PipelineNodeData>[];
@@ -329,9 +387,21 @@ export function createEmptyPipeline(): {
         },
       },
       {
+        id: "wrap-1",
+        type: "wrap",
+        position: { x: 425, y: 200 },
+        data: {
+          params: {
+            type: "wrap",
+            mode: "none",
+          },
+          enabled: true,
+        },
+      },
+      {
         id: "replicate-1",
         type: "replicate",
-        position: { x: 425, y: 200 },
+        position: { x: 425, y: 400 },
         data: {
           params: {
             type: "replicate",
@@ -345,7 +415,7 @@ export function createEmptyPipeline(): {
       {
         id: "addbond-1",
         type: "add_bond",
-        position: { x: 425, y: 400 },
+        position: { x: 425, y: 600 },
         data: {
           params: {
             type: "add_bond",
@@ -357,7 +427,7 @@ export function createEmptyPipeline(): {
       {
         id: "viewport-1",
         type: "viewport",
-        position: { x: 425, y: 655 },
+        position: { x: 425, y: 855 },
         data: {
           params: {
             type: "viewport",
@@ -373,7 +443,7 @@ export function createEmptyPipeline(): {
       {
         id: "e1",
         source: "loader-1",
-        target: "replicate-1",
+        target: "wrap-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
@@ -386,41 +456,55 @@ export function createEmptyPipeline(): {
       },
       {
         id: "e3",
+        source: "wrap-1",
+        target: "replicate-1",
+        sourceHandle: "particle",
+        targetHandle: "particle",
+      },
+      {
+        id: "e4",
         source: "replicate-1",
         target: "addbond-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
-        id: "e4",
+        id: "e5",
         source: "addbond-1",
         target: "viewport-1",
         sourceHandle: "bond",
         targetHandle: "bond",
       },
       {
-        id: "e5",
+        id: "e6",
         source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "particle",
         targetHandle: "particle",
       },
       {
-        id: "e6",
+        id: "e7",
         source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "cell",
         targetHandle: "cell",
       },
       {
-        id: "e7",
+        id: "e8",
         source: "loader-1",
+        target: "wrap-1",
+        sourceHandle: "trajectory",
+        targetHandle: "trajectory",
+      },
+      {
+        id: "e9",
+        source: "wrap-1",
         target: "replicate-1",
         sourceHandle: "trajectory",
         targetHandle: "trajectory",
       },
       {
-        id: "e8",
+        id: "e10",
         source: "replicate-1",
         target: "viewport-1",
         sourceHandle: "trajectory",

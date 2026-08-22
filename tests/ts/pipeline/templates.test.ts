@@ -124,20 +124,30 @@ describe("PIPELINE_TEMPLATES surface mesh", () => {
     expect(params.opacity).toBe(0.5);
   });
 
-  it("wires loader→surface_mesh on particle and surface_mesh→viewport on mesh", () => {
+  it("wires loader→wrap→surface_mesh on particle and surface_mesh→viewport on mesh", () => {
     const { nodes, edges } = surface!.create();
     const loader = nodes.find((n) => n.type === "load_structure")!;
+    const wrap = nodes.find((n) => n.type === "wrap")!;
     const mesh = nodes.find((n) => n.type === "surface_mesh")!;
     const viewport = nodes.find((n) => n.type === "viewport")!;
 
-    const loaderToMesh = edges.find(
+    const loaderToWrap = edges.find(
       (e) =>
         e.source === loader.id &&
+        e.target === wrap.id &&
+        e.sourceHandle === "particle" &&
+        e.targetHandle === "particle",
+    );
+    expect(loaderToWrap).toBeDefined();
+
+    const wrapToMesh = edges.find(
+      (e) =>
+        e.source === wrap.id &&
         e.target === mesh.id &&
         e.sourceHandle === "particle" &&
         e.targetHandle === "particle",
     );
-    expect(loaderToMesh).toBeDefined();
+    expect(wrapToMesh).toBeDefined();
 
     const meshToViewport = edges.find(
       (e) =>
@@ -147,5 +157,17 @@ describe("PIPELINE_TEMPLATES surface mesh", () => {
         e.targetHandle === "mesh",
     );
     expect(meshToViewport).toBeDefined();
+  });
+});
+
+describe("PIPELINE_TEMPLATES wrap toggle", () => {
+  it("every structure template carries a pass-through wrap node", () => {
+    for (const id of ["molecule", "solid", "surface_mesh", "protein"]) {
+      const template = PIPELINE_TEMPLATES.find((t) => t.id === id)!;
+      const { nodes } = template.create();
+      const wrap = nodes.find((n) => n.type === "wrap");
+      expect(wrap, `template "${id}" missing wrap node`).toBeDefined();
+      expect(wrap!.data.params).toEqual({ type: "wrap", mode: "none" });
+    }
   });
 });
