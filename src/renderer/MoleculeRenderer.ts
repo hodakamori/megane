@@ -126,6 +126,15 @@ interface MeganeTestReady {
   frame: number;
   renderEpoch: number;
   atomCount?: number;
+  /**
+   * Count of trajectory frames applied via updateFrame(). E2E capture
+   * helpers gate on `framesApplied >= 1` before screenshotting a
+   * multi-frame structure: lazily decoded trajectories (XTC worker) apply
+   * frame 0 asynchronously after load, so without the gate a capture races
+   * the decode and lands on either the base snapshot or the frame-0
+   * positions nondeterministically.
+   */
+  framesApplied?: number;
 }
 
 export interface MeganeProjectedAtom {
@@ -640,6 +649,7 @@ export class MoleculeRenderer {
     if (_ready) {
       const idx = (frame as Frame & { index?: number }).index;
       _ready.frame = typeof idx === "number" ? idx : (_ready.frame ?? 0);
+      _ready.framesApplied = (_ready.framesApplied ?? 0) + 1;
     }
   }
 
