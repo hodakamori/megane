@@ -568,26 +568,22 @@ mod tests {
         assert!(has(0, 3));
     }
 
-    /// Extended inorganic networks must keep the crystallographic atom sites
-    /// in the home cell. Treating the network as one finite molecule moves
-    /// arbitrary atoms by lattice vectors and corrupts the displayed structure.
+    /// Parsing the expanded AFLOW alpha-Al2O3 conventional cell must preserve
+    /// its 30 asserted atom sites instead of moving the periodic network while
+    /// attempting to make it into one finite molecule.
     #[test]
-    fn test_parse_periodic_network_keeps_sites_in_home_cell() {
-        let text = include_str!("../../../tests/fixtures/zn3in2o6_periodic.cif");
-        let s = parse(text).expect("parse Zn3In2O6 fixture");
-        assert_eq!(s.n_atoms, 33);
+    fn test_parse_aflow_alpha_al2o3_preserves_asserted_sites() {
+        let text = include_str!("../../../tests/fixtures/alpha_al2o3_aflow.cif");
+        let s = parse(text).expect("parse AFLOW alpha-Al2O3 fixture");
+        assert_eq!(s.n_atoms, 30);
         assert_eq!(s.symmetry_ops, vec!["x, y, z"]);
 
         let matrix = s.box_matrix.expect("fixture cell");
-        let one_third = 1.0 / 3.0;
-        let two_thirds = 2.0 / 3.0;
         let expected_fractional = [
-            (2, two_thirds, one_third, 0.20210733),
-            (8, 0.0, 0.0, 0.868_774),
-            (15, 0.0, 0.0, 0.084_947),
-            (16, two_thirds, one_third, 0.24936233),
-            (27, one_third, two_thirds, 0.751_613_7),
-            (28, 0.0, 0.0, 0.916_029),
+            (0, 0.0, 0.0, 0.352_16),
+            (4, 2.0 / 3.0, 1.0 / 3.0, 0.685_493_35),
+            (12, 0.693_9, 0.0, 0.25),
+            (29, 0.027_233_332, 0.360_566_68, 0.416_666_66),
         ];
         for (index, fx, fy, fz) in expected_fractional {
             let (x, y, z) = fract_to_cart(fx, fy, fz, &matrix);
@@ -596,6 +592,9 @@ mod tests {
             assert!((actual[1] - y).abs() < 1e-4, "atom {index} y shifted");
             assert!((actual[2] - z).abs() < 1e-4, "atom {index} z shifted");
         }
+        // The parser stores unique atom pairs. Multiple periodic images of the
+        // same pair are derived later by the bond/coordination pipeline nodes.
+        assert_eq!(s.bonds.len(), 36);
     }
 
     #[test]

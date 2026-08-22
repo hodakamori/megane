@@ -282,8 +282,12 @@ export class ImpostorAtomMesh {
     // that cache, so a mesh that started with capacity 1 would keep drawing at
     // most one instance after growing. Dispose the GPU-side geometry before
     // replacing its attributes; the CPU-side index/vertex data remains valid
-    // and is uploaded again on the next render.
+    // and is uploaded again on the next render. Clear the cache explicitly as
+    // well so growth is correct before a renderer has attached its dispose
+    // listener (for example, in headless use).
     this.geo.dispose();
+    delete (this.geo as THREE.InstancedBufferGeometry & { _maxInstanceCount?: number })
+      ._maxInstanceCount;
 
     this.capacity = Math.max(needed, this.capacity * 2);
 
