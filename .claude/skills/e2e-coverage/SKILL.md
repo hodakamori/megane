@@ -10,11 +10,11 @@ The megane viewer ships through 5 distribution targets. Each one renders the sam
 
 All E2E uses `@playwright/test`. `puppeteer` is **not** in `package.json`; only `playwright` 1.56 is installed. Never add or invoke Puppeteer.
 
-E2E is **local-only by policy** — see `.claude/skills/testing/SKILL.md`. CI does not run any E2E project (port-bind races + font-fontconfig pixel drift on hosted runners).
+**CI split** — see `.claude/skills/testing/SKILL.md` for the full story. The webapp-host and JupyterLab-host projects run in CI (`.github/workflows/e2e.yml`, via `npm run test:e2e:ci:webapp` / `test:e2e:ci:jupyterlab`) inside the pinned Playwright container, against the CI-only baseline set `tests/e2e/baselines-ci/` (selected with `MEGANE_E2E_BASELINE_DIR`; missing baselines are hard failures under `MEGANE_E2E_REQUIRE_BASELINE=1`). Those baselines are re-recorded **only** by the "E2E update baselines" workflow (add the `update-e2e-baselines` label to the PR, or workflow_dispatch), which runs in the same container and commits the PNGs to the dispatched branch — never capture them locally. The VSCode-hosted projects (`vscode`, `widget-vscode`) are local-only. `tests/e2e/baselines/` remains the local baseline set for everything below.
 
 ## When E2E MUST run (CRITICAL RULE #9)
 
-Any change touching the UI — `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs (`vite.config.ts`, `vite.widget.config.ts`, `vite.lib.config.ts`, `vscode-megane/vite.webview.config.ts`), or `crates/megane-core/src/` output the renderer consumes — requires running this suite **locally before opening the PR**. CI does not run E2E, so this is the only safety net for visual / behavioral regressions. The verification has two parts and **both are required**:
+Any change touching the UI — `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs (`vite.config.ts`, `vite.widget.config.ts`, `vite.lib.config.ts`, `vscode-megane/vite.webview.config.ts`), or `crates/megane-core/src/` output the renderer consumes — requires running this suite **locally before opening the PR**. CI covers only the webapp/JupyterLab hosts, so local runs are the only safety net for the VSCode hosts and the local baseline set. The verification has two parts and **both are required**:
 
 1. **Intended change check** — run the projects that target the host(s) you modified and the feature spec closest to the change (use the tables below). Confirm the new behavior is asserted in the DOM contract / pixel baselines. Re-baseline only when the diff is intended, and visually inspect the new PNG before committing it.
 2. **Side-effect sweep** — also run the rest of the host projects plus neighboring feature projects (`format-loading`, `playback`, `sidebar`, `pipeline-editor`, `pipeline-file`, `render-modal`, `widget-api`, `camera`, `measurement`, `subsystems`, `trajectory-bonds`, `modify-node`, `phase2`). Unexpected pixel diffs, timeouts, or runtime errors are regressions; fix the root cause instead of re-baselining. Timeouts and runtime errors are **always** real regressions — never re-baseline through them.
@@ -163,7 +163,8 @@ the `pre-release` skill (Phase 3) requires the **full** matrix across all 5
 platforms — every host project, every feature project, and the Phase-2 5×5
 cross-host matrix — with the VSCode/code-server setup above included. This is
 the checkpoint that catches baseline drift and regressions that piled up
-across merged PRs while E2E was local-only. See CRITICAL RULE #9 in
+across merged PRs on the hosts CI's E2E workflow does not cover (VSCode)
+and on the local baseline set. See CRITICAL RULE #9 in
 `CLAUDE.md` and the `pre-release` skill.
 
 ## Adding a New Spec
@@ -263,7 +264,7 @@ When a comparison fails, `<name>.diff.png` and `<name>.new.png` land next to the
 
 ## Cross-References
 
-- `.claude/skills/testing/SKILL.md` — overall test taxonomy and the local-only policy
+- `.claude/skills/testing/SKILL.md` — overall test taxonomy and the CI vs. local E2E split
 - `.claude/skills/build/SKILL.md` — WASM / widget / lab-extension build prerequisites
 - `.claude/skills/dev-setup/SKILL.md` — toolchain install
 - `tests/e2e/lib/setup.ts` — 3-layer helper implementation

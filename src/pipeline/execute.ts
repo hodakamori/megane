@@ -17,6 +17,7 @@ import type {
   AddBondParams,
   FilterParams,
   ModifyParams,
+  WrapParams,
   ReplicateParams,
   DrawingBoundaryParams,
   BoundaryCompletionParams,
@@ -44,6 +45,7 @@ import { executeLoadTrajectory } from "./executors/loadTrajectory";
 import { executeAddBond } from "./executors/addBond";
 import { executeFilter } from "./executors/filter";
 import { executeModify } from "./executors/modify";
+import { executeWrap } from "./executors/wrap";
 import { executeReplicate } from "./executors/replicate";
 import { executeDrawingBoundary } from "./executors/drawingBoundary";
 import { executeBoundaryCompletion } from "./executors/boundaryCompletion";
@@ -280,6 +282,18 @@ export function executePipeline(
         edgeOutputs.set(id, outputs);
         if (!inputs.get("in")?.length) {
           addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        }
+        break;
+      }
+      case "wrap": {
+        const wrapParams = data.params as WrapParams;
+        const outputs = executeWrap(wrapParams, inputs);
+        edgeOutputs.set(id, outputs);
+        const particleIn = inputs.get("particle")?.[0] as ParticleData | undefined;
+        if (!particleIn) {
+          addError(id, { message: "No input data (check upstream nodes)", severity: "warning" });
+        } else if (wrapParams.mode !== "none" && !particleIn.source.box) {
+          addError(id, { message: "Wrap / Unwrap requires a unit cell", severity: "warning" });
         }
         break;
       }

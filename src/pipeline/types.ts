@@ -304,6 +304,7 @@ export type PipelineNodeType =
   | "viewport"
   | "filter"
   | "modify"
+  | "wrap"
   | "replicate"
   | "drawing_boundary"
   | "boundary_completion"
@@ -329,6 +330,7 @@ export const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
   viewport: "Viewport",
   filter: "Filter",
   modify: "Modify",
+  wrap: "Wrap / Unwrap",
   replicate: "Replicate",
   drawing_boundary: "Drawing Boundary",
   boundary_completion: "Boundary Completion",
@@ -358,6 +360,7 @@ export const NODE_CATEGORY: Record<PipelineNodeType, NodeCategory> = {
   coordination_generator: "bond",
   filter: "filter",
   modify: "modify",
+  wrap: "modify",
   replicate: "modify",
   drawing_boundary: "modify",
   boundary_completion: "modify",
@@ -447,6 +450,16 @@ export const NODE_PORTS: Record<PipelineNodeType, NodePortConfig> = {
   modify: {
     inputs: [{ name: "in", dataType: "particle", label: "In" }],
     outputs: [{ name: "out", dataType: "particle", label: "Out" }],
+  },
+  wrap: {
+    inputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
+    outputs: [
+      { name: "particle", dataType: "particle", label: "Particle" },
+      { name: "trajectory", dataType: "trajectory", label: "Trajectory" },
+    ],
   },
   replicate: {
     inputs: [
@@ -600,6 +613,23 @@ export interface ModifyParams {
   opacity: number;
 }
 
+/** Coordinate-mapping modes of the Wrap / Unwrap node. */
+export type WrapMode = "none" | "wrap" | "unwrap";
+
+/**
+ * Wrap / Unwrap node parameters — periodic-image coordinate mapping.
+ * "wrap" folds every atom back into the home unit cell (fractional [0,1));
+ * "unwrap" shifts atoms by whole lattice vectors so bonded molecules that
+ * straddle a periodic face become spatially contiguous (VESTA/Mercury-style
+ * whole molecules). "none" passes coordinates through untouched, which makes
+ * the node safe to keep wired into default pipelines as an on-demand toggle.
+ * Requires a unit cell on the input particle stream for the active modes.
+ */
+export interface WrapParams {
+  type: "wrap";
+  mode: WrapMode;
+}
+
 /**
  * Replicate node parameters — OVITO/VESTA-style supercell builder.
  * Copies every atom (and its bonds) into an `nx × ny × nz` grid of cell
@@ -747,6 +777,7 @@ export type PipelineNodeParams =
   | ViewportParams
   | FilterParams
   | ModifyParams
+  | WrapParams
   | ReplicateParams
   | DrawingBoundaryParams
   | BoundaryCompletionParams
@@ -797,6 +828,8 @@ export function defaultParams(type: PipelineNodeType): PipelineNodeParams {
         scale: 1.0,
         opacity: 1.0,
       };
+    case "wrap":
+      return { type, mode: "none" };
     case "replicate":
       return { type, nx: 1, ny: 1, nz: 1 };
     case "drawing_boundary":

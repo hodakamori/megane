@@ -76,6 +76,19 @@ Modifies visual properties (scale, opacity).
 - Inputs: `in` (accepts particle or bond data type)
 - Outputs: `out` (same type as input)
 
+### wrap
+Toggles periodic-image coordinate mapping for the particle stream (and its
+trajectory). "wrap" folds every atom back into the home unit cell;
+"unwrap" makes bonded molecules that straddle a periodic face whole again
+(VESTA/Mercury-style). Requires a unit cell; "none" passes through.
+- Parameters: `{ type: "wrap", mode: "none" | "wrap" | "unwrap" }`
+  - "none": pass positions through unchanged (default)
+  - "wrap": fold every atom into the home unit cell (fractional [0,1))
+  - "unwrap": shift atoms by whole lattice vectors so bonded molecules split
+    across a periodic face become contiguous
+- Inputs: `particle`, `trajectory`
+- Outputs: `particle`, `trajectory` (remapped)
+
 ### replicate
 Builds an OVITO/VESTA-style supercell by copying every atom (and its bonds)
 into an `nx × ny × nz` grid of cell images and enlarging the simulation cell

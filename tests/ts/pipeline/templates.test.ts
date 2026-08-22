@@ -6,6 +6,8 @@ import type {
   ModifyParams,
   RepresentationParams,
   SurfaceMeshParams,
+  BoundaryCompletionParams,
+  WrapParams,
 } from "@/pipeline/types";
 
 describe("PIPELINE_TEMPLATES", () => {
@@ -124,20 +126,30 @@ describe("PIPELINE_TEMPLATES surface mesh", () => {
     expect(params.opacity).toBe(0.5);
   });
 
-  it("wires loader→surface_mesh on particle and surface_mesh→viewport on mesh", () => {
+  it("wires loader→wrap→surface_mesh on particle and surface_mesh→viewport on mesh", () => {
     const { nodes, edges } = surface!.create();
     const loader = nodes.find((n) => n.type === "load_structure")!;
+    const wrap = nodes.find((n) => n.type === "wrap")!;
     const mesh = nodes.find((n) => n.type === "surface_mesh")!;
     const viewport = nodes.find((n) => n.type === "viewport")!;
 
-    const loaderToMesh = edges.find(
+    const loaderToWrap = edges.find(
       (e) =>
         e.source === loader.id &&
+        e.target === wrap.id &&
+        e.sourceHandle === "particle" &&
+        e.targetHandle === "particle",
+    );
+    expect(loaderToWrap).toBeDefined();
+
+    const wrapToMesh = edges.find(
+      (e) =>
+        e.source === wrap.id &&
         e.target === mesh.id &&
         e.sourceHandle === "particle" &&
         e.targetHandle === "particle",
     );
-    expect(loaderToMesh).toBeDefined();
+    expect(wrapToMesh).toBeDefined();
 
     const meshToViewport = edges.find(
       (e) =>
@@ -147,5 +159,108 @@ describe("PIPELINE_TEMPLATES surface mesh", () => {
         e.targetHandle === "mesh",
     );
     expect(meshToViewport).toBeDefined();
+  });
+});
+
+describe("PIPELINE_TEMPLATES molecular crystal", () => {
+  const molecularCrystal = PIPELINE_TEMPLATES.find((t) => t.id === "molecular_crystal");
+
+  it("is registered with a wrapped glycine CIF", () => {
+    expect(molecularCrystal).toBeDefined();
+    const { nodes } = molecularCrystal!.create();
+    const loader = nodes.find((n) => n.type === "load_structure")!;
+    const wrap = nodes.find((n) => n.type === "wrap")!;
+    expect((loader.data.params as LoadStructureParams).fileName).toBe("glycine_csd.cif");
+    expect((wrap.data.params as WrapParams).mode).toBe("wrap");
+  });
+
+  it("completes finite molecular components from bond topology and Drawing Boundary", () => {
+    const { nodes, edges } = molecularCrystal!.create();
+    const wrap = nodes.find((n) => n.type === "wrap")!;
+    const addBond = nodes.find((n) => n.type === "add_bond")!;
+    const drawingBoundary = nodes.find((n) => n.type === "drawing_boundary")!;
+    const completion = nodes.find((n) => n.type === "boundary_completion")!;
+    const viewport = nodes.find((n) => n.type === "viewport")!;
+
+    expect((completion.data.params as BoundaryCompletionParams).mode).toBe("components");
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: wrap.id,
+          target: addBond.id,
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        }),
+        expect.objectContaining({
+          source: wrap.id,
+          target: drawingBoundary.id,
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        }),
+        expect.objectContaining({
+          source: drawingBoundary.id,
+          target: completion.id,
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        }),
+        expect.objectContaining({
+          source: addBond.id,
+          target: completion.id,
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        }),
+        expect.objectContaining({
+          source: completion.id,
+          target: viewport.id,
+          sourceHandle: "particle",
+          targetHandle: "particle",
+        }),
+        expect.objectContaining({
+          source: completion.id,
+          target: viewport.id,
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        }),
+      ]),
+    );
+  });
+});
+
+describe("PIPELINE_TEMPLATES solid", () => {
+  it("places Wrap before Drawing Boundary and sends completed coordination bonds to Viewport", () => {
+    const solid = PIPELINE_TEMPLATES.find((t) => t.id === "solid")!;
+    const { nodes, edges } = solid.create();
+    const loader = nodes.find((n) => n.type === "load_structure")!;
+    const wrap = nodes.find((n) => n.type === "wrap")!;
+    const drawingBoundary = nodes.find((n) => n.type === "drawing_boundary")!;
+    const coordination = nodes.find((n) => n.type === "coordination_generator")!;
+    const viewport = nodes.find((n) => n.type === "viewport")!;
+
+    expect((wrap.data.params as WrapParams).mode).toBe("none");
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: loader.id, target: wrap.id }),
+        expect.objectContaining({ source: wrap.id, target: drawingBoundary.id }),
+        expect.objectContaining({ source: drawingBoundary.id, target: coordination.id }),
+        expect.objectContaining({
+          source: coordination.id,
+          target: viewport.id,
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        }),
+      ]),
+    );
+  });
+});
+
+describe("PIPELINE_TEMPLATES wrap toggle", () => {
+  it("every structure template carries a pass-through wrap node", () => {
+    for (const id of ["molecule", "solid", "surface_mesh", "protein"]) {
+      const template = PIPELINE_TEMPLATES.find((t) => t.id === id)!;
+      const { nodes } = template.create();
+      const wrap = nodes.find((n) => n.type === "wrap");
+      expect(wrap, `template "${id}" missing wrap node`).toBeDefined();
+      expect(wrap!.data.params).toEqual({ type: "wrap", mode: "none" });
+    }
   });
 });

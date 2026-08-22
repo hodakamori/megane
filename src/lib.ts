@@ -4,7 +4,8 @@
  */
 
 // React components
-export { MeganeViewer } from "./components/MeganeViewer";
+export { MeganeViewer, DEFAULT_MEGANE_VIEWER_UI } from "./components/MeganeViewer";
+export type { MeganeViewerUiOptions } from "./components/MeganeViewer";
 export { PipelineViewer } from "./components/PipelineViewer";
 export { Viewport } from "./components/Viewport";
 export { Sidebar } from "./components/Sidebar";

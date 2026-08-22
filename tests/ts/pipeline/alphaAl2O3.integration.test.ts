@@ -98,6 +98,8 @@ describe("alpha-Al2O3 drawing-boundary pipeline integration", () => {
     expect(boundaryParticle.drawingBoundary?.images.sourceIndices.length).toBe(16);
     expect(coordination.nBonds).toBe(144);
     expect(bonds.nBonds).toBe(144);
+    expect(coordination.outsideBoundaryImages?.sourceIndices.length).toBeGreaterThan(0);
+    expect(bonds.periodicImages).toBe(coordination.outsideBoundaryImages);
     const centers = new Set<number>();
     for (let pair = 0; pair < coordination.nBonds; pair++) {
       centers.add(coordination.bondIndices[pair * 2]);

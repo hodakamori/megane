@@ -270,6 +270,27 @@ export const NODE_CATALOG: Record<PipelineNodeType, NodeCatalogEntry> = {
     inPrompt: true,
     pythonClass: "Modify",
   },
+  wrap: {
+    description:
+      'Toggles periodic-image coordinate mapping for the particle stream (and its\ntrajectory). "wrap" folds every atom back into the home unit cell;\n"unwrap" makes bonded molecules that straddle a periodic face whole again\n(VESTA/Mercury-style). Requires a unit cell; "none" passes through.',
+    params: [
+      {
+        jsonKey: "mode",
+        tsType: '"none" | "wrap" | "unwrap"',
+        default: '"none"',
+        doc: "Coordinate mapping applied to atoms and trajectory frames.",
+      },
+    ],
+    promptNotes: [
+      '"none": pass positions through unchanged (default)',
+      '"wrap": fold every atom into the home unit cell (fractional [0,1))',
+      '"unwrap": shift atoms by whole lattice vectors so bonded molecules split\n    across a periodic face become contiguous',
+    ],
+    promptInputs: "`particle`, `trajectory`",
+    promptOutputs: "`particle`, `trajectory` (remapped)",
+    inPrompt: true,
+    pythonClass: "Wrap",
+  },
   replicate: {
     description:
       "Builds an OVITO/VESTA-style supercell by copying every atom (and its bonds)\ninto an `nx × ny × nz` grid of cell images and enlarging the simulation cell\nto match. Requires a unit cell on the input.",

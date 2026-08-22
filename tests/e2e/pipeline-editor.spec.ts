@@ -17,7 +17,7 @@ const ATOM_COUNT_CAFFEINE = 3024;
 // graph is not guaranteed for every kind, so the spec only asserts the
 // ones the seed graph mounts. Stub kinds are checked as `>= 0` to allow
 // future seed changes without churning the spec.
-const SEEDED_KINDS = ["load_structure", "viewport"] as const;
+const SEEDED_KINDS = ["load_structure", "wrap", "viewport"] as const;
 
 test.describe("pipeline-editor: webapp default graph", () => {
   test.beforeEach(async ({ page }) => {
@@ -70,6 +70,32 @@ test.describe("pipeline-editor: webapp default graph", () => {
     const nx = page.locator('[data-testid="replicate-node-nx"]').first();
     await nx.fill("2");
     await expect(nx).toHaveValue("2");
+  });
+
+  test("seeded Wrap node exposes its mode toggle and accepts a change", async ({ page }) => {
+    await page.locator('[data-testid="pipeline-editor-tab-editor"]').click();
+
+    // The default seed graph carries a pass-through Wrap node.
+    const node = page.locator('[data-testid="pipeline-node-wrap"]').first();
+    await expect(node).toBeVisible();
+    const mode = page.locator('[data-testid="wrap-node-mode"]').first();
+    await expect(mode).toBeVisible();
+    await expect(mode).toHaveValue("none");
+
+    // The wrap ↔ unwrap toggle is accepted.
+    await mode.selectOption("unwrap");
+    await expect(mode).toHaveValue("unwrap");
+    await mode.selectOption("wrap");
+    await expect(mode).toHaveValue("wrap");
+  });
+
+  test("Add Node menu adds a Wrap / Unwrap node with its mode selector", async ({ page }) => {
+    await page.locator('[data-testid="pipeline-editor-tab-editor"]').click();
+    await page.getByTitle("Add Node").click();
+    await page.getByRole("button", { name: "Wrap / Unwrap", exact: true }).click();
+
+    // The seed graph already carries one wrap node; adding makes it two.
+    await expect(page.locator('[data-testid="pipeline-node-wrap"]')).toHaveCount(2);
   });
 
   // Wiring the two nodes together needs a ReactFlow handle drag, which is

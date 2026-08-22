@@ -271,15 +271,14 @@ fn decompress_coords(xdr: &mut XdrReader, natoms: usize) -> Result<Vec<f32>, Str
 
     // Determine encoding mode
     let mut bitsizeint = [0u32; 3];
-    let bitsize;
-    if (sizeint[0] | sizeint[1] | sizeint[2]) > 0x00ff_ffff {
+    let bitsize = if (sizeint[0] | sizeint[1] | sizeint[2]) > 0x00ff_ffff {
         bitsizeint[0] = sizeofint(sizeint[0]);
         bitsizeint[1] = sizeofint(sizeint[1]);
         bitsizeint[2] = sizeofint(sizeint[2]);
-        bitsize = 0;
+        0
     } else {
-        bitsize = sizeofints(3, &sizeint);
-    }
+        sizeofints(3, &sizeint)
+    };
 
     let mut smallidx = xdr.read_i32()? as usize;
     let tmp_idx = if smallidx > 0 { smallidx - 1 } else { 0 };

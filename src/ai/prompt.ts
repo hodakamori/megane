@@ -518,6 +518,10 @@ Fades the water to fully transparent and shows the rest of the structure at its 
 - For supercells: add a \`replicate\` node between load_structure and viewport
   (and add_bond, if present), forwarding its \`particle\`/\`cell\`/\`trajectory\`
   outputs downstream.
+- To fold atoms back into the periodic cell ("wrap") or make molecules split
+  across a periodic face whole again ("unwrap"): add a \`wrap\` node between
+  load_structure and viewport (before \`replicate\`, if present), forwarding its
+  \`particle\`/\`trajectory\` outputs downstream and setting \`mode\` accordingly.
 - For recoloring or changing display style ("cartoon", "surface", etc.): add
   \`color\` and/or \`representation\` nodes between load_structure (or add_bond)
   and viewport; both only accept \`particle\`.

@@ -24,7 +24,7 @@ import "megane-viewer/styles.css";
 
 ## Full-Featured Viewer
 
-The easiest way to get started is the `MeganeViewer` component. It includes the 3D viewport, sidebar, appearance panel, timeline, tooltip, and measurement panel — everything you need in a single component.
+The easiest way to get started is the `MeganeViewer` component. It includes the 3D viewport, pipeline editor, timeline, tooltip, and measurement panels — everything you need in a single component. Every tool except the 3D viewport can be switched off through the [`ui` prop](#hiding-tools-ui).
 
 ```tsx
 import { useCallback } from "react";
@@ -67,6 +67,38 @@ function App() {
 | `onPlayPause` | `() => void` | | Play/pause toggle |
 | `onFpsChange` | `(fps: number) => void` | | FPS change handler |
 | `width` / `height` | `string \| number` | | Viewer dimensions (default: `"100%"`) |
+| `ui` | `Partial<MeganeViewerUiOptions>` | | Hides individual tools — see below (default: everything visible) |
+
+### Hiding tools (`ui`)
+
+Every tool except the 3D viewport can be hidden at construction time. Omitted
+keys stay visible, so you only list what you want gone:
+
+```tsx
+import { MeganeViewer, usePipelineStore } from "megane-viewer/lib";
+
+// Read-only embed: 3D view and playback only.
+<MeganeViewer
+  ui={{ pipelineEditor: false, resetView: false, perfHud: false }}
+  onUploadStructure={(file) => usePipelineStore.getState().openFile(file)}
+/>;
+```
+
+| Key | Default | Hides |
+|------|---------|-------|
+| `pipelineEditor` | `true` | Pipeline editor panel on the right, including the viewer's only file-open UI |
+| `resetView` | `true` | "Reset View" button in the top-left corner |
+| `perfHud` | `true` | Atoms / Bonds / Draws / FPS readout |
+| `timeline` | `true` | Playback timeline along the bottom |
+| `tooltip` | `true` | Hover tooltip over atoms and bonds |
+| `measurement` | `true` | Measurement readout panel and saved-measurement list (selection itself stays active — press <kbd>Esc</kbd> to clear it) |
+
+Hiding a tool removes it from the DOM but changes nothing about the scene — the
+pipeline still executes and the renderer still receives every update. The type
+`MeganeViewerUiOptions` and the all-visible defaults `DEFAULT_MEGANE_VIEWER_UI`
+are exported for typed configs. With `pipelineEditor: false` you must drive
+file loading yourself (`usePipelineStore.getState().openFile(file)`), since the
+Load Structure node lives inside the editor.
 
 See the [TypeScript Pipeline API](/guide/pipeline/typescript) for the complete interface.
 

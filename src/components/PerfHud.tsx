@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { PERF_HUD_LEFT_DEFAULT } from "./overlayLayout";
 
 interface PerfHudProps {
   atomCount: number;
@@ -19,11 +20,24 @@ interface PerfHudProps {
    * E2E so screenshot baselines stay deterministic (FPS digits vary per run).
    */
   stable?: boolean;
+  /**
+   * Distance from the viewer's left edge in px. Defaults to
+   * {@link PERF_HUD_LEFT_DEFAULT}, which clears the Reset View button; hosts
+   * that hide that button pass a smaller value so the HUD doesn't float with
+   * an empty gap beside it.
+   */
+  left?: number;
 }
 
 const POLL_MS = 500;
 
-export function PerfHud({ atomCount, bondCount, getStats, stable = false }: PerfHudProps) {
+export function PerfHud({
+  atomCount,
+  bondCount,
+  getStats,
+  stable = false,
+  left = PERF_HUD_LEFT_DEFAULT,
+}: PerfHudProps) {
   const [stats, setStats] = useState<{ fps: number; drawCalls: number }>({
     fps: 0,
     drawCalls: 0,
@@ -47,7 +61,7 @@ export function PerfHud({ atomCount, bondCount, getStats, stable = false }: Perf
       style={{
         position: "absolute",
         top: 12,
-        left: 92,
+        left,
         padding: "4px 8px",
         fontSize: 11,
         lineHeight: 1,

@@ -14,6 +14,30 @@ describe("ShareDialog", () => {
     expect(container.querySelector("[data-testid='share-dialog']")).toBeNull();
   });
 
+  // The dialog claims Escape in the capture phase and marks it handled, so it
+  // must not over-claim: other keys have to fall through untouched.
+  it("closes on Escape and marks the event handled", () => {
+    const onClose = vi.fn();
+    render(<ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={onClose} />);
+
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+    window.dispatchEvent(ev);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it("leaves keys other than Escape alone", () => {
+    const onClose = vi.fn();
+    render(<ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={onClose} />);
+
+    const ev = new KeyboardEvent("keydown", { key: "a", cancelable: true });
+    window.dispatchEvent(ev);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
   it("renders a read-only input containing the URL when open", () => {
     render(<ShareDialog open url="http://x/#pipeline=abc" tooLong={false} onClose={() => {}} />);
     const input = screen.getByTestId("share-dialog-url-input") as HTMLInputElement;

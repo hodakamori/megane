@@ -7,7 +7,7 @@ description: Get a base pipeline template for crystalline solid visualization wi
 
 A pipeline for crystalline solid visualization with periodic images in a fractional-coordinate drawing range and coordination polyhedra.
 
-Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerator -> Viewport.
+Structure: LoadStructure -> Wrap -> DrawingBoundary -> Coordination -> PolyhedronGenerator -> Viewport.
 
 ```json
 {
@@ -23,9 +23,16 @@ Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerat
       "enabled": true
     },
     {
+      "id": "wrap-1",
+      "type": "wrap",
+      "position": { "x": 425, "y": 155 },
+      "mode": "none",
+      "enabled": true
+    },
+    {
       "id": "drawing-boundary-1",
       "type": "drawing_boundary",
-      "position": { "x": 425, "y": 180 },
+      "position": { "x": 425, "y": 330 },
       "xMin": 0,
       "xMax": 1,
       "yMin": 0,
@@ -37,7 +44,7 @@ Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerat
     {
       "id": "coordination-1",
       "type": "coordination_generator",
-      "position": { "x": 425, "y": 360 },
+      "position": { "x": 425, "y": 510 },
       "excludedCenters": [],
       "excludedLigands": [],
       "cutoffTolerance": 1.15,
@@ -47,7 +54,7 @@ Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerat
     {
       "id": "polyhedron-1",
       "type": "polyhedron_generator",
-      "position": { "x": 680, "y": 535 },
+      "position": { "x": 680, "y": 685 },
       "opacity": 0.5,
       "showEdges": false,
       "edgeColor": "#dddddd",
@@ -57,7 +64,7 @@ Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerat
     {
       "id": "viewport-1",
       "type": "viewport",
-      "position": { "x": 425, "y": 750 },
+      "position": { "x": 425, "y": 900 },
       "perspective": false,
       "cellAxesVisible": true,
       "enabled": true
@@ -66,6 +73,12 @@ Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerat
   "edges": [
     {
       "source": "loader-1",
+      "target": "wrap-1",
+      "sourceHandle": "particle",
+      "targetHandle": "particle"
+    },
+    {
+      "source": "wrap-1",
       "target": "drawing-boundary-1",
       "sourceHandle": "particle",
       "targetHandle": "particle"
@@ -113,8 +126,9 @@ Structure: LoadStructure -> DrawingBoundary -> Coordination -> PolyhedronGenerat
 ## Customization Notes
 
 - Drawing Boundary owns periodic display copies and accepts arbitrary inclusive fractional bounds.
+- Wrap is placed before Drawing Boundary so callers can explicitly normalize coordinates into the home cell when needed; its default `none` mode leaves coordinates unchanged.
 - Coordination auto-detects metal/metalloid centers and neighboring anion-former atoms. Use `excludedCenters` / `excludedLigands` to opt out specific atomic numbers.
 - Common atomic numbers: Ti=22, O=8, Sr=38, Fe=26, Al=13, Si=14, Mg=12, Ca=20, Zn=30.
-- Adjust Coordination's `cutoffTolerance` to widen or narrow the center-neighbor contact criterion. With `boundaryMode: "complete"`, periodic neighbors just outside the drawing range are included when needed to complete visible centers.
+- Adjust Coordination's `cutoffTolerance` to widen or narrow the center-neighbor contact criterion. With `boundaryMode: "complete"`, periodic neighbors just outside the drawing range are included when needed to complete visible centers. Connect Coordination's Bond output to Viewport to render both those neighbor atoms and their bonds.
 - PolyhedronGenerator owns mesh appearance only.
 - Set `hasCell: true` and `cellAxesVisible: true` to show the unit cell.

@@ -28,6 +28,7 @@ from megane.pipeline import (
     SpectrumPlot,
     VectorOverlay,
     Viewport,
+    Wrap,
     build_pipeline,
     view,
     view_traj,
@@ -85,6 +86,15 @@ class TestNodeClasses:
         assert n.nx == 2
         assert n.ny == 3
         assert n.nz == 4
+
+    def test_wrap_defaults(self):
+        n = Wrap()
+        assert n.mode == "none"
+        assert n._node_type == "wrap"
+
+    def test_wrap_custom(self):
+        n = Wrap(mode="unwrap")
+        assert n.mode == "unwrap"
 
     def test_representation_defaults(self):
         n = Representation()
@@ -569,6 +579,27 @@ class TestPipelineSerialization:
         rebuilt = pipe2._nodes[r._id][0]
         assert isinstance(rebuilt, Replicate)
         assert (rebuilt.nx, rebuilt.ny, rebuilt.nz) == (2, 1, 3)
+
+    def test_wrap_serialization(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        w = pipe.add_node(Wrap(mode="wrap"))
+        pipe.add_edge(s.out.particle, w.inp.particle)
+        result = pipe.to_dict()
+
+        wrap_node = next(n for n in result["nodes"] if n["type"] == "wrap")
+        assert wrap_node["mode"] == "wrap"
+
+    def test_wrap_round_trip(self):
+        pipe = Pipeline()
+        s = pipe.add_node(LoadStructure(str(FIXTURES / "1crn.pdb")))
+        w = pipe.add_node(Wrap(mode="unwrap"))
+        pipe.add_edge(s.out.particle, w.inp.particle)
+
+        pipe2 = Pipeline.from_dict(pipe.to_dict())
+        rebuilt = pipe2._nodes[w._id][0]
+        assert isinstance(rebuilt, Wrap)
+        assert rebuilt.mode == "unwrap"
 
     def test_add_bonds_serialization(self):
         pipe = Pipeline()

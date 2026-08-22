@@ -53,8 +53,9 @@ LoadStructure → AddBond → Viewport
 
 Use the **Templates** dropdown to load pre-built pipelines:
 
-- **Molecule** — Caffeine (`caffeine_water.pdb`) with structure-based bonds and a vibration trajectory (`caffeine_water_vibration.xtc`). Nodes: `LoadStructure → AddBond → Viewport`, `LoadTrajectory → Viewport`.
-- **Solid** — Perovskite SrTiO₃ 3×3×3 supercell with distance-based bonds and TiO₆ coordination polyhedra. Nodes: `LoadStructure → AddBond → Viewport`, `PolyhedronGenerator → Viewport`. Auto-detects metal centers and anion-former ligands (VESTA-style); Sr is excluded from centers so only TiO₆ polyhedra are shown.
+- **Molecule** — Caffeine (`caffeine_water.pdb`) with structure-based bonds and a vibration trajectory (`caffeine_water_vibration.xtc`). Nodes: `LoadStructure → Wrap → AddBond → Viewport`, `LoadTrajectory → Wrap → Viewport`.
+- **Molecular Crystal** — Glycine (`glycine_csd.cif`) with atoms normalized into the home cell and finite molecules completed across its faces. Nodes: `LoadStructure → Wrap`, followed by parallel `AddBond` and `DrawingBoundary` branches that join at `BoundaryCompletion → Viewport`.
+- **Solid** — Perovskite SrTiO₃ 3×3×3 supercell with TiO₆ coordination polyhedra. Nodes: `LoadStructure → Wrap → DrawingBoundary → Coordination → PolyhedronGenerator → Viewport`. Coordination detects metal centers and neighboring anion-former atoms; its Bond output also renders the neighbor atoms required to complete boundary coordination environments.
 
 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
   <LiveViewer data="caffeine_water" height="300px" caption="Molecule template — caffeine in water" />
@@ -209,6 +210,28 @@ streams.
 Molecule 0 (the component containing atom 0) stays fully opaque, while every
 other molecule's atoms and bonds fade together — both Filter nodes derive
 `molecule_id` from the same underlying bond connectivity.
+
+### Wrap / Unwrap a Periodic Structure
+
+The **Wrap / Unwrap** node toggles periodic-image coordinate mapping without
+changing the file. Every default pipeline and structure template already
+carries one between `LoadStructure` and the rest of the graph in its
+pass-through mode (`none`), so the toggle is a single dropdown click:
+
+1. Load a periodic structure (a unit cell is required)
+2. Select the `Wrap / Unwrap` node in the graph
+3. Pick a mode:
+   - **Wrap** folds every atom back into the home unit cell (useful for
+     trajectories whose coordinates drift out of the box)
+   - **Unwrap** shifts atoms by whole lattice vectors so molecules split
+     across a periodic face become whole again, VESTA/Mercury-style —
+     connectivity comes from the file's bonds, or the same distance-based
+     inference the `AddBond` node uses when the file has none
+   - **None** passes coordinates through untouched (the default)
+
+A connected trajectory is remapped frame by frame with the same convention,
+so playback follows the chosen mapping too. The unit cell itself never
+changes — unwrapped molecules may poke outside the cell wireframe.
 
 ### Multiple Structure Layers
 

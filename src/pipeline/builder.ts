@@ -325,6 +325,36 @@ export class BoundaryCompletion extends PipelineNode {
 }
 
 /**
+ * Toggle periodic-image coordinate mapping: fold atoms into the home unit
+ * cell ("wrap") or make molecules split across a periodic face whole again
+ * ("unwrap"). "none" (the default) passes coordinates through untouched.
+ *
+ * Ports:
+ *   inp.particle — atom data in
+ *   inp.traj     — trajectory in
+ *   out.particle — remapped atom data
+ *   out.traj     — remapped trajectory
+ */
+export type WrapMode = "none" | "wrap" | "unwrap";
+
+export class Wrap extends PipelineNode {
+  readonly nodeType = "wrap";
+  protected readonly _outPorts = { particle: "particle", traj: "trajectory" };
+  protected readonly _inpPorts = { particle: "particle", traj: "trajectory" };
+
+  public mode: WrapMode;
+
+  constructor({ mode = "none" }: { mode?: WrapMode } = {}) {
+    super();
+    this.mode = mode;
+  }
+
+  _toSerializedParams() {
+    return { type: this.nodeType, mode: this.mode };
+  }
+}
+
+/**
  * Per-stream coloring (Ovito-style). The Viewport reads color overrides
  * directly off the particle stream, so multiple Color nodes can stack.
  *
