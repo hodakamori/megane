@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The AI chat's free-demo backend and the LLM prompt-eval benchmark now run on Preferred Networks' PLaMo API instead of OpenRouter.** PLaMo's `https://api.platform.preferredai.jp/v1` endpoint is OpenAI-compatible (bearer auth, SSE streaming, `tools` function calling), so the frontend's OpenAI-compatible client path and the skill tool round trip work against it unchanged. What moved: the Cloudflare Worker proxy (`workers/llm-proxy/`) now sends a single `model` and holds `PLAMO_API_KEY` — OpenRouter's server-side `models` routing array and its `HTTP-Referer`/`X-Title` attribution headers are gone, and the Worker walks `PLAMO_MODEL` → `PLAMO_FALLBACK_MODELS` itself, streaming back the first model that answers. The default is `plamo-3.0-prime` (262k context, tool calling) falling back to `plamo-2.2-prime`. `bench/llm/` swaps its `openrouter` provider for `plamo` (`PLAMO_API_KEY`, default `plamo-3.0-prime`), and the `llm-eval` workflow reads the `PLAMO_API_KEY` repository secret. **Deploying requires setting the `PLAMO_API_KEY` GitHub repository secret; the old `OPENROUTER_API_KEY` secret and Worker secret are no longer read.**
+
+### Fixed
+
+- **The `Deploy LLM Proxy Worker` workflow could not install its dependencies.** A Dependabot bump pulled `wrangler` past the point where it requires `@cloudflare/workers-types@^5`, while `workers/llm-proxy/package.json` still asked for `^4`, so `npm ci` failed with `ERESOLVE` and every deploy since 2026-07-25 stopped at the install step. The dev dependency is now on `^5.20260801.1`.
+
 ### Added
 
 - **`MeganeViewer` can hide every tool except the 3D Viewport.** The new `ui` prop takes a partial `MeganeViewerUiOptions` — `pipelineEditor`, `resetView`, `perfHud`, `timeline`, `tooltip`, `measurement` — where omitted keys stay visible, so you only list what you want gone: `<MeganeViewer ui={{ pipelineEditor: false }} />`. The type and the frozen all-visible defaults (`DEFAULT_MEGANE_VIEWER_UI`) are exported from `megane-viewer/lib`. Hiding a tool removes it from the DOM but not from the scene: the pipeline still executes, and the layout closes the gap — the camera frustum stops reserving the pipeline panel's width, the perf HUD takes the vacated Reset View slot, and the measurement panels drop to the corner whenever no timeline strip is on screen. The bundled hosts (webapp, VSCode webview, JupyterLab DocWidget) pass no `ui` prop and are unchanged.

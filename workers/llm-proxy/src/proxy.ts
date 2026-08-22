@@ -11,7 +11,7 @@
  */
 
 export interface Env {
-  OPENROUTER_API_KEY: string;
+  PLAMO_API_KEY: string;
   /**
    * Comma-separated list of origins allowed to call this proxy. A single
    * value (no comma) is the common case, but multiple let one proxy serve
@@ -22,66 +22,64 @@ export interface Env {
   ALLOWED_ORIGIN: string;
   RATE_LIMIT_KV: KVNamespace;
   /**
-   * Optional override for the primary OpenRouter model slug. Free `:free`
-   * models come and go (and occasionally flip to paid-only, returning a
-   * 404), so keeping this in config lets you swap models — or move to a
-   * paid model like an Anthropic one — without a code change. Falls back
-   * to {@link DEFAULT_MODEL}.
+   * Optional override for the primary PLaMo model id. Keeping this in config
+   * lets you move between models — e.g. down to the cheaper, shorter-context
+   * `plamo-2.2-prime` — without a code change. Falls back to
+   * {@link DEFAULT_MODEL}.
    */
-  OPENROUTER_MODEL?: string;
+  PLAMO_MODEL?: string;
   /**
-   * Optional comma-separated fallback models. OpenRouter tries the primary
-   * first and routes to the next on error (e.g. a free model that is
-   * temporarily rate-limited upstream returns 429). Falls back to
+   * Optional comma-separated fallback models, tried in order after the
+   * primary when it errors (see {@link buildModelList}). Falls back to
    * {@link DEFAULT_FALLBACK_MODELS}.
    */
-  OPENROUTER_FALLBACK_MODELS?: string;
+  PLAMO_FALLBACK_MODELS?: string;
 }
 
 /**
- * Default primary model when OPENROUTER_MODEL is unset. A currently-
- * available free instruction-following model; update it here (or via the
- * env var) if OpenRouter retires it.
+ * PLaMo's OpenAI-compatible Chat Completions endpoint. The API mirrors
+ * OpenAI's request/response shape (bearer auth, `stream: true` SSE ending
+ * in `data: [DONE]`, `tools`/`tool_choice` function calling), so the
+ * frontend's OpenAI-compatible client path works against it unchanged.
  */
-export const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+export const PLAMO_API_URL = "https://api.platform.preferredai.jp/v1/chat/completions";
 
 /**
- * Free models from different upstream providers, tried in order after the
- * primary. Free tiers are heavily rate-limited per provider, so spreading
- * across providers makes a transient 429 on one fall through to another
- * instead of failing the request.
+ * Default primary model when PLAMO_MODEL is unset. PLaMo 3.0 Prime has the
+ * largest context window (262k) of the published models and supports tool
+ * calling, which the skill round trip depends on.
  */
-export const DEFAULT_FALLBACK_MODELS = ["openai/gpt-oss-120b:free", "z-ai/glm-4.5-air:free"];
+export const DEFAULT_MODEL = "plamo-3.0-prime";
 
 /**
- * OpenRouter caps its `models` routing array at 3 entries (a 4th yields a
- * 400 "'models' array must have 3 items or fewer.").
+ * Models tried in order after the primary. PLaMo has no server-side model
+ * routing (that was an OpenRouter feature), so the Worker retries the next
+ * id itself when a request errors — see {@link handleFetch}. 2.2 Prime is
+ * the older, smaller-context model, used only if 3.0 is unavailable.
+ */
+export const DEFAULT_FALLBACK_MODELS = ["plamo-2.2-prime"];
+
+/**
+ * Upper bound on how many models one request may try. Each attempt is a
+ * separate upstream fetch, so this bounds both worst-case latency and the
+ * Worker's subrequest budget.
  */
 export const MAX_MODELS = 3;
 
 /**
- * Builds the ordered, de-duplicated model list sent to OpenRouter as its
- * `models` routing array: the configured primary first, then the
- * fallbacks, capped at {@link MAX_MODELS}.
+ * Builds the ordered, de-duplicated list of models to try: the configured
+ * primary first, then the fallbacks, capped at {@link MAX_MODELS}.
  */
 export function buildModelList(env: Env): string[] {
-  const primary = env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  const primary = env.PLAMO_MODEL || DEFAULT_MODEL;
   const fallbacks =
-    env.OPENROUTER_FALLBACK_MODELS !== undefined
-      ? env.OPENROUTER_FALLBACK_MODELS.split(",")
+    env.PLAMO_FALLBACK_MODELS !== undefined
+      ? env.PLAMO_FALLBACK_MODELS.split(",")
           .map((m) => m.trim())
           .filter((m) => m.length > 0)
       : DEFAULT_FALLBACK_MODELS;
   return [...new Set([primary, ...fallbacks])].slice(0, MAX_MODELS);
 }
-/**
- * Upstream completion cap. Matches the direct-provider paths in the
- * frontend client (`src/ai/client.ts` sends `max_tokens: 4096`): a
- * smaller cap here silently truncated larger completions — e.g. the
- * multi-branch pipelines produced for "make only the water transparent"
- * style requests — leaving an unterminated JSON fence that the frontend
- * could not parse, surfacing only a generic "Something went wrong".
- */
 export const MAX_TOKENS = 4096;
 export const MAX_MESSAGES = 12;
 /**
@@ -180,46 +178,62 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
   const models = buildModelList(env);
   log(
     `forwarding ${messages.length} message(s)` +
-      `${tools && tools.length > 0 ? ` + ${tools.length} tool(s)` : ""} to OpenRouter ` +
+      `${tools && tools.length > 0 ? ` + ${tools.length} tool(s)` : ""} to PLaMo ` +
       `(model=${models[0]}${models.length > 1 ? ` +${models.length - 1} fallback(s)` : ""})`,
   );
 
-  const upstreamBody: Record<string, unknown> = {
-    models,
+  const baseBody: Record<string, unknown> = {
     messages,
     max_tokens: MAX_TOKENS,
     stream: true,
   };
   if (tools && tools.length > 0) {
-    upstreamBody.tools = tools;
+    baseBody.tools = tools;
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        // origin is guaranteed allowed (and non-null) here; fall back to the
-        // first configured origin only to satisfy the type.
-        "HTTP-Referer": origin ?? parseAllowedOrigins(env)[0],
-        "X-Title": "megane demo",
-      },
-      body: JSON.stringify(upstreamBody),
-    });
-  } catch (err) {
-    console.error(`[llm-proxy] ${ip} upstream fetch failed: ${(err as Error).message}`);
-    return jsonError("Upstream request failed", 502, origin, env);
+  // PLaMo takes a single `model` and has no server-side routing across
+  // models, so the fallback list is walked here: try each id in turn and
+  // keep the first response that can actually be streamed back. Only the
+  // last failure is reported to the caller.
+  let upstream: Response | null = null;
+  let failureStatus = 502;
+  let failureMessage = "Upstream request failed";
+
+  for (const model of models) {
+    let response: Response;
+    try {
+      response = await fetch(PLAMO_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.PLAMO_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ...baseBody, model }),
+      });
+    } catch (err) {
+      console.error(
+        `[llm-proxy] ${ip} upstream fetch failed for ${model}: ${(err as Error).message}`,
+      );
+      failureStatus = 502;
+      failureMessage = "Upstream request failed";
+      continue;
+    }
+
+    if (response.ok && response.body) {
+      log(`upstream responded ${response.status} for ${model}, streaming back to client`);
+      upstream = response;
+      break;
+    }
+
+    const text = await response.text();
+    console.error(`[llm-proxy] ${ip} upstream error ${response.status} for ${model}: ${text}`);
+    failureStatus = response.status || 502;
+    failureMessage = `Upstream error: ${text}`;
   }
 
-  if (!upstream.ok || !upstream.body) {
-    const text = await upstream.text();
-    console.error(`[llm-proxy] ${ip} upstream error ${upstream.status}: ${text}`);
-    return jsonError(`Upstream error: ${text}`, upstream.status || 502, origin, env);
+  if (!upstream) {
+    return jsonError(failureMessage, failureStatus, origin, env);
   }
-
-  log(`upstream responded ${upstream.status}, streaming back to client`);
 
   return new Response(upstream.body, {
     status: 200,
