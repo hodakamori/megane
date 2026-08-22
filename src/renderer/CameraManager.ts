@@ -11,19 +11,25 @@ export interface ViewExtent {
   maxExtent: number;
   extentX: number;
   extentY: number;
-  /** World Z extent; optional only for backwards-compatible callers. */
-  extentZ?: number;
 }
 
 /** Compute bounding box and center for a snapshot. */
-export function computeViewBounds(
-  snapshot: Snapshot,
-  additionalPositions: readonly Float32Array[] = [],
-): {
+export function computeViewBounds(snapshot: Snapshot): {
   center: [number, number, number];
   extent: ViewExtent;
 } {
   const { positions, nAtoms } = snapshot;
+
+  let sumX = 0,
+    sumY = 0,
+    sumZ = 0;
+  for (let i = 0; i < nAtoms; i++) {
+    sumX += positions[i * 3];
+    sumY += positions[i * 3 + 1];
+    sumZ += positions[i * 3 + 2];
+  }
+
+  let cx: number, cy: number, cz: number;
   let minX = Infinity,
     minY = Infinity,
     minZ = Infinity;
@@ -43,6 +49,10 @@ export function computeViewBounds(
     const ox = origin ? origin[0] : 0;
     const oy = origin ? origin[1] : 0;
     const oz = origin ? origin[2] : 0;
+    cx = ox + (box[0] + box[3] + box[6]) / 2;
+    cy = oy + (box[1] + box[4] + box[7]) / 2;
+    cz = oz + (box[2] + box[5] + box[8]) / 2;
+
     const va = [box[0], box[1], box[2]];
     const vb = [box[3], box[4], box[5]];
     const vc = [box[6], box[7], box[8]];
@@ -61,13 +71,15 @@ export function computeViewBounds(
         }
       }
     }
-  }
+  } else {
+    cx = nAtoms > 0 ? sumX / nAtoms : 0;
+    cy = nAtoms > 0 ? sumY / nAtoms : 0;
+    cz = nAtoms > 0 ? sumZ / nAtoms : 0;
 
-  const includePositions = (coords: Float32Array, count = coords.length / 3) => {
-    for (let i = 0; i < count; i++) {
-      const x = coords[i * 3];
-      const y = coords[i * 3 + 1];
-      const z = coords[i * 3 + 2];
+    for (let i = 0; i < nAtoms; i++) {
+      const x = positions[i * 3];
+      const y = positions[i * 3 + 1];
+      const z = positions[i * 3 + 2];
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       minZ = Math.min(minZ, z);
@@ -75,19 +87,7 @@ export function computeViewBounds(
       maxY = Math.max(maxY, y);
       maxZ = Math.max(maxZ, z);
     }
-  };
-
-  includePositions(positions, nAtoms);
-  for (const extra of additionalPositions) includePositions(extra);
-
-  if (!Number.isFinite(minX)) {
-    minX = minY = minZ = maxX = maxY = maxZ = 0;
   }
-
-  // Fit to Screen centers all visible objects, not just the home cell.
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  const cz = (minZ + maxZ) / 2;
 
   const extentX = maxX - minX;
   const extentY = maxY - minY;
@@ -96,7 +96,7 @@ export function computeViewBounds(
 
   return {
     center: [cx, cy, cz],
-    extent: { maxExtent, extentX, extentY, extentZ },
+    extent: { maxExtent, extentX, extentY },
   };
 }
 
@@ -105,9 +105,8 @@ export function fitCameraToView(
   camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
   controls: OrbitControls,
   snapshot: Snapshot,
-  additionalPositions: readonly Float32Array[] = [],
 ): ViewExtent {
-  const { center, extent } = computeViewBounds(snapshot, additionalPositions);
+  const { center, extent } = computeViewBounds(snapshot);
   const [cx, cy, cz] = center;
 
   controls.target.set(cx, cy, cz);
@@ -224,11 +223,7 @@ export function applyFrustumInsets(
   const effectiveAspect = effectiveWidth / containerHeight;
 
   const padding = 1.2;
-  // The default camera looks down -Y with +Z as screen-up, so the vertical
-  // screen extent is world Z. Falling back to Y preserves external callers
-  // that still construct the older ViewExtent shape.
-  const screenHeight = extent.extentZ ?? extent.extentY;
-  const halfH = Math.max(screenHeight / 2, extent.extentX / (2 * effectiveAspect)) * padding;
+  const halfH = Math.max(extent.extentY / 2, extent.extentX / (2 * effectiveAspect)) * padding;
   const frustumHeight = Math.max(halfH * 2, 0.1);
 
   const fullAspect = containerWidth / containerHeight;

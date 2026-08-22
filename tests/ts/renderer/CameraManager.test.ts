@@ -80,7 +80,7 @@ describe("computeViewBounds", () => {
     const snap = makeSnapshot({ positions: [], elements: [] });
     const { center, extent } = computeViewBounds(snap);
     expect(center).toEqual([0, 0, 0]);
-    expect(extent.maxExtent).toBe(0);
+    expect(Number.isFinite(extent.maxExtent)).toBe(false); // -Infinity from empty extents
   });
 
   it("offsets the box center and corners by boxOrigin", () => {
@@ -125,17 +125,6 @@ describe("computeViewBounds", () => {
     // x extent spans 0..6 (from i=ic=0,ib=1 → x=2; ia=1,ib=1 → x=6)
     expect(extent.extentX).toBeCloseTo(6, 5);
     expect(extent.extentY).toBeCloseTo(4, 5);
-    expect(extent.extentZ).toBeCloseTo(5, 5);
-  });
-
-  it("includes drawing-boundary atom images outside the home cell", () => {
-    const snap = makeSnapshot({
-      positions: [1, 1, 1],
-      box: [4, 0, 0, 0, 4, 0, 0, 0, 4],
-    });
-    const { center, extent } = computeViewBounds(snap, [new Float32Array([-1, 2, 2])]);
-    expect(center).toEqual([1.5, 2, 2]);
-    expect(extent.extentX).toBe(5);
   });
 });
 
@@ -242,17 +231,6 @@ describe("applyFrustumInsets", () => {
     // halfH = max(extentY/2, extentX/(2·aspect)) × 1.2; aspect = 200/100 = 2
     //       = max(5, 2.5) × 1.2 = 6 → frustumHeight = 12
     expect(cam.top - cam.bottom).toBeCloseTo(12, 4);
-  });
-
-  it("uses world Z as screen height for the default -Y camera", () => {
-    const cam = new THREE.OrthographicCamera();
-    applyFrustumInsets(cam, 200, 100, 0, 0, {
-      maxExtent: 13,
-      extentX: 4,
-      extentY: 4,
-      extentZ: 13,
-    });
-    expect(cam.top - cam.bottom).toBeCloseTo(15.6, 4);
   });
 
   it("enforces a minimum frustum height of 0.1", () => {

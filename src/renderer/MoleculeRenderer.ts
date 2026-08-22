@@ -272,10 +272,6 @@ export class MoleculeRenderer {
   private labelOverlay: LabelOverlay | null = null;
   private arrowRenderer: ArrowRenderer | null = null;
   private polyhedronRenderer: PolyhedronRenderer | null = null;
-  /** Positions contributed by polyhedron meshes. */
-  private polyhedronFitPositions: Float32Array[] = [];
-  /** Re-fit once when decorations arrive after a newly loaded snapshot. */
-  private needsInitialDecorationFit = false;
   private pivotMarker: PivotMarker | null = null;
   private useImpostor = false;
   private animationId: number | null = null;
@@ -517,8 +513,6 @@ export class MoleculeRenderer {
   loadSnapshot(snapshot: Snapshot, opts: { fit?: boolean } = {}): void {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
-    this.polyhedronFitPositions = [];
-    this.needsInitialDecorationFit = true;
 
     const _ready = _getTestReady();
     if (_ready) {
@@ -901,7 +895,6 @@ export class MoleculeRenderer {
       );
       this.applyCombinedAtomHiddenMask();
       this.syncLabelOverlay();
-      this.fitToView(this.snapshot);
     }
   }
 
@@ -926,7 +919,6 @@ export class MoleculeRenderer {
         this.representationType === "licorice",
     );
     this.syncLabelOverlay();
-    this.fitToView(this.snapshot);
   }
 
   private applyCombinedAtomHiddenMask(): void {
@@ -1010,11 +1002,6 @@ export class MoleculeRenderer {
       this.scene.add(this.polyhedronRenderer.group);
     }
     this.polyhedronRenderer.loadMeshData(data);
-    this.polyhedronFitPositions = [data.positions];
-    if (this.snapshot && this.needsInitialDecorationFit) {
-      this.fitToView(this.snapshot);
-      this.needsInitialDecorationFit = false;
-    }
   }
 
   /** Clear all polyhedra from the scene. */
@@ -1022,7 +1009,6 @@ export class MoleculeRenderer {
     if (this.polyhedronRenderer) {
       this.polyhedronRenderer.clear();
     }
-    this.polyhedronFitPositions = [];
   }
 
   // ── Structure Layer Management ─────────────────────────────────
@@ -1415,14 +1401,7 @@ export class MoleculeRenderer {
 
   /** Fit camera to show all atoms (or simulation cell if present). */
   private fitToView(snapshot: Snapshot): void {
-    const additionalPositions = [...this.polyhedronFitPositions];
-    if (this.currentDrawingBoundary?.images.positions.length) {
-      additionalPositions.push(this.currentDrawingBoundary.images.positions);
-    }
-    if (this.currentBondPeriodicImages?.positions.length) {
-      additionalPositions.push(this.currentBondPeriodicImages.positions);
-    }
-    this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot, additionalPositions);
+    this.lastExtent = fitCameraToView(this.camera, this.controls, snapshot);
     if (this.camera instanceof THREE.OrthographicCamera) {
       this.doApplyFrustumInsets();
     }
@@ -2151,19 +2130,7 @@ export class MoleculeRenderer {
   /** Re-fit the camera to the current snapshot's bounding box. */
   resetCamera(): void {
     if (!this.snapshot) return;
-    const additionalPositions = [...this.polyhedronFitPositions];
-    if (this.currentDrawingBoundary?.images.positions.length) {
-      additionalPositions.push(this.currentDrawingBoundary.images.positions);
-    }
-    if (this.currentBondPeriodicImages?.positions.length) {
-      additionalPositions.push(this.currentBondPeriodicImages.positions);
-    }
-    this.lastExtent = fitCameraToView(
-      this.camera,
-      this.controls,
-      this.snapshot,
-      additionalPositions,
-    );
+    this.lastExtent = fitCameraToView(this.camera, this.controls, this.snapshot);
     if (this.camera instanceof THREE.OrthographicCamera && this.container) {
       applyFrustumInsets(
         this.camera,
