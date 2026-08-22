@@ -21,6 +21,15 @@ import {
   parseFrontmatter,
   toSnakeCase,
 } from "../../../bench/llm/skills";
+import {
+  configFromEnv,
+  assertConfig,
+  generatePipelineLive,
+  DEFAULT_PLAMO_MODEL,
+  PLAMO_API_URL,
+  DEFAULT_OPENROUTER_MODEL,
+  OPENROUTER_API_URL,
+} from "../../../bench/llm/providers";
 import { runDataset } from "../../../bench/llm/runner";
 import { aggregate, toMarkdown, toJSON } from "../../../bench/llm/report";
 import { DATASET } from "../../../bench/llm/dataset";
@@ -422,5 +431,241 @@ describe("runner + report", () => {
     expect(records).toHaveLength(2);
     expect(records[0].error).toBe("network down");
     expect(records[0].score.total).toBe(0);
+  });
+});
+
+// ─── providers ────────────────────────────────────────────────────────
+
+describe("providers", () => {
+  describe("configFromEnv", () => {
+    it("defaults to anthropic when MEGANE_LLM_PROVIDER is unset", () => {
+      const config = configFromEnv({ ANTHROPIC_API_KEY: "sk-ant-x" });
+      expect(config.provider).toBe("anthropic");
+      expect(config.model).toBe("claude-sonnet-4-20250514");
+      expect(config.apiKey).toBe("sk-ant-x");
+    });
+
+    it("reads the OpenAI key for provider=openai", () => {
+      const config = configFromEnv({ MEGANE_LLM_PROVIDER: "openai", OPENAI_API_KEY: "sk-x" });
+      expect(config).toEqual({ provider: "openai", model: "gpt-4o", apiKey: "sk-x" });
+    });
+
+    it("reads PLAMO_API_KEY and defaults to the PLaMo flagship model", () => {
+      const config = configFromEnv({ MEGANE_LLM_PROVIDER: "plamo", PLAMO_API_KEY: "plamo-x" });
+      expect(config).toEqual({
+        provider: "plamo",
+        model: DEFAULT_PLAMO_MODEL,
+        apiKey: "plamo-x",
+      });
+    });
+
+    it("lets MEGANE_LLM_MODEL override the PLaMo model", () => {
+      const config = configFromEnv({
+        MEGANE_LLM_PROVIDER: "plamo",
+        MEGANE_LLM_MODEL: "plamo-2.2-prime",
+        PLAMO_API_KEY: "plamo-x",
+      });
+      expect(config.model).toBe("plamo-2.2-prime");
+    });
+
+    it("reads OPENROUTER_API_KEY and defaults to the OpenRouter bench model", () => {
+      const config = configFromEnv({
+        MEGANE_LLM_PROVIDER: "openrouter",
+        OPENROUTER_API_KEY: "sk-or-x",
+      });
+      expect(config).toEqual({
+        provider: "openrouter",
+        model: DEFAULT_OPENROUTER_MODEL,
+        apiKey: "sk-or-x",
+      });
+    });
+
+    it("lets MEGANE_LLM_MODEL override the OpenRouter model", () => {
+      const config = configFromEnv({
+        MEGANE_LLM_PROVIDER: "openrouter",
+        MEGANE_LLM_MODEL: "anthropic/claude-sonnet-4.6",
+        OPENROUTER_API_KEY: "sk-or-x",
+      });
+      expect(config.model).toBe("anthropic/claude-sonnet-4.6");
+    });
+
+    it("resolves the demo proxy from MEGANE_LLM_PROXY_URL", () => {
+      const config = configFromEnv({
+        MEGANE_LLM_PROVIDER: "demo",
+        MEGANE_LLM_PROXY_URL: "https://proxy.example.com/chat",
+      });
+      expect(config).toEqual({
+        provider: "demo",
+        model: "demo",
+        proxyUrl: "https://proxy.example.com/chat",
+      });
+    });
+  });
+
+  describe("assertConfig", () => {
+    it("throws a named error when the PLaMo key is missing", () => {
+      expect(() => assertConfig({ provider: "plamo", model: DEFAULT_PLAMO_MODEL })).toThrow(
+        "PLAMO_API_KEY is not set",
+      );
+    });
+
+    it("accepts a complete PLaMo config", () => {
+      expect(() =>
+        assertConfig({ provider: "plamo", model: DEFAULT_PLAMO_MODEL, apiKey: "plamo-x" }),
+      ).not.toThrow();
+    });
+
+    it("throws a named error when the OpenRouter key is missing", () => {
+      expect(() =>
+        assertConfig({ provider: "openrouter", model: DEFAULT_OPENROUTER_MODEL }),
+      ).toThrow("OPENROUTER_API_KEY is not set");
+    });
+
+    it("accepts a complete OpenRouter config", () => {
+      expect(() =>
+        assertConfig({
+          provider: "openrouter",
+          model: DEFAULT_OPENROUTER_MODEL,
+          apiKey: "sk-or-x",
+        }),
+      ).not.toThrow();
+    });
+
+    it("throws for every other provider missing its credential", () => {
+      expect(() => assertConfig({ provider: "anthropic", model: "m" })).toThrow(
+        "ANTHROPIC_API_KEY is not set",
+      );
+      expect(() => assertConfig({ provider: "openai", model: "m" })).toThrow(
+        "OPENAI_API_KEY is not set",
+      );
+      expect(() => assertConfig({ provider: "demo", model: "demo" })).toThrow(
+        "MEGANE_LLM_PROXY_URL is not set",
+      );
+    });
+  });
+
+  describe("generatePipelineLive (OpenAI-compatible providers)", () => {
+    /** Minimal OpenAI-shaped non-streaming completion. */
+    function completion(content: string, finishReason = "stop") {
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { role: "assistant", content }, finish_reason: finishReason }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    it("posts to the PLaMo endpoint with bearer auth and the configured model", async () => {
+      const calls: Array<{
+        url: string;
+        body: Record<string, unknown>;
+        headers: Record<string, string>;
+      }> = [];
+      const fetchImpl = (async (url: string, init: RequestInit) => {
+        calls.push({
+          url,
+          body: JSON.parse(init.body as string),
+          headers: init.headers as Record<string, string>,
+        });
+        return completion("done");
+      }) as unknown as typeof fetch;
+
+      const text = await generatePipelineLive(
+        { provider: "plamo", model: "plamo-3.0-prime", apiKey: "plamo-x" },
+        "show bonds",
+        fetchImpl,
+      );
+
+      expect(text).toBe("done");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toBe(PLAMO_API_URL);
+      expect(calls[0].headers.Authorization).toBe("Bearer plamo-x");
+      expect(calls[0].body.model).toBe("plamo-3.0-prime");
+      const messages = calls[0].body.messages as Array<{ role: string; content: string }>;
+      expect(messages[0].role).toBe("system");
+      expect(messages[1]).toEqual({ role: "user", content: "show bonds" });
+      // Skills are offered as OpenAI function definitions, as in production.
+      expect(Array.isArray(calls[0].body.tools)).toBe(true);
+    });
+
+    it("answers a tool_calls round trip with the skill body and returns the follow-up text", async () => {
+      const skillName = buildOpenAITools(loadSkills())[0].function.name;
+      let round = 0;
+      const sent: Array<Array<Record<string, unknown>>> = [];
+      const fetchImpl = (async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(init.body as string);
+        sent.push(body.messages);
+        round += 1;
+        if (round === 1) {
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: "call_1",
+                        type: "function",
+                        function: { name: skillName, arguments: "{}" },
+                      },
+                    ],
+                  },
+                  finish_reason: "tool_calls",
+                },
+              ],
+            }),
+            { status: 200 },
+          );
+        }
+        return completion("```json\n{}\n```");
+      }) as unknown as typeof fetch;
+
+      const text = await generatePipelineLive(
+        { provider: "plamo", model: DEFAULT_PLAMO_MODEL, apiKey: "plamo-x" },
+        "show bonds",
+        fetchImpl,
+      );
+
+      expect(round).toBe(2);
+      expect(text).toContain("```json");
+      const second = sent[1];
+      expect(second[second.length - 2]).toMatchObject({ role: "assistant" });
+      expect(second[second.length - 1]).toMatchObject({ role: "tool", tool_call_id: "call_1" });
+      expect(second[second.length - 1].content).toBe(executeSkill(loadSkills(), skillName));
+    });
+
+    it("throws with the provider name and status when PLaMo rejects the request", async () => {
+      const fetchImpl = (async () =>
+        new Response("unknown model", { status: 400 })) as unknown as typeof fetch;
+
+      await expect(
+        generatePipelineLive(
+          { provider: "plamo", model: "plamo-9.9-prime", apiKey: "plamo-x" },
+          "show bonds",
+          fetchImpl,
+        ),
+      ).rejects.toThrow(/plamo request failed \(400\): unknown model/);
+    });
+
+    it("posts to the OpenRouter endpoint with bearer auth for provider=openrouter", async () => {
+      const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+      const fetchImpl = (async (url: string, init: RequestInit) => {
+        calls.push({ url, headers: init.headers as Record<string, string> });
+        return completion("done");
+      }) as unknown as typeof fetch;
+
+      const text = await generatePipelineLive(
+        { provider: "openrouter", model: DEFAULT_OPENROUTER_MODEL, apiKey: "sk-or-x" },
+        "show bonds",
+        fetchImpl,
+      );
+
+      expect(text).toBe("done");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).toBe(OPENROUTER_API_URL);
+      expect(calls[0].headers.Authorization).toBe("Bearer sk-or-x");
+    });
   });
 });

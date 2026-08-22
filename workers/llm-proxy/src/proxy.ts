@@ -10,8 +10,21 @@
  * live here and the entry module just re-dispatches into handleFetch.
  */
 
+/**
+ * Upstream LLM providers the proxy can route to. Both speak the OpenAI
+ * Chat Completions protocol (bearer auth, `stream: true` SSE ending in
+ * `data: [DONE]`, `tools`/`tool_choice` function calling), so the
+ * frontend's OpenAI-compatible client path works against either
+ * unchanged; they only differ in endpoint, key, and how model fallback
+ * works (see {@link buildAttempts}).
+ */
+export type ProviderName = "plamo" | "openrouter";
+
 export interface Env {
-  OPENROUTER_API_KEY: string;
+  /** Preferred Networks PLaMo API key. Unset = the plamo provider is skipped. */
+  PLAMO_API_KEY?: string;
+  /** OpenRouter API key. Unset = the openrouter provider is skipped. */
+  OPENROUTER_API_KEY?: string;
   /**
    * Comma-separated list of origins allowed to call this proxy. A single
    * value (no comma) is the common case, but multiple let one proxy serve
@@ -22,66 +35,203 @@ export interface Env {
   ALLOWED_ORIGIN: string;
   RATE_LIMIT_KV: KVNamespace;
   /**
+   * Optional comma-separated provider order, e.g. "plamo,openrouter" or
+   * "openrouter". Unknown names are ignored; providers whose API key
+   * secret is unset are skipped. Falls back to {@link DEFAULT_PROVIDERS}.
+   * Providers after the first are cross-provider fallbacks: they are only
+   * reached once every model of the providers before them has failed.
+   */
+  LLM_PROVIDERS?: string;
+  /**
+   * Optional override for the primary PLaMo model id. Keeping this in config
+   * lets you move between models — e.g. down to the cheaper, shorter-context
+   * `plamo-2.2-prime` — without a code change. Falls back to
+   * {@link DEFAULT_PLAMO_MODEL}.
+   */
+  PLAMO_MODEL?: string;
+  /**
+   * Optional comma-separated PLaMo fallback models, tried in order after
+   * the primary when it errors (see {@link buildModelList}). Falls back to
+   * {@link DEFAULT_PLAMO_FALLBACK_MODELS}.
+   */
+  PLAMO_FALLBACK_MODELS?: string;
+  /**
    * Optional override for the primary OpenRouter model slug. Free `:free`
    * models come and go (and occasionally flip to paid-only, returning a
-   * 404), so keeping this in config lets you swap models — or move to a
-   * paid model like an Anthropic one — without a code change. Falls back
-   * to {@link DEFAULT_MODEL}.
+   * 404), so keeping this in config lets you swap models without a code
+   * change. Falls back to {@link DEFAULT_OPENROUTER_MODEL}.
    */
   OPENROUTER_MODEL?: string;
   /**
-   * Optional comma-separated fallback models. OpenRouter tries the primary
-   * first and routes to the next on error (e.g. a free model that is
-   * temporarily rate-limited upstream returns 429). Falls back to
-   * {@link DEFAULT_FALLBACK_MODELS}.
+   * Optional comma-separated OpenRouter fallback models. OpenRouter tries
+   * the primary first and routes to the next on error server-side. Falls
+   * back to {@link DEFAULT_OPENROUTER_FALLBACK_MODELS}.
    */
   OPENROUTER_FALLBACK_MODELS?: string;
 }
 
-/**
- * Default primary model when OPENROUTER_MODEL is unset. A currently-
- * available free instruction-following model; update it here (or via the
- * env var) if OpenRouter retires it.
- */
-export const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+/** PLaMo's OpenAI-compatible Chat Completions endpoint. */
+export const PLAMO_API_URL = "https://api.platform.preferredai.jp/v1/chat/completions";
+
+/** OpenRouter's OpenAI-compatible Chat Completions endpoint. */
+export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /**
- * Free models from different upstream providers, tried in order after the
- * primary. Free tiers are heavily rate-limited per provider, so spreading
- * across providers makes a transient 429 on one fall through to another
- * instead of failing the request.
+ * Provider order when LLM_PROVIDERS is unset: PLaMo first, OpenRouter as
+ * the cross-provider fallback.
  */
-export const DEFAULT_FALLBACK_MODELS = ["openai/gpt-oss-120b:free", "z-ai/glm-4.5-air:free"];
+export const DEFAULT_PROVIDERS: ProviderName[] = ["plamo", "openrouter"];
 
 /**
- * OpenRouter caps its `models` routing array at 3 entries (a 4th yields a
- * 400 "'models' array must have 3 items or fewer.").
+ * Default primary PLaMo model when PLAMO_MODEL is unset. PLaMo 3.0 Prime
+ * has the largest context window (262k) of the published models and
+ * supports tool calling, which the skill round trip depends on.
+ */
+export const DEFAULT_PLAMO_MODEL = "plamo-3.0-prime";
+
+/**
+ * PLaMo models tried in order after the primary. PLaMo has no server-side
+ * model routing (that is an OpenRouter feature), so the Worker retries the
+ * next id itself when a request errors — see {@link handleFetch}. 2.2
+ * Prime is the older, smaller-context model, used only if 3.0 is
+ * unavailable.
+ */
+export const DEFAULT_PLAMO_FALLBACK_MODELS = ["plamo-2.2-prime"];
+
+/**
+ * Default primary OpenRouter model when OPENROUTER_MODEL is unset. A
+ * currently-available free instruction-following model; update it here
+ * (or via the env var) if OpenRouter retires it.
+ */
+export const DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+
+/**
+ * Free OpenRouter models from different upstream providers, tried in order
+ * after the primary. Free tiers are heavily rate-limited per provider, so
+ * spreading across providers makes a transient 429 on one fall through to
+ * another instead of failing the request.
+ */
+export const DEFAULT_OPENROUTER_FALLBACK_MODELS = [
+  "openai/gpt-oss-120b:free",
+  "z-ai/glm-4.5-air:free",
+];
+
+/**
+ * Per-provider cap on the model list. For OpenRouter this is a hard API
+ * limit — its `models` routing array rejects a 4th entry with a 400. For
+ * PLaMo each model is a separate upstream fetch, so the cap bounds both
+ * worst-case latency and the Worker's subrequest budget.
  */
 export const MAX_MODELS = 3;
 
 /**
- * Builds the ordered, de-duplicated model list sent to OpenRouter as its
- * `models` routing array: the configured primary first, then the
- * fallbacks, capped at {@link MAX_MODELS}.
+ * Resolves the ordered list of providers to try: the configured order
+ * (LLM_PROVIDERS, defaulting to {@link DEFAULT_PROVIDERS}) with unknown
+ * names dropped, de-duplicated, and providers without an API key skipped.
  */
-export function buildModelList(env: Env): string[] {
-  const primary = env.OPENROUTER_MODEL || DEFAULT_MODEL;
+export function buildProviderList(env: Env): ProviderName[] {
+  const configured =
+    env.LLM_PROVIDERS !== undefined
+      ? env.LLM_PROVIDERS.split(",")
+          .map((p) => p.trim().toLowerCase())
+          .filter((p) => p.length > 0)
+      : DEFAULT_PROVIDERS;
+  const known = configured.filter((p): p is ProviderName => p === "plamo" || p === "openrouter");
+  return [...new Set(known)].filter((p) => Boolean(apiKeyFor(p, env)));
+}
+
+function apiKeyFor(provider: ProviderName, env: Env): string | undefined {
+  return provider === "plamo" ? env.PLAMO_API_KEY : env.OPENROUTER_API_KEY;
+}
+
+/**
+ * Builds the ordered, de-duplicated model list for one provider: the
+ * configured primary first, then the fallbacks, capped at
+ * {@link MAX_MODELS}.
+ */
+export function buildModelList(env: Env, provider: ProviderName): string[] {
+  const primary =
+    (provider === "plamo" ? env.PLAMO_MODEL : env.OPENROUTER_MODEL) ||
+    (provider === "plamo" ? DEFAULT_PLAMO_MODEL : DEFAULT_OPENROUTER_MODEL);
+  const fallbackVar =
+    provider === "plamo" ? env.PLAMO_FALLBACK_MODELS : env.OPENROUTER_FALLBACK_MODELS;
   const fallbacks =
-    env.OPENROUTER_FALLBACK_MODELS !== undefined
-      ? env.OPENROUTER_FALLBACK_MODELS.split(",")
+    fallbackVar !== undefined
+      ? fallbackVar
+          .split(",")
           .map((m) => m.trim())
           .filter((m) => m.length > 0)
-      : DEFAULT_FALLBACK_MODELS;
+      : provider === "plamo"
+        ? DEFAULT_PLAMO_FALLBACK_MODELS
+        : DEFAULT_OPENROUTER_FALLBACK_MODELS;
   return [...new Set([primary, ...fallbacks])].slice(0, MAX_MODELS);
 }
+
+/** One upstream request the fallback walk in {@link handleFetch} may make. */
+export interface UpstreamAttempt {
+  provider: ProviderName;
+  /** Human-readable identifier for logs, e.g. "plamo/plamo-3.0-prime". */
+  label: string;
+  url: string;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+}
+
 /**
- * Upstream completion cap. Matches the direct-provider paths in the
- * frontend client (`src/ai/client.ts` sends `max_tokens: 4096`): a
- * smaller cap here silently truncated larger completions — e.g. the
- * multi-branch pipelines produced for "make only the water transparent"
- * style requests — leaving an unterminated JSON fence that the frontend
- * could not parse, surfacing only a generic "Something went wrong".
+ * Expands the configured providers into the ordered list of upstream
+ * requests to try. The two providers fall back differently:
+ *
+ * - PLaMo has no server-side routing, so each model id becomes its own
+ *   attempt (a single `model` field), walked client-side.
+ * - OpenRouter routes across its `models` array server-side, so one
+ *   attempt carries the whole list — plus the OpenRouter-specific
+ *   `HTTP-Referer`/`X-Title` attribution headers.
+ *
+ * Each attempt is a separate upstream fetch; the first response that can
+ * be streamed wins.
  */
+export function buildAttempts(
+  env: Env,
+  origin: string | null,
+  baseBody: Record<string, unknown>,
+): UpstreamAttempt[] {
+  const attempts: UpstreamAttempt[] = [];
+  for (const provider of buildProviderList(env)) {
+    const models = buildModelList(env, provider);
+    const auth = {
+      Authorization: `Bearer ${apiKeyFor(provider, env) ?? ""}`,
+      "Content-Type": "application/json",
+    };
+    if (provider === "plamo") {
+      for (const model of models) {
+        attempts.push({
+          provider,
+          label: `plamo/${model}`,
+          url: PLAMO_API_URL,
+          headers: auth,
+          body: { ...baseBody, model },
+        });
+      }
+    } else {
+      attempts.push({
+        provider,
+        label: `openrouter/${models.join("|")}`,
+        url: OPENROUTER_API_URL,
+        headers: {
+          ...auth,
+          // origin is guaranteed allowed (and non-null) by the time this
+          // runs; fall back to the first configured origin only to
+          // satisfy the type.
+          "HTTP-Referer": origin ?? parseAllowedOrigins(env)[0],
+          "X-Title": "megane demo",
+        },
+        body: { ...baseBody, models },
+      });
+    }
+  }
+  return attempts;
+}
+
 export const MAX_TOKENS = 4096;
 export const MAX_MESSAGES = 12;
 /**
@@ -177,49 +327,69 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return jsonError("Invalid 'tools' array", 400, origin, env);
   }
 
-  const models = buildModelList(env);
-  log(
-    `forwarding ${messages.length} message(s)` +
-      `${tools && tools.length > 0 ? ` + ${tools.length} tool(s)` : ""} to OpenRouter ` +
-      `(model=${models[0]}${models.length > 1 ? ` +${models.length - 1} fallback(s)` : ""})`,
-  );
-
-  const upstreamBody: Record<string, unknown> = {
-    models,
+  const baseBody: Record<string, unknown> = {
     messages,
     max_tokens: MAX_TOKENS,
     stream: true,
   };
   if (tools && tools.length > 0) {
-    upstreamBody.tools = tools;
+    baseBody.tools = tools;
   }
 
-  let upstream: Response;
-  try {
-    upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        // origin is guaranteed allowed (and non-null) here; fall back to the
-        // first configured origin only to satisfy the type.
-        "HTTP-Referer": origin ?? parseAllowedOrigins(env)[0],
-        "X-Title": "megane demo",
-      },
-      body: JSON.stringify(upstreamBody),
-    });
-  } catch (err) {
-    console.error(`[llm-proxy] ${ip} upstream fetch failed: ${(err as Error).message}`);
-    return jsonError("Upstream request failed", 502, origin, env);
+  // Walk providers, then models within each provider (see buildAttempts):
+  // try each upstream request in turn and keep the first response that can
+  // actually be streamed back. Only the last failure is reported to the
+  // caller.
+  const attempts = buildAttempts(env, origin, baseBody);
+  if (attempts.length === 0) {
+    console.error(`[llm-proxy] ${ip} no provider configured (missing API key secrets?)`);
+    return jsonError("No LLM provider is configured", 500, origin, env);
   }
 
-  if (!upstream.ok || !upstream.body) {
-    const text = await upstream.text();
-    console.error(`[llm-proxy] ${ip} upstream error ${upstream.status}: ${text}`);
-    return jsonError(`Upstream error: ${text}`, upstream.status || 502, origin, env);
+  log(
+    `forwarding ${messages.length} message(s)` +
+      `${tools && tools.length > 0 ? ` + ${tools.length} tool(s)` : ""} ` +
+      `(${attempts.length} upstream attempt(s), first=${attempts[0].label})`,
+  );
+
+  let upstream: Response | null = null;
+  let failureStatus = 502;
+  let failureMessage = "Upstream request failed";
+
+  for (const attempt of attempts) {
+    let response: Response;
+    try {
+      response = await fetch(attempt.url, {
+        method: "POST",
+        headers: attempt.headers,
+        body: JSON.stringify(attempt.body),
+      });
+    } catch (err) {
+      console.error(
+        `[llm-proxy] ${ip} upstream fetch failed for ${attempt.label}: ${(err as Error).message}`,
+      );
+      failureStatus = 502;
+      failureMessage = "Upstream request failed";
+      continue;
+    }
+
+    if (response.ok && response.body) {
+      log(`upstream responded ${response.status} for ${attempt.label}, streaming back to client`);
+      upstream = response;
+      break;
+    }
+
+    const text = await response.text();
+    console.error(
+      `[llm-proxy] ${ip} upstream error ${response.status} for ${attempt.label}: ${text}`,
+    );
+    failureStatus = response.status || 502;
+    failureMessage = `Upstream error: ${text}`;
   }
 
-  log(`upstream responded ${upstream.status}, streaming back to client`);
+  if (!upstream) {
+    return jsonError(failureMessage, failureStatus, origin, env);
+  }
 
   return new Response(upstream.body, {
     status: 200,

@@ -4,11 +4,13 @@
  * These mirror the production request shapes in `src/ai/client.ts` (same system
  * prompt via `buildSystemPrompt`, same on-demand skill tool round trips) but
  * use non-streaming requests for simplicity — the benchmark only needs the
- * final text. Supports Anthropic, OpenAI, OpenRouter, and the demo proxy.
+ * final text. Supports Anthropic, OpenAI, PLaMo, OpenRouter, and the demo
+ * proxy.
  *
  * API credentials come from the environment:
  *   - ANTHROPIC_API_KEY  (provider "anthropic")
  *   - OPENAI_API_KEY     (provider "openai")
+ *   - PLAMO_API_KEY      (provider "plamo")
  *   - OPENROUTER_API_KEY (provider "openrouter")
  *   - MEGANE_LLM_PROXY_URL (provider "demo")
  */
@@ -22,13 +24,29 @@ import {
   type BenchSkill,
 } from "./skills";
 
-export type ProviderName = "anthropic" | "openai" | "openrouter" | "demo";
+export type ProviderName = "anthropic" | "openai" | "plamo" | "openrouter" | "demo";
+
+/**
+ * Preferred Networks' PLaMo API. It is OpenAI-compatible (bearer auth,
+ * `/chat/completions`, `tools` function calling), so it reuses the
+ * OpenAI-compatible request path below.
+ */
+export const PLAMO_API_URL = "https://api.platform.preferredai.jp/v1/chat/completions";
+
+/** Default PLaMo model — the largest-context id that supports tool calling. */
+export const DEFAULT_PLAMO_MODEL = "plamo-3.0-prime";
+
+/** OpenRouter's OpenAI-compatible Chat Completions endpoint. */
+export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+/** Default OpenRouter model — cheap, tool-calling, reliable for the bench. */
+export const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-haiku-4.5";
 
 export interface ProviderConfig {
   provider: ProviderName;
   /** Model id; ignored for the demo proxy (it picks server-side). */
   model: string;
-  /** API key (anthropic/openai). */
+  /** API key (anthropic/openai/plamo). */
   apiKey?: string;
   /** Demo proxy URL. */
   proxyUrl?: string;
@@ -58,10 +76,17 @@ export function configFromEnv(
       apiKey: env.OPENAI_API_KEY,
     };
   }
+  if (provider === "plamo") {
+    return {
+      provider,
+      model: env.MEGANE_LLM_MODEL || DEFAULT_PLAMO_MODEL,
+      apiKey: env.PLAMO_API_KEY,
+    };
+  }
   if (provider === "openrouter") {
     return {
       provider,
-      model: env.MEGANE_LLM_MODEL || "anthropic/claude-haiku-4.5",
+      model: env.MEGANE_LLM_MODEL || DEFAULT_OPENROUTER_MODEL,
       apiKey: env.OPENROUTER_API_KEY,
     };
   }
@@ -75,6 +100,9 @@ export function assertConfig(config: ProviderConfig): void {
   }
   if (config.provider === "openai" && !config.apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
+  }
+  if (config.provider === "plamo" && !config.apiKey) {
+    throw new Error("PLAMO_API_KEY is not set");
   }
   if (config.provider === "openrouter" && !config.apiKey) {
     throw new Error("OPENROUTER_API_KEY is not set");
@@ -171,7 +199,7 @@ async function runAnthropic(
   throw new Error("Too many tool-use rounds");
 }
 
-// ─── OpenAI-compatible (OpenAI + demo proxy) ──────────────────────────
+// ─── OpenAI-compatible (OpenAI + PLaMo + OpenRouter + demo proxy) ─────
 
 interface OpenAIToolCall {
   id: string;
@@ -200,9 +228,11 @@ async function runOpenAICompat(
   const isDemo = config.provider === "demo";
   const url = isDemo
     ? config.proxyUrl!
-    : config.provider === "openrouter"
-      ? "https://openrouter.ai/api/v1/chat/completions"
-      : "https://api.openai.com/v1/chat/completions";
+    : config.provider === "plamo"
+      ? PLAMO_API_URL
+      : config.provider === "openrouter"
+        ? OPENROUTER_API_URL
+        : "https://api.openai.com/v1/chat/completions";
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const body: Record<string, unknown> = { messages };

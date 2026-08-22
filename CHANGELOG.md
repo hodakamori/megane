@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The AI chat's free-demo backend now supports both Preferred Networks' PLaMo API and OpenRouter, with PLaMo as the default and OpenRouter as a cross-provider fallback.** Both upstreams are OpenAI-compatible (bearer auth, SSE streaming, `tools` function calling), so the frontend's OpenAI-compatible client path and the skill tool round trip work against either unchanged. The Cloudflare Worker proxy (`workers/llm-proxy/`) walks a configurable provider order (`LLM_PROVIDERS`, default `plamo,openrouter`; a provider whose API key secret is unset is skipped): PLaMo has no server-side routing so the Worker retries `PLAMO_MODEL` → `PLAMO_FALLBACK_MODELS` (default `plamo-3.0-prime` → `plamo-2.2-prime`) one request per model, while OpenRouter keeps its server-side `models` routing array (`OPENROUTER_MODEL` + `OPENROUTER_FALLBACK_MODELS`) and its `HTTP-Referer`/`X-Title` attribution headers; the first response that streams wins. `bench/llm/` gains a `plamo` provider alongside the existing `openrouter` one, and the `llm-eval` workflow picks its provider via the `MEGANE_LLM_BENCH_PROVIDER` repository variable (default `plamo`). **Deploying requires both the `PLAMO_API_KEY` and `OPENROUTER_API_KEY` GitHub repository secrets (the deploy workflow uploads both as Worker secrets; the Worker itself tolerates either being empty).**
+
+### Fixed
+
+- **The `Deploy LLM Proxy Worker` workflow could not install its dependencies.** A Dependabot bump pulled `wrangler` past the point where it requires `@cloudflare/workers-types@^5`, while `workers/llm-proxy/package.json` still asked for `^4`, so `npm ci` failed with `ERESOLVE` and every deploy since 2026-07-25 stopped at the install step. The dev dependency is now on `^5.20260801.1`.
+
 ### Added
 
 - **New `wrap` pipeline node — a wrap ↔ unwrap toggle for periodic structures.** The node has a single `mode` parameter: `"wrap"` folds every atom back into the home unit cell (box-origin aware, triclinic cells included), `"unwrap"` shifts atoms by whole lattice vectors so bonded molecules split across a periodic face become contiguous again (VESTA/Mercury-style whole molecules; connectivity comes from the file's own bonds, falling back to the same PBC-aware VDW inference the Add Bond node uses), and `"none"` (the default) passes coordinates through untouched. A connected trajectory is remapped per frame — variable-cell trajectories use each frame's own cell. The node ships on every surface: editor palette (Modify group), execution engine, AI prompt/node reference catalog, the JS `Pipeline` builder (`Wrap`), and the Python API (`megane.Wrap`). It is also wired into the default pipelines (webapp seed, VSCode extension seed, external-file seed) and the Molecule / Solid / Surface Mesh / Protein templates in pass-through mode, so toggling wrap/unwrap is one dropdown click away without editing the graph.

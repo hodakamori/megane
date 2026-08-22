@@ -86,7 +86,7 @@ export async function generatePipeline(
       );
     }
 
-    // OpenAI-compatible providers (and the OpenRouter-backed demo proxy)
+    // OpenAI-compatible providers (and the PLaMo/OpenRouter-backed demo proxy)
     // speak the OpenAI tool-calling protocol, so the model fetches skill
     // templates on demand via function calls — the same on-demand behaviour
     // as the Anthropic path, no inlining required.
@@ -478,9 +478,9 @@ async function streamOpenAI(
 
 /**
  * Stream a chat completion through the docs-demo Cloudflare Worker proxy.
- * The proxy holds its own OpenRouter API key, picks the model server-side,
- * and speaks the OpenAI tool-calling protocol, so the same skill round
- * trip works end to end.
+ * The proxy holds its own provider API keys (PLaMo and/or OpenRouter),
+ * picks the provider and model server-side, and speaks the OpenAI
+ * tool-calling protocol, so the same skill round trip works end to end.
  */
 async function streamDemoProxy(
   systemPrompt: string,

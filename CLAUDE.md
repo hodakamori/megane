@@ -110,11 +110,13 @@ The `:vscode` / `:widget-vscode` projects need code-server. In a sandboxed/proxi
 `bench/llm/` is a prompt-suite + scorer that grades megane's LLM pipeline
 generator (`src/ai/prompt.ts` + skills) on a fixed dataset of requests. Adding
 the **`llm-eval`** label to a PR runs `.github/workflows/llm-prompt-eval.yml`,
-which scores the PR branch and its base branch via OpenRouter
-(`OPENROUTER_API_KEY` repository secret, model defaults to
-`anthropic/claude-haiku-4.5`, overridable via the `MEGANE_LLM_BENCH_MODEL`
-repository variable) and posts a before/after score comparison as a PR
-comment. It is opt-in (real, paid API calls) and only runs for PRs from
+which scores the PR branch and its base branch via Preferred Networks' PLaMo
+API or OpenRouter — the provider comes from the `MEGANE_LLM_BENCH_PROVIDER`
+repository variable (`plamo`, the default, or `openrouter`), reading the
+matching `PLAMO_API_KEY` / `OPENROUTER_API_KEY` repository secret; the model
+defaults per provider (`plamo-3.0-prime` / `anthropic/claude-haiku-4.5`) and is
+overridable via the `MEGANE_LLM_BENCH_MODEL` repository variable — and posts a
+before/after score comparison as a PR comment. It is opt-in (real, paid API calls) and only runs for PRs from
 branches within this repository (forks don't get secrets). The job also only
 runs for actors listed in the `LLM_EVAL_ALLOWED_USERS` repository variable (a
 JSON array of usernames, defaults to `["hodakamori"]`), so applying the label
