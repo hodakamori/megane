@@ -35,9 +35,10 @@ Keep the first line under 72 characters. Add details in the body if needed.
    - Sweep the rest of the matrix for **side effects**: treat unexpected pixel diffs, timeouts, or runtime errors in *other* projects as regressions and fix the root cause — do not silently re-baseline through them.
    - Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR.
    - In the PR description, list which Playwright projects you ran and which baselines you updated.
-4. Do NOT commit generated files: `crates/megane-wasm/pkg/`, `dist/`, `target/`, `node_modules/`, `dev-preview/`
+4. If the diff touches a parser or load-path file, grep `docs/docs/dev/parser-purity-audit.md` for the files you changed: if your change fixes a listed violation, delete that row in the same commit (CRITICAL RULE #11 says the audit shrinks with the fix — stale rows have slipped through before).
+5. Do NOT commit generated files: `crates/megane-wasm/pkg/`, `dist/`, `target/`, `node_modules/`, `dev-preview/`
    Do NOT commit plan files: any file named `plan.md` or matching `*.plan.md` (these are local planning artifacts, not part of the codebase)
-5. Check if your changes require documentation updates:
+6. Check if your changes require documentation updates:
    - Review `README.md`, `CLAUDE.md`, and files under `docs/` for any descriptions affected by your changes
    - If you added/changed/removed features, CLI options, API, commands, configuration, or architecture, update the corresponding documentation
    - Key docs to check:
@@ -46,7 +47,7 @@ Keep the first line under 72 characters. Add details in the body if needed.
      - `CHANGELOG.md` — notable changes
      - `docs/` — user-facing guides and API reference
    - Include doc updates in the same commit (or a separate `docs:` commit if the changes are substantial)
-6. If you changed pipeline nodes (`src/pipeline/`), ensure the Python API is also updated:
+7. If you changed pipeline nodes (`src/pipeline/`), ensure the Python API is also updated:
    - Node classes in `python/megane/pipeline.py` (add/update corresponding `PipelineNode` subclass)
    - Port mappings in `_SOURCE_OUTPUT_MAP` / `_TARGET_PORT_MAP`
    - Public exports in `python/megane/__init__.py`

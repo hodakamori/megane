@@ -132,11 +132,16 @@ npm run test:e2e:pipeline-file       # drag-drop .megane.json on webapp
 npm run test:e2e:render-modal        # snapshot mode (GIF/MP4 gated by MEGANE_E2E_FFMPEG=1)
 ```
 
-Measurement (right-click selection) and the AppearancePanel slider tests
-were planned but pulled from this PR: the webapp doesn't mount
-AppearancePanel, and reliable measurement coverage needs a renderer-side
-hook to expose projected atom positions. The test IDs are in place for a
-follow-up.
+The 5-host feature matrices (`modify-node`, `camera`, `measurement`,
+`subsystems` (= `subsystem-rendering` spec), `trajectory-bonds`) run via
+`npm run test:e2e:<feature>` for the full matrix or
+`npm run test:e2e:<feature>:webapp`-style per-host scripts. Their internal
+Playwright project names use `<feature>__<host>` (double underscore), e.g.
+`npx playwright test --project=trajectory-bonds__webapp`. The authoritative
+project list is `playwright.config.ts` — newer webapp-hosted regression
+projects (`heterogeneous-traj`, `trajectory-bonds-vdw-leak`, `licorice`,
+`water-line`, `inspector`, `resname-filter-opacity`) exist only there and
+are run with `npx playwright test --project=<name>`.
 
 Specs that iterate hosts read `MEGANE_HOST=webapp|widget-jupyterlab|widget-vscode|jupyterlab-doc|vscode`. Default = webapp.
 
@@ -146,8 +151,6 @@ for host in webapp widget-jupyterlab widget-vscode jupyterlab-doc vscode; do
   MEGANE_HOST=$host npm run test:e2e:format-loading
 done
 ```
-
-(There is no `test:e2e:measurement` script — measurement coverage was deferred, see the note above.)
 
 ## Run Everything
 
