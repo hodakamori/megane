@@ -174,6 +174,12 @@ export interface OpenLabNotebookOpts {
  * Open a notebook in JupyterLab and trigger Run All Cells. Waits for the
  * megane renderer's testMode ready signal. Sets `__MEGANE_TEST__=true` via
  * page.addInitScript.
+ *
+ * The boot is retried once: on a cold or busy runner the Run All menu click
+ * can race the kernel start, in which case the first cell silently fails and
+ * the widget output never mounts (`__megane_test_ready` stays null). A page
+ * reload with a fresh Run All recovers that state, so a single transient
+ * race no longer fails the whole spec (the widget-api CI flake).
  */
 export async function openLabNotebook(page: Page, opts: OpenLabNotebookOpts): Promise<void> {
   await page.addInitScript(() => {
@@ -181,29 +187,49 @@ export async function openLabNotebook(page: Page, opts: OpenLabNotebookOpts): Pr
   });
   // `reset` query forces JupyterLab to discard saved layout from a previous run.
   const url = `http://127.0.0.1:${opts.port}/lab/tree/${opts.notebook}?token=${opts.token}&test=1&reset`;
+
+  const bootOnce = async (waitTimeoutMs: number): Promise<void> => {
+    await page.waitForSelector("#jp-main-dock-panel", { timeout: 30_000 });
+
+    // Wait for the kernel to settle before triggering Run All. The toolbar
+    // kernel name appearing is the coarse gate; the execution indicator
+    // reporting "idle" is the precise one (best-effort — the selector is
+    // JupyterLab-version-dependent, so a miss only skips the extra wait).
+    await page
+      .locator(".jp-Toolbar")
+      .filter({ hasText: "Python 3" })
+      .first()
+      .waitFor({ timeout: 30_000 })
+      .catch(() => {});
+    await page
+      .locator('.jp-Notebook-ExecutionIndicator[data-status="idle"]')
+      .first()
+      .waitFor({ timeout: 15_000 })
+      .catch(() => {});
+
+    // Run All via the menu bar.
+    await page.locator(".lm-MenuBar-itemLabel", { hasText: /^Run$/ }).first().click();
+    await page
+      .locator(".lm-Menu-itemLabel", { hasText: /Run All Cells/ })
+      .first()
+      .click();
+
+    await waitForReady(page, {
+      needsData: opts.waitForData ?? true,
+      timeout: waitTimeoutMs,
+    });
+  };
+
+  const totalTimeout = opts.waitTimeoutMs ?? 90_000;
   await page.goto(url, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("#jp-main-dock-panel", { timeout: 30_000 });
-
-  // Wait for the kernel to settle ("Idle"). Without this Run All races the
-  // kernel boot and the first cell silently fails.
-  await page
-    .locator(".jp-Toolbar")
-    .filter({ hasText: "Python 3" })
-    .first()
-    .waitFor({ timeout: 30_000 })
-    .catch(() => {});
-
-  // Run All via the menu bar.
-  await page.locator(".lm-MenuBar-itemLabel", { hasText: /^Run$/ }).first().click();
-  await page
-    .locator(".lm-Menu-itemLabel", { hasText: /Run All Cells/ })
-    .first()
-    .click();
-
-  await waitForReady(page, {
-    needsData: opts.waitForData ?? true,
-    timeout: opts.waitTimeoutMs ?? 90_000,
-  });
+  try {
+    await bootOnce(Math.max(30_000, Math.floor(totalTimeout / 2)));
+  } catch {
+    // One retry from a clean page: reload discards the wedged notebook
+    // session and Run All executes against a settled kernel.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await bootOnce(totalTimeout);
+  }
 }
 
 /**

@@ -41,6 +41,7 @@ import { computeMeasurement } from "./Selection";
 import { FpsCounter } from "./FpsCounter";
 import { perfMark, perfMeasure, perfPushFrame, perfRendererReady } from "../perf";
 import {
+  computeViewBounds,
   fitCameraToView,
   applyFrustumInsets,
   createSwitchedCamera,
@@ -129,6 +130,15 @@ interface MeganeTestReady {
   frame: number;
   renderEpoch: number;
   atomCount?: number;
+  /**
+   * Count of trajectory frames applied via updateFrame(). E2E capture
+   * helpers gate on `framesApplied >= 1` before screenshotting a
+   * multi-frame structure: lazily decoded trajectories (XTC worker) apply
+   * frame 0 asynchronously after load, so without the gate a capture races
+   * the decode and lands on either the base snapshot or the frame-0
+   * positions nondeterministically.
+   */
+  framesApplied?: number;
 }
 
 export interface MeganeProjectedAtom {
@@ -496,8 +506,15 @@ export class MoleculeRenderer {
     _setActiveRenderer(this);
   }
 
-  /** Load a molecular snapshot (topology + positions). */
-  loadSnapshot(snapshot: Snapshot): void {
+  /**
+   * Load a molecular snapshot (topology + positions).
+   *
+   * `opts.fit` (default true) controls the closing fitToView. Pass false when
+   * the snapshot is a re-mapping of the one already on screen (same topology,
+   * new positions — e.g. the wrap node toggling wrap/unwrap): the camera then
+   * keeps its current zoom/target instead of re-fitting to the new bounds.
+   */
+  loadSnapshot(snapshot: Snapshot, opts: { fit?: boolean } = {}): void {
     this.snapshot = snapshot;
     this.currentPositions = new Float32Array(snapshot.positions);
     this.polyhedronFitPositions = [];
@@ -641,7 +658,13 @@ export class MoleculeRenderer {
       this.setRepresentationByAtom(this.representationByAtom);
     }
 
-    this.fitToView(snapshot);
+    if (opts.fit !== false) {
+      this.fitToView(snapshot);
+    } else {
+      // Camera untouched, but the extent drives zoom clamping elsewhere —
+      // keep it in sync with the new positions.
+      this.lastExtent = computeViewBounds(snapshot).extent;
+    }
   }
 
   /** Update positions from a trajectory frame.
@@ -713,6 +736,7 @@ export class MoleculeRenderer {
     if (_ready) {
       const idx = (frame as Frame & { index?: number }).index;
       _ready.frame = typeof idx === "number" ? idx : (_ready.frame ?? 0);
+      _ready.framesApplied = (_ready.framesApplied ?? 0) + 1;
     }
   }
 
