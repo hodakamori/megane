@@ -15,9 +15,9 @@ const inputStyle: React.CSSProperties = {
 };
 
 const AXES = [
-  ["x", "xMin", "xMax"],
-  ["y", "yMin", "yMax"],
-  ["z", "zMin", "zMax"],
+  ["a", "xMin", "xMax"],
+  ["b", "yMin", "yMax"],
+  ["c", "zMin", "zMax"],
 ] as const;
 
 export function DrawingBoundaryNode({ id, data }: NodeProps<Node<PipelineNodeData>>) {
