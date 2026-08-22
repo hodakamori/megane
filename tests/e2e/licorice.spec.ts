@@ -28,6 +28,7 @@ import {
   expectFullPageMatch,
   expectViewerRegionMatch,
   getReadyState,
+  pinFrame,
   stabilizeUi,
   waitForReady,
 } from "./lib/setup";
@@ -54,6 +55,13 @@ test.beforeAll(async ({ browser }, info) => {
   await assertDomContract(boot.scope, [
     ...defaultViewerContract({ expectedAtoms: FIXTURE_ATOMS, context: boot.context }),
   ]);
+  // Pin the displayed trajectory frame before any capture: the webapp host
+  // attaches the default 100-frame vibration XTC, whose frame 0 is decoded
+  // lazily and applied asynchronously — without the pin the full-page
+  // baselines race between base-snapshot and frame-0 positions across
+  // ~1000 vibrating waters (the same class of CI flake #659 fixed for
+  // camera__webapp).
+  await pinFrame(boot.scope, 0);
 });
 
 test.afterAll(async () => {
@@ -81,6 +89,10 @@ test("licorice: switching representation renders a continuous equal-radius tube"
     /* mode flip may not bump the epoch if it re-renders synchronously */
   });
 
+  // Re-pin after the representation re-render: re-executing the pipeline
+  // re-applies the base snapshot and the trajectory frame lands
+  // asynchronously again, so the beforeAll pin alone still leaves a race.
+  await pinFrame(scope, 0);
   await stabilizeUi(scope);
   await expectFullPageMatch(boot!.scope, PLATFORM, `${getHost()}-licorice`);
   await expectViewerRegionMatch(boot!.scope, PLATFORM, `${getHost()}-licorice-viewer`);
