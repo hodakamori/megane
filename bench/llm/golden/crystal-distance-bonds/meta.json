@@ -1,7 +1,7 @@
 {
   "fixture": "perovskite_srtio3_3x3x3.xyz",
   "expectation": "The crystal with distance-inferred bonds and its unit cell drawn.",
-  "capturedFrom": "pipeline template \"solid\" applied via store.applyTemplate, then edited through the editor store; add_bond bondSource=distance",
+  "capturedFrom": "pipeline template \"solid\" applied via store.applyTemplate, then edited through the editor store; add_bond bondSource=distance. Re-captured through the editor store (removeNode) without the template's coordination_generator / polyhedron_generator: their translucent polyhedra covered the sticks, so deleting add_bond changed only a few dozen pixels and the counterexample could not discriminate once the default view moved to the standard orientation (#661). The prompt asks for bonds and the cell, not polyhedra.",
   "imageStability": {
     "boots": 3,
     "worstDiffPercent": 0.0,
