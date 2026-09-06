@@ -38,7 +38,12 @@ export const DATASET: BenchCase[] = [
       requiredNodeTypes: ["load_structure", "add_bond", "viewport"],
       requiredConnections: [
         { sourceType: "load_structure", targetType: "viewport", sourceHandle: "particle" },
-        { sourceType: "add_bond", targetType: "viewport", sourceHandle: "bond", targetHandle: "bond" },
+        {
+          sourceType: "add_bond",
+          targetType: "viewport",
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        },
       ],
       minNodes: 3,
     },
@@ -63,7 +68,12 @@ export const DATASET: BenchCase[] = [
     rubric: {
       requiredNodeTypes: ["load_structure", "add_bond", "viewport"],
       requiredConnections: [
-        { sourceType: "add_bond", targetType: "viewport", sourceHandle: "bond", targetHandle: "bond" },
+        {
+          sourceType: "add_bond",
+          targetType: "viewport",
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        },
         { sourceType: "load_trajectory", targetType: "viewport", targetHandle: "trajectory" },
       ],
     },
@@ -83,7 +93,12 @@ export const DATASET: BenchCase[] = [
           sourceHandle: "mesh",
           targetHandle: "mesh",
         },
-        { sourceType: "load_structure", targetType: "viewport", sourceHandle: "cell", targetHandle: "cell" },
+        {
+          sourceType: "load_structure",
+          targetType: "viewport",
+          sourceHandle: "cell",
+          targetHandle: "cell",
+        },
       ],
     },
   },
@@ -95,7 +110,12 @@ export const DATASET: BenchCase[] = [
     rubric: {
       requiredNodeTypes: ["load_structure", "add_bond", "viewport"],
       requiredConnections: [
-        { sourceType: "load_structure", targetType: "viewport", sourceHandle: "cell", targetHandle: "cell" },
+        {
+          sourceType: "load_structure",
+          targetType: "viewport",
+          sourceHandle: "cell",
+          targetHandle: "cell",
+        },
       ],
       paramChecks: [
         {
@@ -112,11 +132,22 @@ export const DATASET: BenchCase[] = [
       "Show coordination polyhedra for an oxide but skip titanium (Z=22) as a center, keep only the others.",
     tags: ["solid", "polyhedra", "params"],
     rubric: {
-      requiredNodeTypes: ["load_structure", "polyhedron_generator", "viewport"],
+      // `excludedCenters` is a Coordination Generator parameter
+      // (`CoordinationGeneratorParams`, src/pipeline/types.ts) — the node that
+      // searches for centre/ligand pairs. Polyhedron Generator only turns that
+      // coordination into a mesh and carries no exclusion list at all, so the
+      // check this rubric used to make ("polyhedron_generator.excludedCenters
+      // includes 22") could not pass for any pipeline, correct ones included.
+      requiredNodeTypes: [
+        "load_structure",
+        "coordination_generator",
+        "polyhedron_generator",
+        "viewport",
+      ],
       paramChecks: [
         {
-          label: "polyhedron excludedCenters contains 22 (Ti)",
-          nodeType: "polyhedron_generator",
+          label: "coordination excludedCenters contains 22 (Ti)",
+          nodeType: "coordination_generator",
           test: (n) => arr(n, "excludedCenters").includes(22),
         },
       ],
@@ -130,10 +161,27 @@ export const DATASET: BenchCase[] = [
     tags: ["filter", "params"],
     rubric: {
       requiredNodeTypes: ["load_structure", "filter", "viewport"],
+      requiredConnections: [
+        {
+          // A bare `filter` selects; it does not change what is drawn. Without a
+          // downstream node acting on the selection the pipeline renders the
+          // default view — measured: filtering 8 carbons and filtering 1006
+          // oxygens+nitrogens differ from each other by 0.002% of pixels. The
+          // target is left open because "show only" and "highlight" are answered
+          // equally well by modify, color or representation, and pinning one
+          // would score a correct pipeline below a broken one.
+          label: "the selection feeds a node that changes what is drawn",
+          sourceType: "filter",
+          targetType: ["modify", "color", "representation"],
+          sourceHandle: "out",
+          targetHandle: "in",
+        },
+      ],
       paramChecks: [
         {
           label: 'filter.query selects carbon (element == "C")',
           nodeType: "filter",
+          any: true,
           test: (n) => /element\s*==\s*["']?C["']?/i.test(str(n, "query")),
         },
       ],
@@ -145,10 +193,27 @@ export const DATASET: BenchCase[] = [
     tags: ["filter", "params"],
     rubric: {
       requiredNodeTypes: ["load_structure", "filter", "viewport"],
+      requiredConnections: [
+        {
+          // A bare `filter` selects; it does not change what is drawn. Without a
+          // downstream node acting on the selection the pipeline renders the
+          // default view — measured: filtering 8 carbons and filtering 1006
+          // oxygens+nitrogens differ from each other by 0.002% of pixels. The
+          // target is left open because "show only" and "highlight" are answered
+          // equally well by modify, color or representation, and pinning one
+          // would score a correct pipeline below a broken one.
+          label: "the selection feeds a node that changes what is drawn",
+          sourceType: "filter",
+          targetType: ["modify", "color", "representation"],
+          sourceHandle: "out",
+          targetHandle: "in",
+        },
+      ],
       paramChecks: [
         {
           label: "filter.query selects resname ALA",
           nodeType: "filter",
+          any: true,
           test: (n) => /resname\s*==\s*["']?ALA["']?/i.test(str(n, "query")),
         },
       ],
@@ -160,10 +225,27 @@ export const DATASET: BenchCase[] = [
     tags: ["filter", "params"],
     rubric: {
       requiredNodeTypes: ["load_structure", "filter", "viewport"],
+      requiredConnections: [
+        {
+          // A bare `filter` selects; it does not change what is drawn. Without a
+          // downstream node acting on the selection the pipeline renders the
+          // default view — measured: filtering 8 carbons and filtering 1006
+          // oxygens+nitrogens differ from each other by 0.002% of pixels. The
+          // target is left open because "show only" and "highlight" are answered
+          // equally well by modify, color or representation, and pinning one
+          // would score a correct pipeline below a broken one.
+          label: "the selection feeds a node that changes what is drawn",
+          sourceType: "filter",
+          targetType: ["modify", "color", "representation"],
+          sourceHandle: "out",
+          targetHandle: "in",
+        },
+      ],
       paramChecks: [
         {
           label: "filter.query references both O and N",
           nodeType: "filter",
+          any: true,
           test: (n) => {
             const q = str(n, "query");
             return /["']?O["']?/.test(q) && /["']?N["']?/.test(q) && /\bor\b/i.test(q);
@@ -254,10 +336,27 @@ export const DATASET: BenchCase[] = [
     tags: ["multistep", "filter", "labels"],
     rubric: {
       requiredNodeTypes: ["load_structure", "add_bond", "filter", "label_generator", "viewport"],
+      requiredConnections: [
+        {
+          // A bare `filter` selects; it does not change what is drawn. Without a
+          // downstream node acting on the selection the pipeline renders the
+          // default view — measured: filtering 8 carbons and filtering 1006
+          // oxygens+nitrogens differ from each other by 0.002% of pixels. The
+          // target is left open because "show only" and "highlight" are answered
+          // equally well by modify, color or representation, and pinning one
+          // would score a correct pipeline below a broken one.
+          label: "the selection feeds a node that changes what is drawn",
+          sourceType: "filter",
+          targetType: ["modify", "color", "representation"],
+          sourceHandle: "out",
+          targetHandle: "in",
+        },
+      ],
       paramChecks: [
         {
           label: "filter.query selects carbon",
           nodeType: "filter",
+          any: true,
           test: (n) => /["']?C["']?/.test(str(n, "query")),
         },
       ],
@@ -270,7 +369,7 @@ export const DATASET: BenchCase[] = [
       "I have a caffeine molecule dissolved in water, where the water residues are named HOH. Keep the caffeine fully visible, but make the water molecules semi-transparent.",
     tags: ["multistep", "filter", "modify", "params"],
     rubric: {
-      requiredNodeTypes: ["load_structure", "filter", "modify", "viewport"],
+      requiredNodeTypes: ["load_structure", "filter", "modify", "add_bond", "viewport"],
       requiredConnections: [
         { sourceType: "filter", targetType: "modify", sourceHandle: "out", targetHandle: "in" },
         {
@@ -279,20 +378,49 @@ export const DATASET: BenchCase[] = [
           sourceHandle: "out",
           targetHandle: "particle",
         },
+        {
+          // Atoms and bonds are separate viewport streams. Fading or hiding the
+          // particles leaves every bond of the selection drawn at full opacity —
+          // the solvent shell stays on screen as sticks. Verified against
+          // tests/e2e/water-line.spec.ts, whose reference view needs this branch.
+          label: "routes the bond stream through a filter (add_bond -> filter)",
+          sourceType: "add_bond",
+          targetType: "filter",
+          sourceHandle: "bond",
+          targetHandle: "in",
+        },
+        {
+          label: "sends a modified bond stream to viewport.bond",
+          sourceType: "modify",
+          targetType: "viewport",
+          sourceHandle: "out",
+          targetHandle: "bond",
+        },
       ],
       paramChecks: [
         {
           label: 'filter.query selects water (resname == "HOH")',
           nodeType: "filter",
+          any: true,
           test: (n) => /resname\s*==\s*["']?HOH["']?/i.test(str(n, "query")),
         },
         {
           label: "modify.opacity is below 1 (transparent)",
           nodeType: "modify",
+          any: true,
           test: (n) => num(n, "opacity") < 1 && num(n, "opacity") > 0,
         },
+        {
+          // `bond_query` has its own, smaller field list — bond_index /
+          // atom_index / element / molecule_id. `resname` does not exist there,
+          // so the atom selection has to be translated, not copied.
+          label: "a filter selects the solvent's bonds (bond_query on a bond field)",
+          nodeType: "filter",
+          any: true,
+          test: (n) => /\b(bond_index|atom_index|element|molecule_id)\b/.test(str(n, "bond_query")),
+        },
       ],
-      minNodes: 4,
+      minNodes: 6,
     },
   },
   {
@@ -303,7 +431,12 @@ export const DATASET: BenchCase[] = [
     rubric: {
       requiredNodeTypes: ["load_structure", "filter", "representation", "viewport"],
       requiredConnections: [
-        { sourceType: "filter", targetType: "representation", sourceHandle: "out", targetHandle: "in" },
+        {
+          sourceType: "filter",
+          targetType: "representation",
+          sourceHandle: "out",
+          targetHandle: "in",
+        },
         {
           sourceType: "representation",
           targetType: "viewport",
@@ -332,7 +465,7 @@ export const DATASET: BenchCase[] = [
       "I have a caffeine molecule dissolved in water, where the water residues are named HOH. Hide the water so only the caffeine is shown.",
     tags: ["multistep", "filter", "modify", "params"],
     rubric: {
-      requiredNodeTypes: ["load_structure", "filter", "modify", "viewport"],
+      requiredNodeTypes: ["load_structure", "filter", "modify", "add_bond", "viewport"],
       requiredConnections: [
         { sourceType: "filter", targetType: "modify", sourceHandle: "out", targetHandle: "in" },
         {
@@ -341,20 +474,49 @@ export const DATASET: BenchCase[] = [
           sourceHandle: "out",
           targetHandle: "particle",
         },
+        {
+          // Atoms and bonds are separate viewport streams. Fading or hiding the
+          // particles leaves every bond of the selection drawn at full opacity —
+          // the solvent shell stays on screen as sticks. Verified against
+          // tests/e2e/water-line.spec.ts, whose reference view needs this branch.
+          label: "routes the bond stream through a filter (add_bond -> filter)",
+          sourceType: "add_bond",
+          targetType: "filter",
+          sourceHandle: "bond",
+          targetHandle: "in",
+        },
+        {
+          label: "sends a modified bond stream to viewport.bond",
+          sourceType: "modify",
+          targetType: "viewport",
+          sourceHandle: "out",
+          targetHandle: "bond",
+        },
       ],
       paramChecks: [
         {
           label: 'filter selects water (resname == "HOH")',
           nodeType: "filter",
+          any: true,
           test: (n) => /resname\s*==\s*["']?HOH["']?/i.test(str(n, "query")),
         },
         {
           label: "modify.opacity is 0 (water hidden)",
           nodeType: "modify",
+          any: true,
           test: (n) => num(n, "opacity") === 0,
         },
+        {
+          // `bond_query` has its own, smaller field list — bond_index /
+          // atom_index / element / molecule_id. `resname` does not exist there,
+          // so the atom selection has to be translated, not copied.
+          label: "a filter selects the solvent's bonds (bond_query on a bond field)",
+          nodeType: "filter",
+          any: true,
+          test: (n) => /\b(bond_index|atom_index|element|molecule_id)\b/.test(str(n, "bond_query")),
+        },
       ],
-      minNodes: 4,
+      minNodes: 6,
     },
   },
 
@@ -366,7 +528,12 @@ export const DATASET: BenchCase[] = [
     rubric: {
       requiredNodeTypes: ["load_structure", "add_bond", "viewport"],
       requiredConnections: [
-        { sourceType: "add_bond", targetType: "viewport", sourceHandle: "bond", targetHandle: "bond" },
+        {
+          sourceType: "add_bond",
+          targetType: "viewport",
+          sourceHandle: "bond",
+          targetHandle: "bond",
+        },
       ],
     },
   },
@@ -376,10 +543,27 @@ export const DATASET: BenchCase[] = [
     tags: ["filter", "multilingual", "params"],
     rubric: {
       requiredNodeTypes: ["load_structure", "filter", "viewport"],
+      requiredConnections: [
+        {
+          // A bare `filter` selects; it does not change what is drawn. Without a
+          // downstream node acting on the selection the pipeline renders the
+          // default view — measured: filtering 8 carbons and filtering 1006
+          // oxygens+nitrogens differ from each other by 0.002% of pixels. The
+          // target is left open because "show only" and "highlight" are answered
+          // equally well by modify, color or representation, and pinning one
+          // would score a correct pipeline below a broken one.
+          label: "the selection feeds a node that changes what is drawn",
+          sourceType: "filter",
+          targetType: ["modify", "color", "representation"],
+          sourceHandle: "out",
+          targetHandle: "in",
+        },
+      ],
       paramChecks: [
         {
           label: "filter.query selects carbon",
           nodeType: "filter",
+          any: true,
           test: (n) => /element\s*==\s*["']?C["']?/i.test(str(n, "query")),
         },
       ],

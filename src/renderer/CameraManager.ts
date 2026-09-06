@@ -4,17 +4,42 @@
  */
 
 import * as THREE from "three";
-import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import type { CameraControlsLike } from "./CameraControls";
 import type { Snapshot } from "../types";
+import { getRadius } from "../constants";
+import {
+  orientationFromPose,
+  screenRight,
+  standardOrientation,
+  type CameraOrientation,
+} from "./cameraOrientation";
 
 export interface ViewExtent {
+  /** Largest world-axis-aligned extent; sizes the fit distance and clipping. */
   maxExtent: number;
+  /** Extent along screen-right for the orientation the bounds were computed for. */
   extentX: number;
+  /** Extent along screen-up for the orientation the bounds were computed for. */
   extentY: number;
 }
 
-/** Compute bounding box and center for a snapshot. */
-export function computeViewBounds(snapshot: Snapshot): {
+/**
+ * Compute bounding box and center for a snapshot.
+ *
+ * `extentX` / `extentY` are measured along the screen axes of `orientation`
+ * (default: the structure's standard orientation), so the orthographic
+ * frustum fit stays tight in any view; `maxExtent` is the world AABB.
+ *
+ * Without a cell the bounds are those of the atoms' van der Waals spheres,
+ * not just their centres: a small molecule seen along its long axis
+ * projects to a very short span of centres, and a fit to that alone put
+ * the spheres off screen. With a cell the parallelepiped's corners bound
+ * the view, as before.
+ */
+export function computeViewBounds(
+  snapshot: Snapshot,
+  orientation: CameraOrientation = standardOrientation(snapshot.box),
+): {
   center: [number, number, number];
   extent: ViewExtent;
 } {
@@ -36,6 +61,28 @@ export function computeViewBounds(snapshot: Snapshot): {
   let maxX = -Infinity,
     maxY = -Infinity,
     maxZ = -Infinity;
+  // Screen-space extents along the orientation's right / up axes.
+  const right = screenRight(orientation);
+  const up = orientation.up;
+  let minR = Infinity,
+    maxR = -Infinity,
+    minU = Infinity,
+    maxU = -Infinity;
+  /** Grow the bounds by a sphere of `radius` at (x, y, z). */
+  const track = (x: number, y: number, z: number, radius: number) => {
+    minX = Math.min(minX, x - radius);
+    minY = Math.min(minY, y - radius);
+    minZ = Math.min(minZ, z - radius);
+    maxX = Math.max(maxX, x + radius);
+    maxY = Math.max(maxY, y + radius);
+    maxZ = Math.max(maxZ, z + radius);
+    const r = x * right[0] + y * right[1] + z * right[2];
+    const u = x * up[0] + y * up[1] + z * up[2];
+    minR = Math.min(minR, r - radius);
+    maxR = Math.max(maxR, r + radius);
+    minU = Math.min(minU, u - radius);
+    maxU = Math.max(maxU, u + radius);
+  };
 
   const hasBox = snapshot.box && snapshot.box.some((v) => v !== 0);
 
@@ -59,15 +106,12 @@ export function computeViewBounds(snapshot: Snapshot): {
     for (let ia = 0; ia <= 1; ia++) {
       for (let ib = 0; ib <= 1; ib++) {
         for (let ic = 0; ic <= 1; ic++) {
-          const vx = ox + ia * va[0] + ib * vb[0] + ic * vc[0];
-          const vy = oy + ia * va[1] + ib * vb[1] + ic * vc[1];
-          const vz = oz + ia * va[2] + ib * vb[2] + ic * vc[2];
-          minX = Math.min(minX, vx);
-          minY = Math.min(minY, vy);
-          minZ = Math.min(minZ, vz);
-          maxX = Math.max(maxX, vx);
-          maxY = Math.max(maxY, vy);
-          maxZ = Math.max(maxZ, vz);
+          track(
+            ox + ia * va[0] + ib * vb[0] + ic * vc[0],
+            oy + ia * va[1] + ib * vb[1] + ic * vc[1],
+            oz + ia * va[2] + ib * vb[2] + ic * vc[2],
+            0,
+          );
         }
       }
     }
@@ -76,43 +120,43 @@ export function computeViewBounds(snapshot: Snapshot): {
     cy = nAtoms > 0 ? sumY / nAtoms : 0;
     cz = nAtoms > 0 ? sumZ / nAtoms : 0;
 
+    const { elements } = snapshot;
     for (let i = 0; i < nAtoms; i++) {
-      const x = positions[i * 3];
-      const y = positions[i * 3 + 1];
-      const z = positions[i * 3 + 2];
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      minZ = Math.min(minZ, z);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-      maxZ = Math.max(maxZ, z);
+      track(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], getRadius(elements[i]));
     }
   }
 
-  const extentX = maxX - minX;
-  const extentY = maxY - minY;
-  const extentZ = maxZ - minZ;
-  const maxExtent = Math.max(extentX, extentY, extentZ);
+  const maxExtent = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
 
   return {
     center: [cx, cy, cz],
-    extent: { maxExtent, extentX, extentY },
+    extent: { maxExtent, extentX: maxR - minR, extentY: maxU - minU },
   };
 }
 
-/** Fit the camera to show all atoms (or simulation cell if present). */
+/**
+ * Fit the camera to show all atoms (or simulation cell if present).
+ *
+ * Restores `orientation` — by default the structure's standard orientation
+ * (VESTA's "Standard orientation of crystal shape", see `cameraOrientation.ts`).
+ * The trackball controls rotate `camera.up` freely, so without resetting it a
+ * re-fit after a few drags would keep the current roll.
+ */
 export function fitCameraToView(
   camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
-  controls: OrbitControls,
+  controls: CameraControlsLike,
   snapshot: Snapshot,
+  orientation: CameraOrientation = standardOrientation(snapshot.box),
 ): ViewExtent {
-  const { center, extent } = computeViewBounds(snapshot);
+  const { center, extent } = computeViewBounds(snapshot, orientation);
   const [cx, cy, cz] = center;
 
   controls.target.set(cx, cy, cz);
 
   const distance = Math.max(extent.maxExtent * 1.2, 0.1);
-  camera.position.set(cx, cy - distance, cz);
+  const [ex, ey, ez] = orientation.eye;
+  camera.position.set(cx + ex * distance, cy + ey * distance, cz + ez * distance);
+  camera.up.set(...orientation.up);
 
   if (camera instanceof THREE.OrthographicCamera) {
     camera.near = -distance * 10;
@@ -129,11 +173,45 @@ export function fitCameraToView(
 }
 
 /**
+ * Turn the camera to `orientation` around the current target, keeping its
+ * distance (perspective) and zoom (orthographic) so only the viewing
+ * direction changes — the "align with axis" operation, as opposed to the
+ * full re-fit of {@link fitCameraToView}.
+ *
+ * A camera sitting exactly on its target has no distance to keep; it is
+ * backed off by 1 unit so the orientation is still applied.
+ */
+export function orientCamera(
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
+  controls: CameraControlsLike,
+  orientation: CameraOrientation,
+): void {
+  const target = controls.target;
+  const distance = camera.position.distanceTo(target) || 1;
+  const [ex, ey, ez] = orientation.eye;
+  camera.position.set(target.x + ex * distance, target.y + ey * distance, target.z + ez * distance);
+  camera.up.set(...orientation.up);
+  controls.update();
+}
+
+/** The orientation a camera currently has relative to its controls target. */
+export function currentOrientation(
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
+  controls: Pick<CameraControlsLike, "target">,
+): CameraOrientation | null {
+  return orientationFromPose(
+    camera.position.toArray(),
+    controls.target.toArray(),
+    camera.up.toArray(),
+  );
+}
+
+/**
  * Keep a perspective camera's near/far planes tracking the current dolly
  * distance so the model's bounding sphere always stays inside the frustum.
  *
- * Perspective wheel zoom is handled by OrbitControls' dolly, which moves the
- * camera (changing its distance to the target) but never touches near/far.
+ * Perspective wheel zoom dollies the camera (changing its distance to the
+ * target) but never touches near/far.
  * Without this, zooming out past the initial `far` (set once in
  * fitCameraToView) pushes the whole model behind the far plane and nothing is
  * drawn until "Reset view" re-fits. Recomputing per frame fixes that.
@@ -143,7 +221,7 @@ export function fitCameraToView(
  */
 export function updatePerspectiveClipping(
   camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
-  controls: Pick<OrbitControls, "target">,
+  controls: Pick<CameraControlsLike, "target">,
   extent: ViewExtent,
 ): boolean {
   if (!(camera instanceof THREE.PerspectiveCamera)) return false;
@@ -165,6 +243,40 @@ export function updatePerspectiveClipping(
   camera.far = far;
   camera.updateProjectionMatrix();
   return true;
+}
+
+/**
+ * Convert a wheel event into a multiplicative zoom factor (> 1 zooms in).
+ *
+ * Normalises `deltaY` across `deltaMode` (pixel / line / page) and applies
+ * the same exponential ramp OrbitControls used (`0.95^(zoomSpeed * |delta| / 100)`)
+ * so wheel zoom feels identical in both projection modes and is exactly
+ * reversible: N ticks in followed by N ticks out return to the start.
+ */
+export function wheelZoomFactor(deltaY: number, deltaMode: number, zoomSpeed: number): number {
+  let delta = deltaY;
+  if (deltaMode === 1 /* DOM_DELTA_LINE */) delta *= 40;
+  else if (deltaMode === 2 /* DOM_DELTA_PAGE */) delta *= 800;
+  const scale = Math.pow(0.95, zoomSpeed * Math.abs(delta) * 0.01);
+  return delta < 0 ? 1 / scale : scale;
+}
+
+/**
+ * Dolly a perspective camera along its view axis so its distance to `target`
+ * is divided by `zoomFactor` (> 1 moves closer). The distance is floored at
+ * `minDistance` so the camera can never pass through the pivot, which would
+ * flip the view.
+ */
+export function dollyPerspectiveTowardTarget(
+  camera: THREE.PerspectiveCamera,
+  target: THREE.Vector3,
+  zoomFactor: number,
+  minDistance = 0.01,
+): void {
+  const eye = camera.position.clone().sub(target);
+  const distance = Math.max(eye.length() / zoomFactor, minDistance);
+  if (eye.lengthSq() === 0) return;
+  camera.position.copy(target).addScaledVector(eye.normalize(), distance);
 }
 
 /**
@@ -245,7 +357,7 @@ export function applyFrustumInsets(
 /**
  * Create a new camera for switching between orthographic and perspective projection.
  * Returns the new camera with position/up preserved from the old one.
- * Caller is responsible for recreating OrbitControls.
+ * Caller is responsible for recreating the camera controls.
  */
 export function createSwitchedCamera(
   currentCamera: THREE.OrthographicCamera | THREE.PerspectiveCamera,

@@ -17,15 +17,15 @@ import { MoleculeRenderer, type MeganeCameraState } from "@/renderer/MoleculeRen
 
 interface ControlsStub {
   target: THREE.Vector3;
-  enableDamping: boolean;
   update: ReturnType<typeof vi.fn>;
+  syncImmediate: ReturnType<typeof vi.fn>;
 }
 
-function makeControls(enableDamping = true): ControlsStub {
+function makeControls(): ControlsStub {
   return {
     target: new THREE.Vector3(),
-    enableDamping,
     update: vi.fn(),
+    syncImmediate: vi.fn(),
   };
 }
 
@@ -62,10 +62,11 @@ describe("MoleculeRenderer.getCameraState", () => {
     expect(r.getCameraState()).toBeNull();
   });
 
-  it("captures orthographic camera position, target, and zoom", () => {
+  it("captures orthographic camera position, target, zoom, and up", () => {
     const cam = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
     cam.position.set(1, 2, 3);
     cam.zoom = 2.5;
+    cam.up.set(0, 1, 0);
     const ctrls = makeControls();
     ctrls.target.set(4, 5, 6);
     const r = makeRenderer({ camera: cam, controls: ctrls, perspectiveMode: false });
@@ -76,7 +77,16 @@ describe("MoleculeRenderer.getCameraState", () => {
       position: [1, 2, 3],
       target: [4, 5, 6],
       zoom: 2.5,
+      up: [0, 1, 0],
     });
+  });
+
+  it("testGetCameraState mirrors getCameraState (including up)", () => {
+    const cam = new THREE.OrthographicCamera();
+    cam.up.set(0, 0, -1);
+    const r = makeRenderer({ camera: cam, controls: makeControls(), perspectiveMode: false });
+    expect(r.testGetCameraState()).toEqual(r.getCameraState());
+    expect(r.testGetCameraState()?.up).toEqual([0, 0, -1]);
   });
 
   it("reports perspective mode when perspectiveMode flag is true", () => {
@@ -102,7 +112,7 @@ describe("MoleculeRenderer.applyCameraState", () => {
     ).not.toThrow();
   });
 
-  it("writes position, target, and zoom into camera/controls", () => {
+  it("writes position, target, up, and zoom into camera/controls", () => {
     const cam = new THREE.OrthographicCamera();
     const ctrls = makeControls();
     const r = makeRenderer({ camera: cam, controls: ctrls, perspectiveMode: false });
@@ -112,22 +122,19 @@ describe("MoleculeRenderer.applyCameraState", () => {
       position: [9, 8, 7],
       target: [1, 2, 3],
       zoom: 3.25,
+      up: [0, 1, 0],
     };
     r.applyCameraState(state);
 
     expect(cam.position.toArray()).toEqual([9, 8, 7]);
     expect(ctrls.target.toArray()).toEqual([1, 2, 3]);
+    expect(cam.up.toArray()).toEqual([0, 1, 0]);
     expect(cam.zoom).toBe(3.25);
-    expect(ctrls.update).toHaveBeenCalled();
   });
 
-  it("temporarily disables damping during the update and restores it", () => {
+  it("syncs the controls immediately so drag momentum cannot drift the restored pose", () => {
     const cam = new THREE.OrthographicCamera();
-    const ctrls = makeControls(/* enableDamping */ true);
-    let dampingDuringUpdate: boolean | null = null;
-    ctrls.update.mockImplementation(() => {
-      dampingDuringUpdate = ctrls.enableDamping;
-    });
+    const ctrls = makeControls();
     const r = makeRenderer({ camera: cam, controls: ctrls, perspectiveMode: false });
 
     r.applyCameraState({
@@ -137,9 +144,44 @@ describe("MoleculeRenderer.applyCameraState", () => {
       zoom: 1,
     });
 
-    expect(dampingDuringUpdate).toBe(false);
-    // After the call, the previous damping value must be restored.
-    expect(ctrls.enableDamping).toBe(true);
+    expect(ctrls.syncImmediate).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the current up vector when a legacy state has no `up`", () => {
+    const cam = new THREE.OrthographicCamera();
+    cam.up.set(0, 0, 1);
+    const ctrls = makeControls();
+    const r = makeRenderer({ camera: cam, controls: ctrls, perspectiveMode: false });
+
+    r.applyCameraState({
+      mode: "orthographic",
+      position: [0, -10, 0],
+      target: [0, 0, 0],
+      zoom: 1,
+    });
+
+    expect(cam.up.toArray()).toEqual([0, 0, 1]);
+  });
+
+  it("round-trips through getCameraState → applyCameraState", () => {
+    const camA = new THREE.OrthographicCamera();
+    camA.position.set(3, -20, 4);
+    camA.up.set(0.6, 0, 0.8);
+    camA.zoom = 1.75;
+    const ctrlsA = makeControls();
+    ctrlsA.target.set(3, 1, 4);
+    const rA = makeRenderer({ camera: camA, controls: ctrlsA, perspectiveMode: false });
+    const saved = rA.getCameraState()!;
+
+    const camB = new THREE.OrthographicCamera();
+    const ctrlsB = makeControls();
+    const rB = makeRenderer({ camera: camB, controls: ctrlsB, perspectiveMode: false });
+    rB.applyCameraState(saved);
+
+    expect(camB.position.toArray()).toEqual(camA.position.toArray());
+    expect(camB.up.toArray()).toEqual(camA.up.toArray());
+    expect(ctrlsB.target.toArray()).toEqual(ctrlsA.target.toArray());
+    expect(camB.zoom).toBe(camA.zoom);
   });
 
   it("resets accumulated frustum pan offsets", () => {
@@ -195,6 +237,70 @@ describe("MoleculeRenderer.applyCameraState", () => {
     });
 
     expect(setPerspectiveSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("MoleculeRenderer.alignCameraToAxis", () => {
+  function makeSnapshot(box: number[] | null) {
+    return {
+      nAtoms: 1,
+      nBonds: 0,
+      nFileBonds: 0,
+      positions: new Float32Array([5, 5, 5]),
+      elements: new Uint8Array([6]),
+      bonds: new Uint32Array(0),
+      bondOrders: null,
+      box: box ? new Float32Array(box) : null,
+      boxOrigin: null,
+    };
+  }
+
+  it("is a no-op before mount", () => {
+    const r = new MoleculeRenderer();
+    expect(() => r.alignCameraToAxis("+a")).not.toThrow();
+  });
+
+  it("looks along the snapshot's lattice vector, keeping target, distance and zoom", () => {
+    const cam = new THREE.OrthographicCamera();
+    cam.position.set(5, -15, 5);
+    cam.zoom = 2;
+    const ctrls = makeControls();
+    ctrls.target.set(5, 5, 5);
+    const r = makeRenderer({ camera: cam, controls: ctrls, perspectiveMode: false });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internals = r as any;
+    // Hexagonal-ish cell: b is not along y, so "+b" differs from "+y".
+    internals.snapshot = makeSnapshot([10, 0, 0, -5, 8.66, 0, 0, 0, 10]);
+    const cb = vi.fn();
+    r.setCameraChangeCallback(cb);
+
+    r.alignCameraToAxis("+b");
+
+    const b = new THREE.Vector3(-5, 8.66, 0).normalize();
+    const eye = cam.position.clone().sub(ctrls.target);
+    expect(eye.length()).toBeCloseTo(20, 9);
+    // The box is a Float32Array, so the lattice vector is only float-exact.
+    expect(eye.normalize().distanceTo(b)).toBeLessThan(1e-6);
+    expect(cam.up.toArray()).toEqual([0, 0, 1]);
+    expect(cam.zoom).toBe(2);
+    expect(ctrls.target.toArray()).toEqual([5, 5, 5]);
+    expect(ctrls.update).toHaveBeenCalled();
+    expect(cb).toHaveBeenCalledTimes(1);
+    // The frustum-fit extent follows the new view.
+    expect(internals.lastExtent).toBeDefined();
+    expect(internals.lastExtent.maxExtent).toBeCloseTo(15, 5);
+  });
+
+  it("falls back to the Cartesian axes without a snapshot", () => {
+    const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+    cam.position.set(0, -10, 0);
+    const ctrls = makeControls();
+    const r = makeRenderer({ camera: cam, controls: ctrls, perspectiveMode: true });
+
+    r.alignCameraToAxis("-c");
+
+    expect(cam.position.toArray()).toEqual([0, 0, -10]);
+    expect(cam.up.toArray()).toEqual([0, 1, 0]);
   });
 });
 

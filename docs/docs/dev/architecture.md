@@ -86,7 +86,7 @@ Each edge in the UI is color-coded by data type (`DATA_TYPE_COLORS`). Filter and
 
 ### MoleculeRenderer
 
-`src/renderer/MoleculeRenderer.ts` (~1300 lines) is the main orchestrator. It owns the Three.js scene, camera (orthographic or perspective), OrbitControls, and all sub-renderers. Its API is imperative and framework-agnostic — React components call it via refs, and the widget/docs embed uses the same API.
+`src/renderer/MoleculeRenderer.ts` (~1300 lines) is the main orchestrator. It owns the Three.js scene, camera (orthographic or perspective), trackball camera controls (`src/renderer/CameraControls.ts`, unrestricted 360° rotation with no pole clamp), and all sub-renderers. Its API is imperative and framework-agnostic — React components call it via refs, and the widget/docs embed uses the same API.
 
 Scene graph structure:
 
@@ -304,7 +304,7 @@ the same PR. The full per-host registration checklist lives in the
 | **Bond impostor** | `src/renderer/ImpostorBondMesh.ts` |
 | **Shaders** | `src/renderer/shaders.ts` |
 | **Multi-structure** | `src/renderer/StructureLayer.ts` |
-| **Camera/controls** | `src/renderer/CameraManager.ts` |
+| **Camera/controls** | `src/renderer/CameraManager.ts` (fit, insets, zoom), `src/renderer/cameraOrientation.ts` (VESTA standard orientation, ±a/±b/±c and ±x/±y/±z views) |
 | **Picking** | `src/renderer/Picking.ts` |
 | **Element data** | `src/constants.ts` (colors, vdW radii, bond params) |
 | **WASM parsers** | `crates/megane-core/`, `crates/megane-wasm/` |
