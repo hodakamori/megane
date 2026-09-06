@@ -592,19 +592,26 @@ describe("generatePipeline — structure summary + query repair", () => {
     nodes: [{ id: "x1", type: "not_a_real_node", position: { x: 0, y: 0 } }],
     edges: [],
   });
-  // Schema-clean but semantically wrong: the loader feeds the viewport directly
-  // *and* through a filter, so the filtered atoms are drawn twice.
+  // Schema-clean but semantically wrong: the whole structure at half opacity
+  // *and* the carbons at zero both reach the viewport, so for the carbons which
+  // opacity applies is unspecified. (An unfiltered base beside a faded
+  // selection is not this — the Viewport merges per-atom overrides and the
+  // fade wins; only two competing non-default values are ambiguous.)
   const OVERLAPPING_PIPELINE = JSON.stringify({
     version: 3,
     nodes: [
       { id: "l1", type: "load_structure", position: { x: 0, y: 0 } },
       { id: "f1", type: "filter", position: { x: 0, y: 155 }, query: 'element == "C"' },
-      { id: "v1", type: "viewport", position: { x: 0, y: 310 } },
+      { id: "m1", type: "modify", position: { x: 0, y: 310 }, scale: 1, opacity: 0 },
+      { id: "m2", type: "modify", position: { x: 300, y: 155 }, scale: 1, opacity: 0.5 },
+      { id: "v1", type: "viewport", position: { x: 0, y: 465 } },
     ],
     edges: [
       { source: "l1", target: "f1", sourceHandle: "particle", targetHandle: "in" },
-      { source: "f1", target: "v1", sourceHandle: "out", targetHandle: "particle" },
-      { source: "l1", target: "v1", sourceHandle: "particle", targetHandle: "particle" },
+      { source: "f1", target: "m1", sourceHandle: "out", targetHandle: "in" },
+      { source: "m1", target: "v1", sourceHandle: "out", targetHandle: "particle" },
+      { source: "l1", target: "m2", sourceHandle: "particle", targetHandle: "in" },
+      { source: "m2", target: "v1", sourceHandle: "out", targetHandle: "particle" },
     ],
   });
 
@@ -692,7 +699,7 @@ describe("generatePipeline — structure summary + query repair", () => {
     expect(result).toContain("Fixed.");
   });
 
-  it("repairs a schema-clean pipeline that draws the same atoms twice", async () => {
+  it("repairs a schema-clean pipeline whose branches compete for the same atoms", async () => {
     fetchMock.mockResolvedValueOnce(
       anthropicTextResponse("```json\n" + OVERLAPPING_PIPELINE + "\n```\nHere."),
     );
@@ -704,7 +711,7 @@ describe("generatePipeline — structure summary + query repair", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const repairBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string);
     const userMsg = repairBody.messages[repairBody.messages.length - 1];
-    expect(userMsg.content).toContain("drawn twice");
+    expect(userMsg.content).toContain("which change wins is unspecified");
     expect(result).toContain("Fixed.");
   });
 

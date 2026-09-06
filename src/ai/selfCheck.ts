@@ -9,9 +9,9 @@
  *
  *   - an edge whose ports type-check individually but carry incompatible data
  *     (`particle` into a `bond` port) — the executor silently drops it;
- *   - two `filter` branches that both reach the viewport and overlap, so the
- *     shared atoms are drawn twice (the "hide the water" bug the system prompt
- *     warns about three separate times);
+ *   - two branches that both change how the same atoms are drawn (a `modify`,
+ *     `color` or `representation` on each) and both reach the viewport, so
+ *     which change wins for the shared atoms is unspecified;
  *   - a syntactically valid query that matches zero atoms because the model
  *     invented a resname the structure doesn't carry;
  *   - a node whose upstream never produces data, so nothing renders at all.
@@ -57,6 +57,13 @@ const PARTICLE_PASSTHROUGH: ReadonlySet<string> = new Set([
   "drawing_boundary",
   "boundary_completion",
 ]);
+
+/**
+ * Node types that change how the atoms passing through them are drawn. Only a
+ * branch carrying one of these can conflict with another branch over the same
+ * atoms; a bare selection, or the raw stream, asks the Viewport for nothing.
+ */
+const TREATMENT_NODE_TYPES: ReadonlySet<string> = new Set(["modify", "color", "representation"]);
 
 /** `validatePipeline` findings already reported by `collectQueryErrors`. */
 const QUERY_SYNTAX_PREFIX = "Query syntax error";
@@ -127,6 +134,12 @@ interface ParticleBranch {
   loaderId: string | null;
   /** `filter` queries applied along the path, source-order irrelevant. */
   queries: string[];
+  /**
+   * Whether the path changes how its atoms are drawn — passes through a
+   * `modify`, `color` or `representation`. A branch that only selects, or the
+   * raw stream, contributes nothing the Viewport has to arbitrate.
+   */
+  treated: boolean;
 }
 
 /**
@@ -145,6 +158,7 @@ function traceParticleBranch(
 ): ParticleBranch {
   const queries: string[] = [];
   const seen = new Set<string>();
+  let treated = false;
   let currentId: string | null = startId;
 
   while (currentId && !seen.has(currentId)) {
@@ -153,12 +167,13 @@ function traceParticleBranch(
     if (!node) break;
 
     if (node.type === "load_structure") {
-      return { endId: startId, loaderId: currentId, queries };
+      return { endId: startId, loaderId: currentId, queries, treated };
     }
     if (!PARTICLE_PASSTHROUGH.has(node.type)) break;
     if (node.type === "filter" && typeof node.query === "string" && node.query.trim() !== "") {
       queries.push(node.query);
     }
+    if (TREATMENT_NODE_TYPES.has(node.type)) treated = true;
 
     // Follow the single particle-bearing input; anything else ends the trace.
     const feeds: { source: string; targetHandle: string }[] = (
@@ -168,7 +183,7 @@ function traceParticleBranch(
     currentId = feeds[0].source;
   }
 
-  return { endId: startId, loaderId: null, queries };
+  return { endId: startId, loaderId: null, queries, treated };
 }
 
 /**
@@ -219,16 +234,24 @@ function resolveBranchSelection(
 }
 
 /**
- * Report pairs of particle branches that deliver the *same* atoms to the
- * viewport. Overlapping branches render on top of each other, which is how
- * "hide the water" silently fails: the model fades one branch to `opacity: 0`
- * but also leaves the unfiltered structure connected, so the water is redrawn
- * at full opacity through the second path.
+ * Report pairs of particle branches that both change how the *same* atoms are
+ * drawn.
+ *
+ * The Viewport does not draw each branch's atoms separately. Every branch into
+ * `viewport.particle` contributes per-atom overrides that are merged onto the
+ * one loaded structure, and a non-default value wins over the default. So an
+ * unfiltered base beside a `filter → modify(opacity: 0)` branch is not "drawn
+ * twice" — it is the construction that hides a species, the one the benchmark's
+ * reviewed references use, and removing the base from such a reference changed
+ * 0.0000% of pixels. What the merge cannot settle is two *non-default* values
+ * for one atom: a `modify` on each of two overlapping branches, or two
+ * `color`s. Which one wins is whichever the executor applies last, so that is
+ * what this reports.
  *
  * With a structure loaded the overlap is computed exactly (evaluating each
  * branch's filters); without one, only the unmistakable case is reported — a
- * branch with no filters at all shares every atom with any other branch off the
- * same loader.
+ * treated branch with no filters at all shares every atom with any other
+ * treated branch off the same loader.
  */
 export function collectOverlapErrors(
   pipeline: SerializedPipeline,
@@ -270,6 +293,10 @@ export function collectOverlapErrors(
       const b = branches[j];
       // Different structures never overlap; an untraceable branch is skipped.
       if (!a.loaderId || a.loaderId !== b.loaderId) continue;
+      // A branch that only selects, or the raw stream, changes nothing about
+      // how its atoms are drawn, so there is nothing for the other branch to
+      // conflict with: whatever it covers, the picture is the other branch's.
+      if (!a.treated || !b.treated) continue;
 
       if (!snapshot) {
         // No data to intersect: only an entirely unfiltered branch is provably
@@ -278,10 +305,11 @@ export function collectOverlapErrors(
           const open = a.queries.length === 0 ? a : b;
           const other = open === a ? b : a;
           errors.push(
-            `nodes "${open.endId}" and "${other.endId}" both send atoms of "${a.loaderId}" to the ` +
-              `viewport, and "${open.endId}" is not filtered — the atoms selected by ` +
-              `"${other.endId}" are drawn twice. Route the remainder through a second filter ` +
-              `with the complementary query instead of connecting the unfiltered stream.`,
+            `nodes "${open.endId}" and "${other.endId}" both change how atoms of ` +
+              `"${a.loaderId}" are drawn, and "${open.endId}" is not filtered, so for the atoms ` +
+              `"${other.endId}" selects which change wins is unspecified. Filter ` +
+              `"${open.endId}" down to the complement of "${other.endId}"'s query, or drop one ` +
+              `of the two.`,
           );
         }
         continue;
@@ -295,9 +323,10 @@ export function collectOverlapErrors(
       if (shared === 0) continue;
 
       errors.push(
-        `nodes "${a.endId}" and "${b.endId}" both send atoms of "${a.loaderId}" to the viewport ` +
-          `and their selections overlap by ${shared} atom(s), so those atoms are drawn twice. ` +
-          `Make the two branches disjoint (e.g. \`resname == "HOH"\` and \`resname != "HOH"\`).`,
+        `nodes "${a.endId}" and "${b.endId}" both change how atoms of "${a.loaderId}" are drawn ` +
+          `and their selections overlap by ${shared} atom(s), so for those atoms which change ` +
+          `wins is unspecified. Make the two branches disjoint (e.g. \`resname == "HOH"\` and ` +
+          `\`resname != "HOH"\`).`,
       );
     }
   }

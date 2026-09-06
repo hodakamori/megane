@@ -45,6 +45,11 @@ function filterNode(id: string, query: string, y = 310): Node {
   return { id, type: "filter", position: { x: 0, y }, query } as Node;
 }
 
+/** A `modify` that changes how its atoms are drawn (opacity < 1 or scale != 1). */
+function modifyNode(id: string, opacity: number, y = 460): Node {
+  return { id, type: "modify", position: { x: 0, y }, scale: 1, opacity } as Node;
+}
+
 function edge(source: string, sourceHandle: string, target: string, targetHandle: string): Edge {
   return { source, target, sourceHandle, targetHandle };
 }
@@ -105,7 +110,30 @@ describe("collectOverlapErrors", () => {
     expect(collectOverlapErrors(p)).toEqual([]);
   });
 
-  it("flags an unfiltered branch running alongside a filtered one", () => {
+  // The construction that hides a species: the unfiltered structure and a
+  // faded selection both reach the viewport. The Viewport merges per-atom
+  // overrides onto the one loaded structure, so the base contributes nothing
+  // and the fade wins for the atoms it covers. Every filter reference in
+  // bench/llm/golden is built this way, and removing the base from one of
+  // them changed 0.0000% of pixels. Reporting it would send the model to
+  // "repair" a pipeline that is already right.
+  it("accepts an unfiltered base beside a filtered branch that fades its atoms", () => {
+    const p = pipeline(
+      [LOADER, filterNode("f1", 'element == "C"'), modifyNode("m1", 0), VIEWPORT],
+      [
+        edge("l1", "particle", "f1", "in"),
+        edge("f1", "out", "m1", "in"),
+        edge("m1", "out", "v1", "particle"),
+        edge("l1", "particle", "v1", "particle"),
+      ],
+    );
+    expect(collectOverlapErrors(p)).toEqual([]);
+  });
+
+  // Two branches that select without changing anything ask the Viewport for
+  // nothing either way — the crystal-distance-bonds reference carries exactly
+  // this (the raw stream beside a drawing_boundary), and both draw the same.
+  it("accepts overlapping branches that only select", () => {
     const p = pipeline(
       [LOADER, filterNode("f1", 'element == "C"'), VIEWPORT],
       [
@@ -114,9 +142,30 @@ describe("collectOverlapErrors", () => {
         edge("l1", "particle", "v1", "particle"),
       ],
     );
+    expect(collectOverlapErrors(p)).toEqual([]);
+  });
+
+  it("flags an unfiltered branch that changes the drawing beside a filtered one that does too", () => {
+    const p = pipeline(
+      [
+        LOADER,
+        filterNode("f1", 'element == "C"'),
+        modifyNode("fade", 0),
+        modifyNode("shrink", 0.5, 150),
+        VIEWPORT,
+      ],
+      [
+        edge("l1", "particle", "f1", "in"),
+        edge("f1", "out", "fade", "in"),
+        edge("fade", "out", "v1", "particle"),
+        // The whole structure at half opacity, on top of the carbons at zero.
+        edge("l1", "particle", "shrink", "in"),
+        edge("shrink", "out", "v1", "particle"),
+      ],
+    );
     const errors = collectOverlapErrors(p);
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain("drawn twice");
+    expect(errors[0]).toContain("which change wins is unspecified");
     expect(errors[0]).toContain("not filtered");
   });
 
@@ -128,52 +177,57 @@ describe("collectOverlapErrors", () => {
   it("does not flag branches fed by different loaders", () => {
     const second = { id: "l2", type: "load_structure", position: { x: 400, y: 0 } } as Node;
     const p = pipeline(
-      [LOADER, second, VIEWPORT],
-      [edge("l1", "particle", "v1", "particle"), edge("l2", "particle", "v1", "particle")],
+      [LOADER, second, modifyNode("a", 0.5), modifyNode("b", 0.2, 150), VIEWPORT],
+      [
+        edge("l1", "particle", "a", "in"),
+        edge("a", "out", "v1", "particle"),
+        edge("l2", "particle", "b", "in"),
+        edge("b", "out", "v1", "particle"),
+      ],
     );
     expect(collectOverlapErrors(p)).toEqual([]);
   });
 
-  it("counts the shared atoms exactly when a structure is loaded", () => {
-    // Both branches select carbon, so all three carbons are drawn twice.
-    const p = pipeline(
-      [LOADER, filterNode("a", 'element == "C"'), filterNode("b", "mass > 5"), VIEWPORT],
+  /** loader -> filter(a) -> modify -> viewport, loader -> filter(b) -> modify -> viewport. */
+  function twoTreatedBranches(queryA: string, queryB: string): SerializedPipeline {
+    return pipeline(
+      [
+        LOADER,
+        filterNode("a", queryA),
+        filterNode("b", queryB, 150),
+        modifyNode("ma", 0.5),
+        modifyNode("mb", 0.2, 460),
+        VIEWPORT,
+      ],
       [
         edge("l1", "particle", "a", "in"),
         edge("l1", "particle", "b", "in"),
-        edge("a", "out", "v1", "particle"),
-        edge("b", "out", "v1", "particle"),
+        edge("a", "out", "ma", "in"),
+        edge("b", "out", "mb", "in"),
+        edge("ma", "out", "v1", "particle"),
+        edge("mb", "out", "v1", "particle"),
       ],
     );
+  }
+
+  it("counts the shared atoms exactly when a structure is loaded", () => {
+    // Both branches select carbon and each fades it differently, so for all
+    // three carbons which opacity applies is unspecified.
+    const p = twoTreatedBranches('element == "C"', "mass > 5");
     const ctx: SelfCheckContext = { snapshot: makeSnapshot([6, 6, 6, 1, 1]) };
     const errors = collectOverlapErrors(p, ctx);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("overlap by 3 atom(s)");
+    expect(errors[0]).toContain("which change wins is unspecified");
   });
 
   it("stays quiet when the loaded structure makes the branches disjoint", () => {
-    const p = pipeline(
-      [LOADER, filterNode("a", 'element == "C"'), filterNode("b", 'element == "H"'), VIEWPORT],
-      [
-        edge("l1", "particle", "a", "in"),
-        edge("l1", "particle", "b", "in"),
-        edge("a", "out", "v1", "particle"),
-        edge("b", "out", "v1", "particle"),
-      ],
-    );
+    const p = twoTreatedBranches('element == "C"', 'element == "H"');
     expect(collectOverlapErrors(p, { snapshot: makeSnapshot([6, 6, 1]) })).toEqual([]);
   });
 
   it("does not guess at a branch whose query cannot be parsed", () => {
-    const p = pipeline(
-      [LOADER, filterNode("a", "chain A"), filterNode("b", 'element == "C"'), VIEWPORT],
-      [
-        edge("l1", "particle", "a", "in"),
-        edge("l1", "particle", "b", "in"),
-        edge("a", "out", "v1", "particle"),
-        edge("b", "out", "v1", "particle"),
-      ],
-    );
+    const p = twoTreatedBranches("chain A", 'element == "C"');
     expect(collectOverlapErrors(p, { snapshot: makeSnapshot([6, 1]) })).toEqual([]);
   });
 });
@@ -311,16 +365,24 @@ describe("collectSelfCheckErrors", () => {
 
   it("combines findings from every check", () => {
     const p = pipeline(
-      [LOADER, filterNode("f1", 'element == "C"'), VIEWPORT],
+      [
+        LOADER,
+        filterNode("f1", 'element == "C"'),
+        modifyNode("m1", 0),
+        modifyNode("m2", 0.5, 150),
+        VIEWPORT,
+      ],
       [
         edge("l1", "particle", "f1", "in"),
-        edge("f1", "out", "v1", "particle"),
-        edge("l1", "particle", "v1", "particle"),
+        edge("f1", "out", "m1", "in"),
+        edge("m1", "out", "v1", "particle"),
+        edge("l1", "particle", "m2", "in"),
+        edge("m2", "out", "v1", "particle"),
         edge("l1", "particle", "v1", "bond"),
       ],
     );
     const errors = collectSelfCheckErrors(p);
     expect(errors.some((e) => e.includes("incompatible ports"))).toBe(true);
-    expect(errors.some((e) => e.includes("drawn twice"))).toBe(true);
+    expect(errors.some((e) => e.includes("which change wins is unspecified"))).toBe(true);
   });
 });

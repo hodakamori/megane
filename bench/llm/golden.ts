@@ -221,7 +221,34 @@ function without(base: SerializedPipeline, type: PipelineNodeType): SerializedPi
     p.edges = p.edges.filter((e) => e.source !== node.id && e.target !== node.id);
   }
   p.nodes = p.nodes.filter((n) => n.type !== type);
+  pruneDangling(p);
   return p;
+}
+
+/**
+ * Drop nodes whose output no longer reaches anything, repeatedly.
+ *
+ * Deleting a generator can orphan the selection that existed only to feed it
+ * (multistep-filter-bonds' carbon filter feeds nothing but its label
+ * generator). A counterexample has to be a pipeline megane accepts, so that it
+ * is rejected for drawing the wrong picture and not for being malformed — and
+ * a node that reaches no sink is exactly what the self-check flags as
+ * malformed. Sinks (no outputs) and loaders are kept regardless.
+ */
+function pruneDangling(p: SerializedPipeline): void {
+  for (;;) {
+    const feeding = new Set(p.edges.map((e) => e.source));
+    const dangling = p.nodes.filter(
+      (n) =>
+        !feeding.has(n.id) &&
+        NODE_PORTS[n.type as PipelineNodeType]?.outputs.length > 0 &&
+        !n.type.startsWith("load_"),
+    );
+    if (dangling.length === 0) return;
+    const ids = new Set(dangling.map((n) => n.id));
+    p.nodes = p.nodes.filter((n) => !ids.has(n.id));
+    p.edges = p.edges.filter((e) => !ids.has(e.source) && !ids.has(e.target));
+  }
 }
 
 /** Overwrite a parameter on every node of `type`. */
