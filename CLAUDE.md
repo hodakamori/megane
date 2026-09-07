@@ -112,9 +112,12 @@ The chat tab of the pipeline editor turns a natural-language request into a
 `SerializedPipeline`. It **self-checks its own output**: after each generation
 `collectPipelineErrors()` (`src/ai/validatePipeline.ts`) runs the schema check,
 the selection-DSL syntax check, and `src/ai/selfCheck.ts` — edge typing via
-`canConnect`, overlapping viewport branches (the "hide the water draws it
-twice" bug), and, when a structure is loaded, the graph is actually executed so
-the real `nodeErrors` (`Filter returned 0 atoms`, `Replicate requires a unit
+`canConnect`, two viewport branches that both change how the same atoms are
+drawn (particle branches are merged per atom, so an unfiltered base beside a
+`filter → modify(opacity: 0)` branch is the correct way to hide a species; what
+gets flagged is two competing non-default treatments for one atom, whose winner
+is unspecified), and, when a structure is loaded, the graph is actually executed
+so the real `nodeErrors` (`Filter returned 0 atoms`, `Replicate requires a unit
 cell`, …) come back. Findings are fed into the **same** conversation and the
 model is asked to fix them, up to `MAX_REPAIR_ROUNDS` (`src/ai/client.ts`).
 

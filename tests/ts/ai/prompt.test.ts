@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 import { buildSystemPrompt, renderNodeSchemaSection } from "@/ai/prompt";
 import { collectPipelineErrors } from "@/ai/validatePipeline";
+import { collectOverlapErrors } from "@/ai/selfCheck";
 import type { SerializedPipeline } from "@/pipeline/types";
 
 /** Extract the first ```json fenced block that follows a section heading. */
@@ -12,6 +13,39 @@ function exampleAfter(prompt: string, heading: string): SerializedPipeline {
   const match = prompt.slice(idx).match(/```json\s*\n([\s\S]*?)```/);
   expect(match).not.toBeNull();
   return JSON.parse(match![1].trim()) as SerializedPipeline;
+}
+
+/** Does `pipeline` carry an edge between these two node types on these handles? */
+function hasEdge(
+  pipeline: SerializedPipeline,
+  sourceType: string,
+  targetType: string,
+  sourceHandle: string,
+  targetHandle: string,
+): boolean {
+  const typeOf = new Map(pipeline.nodes.map((n) => [n.id, n.type]));
+  return pipeline.edges.some(
+    (e) =>
+      typeOf.get(e.source) === sourceType &&
+      typeOf.get(e.target) === targetType &&
+      e.sourceHandle === sourceHandle &&
+      e.targetHandle === targetHandle,
+  );
+}
+
+/**
+ * The shape every "treat only part of the structure" example must have: the
+ * unfiltered base edge stays, exactly one filtered branch changes the drawing,
+ * and — because bond branches are appended rather than merged — the bond
+ * stream reaches the viewport only through its own filter/modify branch. The
+ * Viewport merges particle branches per atom (`mergeParticleOverrides`), so
+ * the base edge is the correct construction; it is what the benchmark's
+ * reviewed references use, and the self-check must accept it.
+ */
+function expectBaseEdgePattern(pipeline: SerializedPipeline): void {
+  expect(collectPipelineErrors(pipeline)).toEqual([]);
+  expect(collectOverlapErrors(pipeline)).toEqual([]);
+  expect(hasEdge(pipeline, "load_structure", "viewport", "particle", "particle")).toBe(true);
 }
 
 describe("buildSystemPrompt", () => {
@@ -110,23 +144,58 @@ describe("buildSystemPrompt", () => {
     }
   });
 
+  it("documents how the viewport combines branches per port", () => {
+    // Particle branches merge per atom (a non-default value wins); bond
+    // branches are appended. Everything the selective examples say follows
+    // from this rule, so it has to be stated where the connection rules are.
+    expect(prompt).toContain("MERGED per atom");
+    expect(prompt).toContain("APPENDED");
+    expect(prompt).not.toContain("renders twice");
+    expect(prompt).not.toContain("re-draws the hidden species");
+  });
+
   it("documents the selective visual property (subset) pattern", () => {
     expect(prompt).toContain("Selective Visual Property");
-    // The guideline should steer the model away from double-rendering the
-    // same atoms (full structure + filtered copy) into the viewport.
+    // The guideline keeps the unfiltered base edge (the merge makes it
+    // correct) and only forbids two branches that both change the same atoms.
+    expect(prompt).toContain("NOT drawn twice");
     expect(prompt).toContain("disjoint");
   });
 
   it("ships a valid selective-property example pipeline", () => {
     const pipeline = exampleAfter(prompt, "## Example: Selective Visual Property");
     // The documented example must itself pass the same schema + query
-    // validators the repair round trip uses, so the model has a correct
-    // template to follow.
-    expect(collectPipelineErrors(pipeline)).toEqual([]);
-    // Two disjoint filter branches (water vs. the rest), only one modified.
-    const filters = pipeline.nodes.filter((n) => n.type === "filter");
-    expect(filters).toHaveLength(2);
-    expect(pipeline.nodes.filter((n) => n.type === "modify")).toHaveLength(1);
+    // validators (and the self-check) the repair round trip uses, so the
+    // model has a correct template to follow.
+    expectBaseEdgePattern(pipeline);
+    // One filtered branch fades the water's atoms ...
+    const filters = pipeline.nodes.filter((n) => n.type === "filter") as Array<{
+      id: string;
+      query?: string;
+      bond_query?: string;
+    }>;
+    const atomFilter = filters.find((f) => (f.query ?? "").includes("HOH"));
+    expect(atomFilter).toBeDefined();
+    const modifies = pipeline.nodes.filter((n) => n.type === "modify") as Array<{
+      id: string;
+      opacity?: number;
+    }>;
+    expect(modifies).toHaveLength(2);
+    for (const m of modifies) {
+      expect(m.opacity).toBeGreaterThan(0);
+      expect(m.opacity).toBeLessThan(1);
+    }
+    expect(hasEdge(pipeline, "filter", "modify", "out", "in")).toBe(true);
+    expect(hasEdge(pipeline, "modify", "viewport", "out", "particle")).toBe(true);
+    // ... and a second one fades its bonds, replacing the direct bond edge:
+    // bond streams are appended, so `add_bond -> viewport.bond` beside the
+    // faded branch would draw every bond again at full opacity.
+    const bondFilter = filters.find((f) => (f.bond_query ?? "").length > 0);
+    expect(bondFilter).toBeDefined();
+    expect(bondFilter!.bond_query).toMatch(/\b(bond_index|atom_index|element|molecule_id)\b/);
+    expect(hasEdge(pipeline, "add_bond", "filter", "bond", "in")).toBe(true);
+    expect(hasEdge(pipeline, "modify", "viewport", "out", "bond")).toBe(true);
+    expect(hasEdge(pipeline, "add_bond", "viewport", "bond", "bond")).toBe(false);
   });
 
   it("documents the selective representation (style one species) pattern", () => {
@@ -139,10 +208,12 @@ describe("buildSystemPrompt", () => {
 
   it("ships a valid selective-representation example with line on the water branch", () => {
     const pipeline = exampleAfter(prompt, "## Example: Selective Representation");
-    expect(collectPipelineErrors(pipeline)).toEqual([]);
-    // Two disjoint filter branches; the representation styles only one of them.
+    expectBaseEdgePattern(pipeline);
+    // The base edge keeps every atom in its default style; one filtered
+    // branch restyles only the water.
     const filters = pipeline.nodes.filter((n) => n.type === "filter");
-    expect(filters).toHaveLength(2);
+    expect(filters).toHaveLength(1);
+    expect((filters[0] as { query?: string }).query).toContain("HOH");
     const reps = pipeline.nodes.filter((n) => n.type === "representation");
     expect(reps).toHaveLength(1);
     expect((reps[0] as { mode?: string }).mode).toBe("line");
@@ -164,29 +235,33 @@ describe("buildSystemPrompt", () => {
 
   it("ships a valid hide-species example that fades the target to opacity 0", () => {
     const pipeline = exampleAfter(prompt, "## Example: Hiding / removing a species");
-    expect(collectPipelineErrors(pipeline)).toEqual([]);
-    const modifies = pipeline.nodes.filter((n) => n.type === "modify");
-    expect(modifies.length).toBeGreaterThanOrEqual(1);
-    expect((modifies[0] as { opacity?: number }).opacity).toBe(0);
-    // Two disjoint filter branches: the first selects the species to hide
-    // (water), the second keeps the rest. Routing the rest through its own
-    // filter — instead of re-sending the full structure — is what actually
-    // hides the species (an unfiltered branch would re-draw it at full opacity).
-    const filters = pipeline.nodes.filter((n) => n.type === "filter");
-    expect(filters).toHaveLength(2);
-    expect((filters[0] as { query?: string }).query).toContain("HOH");
-    // No edge feeds the load_structure's particles straight to the viewport;
-    // every particle path into the viewport goes through a filter first.
-    const loaderId = pipeline.nodes.find((n) => n.type === "load_structure")!.id;
-    const viewportId = pipeline.nodes.find((n) => n.type === "viewport")!.id;
-    const directParticleEdge = pipeline.edges.find(
-      (e) =>
-        e.source === loaderId &&
-        e.target === viewportId &&
-        e.sourceHandle === "particle" &&
-        e.targetHandle === "particle",
-    );
-    expect(directParticleEdge).toBeUndefined();
+    // The unfiltered base edge stays: the Viewport merges the branch's
+    // opacity 0 onto it per atom, so the water disappears and nothing is drawn
+    // twice. This is the construction the benchmark's `hide-water` reference
+    // uses; a prompt that forbade it was steering the model away from the
+    // answer the rubric grades against.
+    expectBaseEdgePattern(pipeline);
+    const modifies = pipeline.nodes.filter((n) => n.type === "modify") as Array<{
+      opacity?: number;
+    }>;
+    expect(modifies).toHaveLength(2);
+    for (const m of modifies) expect(m.opacity).toBe(0);
+    const filters = pipeline.nodes.filter((n) => n.type === "filter") as Array<{
+      query?: string;
+      bond_query?: string;
+    }>;
+    // The atom branch selects the species to hide ...
+    expect(filters[0].query).toContain("HOH");
+    expect(hasEdge(pipeline, "filter", "modify", "out", "in")).toBe(true);
+    expect(hasEdge(pipeline, "modify", "viewport", "out", "particle")).toBe(true);
+    // ... and the bond branch hides its bonds, in place of the direct bond
+    // edge (bond streams are appended, so a direct edge would keep the
+    // solvent's sticks on screen). `bond_query` has no `resname`, so the
+    // selection is spelled on a bond field.
+    expect(filters[1].bond_query).toMatch(/\b(bond_index|atom_index|element|molecule_id)\b/);
+    expect(hasEdge(pipeline, "add_bond", "filter", "bond", "in")).toBe(true);
+    expect(hasEdge(pipeline, "modify", "viewport", "out", "bond")).toBe(true);
+    expect(hasEdge(pipeline, "add_bond", "viewport", "bond", "bond")).toBe(false);
   });
 });
 
