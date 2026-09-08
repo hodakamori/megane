@@ -1,0 +1,18 @@
+{
+  "description": "megane lifecycle hooks for Codex CLI. Mirrors .claude/settings.json; the script itself is shared in .agents/hooks/. Loaded only when this project is trusted in Codex (see AGENTS.md > Agent tooling layout).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)/.agents/hooks/session-start.sh\"",
+            "statusMessage": "Loading megane bootstrap rules",
+            "additionalContextLimit": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

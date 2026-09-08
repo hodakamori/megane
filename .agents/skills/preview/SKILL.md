@@ -1,4 +1,5 @@
 ---
+name: preview
 description: Capture screenshots and videos of the megane viewer for visual review. Use when asked to take screenshots, capture previews, or verify visual output.
 ---
 

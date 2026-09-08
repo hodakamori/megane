@@ -1,0 +1,15 @@
+# Project-scoped Codex CLI configuration for megane.
+#
+# Codex applies this layer only after the project has been trusted
+# (`[projects."<abs path>"] trust_level = "trusted"` in ~/.codex/config.toml,
+# or accept the trust prompt on first launch). Untrusted projects skip this
+# file, `.codex/hooks.json`, and any project-local rules.
+#
+# Skills need no configuration: Codex discovers `.agents/skills/` at the
+# repository root on its own. Claude Code reads the same directory through
+# the `.claude/skills` symlink.
+
+# AGENTS.md is ~30 KB and Codex's default budget for combined AGENTS.md
+# content (global + project) is 32 KiB. Raise it so the project instructions
+# are never truncated or skipped when ~/.codex/AGENTS.md also exists.
+project_doc_max_bytes = 131072

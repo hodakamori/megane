@@ -1,4 +1,5 @@
 ---
+name: testing
 description: Run tests for megane. Covers TypeScript, Rust, Python, and E2E tests. IMPORTANT: E2E tests use Playwright, NOT Puppeteer.
 ---
 
@@ -42,7 +43,7 @@ Tests: `tests/python/`. Config: `pyproject.toml` under `[tool.pytest.ini_options
 
 ## Coverage & Codecov (merge gate)
 
-**Codecov is a hard merge gate — see CRITICAL RULE #8 in `CLAUDE.md`.** The
+**Codecov is a hard merge gate — see CRITICAL RULE #8 in `AGENTS.md`.** The
 three CI jobs that upload coverage all go through
 `.github/actions/codecov-upload` (`fail_ci_if_error: true`), and
 `codecov.yml` requires **patch coverage ≥ 70 %** on every PR (project
@@ -208,7 +209,7 @@ MEGANE_HOST=widget-jupyterlab npm run test:e2e:format-loading
 
 `MEGANE_HOST` accepts `webapp | widget-jupyterlab | widget-vscode |
 jupyterlab-doc | vscode`. Default is `webapp`. See
-`.claude/skills/e2e-coverage/SKILL.md` for the full per-feature runbook.
+`.agents/skills/e2e-coverage/SKILL.md` for the full per-feature runbook.
 
 ### Running everything
 
@@ -245,9 +246,9 @@ is untouched by CI. The VSCode-hosted projects (`vscode`,
 `widget-vscode`) still run only locally (they need a code-server
 install).
 
-The expected pre-PR workflow (CRITICAL RULE #9 in `CLAUDE.md`) is:
+The expected pre-PR workflow (CRITICAL RULE #9 in `AGENTS.md`) is:
 
-1. Identify which Playwright projects the change can reach (host projects + per-feature projects). The table in `.claude/skills/e2e-coverage/SKILL.md` is the source of truth. "UI-touching" includes any edit under `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs, or `crates/megane-core/src/` output the renderer consumes.
+1. Identify which Playwright projects the change can reach (host projects + per-feature projects). The table in `.agents/skills/e2e-coverage/SKILL.md` is the source of truth. "UI-touching" includes any edit under `src/`, `vscode-megane/src/`, `vscode-megane/media/`, `jupyterlab-megane/src/`, `crates/megane-wasm/src/`, the Vite configs, or `crates/megane-core/src/` output the renderer consumes.
 2. Run them locally and confirm the **intended** UI change is reflected. Re-baseline only when the diff is intended, and visually inspect the new PNG before committing it.
 3. Sweep neighboring projects for **side effects**. Unexpected pixel diffs, timeouts, or runtime errors are regressions — fix the root cause, do not silently re-baseline. Timeouts and runtime errors are always real regressions.
 4. Commit any intentional baseline updates under `tests/e2e/baselines/<project>/` in the same PR.

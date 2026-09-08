@@ -318,4 +318,4 @@ jobs:
   #
   # The VSCode-hosted projects (`vscode`, `widget-vscode`) remain
   # local-only, and `tests/e2e/baselines/` remains the local dev baseline
-  # set. See `.claude/skills/e2e-coverage/SKILL.md` for the full runbook.
+  # set. See `.agents/skills/e2e-coverage/SKILL.md` for the full runbook.

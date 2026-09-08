@@ -148,7 +148,7 @@ Adding ground truth to a case means dropping a folder named after it. There is
 no registry to update: `golden.ts` discovers the directory, joins each folder to
 its prompt by id, and throws if a folder names a case `dataset.ts` does not
 have. **All 24 cases have all three files** — that pairing is CRITICAL RULE #12
-in `CLAUDE.md` and `tests/ts/bench/golden.test.ts` fails if any piece is missing.
+in `AGENTS.md` and `tests/ts/bench/golden.test.ts` fails if any piece is missing.
 
 The pipelines are **captured, not hand-authored**: each is `store.serialize()`
 taken from a graph built through the editor store — usually a

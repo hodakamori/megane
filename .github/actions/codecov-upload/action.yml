@@ -3,7 +3,7 @@ description: >
   Upload one coverage report to Codecov and fail the job when the upload does
   not land. Wraps codecov/codecov-action@v5 so the three coverage jobs (Rust,
   TypeScript, Python) share a single definition of the patch-coverage gate
-  described in CRITICAL RULE #8 of CLAUDE.md.
+  described in CRITICAL RULE #8 of AGENTS.md.
 
 inputs:
   files:

@@ -411,6 +411,6 @@ to bless. The full runbook (all five hosts, per-host setup) lives in the
 ## Quick reference
 
 For the agent-facing checklist version of this walkthrough, see the `add-node`
-skill (`.claude/skills/add-node/SKILL.md`). For the internals it plugs into, see
+skill (`.agents/skills/add-node/SKILL.md`). For the internals it plugs into, see
 [Architecture](/dev/architecture). For the per-node parameter tables generated
 from `catalog.ts`, see the [Node Reference](/reference/node-reference).
