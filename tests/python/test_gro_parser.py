@@ -67,3 +67,19 @@ def test_load_gro_missing_file():
     """load_gro raises an error for a non-existent file."""
     with pytest.raises((FileNotFoundError, OSError)):
         load_gro("/nonexistent/path/missing.gro")
+
+
+def test_high_precision_gro_coordinates():
+    """Issue #695: 8-decimal coordinates occupy 13 columns, not 8.
+
+    The old fixed 8-column slices straddled two numbers, failing on atom 11
+    and silently misreading the atoms before it, so the values are asserted
+    as well as the atom count.
+    """
+    s = load_gro(str(FIXTURES / "high_precision.gro"))
+
+    assert s.n_atoms == 11
+    np.testing.assert_allclose(s.positions[0], [153.4893685, 26.2489948, 2.2520719], rtol=1e-6)
+    np.testing.assert_allclose(s.positions[10], [155.5595796, 148.8182486, 23.9361028], rtol=1e-6)
+    assert s.elements.tolist() == [6] * 11
+    np.testing.assert_allclose(np.diag(s.box), [171.5761] * 3, rtol=1e-6)

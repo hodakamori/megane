@@ -40,6 +40,14 @@ const STRUCTURE_CASES: StructureCase[] = [
   { name: "pdb-1crn", file: "1crn.pdb", mime: "chemical/x-pdb", expectedAtoms: 327 },
   { name: "pdb-water-wrapped", file: "water_wrapped.pdb", mime: "chemical/x-pdb" },
   { name: "gro-water", file: "water.gro", mime: "chemical/x-gro" },
+  // GRO with 8-decimal (13-column) coordinate fields: the field width must be
+  // inferred from the decimal-point spacing, not assumed to be %8.3f (#695).
+  {
+    name: "gro-high-precision",
+    file: "high_precision.gro",
+    mime: "chemical/x-gro",
+    expectedAtoms: 11,
+  },
   { name: "xyz-perovskite", file: "perovskite_srtio3.xyz", mime: "chemical/x-xyz" },
   { name: "xyz-multiframe", file: "water_multiframe.xyz", mime: "chemical/x-xyz" },
   { name: "mol-methane", file: "methane.mol", mime: "chemical/x-mdl-molfile" },
