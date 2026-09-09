@@ -44,7 +44,7 @@
  *   --clean                 Remove demo/out before running
  *
  * Requires WASM to be built first; this script builds it automatically if the
- * pkg directory is missing (CLAUDE.md CRITICAL RULE #3).
+ * pkg directory is missing (AGENTS.md CRITICAL RULE #3).
  */
 
 import { spawn, execSync } from "child_process";

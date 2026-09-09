@@ -12,7 +12,7 @@
  * going live (fileFrames OR fileProvider changes) — i.e. time-to-interactive.
  *
  * NOTE: unoptimized local wasm inflates absolute numbers; the same-.wasm A/B
- * (single vs twophase) is valid. See CLAUDE.md rule #10.
+ * (single vs twophase) is valid. See AGENTS.md rule #10.
  *
  * Usage: node scripts/profile-trajectory-frame0.mjs
  *   env STRUCT_FIXTURE / TRAJ_FIXTURE override the defaults; RUNS sets repeats.

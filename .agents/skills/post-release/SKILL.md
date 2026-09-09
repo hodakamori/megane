@@ -1,4 +1,5 @@
 ---
+name: post-release
 description: Post-release checklist for megane. Run after pushing a release tag to verify all publish workflows succeeded and packages are live.
 ---
 

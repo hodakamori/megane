@@ -1,4 +1,5 @@
 ---
+name: pre-release
 description: Pre-release checklist for megane. Run before tagging and publishing a new version. Covers tests, build, versioning, docs, and dry-run validation.
 ---
 
@@ -165,9 +166,9 @@ The release diff is mostly version bumps + CHANGELOG, which Codecov ignores
 (`pyproject.toml`, `Cargo.toml`, `*.md`), so the gate normally passes
 trivially. If the release branch happens to also include source-code
 changes, run `make coverage-all` locally first — see CRITICAL RULE #8 in
-`CLAUDE.md` and the `testing` skill's "Coverage & Codecov" section.
+`AGENTS.md` and the `testing` skill's "Coverage & Codecov" section.
 
-**E2E baseline drift.** Per `CLAUDE.md`, E2E is local-only and font /
+**E2E baseline drift.** Per `AGENTS.md`, E2E is local-only and font /
 fontconfig differences across machines can cause baseline diffs. If E2E
 fails only with `full-page diff X.XX% > 2%` style errors (not timeouts or
 app errors), re-baseline the affected projects and commit the new PNGs:
@@ -329,7 +330,7 @@ git commit -m "chore: release vX.Y.Z"
 
 Then push. The push target depends on workflow:
 - **Direct main flow**: `git push origin main`
-- **Branch + PR flow** (default in Claude Code on web): push to the working
+- **Branch + PR flow** (default for hosted agent sessions such as Claude Code on web or Codex cloud): push to the working
   branch (e.g. `claude/release-vX.Y.Z-...`), open a PR, merge after CI
   passes. The tag must point at the merge commit on `main`.
 

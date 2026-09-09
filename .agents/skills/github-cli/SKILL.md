@@ -1,4 +1,5 @@
 ---
+name: github-cli
 description: Using GitHub CLI (gh) for PRs, issues, and API calls. Use when interacting with GitHub.
 ---
 

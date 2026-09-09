@@ -37,7 +37,7 @@ mkdirSync(SNAPSHOTS_DIR, { recursive: true });
 
 /**
  * Resolve Playwright from multiple possible install locations.
- * Local dev installs Playwright at /opt/node22/lib/node_modules/ per CLAUDE.md;
+ * Local dev installs Playwright at /opt/node22/lib/node_modules/ per AGENTS.md;
  * GitHub-hosted runners typically use ~/.npm-global or /usr/local/lib/node_modules/.
  * The project's own node_modules is preferred when present so a single
  * `npm i --no-save playwright` in CI is enough.

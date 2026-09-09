@@ -1,4 +1,5 @@
 ---
+name: dev-setup
 description: Set up and verify the megane development environment. Use at session start or when build tools are missing.
 ---
 

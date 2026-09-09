@@ -1,4 +1,5 @@
 ---
+name: build
 description: Build megane components (WASM, frontend, Python wheel). Use when asked to build or when build errors occur.
 ---
 
@@ -58,7 +59,7 @@ wasm-pack aborts after emitting the `.wasm`/`.js` but before writing
 - Set `MEGANE_WASM_NO_OPT=1 npm run build:wasm` to skip the doomed optimized
   attempt and go straight to `--no-opt` in a known sandbox.
 - The fallback produces an **unoptimized** `.wasm`. It is functionally identical
-  and fine for dev/E2E, but absolute perf numbers are inflated — see CLAUDE.md
+  and fine for dev/E2E, but absolute perf numbers are inflated — see AGENTS.md
   CRITICAL RULE #10. Optimized `-O3` builds are still produced automatically in
   CI / any networked environment.
 

@@ -1,10 +1,11 @@
 ---
-description: Register a new file format across every megane host (standalone webapp, Jupyter widget, JupyterLab labextension, VSCode extension, Python). Use whenever you add a parser to `megane-core`, expose it via WASM/PyO3, or notice that an existing parser is missing from one of the host openers. Enforces CRITICAL RULE #6 in CLAUDE.md.
+name: add-format
+description: Register a new file format across every megane host (standalone webapp, Jupyter widget, JupyterLab labextension, VSCode extension, Python). Use whenever you add a parser to `megane-core`, expose it via WASM/PyO3, or notice that an existing parser is missing from one of the host openers. Enforces CRITICAL RULE #6 in AGENTS.md.
 ---
 
 # Adding a new file format to megane
 
-A new format is **not done** until it is openable on every host where it makes sense. The Rust core, WASM bindings, and Python bindings only get you the parser — each host has a separate registration point and they drift independently. This checklist mirrors CRITICAL RULE #6 in `CLAUDE.md`.
+A new format is **not done** until it is openable on every host where it makes sense. The Rust core, WASM bindings, and Python bindings only get you the parser — each host has a separate registration point and they drift independently. This checklist mirrors CRITICAL RULE #6 in `AGENTS.md`.
 
 ## When to use this skill
 
@@ -77,7 +78,7 @@ This is the only file that knows how to dispatch by extension; every host below 
 
 ## Source-of-truth pointers
 
-These match CLAUDE.md CRITICAL RULE #6:
+These match AGENTS.md CRITICAL RULE #6:
 
 - Browser parsers: `crates/megane-wasm/src/lib.rs`
 - Standalone accept lists: `src/components/nodes/LoadStructureNode.tsx`, `src/components/nodes/LoadTrajectoryNode.tsx`

@@ -1,4 +1,5 @@
 ---
+name: e2e-coverage
 description: Run, extend, or re-baseline the megane E2E coverage suite. Covers all 5 platforms (webapp, JupyterLab DocWidget, VSCode custom editor, Jupyter widget in JupyterLab, Jupyter widget in VSCode notebook). Use when adding new E2E specs, debugging baseline drift, reproducing a UI bug across hosts, or running the full local-only matrix.
 ---
 
@@ -10,7 +11,7 @@ The megane viewer ships through 5 distribution targets. Each one renders the sam
 
 All E2E uses `@playwright/test`. `puppeteer` is **not** in `package.json`; only `playwright` 1.56 is installed. Never add or invoke Puppeteer.
 
-**CI split** — see `.claude/skills/testing/SKILL.md` for the full story. The webapp-host and JupyterLab-host projects run in CI (`.github/workflows/e2e.yml`, via `npm run test:e2e:ci:webapp` / `test:e2e:ci:jupyterlab`) inside the pinned Playwright container, against the CI-only baseline set `tests/e2e/baselines-ci/` (selected with `MEGANE_E2E_BASELINE_DIR`; missing baselines are hard failures under `MEGANE_E2E_REQUIRE_BASELINE=1`). Those baselines are re-recorded **only** by the "E2E update baselines" workflow (add the `update-e2e-baselines` label to the PR, or workflow_dispatch), which runs in the same container and commits the PNGs to the dispatched branch — never capture them locally. The VSCode-hosted projects (`vscode`, `widget-vscode`) are local-only. `tests/e2e/baselines/` remains the local baseline set for everything below.
+**CI split** — see `.agents/skills/testing/SKILL.md` for the full story. The webapp-host and JupyterLab-host projects run in CI (`.github/workflows/e2e.yml`, via `npm run test:e2e:ci:webapp` / `test:e2e:ci:jupyterlab`) inside the pinned Playwright container, against the CI-only baseline set `tests/e2e/baselines-ci/` (selected with `MEGANE_E2E_BASELINE_DIR`; missing baselines are hard failures under `MEGANE_E2E_REQUIRE_BASELINE=1`). Those baselines are re-recorded **only** by the "E2E update baselines" workflow (add the `update-e2e-baselines` label to the PR, or workflow_dispatch), which runs in the same container and commits the PNGs to the dispatched branch — never capture them locally. The VSCode-hosted projects (`vscode`, `widget-vscode`) are local-only. `tests/e2e/baselines/` remains the local baseline set for everything below.
 
 ## When E2E MUST run (CRITICAL RULE #9)
 
@@ -170,7 +171,7 @@ cross-host matrix — with the VSCode/code-server setup above included. This is
 the checkpoint that catches baseline drift and regressions that piled up
 across merged PRs on the hosts CI's E2E workflow does not cover (VSCode)
 and on the local baseline set. See CRITICAL RULE #9 in
-`CLAUDE.md` and the `pre-release` skill.
+`AGENTS.md` and the `pre-release` skill.
 
 ## Adding a New Spec
 
@@ -269,9 +270,9 @@ When a comparison fails, `<name>.diff.png` and `<name>.new.png` land next to the
 
 ## Cross-References
 
-- `.claude/skills/testing/SKILL.md` — overall test taxonomy and the CI vs. local E2E split
-- `.claude/skills/build/SKILL.md` — WASM / widget / lab-extension build prerequisites
-- `.claude/skills/dev-setup/SKILL.md` — toolchain install
+- `.agents/skills/testing/SKILL.md` — overall test taxonomy and the CI vs. local E2E split
+- `.agents/skills/build/SKILL.md` — WASM / widget / lab-extension build prerequisites
+- `.agents/skills/dev-setup/SKILL.md` — toolchain install
 - `tests/e2e/lib/setup.ts` — 3-layer helper implementation
 - `tests/e2e/lib/hosts/` — host emulation modules
 - `playwright.config.ts` — project definitions

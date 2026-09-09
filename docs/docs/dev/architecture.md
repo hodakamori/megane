@@ -272,7 +272,7 @@ To add a new uniform:
 The single source of truth for cross-host format coverage is
 `docs/docs/platform-support.md` — every parser change MUST update its tables in
 the same PR. The full per-host registration checklist lives in the
-`add-format` skill (`.claude/skills/add-format/SKILL.md`).
+`add-format` skill (`.agents/skills/add-format/SKILL.md`).
 
 1. Implement the parser in Rust in `crates/megane-core/src/`
 2. Expose via WASM in `crates/megane-wasm/src/lib.rs` with `#[wasm_bindgen]`

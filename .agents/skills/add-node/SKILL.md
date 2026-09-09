@@ -1,4 +1,5 @@
 ---
+name: add-node
 description: Register a new pipeline node type across every surface it must touch (types, catalog, executor, engine dispatch, React component, editor palette, and the optional JS/Python builders). Use whenever you add a node to the visual pipeline, or notice a node is only half-wired. Complements the `add-format` skill (formats vs. nodes) and the prose walkthrough at docs/docs/dev/custom-nodes.md.
 ---
 

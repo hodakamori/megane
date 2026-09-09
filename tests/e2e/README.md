@@ -110,7 +110,7 @@ issues made GH-hosted runs unreliable:
 
 Run all four projects locally before pushing changes to MeganeViewer,
 Viewport, MoleculeRenderer, the widget bundle, or DocWidget. See
-`.claude/skills/testing/SKILL.md` for commands.
+`.agents/skills/testing/SKILL.md` for commands.
 
 Follow-up milestones (more interaction matrices, more dynamic-update
 matrices, more host options) are tracked in the planning doc.
