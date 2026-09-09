@@ -113,6 +113,43 @@ function repoRoot(): string {
 }
 
 /**
+ * Resolve once the viewer's observable load state — total frames, atom count,
+ * and the load_trajectory node's file name — has not changed for `holdMs`.
+ * A structure swap on the webapp settles in several React commits; capturing
+ * between them mixes the old trajectory with the new atoms.
+ */
+export async function waitForViewerQuiescent(
+  scope: Page | Frame,
+  opts: { holdMs?: number; timeout?: number } = {},
+): Promise<void> {
+  const { holdMs = 500, timeout = 15_000 } = opts;
+  await scope
+    .waitForFunction(
+      (hold: number) => {
+        const viewer = document.querySelector('[data-testid="megane-viewer"]');
+        const traj = document.querySelector('[data-testid="load-trajectory-filename"]');
+        const cur = [
+          viewer?.getAttribute("data-total-frames"),
+          viewer?.getAttribute("data-atom-count"),
+          traj?.textContent,
+        ].join("|");
+        const w = window as unknown as { __meganeQuiescent?: { last: string; since: number } };
+        const q = w.__meganeQuiescent;
+        if (!q || q.last !== cur) {
+          w.__meganeQuiescent = { last: cur, since: performance.now() };
+          return false;
+        }
+        return performance.now() - q.since >= hold;
+      },
+      holdMs,
+      { timeout, polling: 50 },
+    )
+    .catch(() => {
+      /* best effort: the spec's own contract asserts the final state */
+    });
+}
+
+/**
  * Boot the host indicated by MEGANE_HOST and load `opts.fixture`. Returns
  * the scope a spec should drive plus a teardown to call in `afterAll`.
  */
@@ -127,13 +164,56 @@ export async function bootHost(page: Page, opts: BootOpts = {}): Promise<HostBoo
     case "webapp": {
       // Static webServer is started by playwright.config.ts; just open the page.
       await page.goto("/?test=1", { waitUntil: "domcontentloaded" });
+      // The webapp boots by loading the bundled caffeine_water demo and then
+      // fetching its XTC in a follow-up promise (src/index.tsx). loadXtc()
+      // captures the demo's atom count up-front and only writes the parsed
+      // frames to the pipeline store once the (async) parse finishes, so a
+      // fixture dropped inside that window replaces the structure first and
+      // then gets the demo's 100 caffeine_water frames stamped on top of it —
+      // the playback bar appears and the fixture's atoms take the demo's
+      // coordinates (seen as a ~13% pixel diff in the illustrative project in
+      // CI). Wait for the demo to be fully bound before dropping the fixture;
+      // a fresh structure load then clears the demo trajectory deterministically.
+      await waitForReady(page, { needsData: true, timeout: 30_000 });
+      await page
+        .waitForFunction(
+          () =>
+            Number(
+              document
+                .querySelector('[data-testid="megane-viewer"]')
+                ?.getAttribute("data-total-frames") ?? 0,
+            ) > 1,
+          undefined,
+          { timeout: 15_000 },
+        )
+        .catch(() => {
+          /* no demo trajectory (e.g. a hash-restored pipeline): nothing to race */
+        });
       // Drag the fixture into the dropzone — same path the existing webapp
       // spec uses. We avoid touching files; instead inject through the
       // hidden input the dropzone exposes.
       const fixturePath = join(repo, "tests", "fixtures", fixture);
       const input = page.locator('input[type="file"]').first();
       await input.setInputFiles(fixturePath);
+      // `dataLoaded` / `firstFrame` are already true from the demo, so
+      // waitForReady alone returns before the fixture is applied. Replacing a
+      // structure is not atomic either: the load_structure node's fileName
+      // flips first, the renderer swaps its snapshot next, and the file
+      // trajectory is cleared last — under CI load these steps are
+      // seconds apart. Wait for the node to name the fixture, then for the
+      // viewer's (frames, atoms, trajectory) tuple to hold still.
+      await page
+        .waitForFunction(
+          (name) =>
+            document.querySelector('[data-testid="load-structure-filename"]')?.textContent === name,
+          fixture,
+          { timeout: 30_000 },
+        )
+        .catch(() => {
+          /* hosts without the pipeline panel: fall through to the quiescence wait */
+        });
       await waitForReady(page, { needsData: true, timeout: 30_000 });
+      await waitForViewerQuiescent(page);
       return {
         host,
         scope: page,
