@@ -90,6 +90,21 @@ Fractional coordinates without a `<crystal>` cell are a clear error rather than
 a silent misplacement. XML is read with `quick-xml`, a pull parser that performs
 no DTD processing and no custom entity expansion, so an untrusted `.cml` cannot
 mount an XXE or billion-laughs attack.
+Note: **MOL2 unit cell.** A `@<TRIPOS>CRYSIN` record (the only cell record
+the Tripos spec defines: `a b c alpha beta gamma space_grp setting`) is read
+into the structure's cell on every host, so a periodic `.mol2` (Open Babel,
+SYBYL, Materials Studio, MOF/zeolite converters) shows its box like a CIF or a
+PDB `CRYST1`. Writers fill the record differently, and the reader accepts all
+the common layouts: the space group and setting may be missing or symbolic
+(`P1`, `P63/mmc`), the six numbers may be separated by whitespace, tabs or
+commas, use exponent notation, or wrap onto a second line, and the section may
+sit anywhere in the molecule (after `BOND`, or right after `MOLECULE` as some
+tools write it); section headers are matched case-insensitively. Only the
+first molecule's first `CRYSIN` is used. A record that cannot be read, or a
+placeholder cell such as `0 0 0 90 90 90`, leaves the structure without a box
+and adds a parser warning rather than failing the load. Cell vectors are never
+written as a 3×3 matrix in MOL2, so no vector form is read.
+
 Note: **VASP** files are the one format megane dispatches by **filename**, not
 only by extension: `POSCAR`, `CONTCAR`, and `XDATCAR` are conventionally written
 with no extension at all. `src/parsers/fileNames.ts` maps those bare names (and

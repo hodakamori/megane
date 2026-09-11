@@ -5,6 +5,17 @@
 ///   @<TRIPOS>ATOM       — per-atom: id name x y z type [subst_id [subst_name [charge]]]
 ///   @<TRIPOS>BOND       — per-bond: id atom1 atom2 type
 ///   @<TRIPOS>SUBSTRUCTURE — optional, parsed for residue labels only
+///   @<TRIPOS>CRYSIN     — optional unit cell: a b c alpha beta gamma [space_grp [setting]]
+///
+/// CRYSIN is the only cell record the Tripos spec defines, but writers differ
+/// in how they fill it, so `parse_crysin` is deliberately tolerant: the space
+/// group and setting may be absent or symbolic (`P1`), the six numbers may be
+/// separated by whitespace, tabs or commas, use exponent notation, or be split
+/// across several lines, and the section may appear anywhere in the molecule
+/// (some tools emit it right after MOLECULE rather than after BOND). Section
+/// headers are matched case-insensitively. A cell that cannot be read, or
+/// whose parameters are degenerate (a placeholder `0 0 0 90 90 90`), leaves
+/// `box_matrix` unset and records a warning instead of failing the load.
 ///
 /// Multi-molecule streams are supported; only the first molecule is returned,
 /// with a warning counting the records that were skipped.
@@ -33,6 +44,66 @@ fn bond_order_from_mol2_type(bond_type: &str) -> u8 {
     }
 }
 
+/// Outcome of reading the CRYSIN section of one molecule.
+#[derive(Debug, PartialEq)]
+enum Crysin {
+    /// Row-major 3x3 cell matrix.
+    Cell([f32; 9]),
+    /// The section was present but unusable; the string is the warning text.
+    Invalid(String),
+}
+
+/// Numeric tokens of one CRYSIN data line. Writers separate the fields with
+/// whitespace, tabs or commas; the trailing space group may be symbolic
+/// (`P1`, `P63/mmc`), so a non-numeric token simply ends the numeric run
+/// rather than being an error.
+fn crysin_numbers(line: &str) -> Vec<f32> {
+    line.split(|c: char| c.is_whitespace() || c == ',')
+        .filter(|t| !t.is_empty())
+        .map(|t| t.parse::<f32>())
+        .take_while(|r| r.is_ok())
+        .map(|r| r.unwrap())
+        .collect()
+}
+
+/// Turn the six CRYSIN cell parameters into a cell matrix, or explain why the
+/// record is unusable.
+fn parse_crysin(params: &[f32]) -> Crysin {
+    if params.len() < 6 {
+        return Crysin::Invalid(format!(
+            "CRYSIN record has {} numeric field{} (need a b c alpha beta gamma); no unit cell shown",
+            params.len(),
+            if params.len() == 1 { "" } else { "s" }
+        ));
+    }
+    let (a, b, c, alpha, beta, gamma) = (
+        params[0], params[1], params[2], params[3], params[4], params[5],
+    );
+    if !(a > 0.0 && b > 0.0 && c > 0.0) || [a, b, c].iter().any(|v| !v.is_finite()) {
+        return Crysin::Invalid(format!(
+            "CRYSIN cell lengths {} {} {} are not all positive; no unit cell shown",
+            a, b, c
+        ));
+    }
+    let angle_ok = |v: f32| v.is_finite() && v > 0.0 && v < 180.0;
+    if !(angle_ok(alpha) && angle_ok(beta) && angle_ok(gamma)) {
+        return Crysin::Invalid(format!(
+            "CRYSIN cell angles {} {} {} must lie in (0, 180) degrees; no unit cell shown",
+            alpha, beta, gamma
+        ));
+    }
+    let m = crate::parser::cell_params_to_matrix(a, b, c, alpha, beta, gamma);
+    // The angle combination can still be geometrically impossible (e.g.
+    // alpha = beta = gamma = 179): c_z collapses to zero and the cell is flat.
+    if m.iter().any(|v| !v.is_finite()) || m[8] <= 0.0 {
+        return Crysin::Invalid(format!(
+            "CRYSIN cell angles {} {} {} do not describe a valid cell; no unit cell shown",
+            alpha, beta, gamma
+        ));
+    }
+    Crysin::Cell(m)
+}
+
 pub fn parse(text: &str) -> Result<crate::parser::ParsedStructure, String> {
     parse_first_molecule(text)
 }
@@ -44,6 +115,7 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
         Molecule,
         Atom,
         Bond,
+        Crysin,
         Other,
     }
 
@@ -64,6 +136,11 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
 
     let mut molecule_count = 0u32;
 
+    // Numeric CRYSIN fields accumulated across the lines of the first CRYSIN
+    // section (writers may wrap `a b c` / `alpha beta gamma` onto two lines).
+    let mut crysin_fields: Vec<f32> = Vec::new();
+    let mut crysin_sections = 0u32;
+
     for line in text.lines() {
         let trimmed = line.trim();
 
@@ -74,14 +151,26 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
 
         // Section header
         if let Some(name) = trimmed.strip_prefix("@<TRIPOS>") {
-            if name == "MOLECULE" {
+            let name = name.trim();
+            if name.eq_ignore_ascii_case("MOLECULE") {
                 molecule_count += 1;
                 section = Section::Molecule;
                 mol_line = 0;
-            } else if name == "ATOM" {
+            } else if name.eq_ignore_ascii_case("ATOM") {
                 section = Section::Atom;
-            } else if name == "BOND" {
+            } else if name.eq_ignore_ascii_case("BOND") {
                 section = Section::Bond;
+            } else if name.eq_ignore_ascii_case("CRYSIN") {
+                if molecule_count <= 1 {
+                    crysin_sections += 1;
+                }
+                // Only the first CRYSIN of the first molecule is read; a
+                // repeated section is counted for the warning below.
+                section = if crysin_sections == 1 {
+                    Section::Crysin
+                } else {
+                    Section::Other
+                };
             } else {
                 section = Section::Other;
             }
@@ -182,6 +271,14 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
                 bond_orders.push(bond_order_from_mol2_type(bond_type));
             }
 
+            Section::Crysin => {
+                // a b c alpha beta gamma [space_grp [setting]] — possibly
+                // wrapped over several lines; stop once six numbers are in.
+                if crysin_fields.len() < 6 {
+                    crysin_fields.extend(crysin_numbers(trimmed));
+                }
+            }
+
             Section::None | Section::Other => {}
         }
     }
@@ -213,6 +310,19 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
     let n_file_bonds = bonds.len();
 
     let mut warnings = Vec::new();
+    let mut box_matrix = None;
+    if crysin_sections > 0 {
+        match parse_crysin(&crysin_fields) {
+            Crysin::Cell(m) => box_matrix = Some(m),
+            Crysin::Invalid(msg) => warnings.push(msg),
+        }
+    }
+    if crysin_sections > 1 {
+        warnings.push(format!(
+            "file has {} CRYSIN records; only the first is used",
+            crysin_sections
+        ));
+    }
     if molecule_count > 1 {
         let extra = molecule_count - 1;
         warnings.push(format!(
@@ -229,7 +339,7 @@ fn parse_first_molecule(text: &str) -> Result<crate::parser::ParsedStructure, St
         bonds,
         n_file_bonds,
         bond_orders: Some(bond_orders),
-        box_matrix: None,
+        box_matrix,
         box_origin: None,
         frame_positions_flat: Vec::new(),
         atom_labels: Some(atom_labels),
@@ -566,5 +676,333 @@ SMALL
         let result = parse(mol2).unwrap();
         assert_eq!(result.n_atoms, 1);
         assert_eq!(result.elements[0], 6);
+    }
+
+    // ---- CRYSIN unit cell -------------------------------------------------
+
+    fn assert_close(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+        for (i, (a, e)) in actual.iter().zip(expected).enumerate() {
+            assert!(
+                (a - e).abs() < 1e-3,
+                "element {} differs: {} vs {} (actual {:?})",
+                i,
+                a,
+                e,
+                actual
+            );
+        }
+    }
+
+    const CUBIC_10: [f32; 9] = [10.0, 0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
+
+    /// One-atom molecule followed by the given CRYSIN body.
+    fn with_crysin(body: &str) -> String {
+        format!(
+            "@<TRIPOS>MOLECULE\ncell\n 1 0 0 0 0\nSMALL\n\n@<TRIPOS>ATOM\n      1 C1  0.0 0.0 0.0 C.3\n@<TRIPOS>BOND\n@<TRIPOS>CRYSIN\n{}\n",
+            body
+        )
+    }
+
+    #[test]
+    fn crysin_numbers_stops_at_symbolic_space_group() {
+        assert_eq!(
+            crysin_numbers("10 10 10 90 90 90 P1 1"),
+            vec![10.0, 10.0, 10.0, 90.0, 90.0, 90.0]
+        );
+        assert_eq!(crysin_numbers("1,2,3"), vec![1.0, 2.0, 3.0]);
+        assert_eq!(crysin_numbers("1\t2  3"), vec![1.0, 2.0, 3.0]);
+        assert_eq!(crysin_numbers("P1 1"), Vec::<f32>::new());
+        assert_eq!(crysin_numbers(""), Vec::<f32>::new());
+    }
+
+    #[test]
+    fn parse_crysin_rejects_bad_parameters() {
+        assert!(matches!(parse_crysin(&[]), Crysin::Invalid(_)));
+        assert!(matches!(
+            parse_crysin(&[1.0, 2.0, 3.0, 90.0, 90.0]),
+            Crysin::Invalid(_)
+        ));
+        // Placeholder zero cell.
+        match parse_crysin(&[0.0, 0.0, 0.0, 90.0, 90.0, 90.0]) {
+            Crysin::Invalid(msg) => assert!(msg.contains("not all positive"), "{}", msg),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+        assert!(matches!(
+            parse_crysin(&[1.0, -2.0, 3.0, 90.0, 90.0, 90.0]),
+            Crysin::Invalid(_)
+        ));
+        assert!(matches!(
+            parse_crysin(&[f32::NAN, 2.0, 3.0, 90.0, 90.0, 90.0]),
+            Crysin::Invalid(_)
+        ));
+        // Angles out of range.
+        match parse_crysin(&[5.0, 5.0, 5.0, 0.0, 90.0, 90.0]) {
+            Crysin::Invalid(msg) => assert!(msg.contains("(0, 180)"), "{}", msg),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+        assert!(matches!(
+            parse_crysin(&[5.0, 5.0, 5.0, 90.0, 180.0, 90.0]),
+            Crysin::Invalid(_)
+        ));
+        assert!(matches!(
+            parse_crysin(&[5.0, 5.0, 5.0, 90.0, 90.0, f32::INFINITY]),
+            Crysin::Invalid(_)
+        ));
+        // Geometrically impossible angle triple: the c vector collapses.
+        match parse_crysin(&[5.0, 5.0, 5.0, 179.0, 179.0, 179.0]) {
+            Crysin::Invalid(msg) => assert!(msg.contains("valid cell"), "{}", msg),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_crysin_accepts_valid_cells() {
+        match parse_crysin(&[10.0, 10.0, 10.0, 90.0, 90.0, 90.0]) {
+            Crysin::Cell(m) => assert_close(&m, &CUBIC_10),
+            other => panic!("expected Cell, got {:?}", other),
+        }
+        // Extra fields (space group / setting) are ignored.
+        match parse_crysin(&[10.0, 10.0, 10.0, 90.0, 90.0, 90.0, 225.0, 1.0]) {
+            Crysin::Cell(m) => assert_close(&m, &CUBIC_10),
+            other => panic!("expected Cell, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn crysin_standard_eight_fields_sets_box() {
+        let s = parse(&with_crysin(
+            "   10.0000   10.0000   10.0000   90.0000   90.0000   90.0000 1 1",
+        ))
+        .unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        assert!(s.box_origin.is_none());
+        assert!(s.warnings.is_empty(), "{:?}", s.warnings);
+    }
+
+    #[test]
+    fn crysin_six_fields_only() {
+        let s = parse(&with_crysin("10 10 10 90 90 90")).unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        assert!(s.warnings.is_empty());
+    }
+
+    #[test]
+    fn crysin_symbolic_space_group() {
+        let s = parse(&with_crysin("10 10 10 90 90 90 P1 1")).unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        let s = parse(&with_crysin("10 10 10 90 90 90 P63/mmc")).unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+    }
+
+    #[test]
+    fn crysin_commas_tabs_and_exponent_notation() {
+        let s = parse(&with_crysin("1.0E+01,\t1.0e1, 10.0,\t9.0E1, 90, 90.0")).unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        assert!(s.warnings.is_empty());
+    }
+
+    #[test]
+    fn crysin_wrapped_over_two_lines() {
+        let s = parse(&with_crysin("10 10 10\n90 90 90\n1 1")).unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        assert!(s.warnings.is_empty());
+    }
+
+    #[test]
+    fn crysin_lowercase_header() {
+        let text = with_crysin("10 10 10 90 90 90").replace("@<TRIPOS>CRYSIN", "@<TRIPOS>crysin");
+        let s = parse(&text).unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        // Case-insensitive matching must not break the other sections.
+        let text = text
+            .replace(
+                "@<TRIPOS>MOLECULE",
+                "@<tripos>molecule".replace("<tripos>", "<TRIPOS>").as_str(),
+            )
+            .replace("@<TRIPOS>ATOM", "@<TRIPOS>atom")
+            .replace("@<TRIPOS>BOND", "@<TRIPOS>Bond");
+        let s = parse(&text).unwrap();
+        assert_eq!(s.n_atoms, 1);
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+    }
+
+    #[test]
+    fn crysin_before_atom_section() {
+        let text = "\
+@<TRIPOS>MOLECULE
+cell
+ 1 0 0 0 0
+SMALL
+
+@<TRIPOS>CRYSIN
+10 10 10 90 90 90 1 1
+@<TRIPOS>ATOM
+      1 C1  0.0 0.0 0.0 C.3
+@<TRIPOS>BOND
+";
+        let s = parse(text).unwrap();
+        assert_eq!(s.n_atoms, 1);
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+    }
+
+    #[test]
+    fn crysin_non_orthogonal_cell_matrix() {
+        // Hexagonal: b lies in the xy-plane at 120 deg from a.
+        let s = parse(&with_crysin("2.4612 2.4612 6.7079 90 90 120")).unwrap();
+        let m = s.box_matrix.expect("box");
+        assert_close(
+            &m,
+            &[
+                2.4612, 0.0, 0.0, //
+                -1.2306, 2.13146, 0.0, //
+                0.0, 0.0, 6.7079,
+            ],
+        );
+    }
+
+    #[test]
+    fn crysin_zero_cell_is_skipped_with_warning() {
+        let s = parse(&with_crysin("0.0 0.0 0.0 90.0 90.0 90.0 1 1")).unwrap();
+        assert!(s.box_matrix.is_none());
+        assert_eq!(s.warnings.len(), 1);
+        assert!(s.warnings[0].contains("CRYSIN"), "{}", s.warnings[0]);
+        assert!(
+            s.warnings[0].contains("no unit cell shown"),
+            "{}",
+            s.warnings[0]
+        );
+    }
+
+    #[test]
+    fn crysin_bad_angles_skipped_with_warning() {
+        let s = parse(&with_crysin("10 10 10 90 90 0")).unwrap();
+        assert!(s.box_matrix.is_none());
+        assert_eq!(s.warnings.len(), 1);
+        assert!(s.warnings[0].contains("angles"), "{}", s.warnings[0]);
+    }
+
+    #[test]
+    fn crysin_too_few_fields_skipped_with_warning() {
+        let s = parse(&with_crysin("10 10 10")).unwrap();
+        assert!(s.box_matrix.is_none());
+        assert_eq!(s.warnings.len(), 1);
+        assert!(
+            s.warnings[0].contains("3 numeric fields"),
+            "{}",
+            s.warnings[0]
+        );
+
+        // Header with no data at all.
+        let s = parse(&with_crysin("")).unwrap();
+        assert!(s.box_matrix.is_none());
+        assert!(
+            s.warnings[0].contains("0 numeric fields"),
+            "{}",
+            s.warnings[0]
+        );
+    }
+
+    #[test]
+    fn crysin_duplicate_uses_first_and_warns() {
+        let s = parse(&with_crysin(
+            "10 10 10 90 90 90\n@<TRIPOS>CRYSIN\n20 20 20 90 90 90",
+        ))
+        .unwrap();
+        assert_close(&s.box_matrix.expect("box"), &CUBIC_10);
+        assert_eq!(s.warnings.len(), 1);
+        assert!(
+            s.warnings[0].contains("2 CRYSIN records"),
+            "{}",
+            s.warnings[0]
+        );
+    }
+
+    #[test]
+    fn crysin_of_second_molecule_is_ignored() {
+        // First molecule has no cell, second declares one: the cell belongs to
+        // the molecule that is not shown, so no box is set.
+        let text = "\
+@<TRIPOS>MOLECULE
+first
+ 1 0 0 0 0
+SMALL
+
+@<TRIPOS>ATOM
+      1 C1  0.0 0.0 0.0 C.3
+@<TRIPOS>BOND
+@<TRIPOS>MOLECULE
+second
+ 1 0 0 0 0
+SMALL
+
+@<TRIPOS>ATOM
+      1 C1  0.0 0.0 0.0 C.3
+@<TRIPOS>BOND
+@<TRIPOS>CRYSIN
+10 10 10 90 90 90 1 1
+";
+        let s = parse(text).unwrap();
+        assert!(s.box_matrix.is_none());
+        // Only the multi-molecule warning, nothing about CRYSIN.
+        assert_eq!(s.warnings.len(), 1);
+        assert!(
+            s.warnings[0].contains("additional MOLECULE"),
+            "{}",
+            s.warnings[0]
+        );
+
+        // First molecule with a cell, second with a different one: first wins,
+        // and the second's record is not counted as a duplicate.
+        let text = text.replacen(
+            "@<TRIPOS>BOND\n@<TRIPOS>MOLECULE",
+            "@<TRIPOS>BOND\n@<TRIPOS>CRYSIN\n5 5 5 90 90 90\n@<TRIPOS>MOLECULE",
+            1,
+        );
+        let s = parse(&text).unwrap();
+        assert_close(
+            &s.box_matrix.expect("box"),
+            &[5.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 5.0],
+        );
+        assert_eq!(s.warnings.len(), 1);
+        assert!(
+            s.warnings[0].contains("additional MOLECULE"),
+            "{}",
+            s.warnings[0]
+        );
+    }
+
+    #[test]
+    fn no_crysin_means_no_box_and_no_warning() {
+        let s = parse(METHANOL_MOL2).unwrap();
+        assert!(s.box_matrix.is_none());
+        assert!(s.warnings.is_empty());
+    }
+
+    #[test]
+    fn fixture_nacl_crysin() {
+        let s = parse(include_str!("../../../tests/fixtures/nacl_crysin.mol2")).unwrap();
+        assert_eq!(s.n_atoms, 8);
+        assert_eq!(s.bonds.len(), 0);
+        assert_eq!(s.elements.iter().filter(|&&e| e == 11).count(), 4);
+        assert_eq!(s.elements.iter().filter(|&&e| e == 17).count(), 4);
+        assert_close(
+            &s.box_matrix.expect("box"),
+            &[5.6402, 0.0, 0.0, 0.0, 5.6402, 0.0, 0.0, 0.0, 5.6402],
+        );
+        assert!(s.warnings.is_empty(), "{:?}", s.warnings);
+    }
+
+    #[test]
+    fn fixture_graphite_crysin() {
+        let s = parse(include_str!("../../../tests/fixtures/graphite_crysin.mol2")).unwrap();
+        assert_eq!(s.n_atoms, 4);
+        assert_eq!(s.bonds.len(), 2);
+        assert_eq!(s.bond_orders.as_ref().unwrap(), &vec![4, 4]);
+        assert_close(
+            &s.box_matrix.expect("box"),
+            &[2.4612, 0.0, 0.0, -1.2306, 2.13146, 0.0, 0.0, 0.0, 6.7079],
+        );
+        assert!(s.warnings.is_empty(), "{:?}", s.warnings);
     }
 }

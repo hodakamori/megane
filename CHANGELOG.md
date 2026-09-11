@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **MOL2 files with a `@<TRIPOS>CRYSIN` record now show their unit cell.** The MOL2 parser skipped the CRYSIN section, so a periodic `.mol2` (Open Babel, SYBYL, Materials Studio, MOF/zeolite converters) opened without its box on every host. The reader now turns `a b c alpha beta gamma` into the cell matrix and accepts the layouts writers actually produce: the 8-field record with numeric or symbolic space group and setting, the bare 6-field record, whitespace/tab/comma separators, exponent notation, values wrapped onto a second line, the section placed after `BOND` or right after `MOLECULE`, and case-insensitive section headers. Only the first molecule's first CRYSIN is used; an unreadable record or a placeholder zero cell leaves the structure without a box and adds a parser warning instead of failing the load. Two periodic fixtures (`nacl_crysin.mol2`, `graphite_crysin.mol2`) cover the Rust, Python and `format-loading` E2E suites.
+
 ## [0.15.0] - 2026-09-09
 
 ### Added

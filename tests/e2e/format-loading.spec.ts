@@ -52,6 +52,17 @@ const STRUCTURE_CASES: StructureCase[] = [
   { name: "xyz-multiframe", file: "water_multiframe.xyz", mime: "chemical/x-xyz" },
   { name: "mol-methane", file: "methane.mol", mime: "chemical/x-mdl-molfile" },
   { name: "sdf-ethanol", file: "ethanol.sdf", mime: "chemical/x-mdl-sdfile" },
+  // MOL2 with a @<TRIPOS>CRYSIN unit cell: the standard 8-field record after
+  // BOND (cubic NaCl, no bonds) and the 6-field record placed right after
+  // MOLECULE (hexagonal graphite). Both must render the periodic cell —
+  // the parser used to drop CRYSIN, so periodic MOL2 files showed no box.
+  { name: "mol2-crysin-nacl", file: "nacl_crysin.mol2", mime: "chemical/x-mol2", expectedAtoms: 8 },
+  {
+    name: "mol2-crysin-graphite",
+    file: "graphite_crysin.mol2",
+    mime: "chemical/x-mol2",
+    expectedAtoms: 4,
+  },
   { name: "cif-nacl", file: "nacl.cif", mime: "chemical/x-cif" },
   {
     // 10 atoms in the asymmetric unit x 4 general positions of P 1 21/n 1.

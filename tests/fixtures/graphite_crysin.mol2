@@ -1,0 +1,24 @@
+@<TRIPOS>MOLECULE
+graphite_hexagonal
+ 4 2 1 0 0
+SMALL
+NO_CHARGES
+
+# Hexagonal graphite (P6_3/mmc, a = 2.4612 A, c = 6.7079 A, gamma = 120 deg).
+# Exercises the other common CRYSIN layout: the record placed directly after
+# MOLECULE and carrying only the six cell parameters, with no space group or
+# setting. Only the two in-cell C-C bonds are declared; the others cross the
+# periodic boundary.
+@<TRIPOS>CRYSIN
+2.4612 2.4612 6.7079 90.0 90.0 120.0
+
+@<TRIPOS>ATOM
+      1 C1          0.0000    0.0000    1.6770 C.ar    1  GRA         0.0000
+      2 C2          0.0000    0.0000    5.0309 C.ar    1  GRA         0.0000
+      3 C3          0.0000    1.4210    1.6770 C.ar    1  GRA         0.0000
+      4 C4          1.2306    0.7105    5.0309 C.ar    1  GRA         0.0000
+@<TRIPOS>BOND
+     1     1     3    ar
+     2     2     4    ar
+@<TRIPOS>SUBSTRUCTURE
+     1  GRA         1 TEMP              0 ****  ****    0 ROOT
