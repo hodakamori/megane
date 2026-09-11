@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import styles from "./HeroViewer.module.css";
+import { startAutoRotate } from "./autoRotate";
 
 /**
  * HeroViewer — the landing hero's live, auto-rotating structure.
@@ -73,6 +74,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
     if (!container) return;
 
     let renderer: any = null;
+    let stopAutoRotate: (() => void) | null = null;
     let observer: IntersectionObserver | null = null;
     let idleHandle: number | null = null;
     let unmounted = false;
@@ -89,13 +91,12 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
       renderer.mount(container);
       renderer.setBackgroundColor(HERO_BG);
 
-      // Backdrop, not a control surface.
-      if (renderer.controls) {
-        renderer.controls.enabled = false;
-        if (!prefersReducedMotion) {
-          renderer.controls.autoRotate = true;
-          renderer.controls.autoRotateSpeed = 1.4;
-        }
+      // Backdrop, not a control surface: no pointer interaction, and a slow
+      // orbit (one turn every ~43 s, the old OrbitControls autoRotateSpeed
+      // 1.4) unless the visitor prefers reduced motion.
+      renderer.setControlsEnabled(false);
+      if (!prefersReducedMotion) {
+        stopAutoRotate = startAutoRotate(renderer, 8.4);
       }
       rendererRef.current = renderer;
       setMounted(true);
@@ -129,6 +130,7 @@ export default function HeroViewer({ mode }: { mode: HeroMode }) {
         if (cic) cic(idleHandle);
         else clearTimeout(idleHandle);
       }
+      stopAutoRotate?.();
       if (renderer) renderer.dispose();
       rendererRef.current = null;
     };

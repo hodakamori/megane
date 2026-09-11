@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import styles from "./MoleculeDemo.module.css";
+import { startAutoRotate } from "./autoRotate";
 
 interface Props {
   src: string;
@@ -18,6 +19,7 @@ export default function MoleculeDemo({
     if (!containerRef.current) return;
     const container = containerRef.current;
     let renderer: any = null;
+    let stopAutoRotate: (() => void) | null = null;
     let disposed = false;
 
     (async () => {
@@ -47,16 +49,14 @@ export default function MoleculeDemo({
       renderer.loadSnapshot(snapshot);
 
       if (autoRotate) {
-        const r = renderer as any;
-        if (r.controls) {
-          r.controls.autoRotate = true;
-          r.controls.autoRotateSpeed = 2.0;
-        }
+        // One orbit every 30 s (the old OrbitControls autoRotateSpeed 2.0).
+        stopAutoRotate = startAutoRotate(renderer, 12);
       }
     })();
 
     return () => {
       disposed = true;
+      stopAutoRotate?.();
       if (renderer) {
         renderer.dispose();
       }

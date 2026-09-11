@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The docs landing hero rendered nothing.** Docusaurus compiles the shared `src/` viewer through Babel, and the docs site declared no browserslist, so `@babel/preset-env` assumed the oldest browsers and down-levelled `class` — while `node_modules` stays untranspiled. Since 0.15.0 the camera controls are a subclass of three.js' `TrackballControls`, and the transpiled subclass called that native class without `new`, so `MoleculeRenderer.mount()` threw and the hero stayed transparent (every docs viewer embed died the same way). The docs `package.json` now carries the standard Docusaurus browserslist targets, and a unit test asserts they never make Babel down-level classes again. The hero's slow auto-rotation, which the switch to `TrackballControls` had silently dropped (`autoRotate` was an `OrbitControls` option), is back via a small camera-orbit helper in the docs.
+
 ## [0.15.0] - 2026-09-09
 
 ### Added

@@ -12,6 +12,18 @@
     "preview": "docusaurus serve",
     "clear": "docusaurus clear"
   },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
+  },
   "dependencies": {
     "@docusaurus/core": "^3.9.0",
     "@docusaurus/preset-classic": "^3.9.0",
