@@ -4,7 +4,7 @@ import {
   rotateCameraAroundTarget,
   startAutoRotate,
   type AutoRotateRenderer,
-} from "../../../docs/src/components/autoRotate";
+} from "@/renderer/cameraAutoRotate";
 
 function makeRenderer(
   position: [number, number, number],
@@ -113,6 +113,29 @@ describe("startAutoRotate", () => {
     frame(10_000);
     const angle = Math.atan2(r.camera.position.y, r.camera.position.x);
     expect((angle * 180) / Math.PI).toBeCloseTo(9, 6);
+  });
+
+  it("defaults to window.requestAnimationFrame / cancelAnimationFrame", () => {
+    const r = makeRenderer([10, 0, 0], [0, 0, 1], [0, 0, 0]);
+    let pending: FrameRequestCallback | null = null;
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      pending = cb;
+      return 7;
+    });
+    const caf = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    try {
+      const stop = startAutoRotate(r, 90);
+      expect(raf).toHaveBeenCalledTimes(1);
+      pending!(0);
+      pending!(100);
+      const angle = Math.atan2(r.camera.position.y, r.camera.position.x);
+      expect((angle * 180) / Math.PI).toBeCloseTo(9, 6);
+      stop();
+      expect(caf).toHaveBeenCalledWith(7);
+    } finally {
+      raf.mockRestore();
+      caf.mockRestore();
+    }
   });
 
   it("stopping twice is safe", () => {

@@ -1,17 +1,17 @@
 /**
  * Slow, continuous orbit of a `MoleculeRenderer` camera around its target —
- * the decorative auto-rotation used by the landing hero and demo embeds.
+ * the decorative auto-rotation used by the docs landing hero and demo embeds.
  *
- * The viewer's camera controls are a trackball (`src/renderer/CameraControls`),
- * and three.js `TrackballControls` has no `autoRotate` option (that was an
+ * The viewer's camera controls are a trackball (`CameraControls`), and
+ * three.js `TrackballControls` has no `autoRotate` option (that was an
  * `OrbitControls` feature). Each frame this spins the camera position around
  * the target about the camera's own up vector; the trackball re-derives its
  * eye vector from `camera.position − target` on every `update()`, so the
  * externally applied rotation persists and stays interaction-free.
  *
  * Only the renderer's public API is touched (`getCamera`, `getCameraState`),
- * and no `three` import is needed: the vectors are cloned from the camera so
- * the docs bundle never pulls in a second copy of three.js.
+ * and the vectors are cloned from the camera rather than constructed here so
+ * an embedder bundling its own copy of three.js never mixes two versions.
  */
 
 type Vec3Like = {

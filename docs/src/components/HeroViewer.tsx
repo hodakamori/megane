@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 import styles from "./HeroViewer.module.css";
-import { startAutoRotate } from "./autoRotate";
+import { startAutoRotate } from "../../../src/renderer/cameraAutoRotate";
 
 /**
  * HeroViewer — the landing hero's live, auto-rotating structure.

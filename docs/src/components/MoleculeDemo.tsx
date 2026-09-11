@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import styles from "./MoleculeDemo.module.css";
-import { startAutoRotate } from "./autoRotate";
+import { startAutoRotate } from "../../../src/renderer/cameraAutoRotate";
 
 interface Props {
   src: string;
