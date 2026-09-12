@@ -178,10 +178,10 @@ Large language models were used during development of `megane`, primarily
 through the Claude Code agent, to implement features, write tests, and draft
 documentation. Every such change was reviewed by a human maintainer, passed
 the project's unit, coverage, and end-to-end gates, and was merged through a
-pull request. The software itself contains an optional, off-by-default
-feature that calls a language model to generate pipelines from natural
-language; that feature is a user-facing capability and is distinct from the
-development use disclosed here. This manuscript was drafted with language-model
+pull request. The software itself contains an optional feature that, only when the user
+supplies an API key or a build provides a proxy, calls a language model to
+generate pipelines from natural language; that feature is a user-facing
+capability and is distinct from the development use disclosed here. This manuscript was drafted with language-model
 assistance and edited by the authors.
 
 # Acknowledgements
