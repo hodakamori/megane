@@ -1,0 +1,24 @@
+# Rock-salt NaCl conventional cell (Fm-3m, a = 5.6402 A) written the way
+# Open Babel / SYBYL do: the standard 8-field @<TRIPOS>CRYSIN record
+# (a b c alpha beta gamma space_grp setting) after the BOND section.
+# Ionic lattice: the file declares no bonds.
+@<TRIPOS>MOLECULE
+nacl_rocksalt
+ 8 0 1 0 0
+SMALL
+NO_CHARGES
+
+@<TRIPOS>ATOM
+      1 Na1         0.0000    0.0000    0.0000 Na      1  NACL        0.0000
+      2 Na2         2.8201    2.8201    0.0000 Na      1  NACL        0.0000
+      3 Na3         2.8201    0.0000    2.8201 Na      1  NACL        0.0000
+      4 Na4         0.0000    2.8201    2.8201 Na      1  NACL        0.0000
+      5 Cl1         2.8201    0.0000    0.0000 Cl      1  NACL        0.0000
+      6 Cl2         0.0000    2.8201    0.0000 Cl      1  NACL        0.0000
+      7 Cl3         0.0000    0.0000    2.8201 Cl      1  NACL        0.0000
+      8 Cl4         2.8201    2.8201    2.8201 Cl      1  NACL        0.0000
+@<TRIPOS>BOND
+@<TRIPOS>SUBSTRUCTURE
+     1  NACL        1 TEMP              0 ****  ****    0 ROOT
+@<TRIPOS>CRYSIN
+    5.6402    5.6402    5.6402   90.0000   90.0000   90.0000 225 1

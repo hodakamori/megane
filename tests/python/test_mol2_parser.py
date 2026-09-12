@@ -67,3 +67,49 @@ def test_load_mol2_missing_file():
     """load_mol2 raises an error for a non-existent file."""
     with pytest.raises((FileNotFoundError, OSError)):
         load_mol2("/nonexistent/missing.mol2")
+
+
+# ---- CRYSIN unit cell ------------------------------------------------------
+
+
+def test_mol2_crysin_standard_record_sets_box():
+    """The 8-field @<TRIPOS>CRYSIN record after BOND becomes the cell matrix."""
+    s = load_mol2(str(FIXTURES / "nacl_crysin.mol2"))
+
+    assert s.n_atoms == 8
+    assert len(s.bonds) == 0
+    assert s.box.shape == (3, 3)
+    assert s.box.dtype == np.float32
+    np.testing.assert_allclose(s.box, np.diag([5.6402, 5.6402, 5.6402]), atol=1e-4)
+
+
+def test_mol2_crysin_six_fields_before_atom_non_orthogonal():
+    """A 6-field CRYSIN placed right after MOLECULE gives a hexagonal cell."""
+    s = load_mol2(str(FIXTURES / "graphite_crysin.mol2"))
+
+    assert s.n_atoms == 4
+    assert len(s.bonds) == 2
+    expected = np.array(
+        [
+            [2.4612, 0.0, 0.0],
+            [-1.2306, 2.13146, 0.0],
+            [0.0, 0.0, 6.7079],
+        ],
+        dtype=np.float32,
+    )
+    np.testing.assert_allclose(s.box, expected, atol=1e-4)
+
+
+def test_mol2_crysin_degenerate_cell_is_skipped(tmp_path):
+    """A placeholder zero cell must not produce a box (and must not fail)."""
+    text = (FIXTURES / "nacl_crysin.mol2").read_text()
+    text = text.replace(
+        "    5.6402    5.6402    5.6402   90.0000   90.0000   90.0000 225 1",
+        "0.0 0.0 0.0 90.0 90.0 90.0 1 1",
+    )
+    p = tmp_path / "zero_cell.mol2"
+    p.write_text(text)
+
+    s = load_mol2(str(p))
+    assert s.n_atoms == 8
+    assert np.all(s.box == 0)
